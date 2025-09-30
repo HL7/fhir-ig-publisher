@@ -4,6 +4,7 @@ import org.hl7.fhir.r5.formats.IParser;
 import org.hl7.fhir.r5.formats.XmlParser;
 import org.hl7.fhir.r5.model.*;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
+import org.hl7.fhir.r5.utils.TypesUtilities;
 import org.hl7.fhir.utilities.Utilities;
 
 import java.io.*;
@@ -24,7 +25,7 @@ public class TemplateRenderer {
   public TemplateRenderer(RenderingContext context, StructureDefinition sd, String dtRoot, String prefix) throws UnsupportedEncodingException {
     this.context = context;
     this.sd = sd;
-    this.defPage = context.getPkp().getLinkFor(context.getLink(RenderingContext.KnownLinkType.SPEC, true), sd.getType());
+    this.defPage = getLinkFor(sd.getType());
     this.dtRoot = dtRoot == null ? "" : dtRoot;
     this.prefix = prefix;
   }
@@ -134,7 +135,7 @@ public class TemplateRenderer {
     else
       b.append("<span style=\"color: navy\">" + Utilities.escapeXml(elem.getShort()) + "</span>");
     String t = elem.typeSummary();
-    b.append(" (<span style=\"color: darkgreen\"><a href=\"" + (dtRoot + context.getPkp().getLinkFor(context.getLink(RenderingContext.KnownLinkType.SPEC, true), t) + ".html#" + t) + "\">" + t + "</a></span>)\"");
+    b.append(" (<span style=\"color: darkgreen\"><a href=\"" + (dtRoot + getLinkFor(t) + ".html#" + t) + "\">" + t + "</a></span>)\"");
   }
 
   private void generateCoreElemXml(StringBuilder b, ElementDefinition elem, int indent, String rootName, String pathName, boolean backbone) throws Exception {
@@ -199,7 +200,7 @@ public class TemplateRenderer {
       }
       if (elem.getType().size() == 1 && context.getContextUtilities().isPrimitiveType(elem.typeSummary())) {
         doneType = true;
-        b.append(" value=\"[<span style=\"color: darkgreen\"><a href=\"" + context.getPkp().getLinkFor(context.getLink(RenderingContext.KnownLinkType.SPEC, true), elem.typeSummary()) + "\">" + elem.typeSummary() + "</a></span>]\"/");
+        b.append(" value=\"[<span style=\"color: darkgreen\"><a href=\"" + getLinkFor(elem.typeSummary()) + "\">" + elem.typeSummary() + "</a></span>]\"/");
       }
       b.append("&gt;");
 
@@ -381,7 +382,7 @@ public class TemplateRenderer {
       } else if (t.getName().equals("Extension") && t.hasProfile()) {
         b.append("<a href=\"" + prefix + t.getProfile().get(0).primitiveValue() + "\"><span style=\"color: DarkViolet\">@" + t.getProfile().get(0).primitiveValue() + "</span></a>");
       } else
-        b.append("<a href=\"" + (dtRoot + context.getPkp().getLinkFor(context.getLink(RenderingContext.KnownLinkType.SPEC, true), t.getWorkingCode())
+        b.append("<a href=\"" + (dtRoot + getLinkFor(t.getWorkingCode())
                 + ".html#" + t.getName() + "\">" + t.getName())
                 + "</a>");
       if (t.hasTargetProfile()) {
@@ -413,7 +414,7 @@ public class TemplateRenderer {
           } else if (t.getName().equals("Reference") && t.getTargetProfile().size() == 1 && !Utilities.noString(t.getProfile().get(0).primitiveValue())) {
             b.append("<a href=\"" + prefix + t.getProfile() + "\"><span style=\"color: DarkViolet\">@" + t.getProfile().get(0).primitiveValue() + "</span></a>");
           } else {
-            b.append("<a href=\"" + (dtRoot + context.getPkp().getLinkFor(context.getLink(RenderingContext.KnownLinkType.SPEC, true), p)
+            b.append("<a href=\"" + (dtRoot + getLinkFor(p)
                     + ".html#" + p) + "\">" + p + "</a>");
           }
 
@@ -440,59 +441,312 @@ public class TemplateRenderer {
   }
 
   private void generateInnerJson(StringBuilder b, ElementDefinition root) throws IOException, Exception {
+    List<ElementDefinition> children = context.getProfileUtilities().getChildList(sd, root);
+
     String rn;
     if (sd.getAbstract())
       rn = "[name]";
     else
       rn = root.getName();
 
+    boolean resource = sd.getKind() == StructureDefinition.StructureDefinitionKind.RESOURCE;
 
     b.append("{<span style=\"float: right\"><a title=\"Documentation for this format\" href=\""+prefix+"json.html\"><img src=\""+prefix+"help.png\" alt=\"doco\"/></a></span>\r\n");
-//    if (definitions.hasResource(root.getName()) || Utilities.existsInList(root.getName(), "Parameters")) {
-//      b.append("  \"resourceType\" : \"");
-//      if (defPage == null)
-//        b.append("<span title=\"" + Utilities.escapeXml(root.getDefinition())
-//                + "\"><b>");
-//      else
-//        b.append("<a href=\"" + (defPage + "#" + root.getName()) + "\" title=\""
-//                + Utilities.escapeXml(root.getDefinition())
-//                + "\" class=\"dict\"><b>");
-//      b.append(rn);
-//      if ((defPage == null))
-//        b.append("</b></span>\",\r\n");
-//      else
-//        b.append("</b></a>\",\r\n");
-//    }
-//
-//    if ((root.getName().equals(rn) || "[name]".equals(rn)) && resource) {
-//      if (!Utilities.noString(root.typeCode())) {
-//        b.append("  // from <a href=\""+prefix+"resource.html\">Resource</a>: <a href=\""+prefix+"resource.html#id\">id</a>, <a href=\""+prefix+"resource.html#meta\">meta</a>, <a href=\""+prefix+"resource.html#implicitRules\">implicitRules</a>, and <a href=\""+prefix+"resource.html#language\">language</a>\r\n");
-//        if (root.typeCode().equals("DomainResource") || Utilities.existsInList(root.typeCode(), definitions.getInterfaceNames())) {
-//          b.append("  // from <a href=\""+prefix+"domainresource.html\">DomainResource</a>: <a href=\""+prefix+"narrative.html#Narrative\">text</a>, <a href=\""+prefix+"references.html#contained\">contained</a>, <a href=\""+prefix+"extensibility.html\">extension</a>, and <a href=\""+prefix+"extensibility.html#modifierExtension\">modifierExtension</a>\r\n");
-//        }
-//      }
-//    } else if (!resource) {
-//      if (root.typeCode().equals("BackboneElement"))
-//        b.append("  // from BackboneElement: <a href=\""+prefix+"extensibility.html\">extension</a>, <a href=\""+prefix+"extensibility.html\">modifierExtension</a>\r\n");
-//      else
-//        b.append("  // from Element: <a href=\""+prefix+"extensibility.html\">extension</a>\r\n");
-//    }
-////    if (root.getName().equals("Extension")) {
-////      ElementDefn urld = root.getElements().get(0);
-////      b.append("  \"<span title=\"" + Utilities.escapeXml(urld.getDefinition()) + "\"><a href=\"" + (defPage + "#Extension.url") + "\" title=\"" + Utilities.escapeXml(urld.getDefinition()) + "\" class=\"dict\">");
-////      b.append("&lt;url&gt;</a></span>");
-////      b.append("\" : { // <span style=\"color: navy; opacity: 0.8\">" + Utilities.escapeXml(root.getElements().get(0).getShortDefn()) + "</span>\r\n");
-////      generateCoreElem(root.getElements().get(1), 2, rn, root.getName(), false, true);
-////      b.append("  }\r\n");
-////    } else {
-//    int c = 0;
-//    for (ElementDefn elem : root.getElements()) {
-//      generateCoreElem(elem, 1, rn, root.getName(), root.getName().equals(rn) && resource, ++c == root.getElements().size());
-////      }
-//    }
-//
-//    b.append("}\r\n");
+    if (resource) {
+      b.append("  \"resourceType\" : \"");
+      if (defPage == null)
+        b.append("<span title=\"" + Utilities.escapeXml(root.getDefinition())
+                + "\"><b>");
+      else
+        b.append("<a href=\"" + (defPage + "#" + root.getName()) + "\" title=\""
+                + Utilities.escapeXml(root.getDefinition())
+                + "\" class=\"dict\"><b>");
+      b.append(rn);
+      if ((defPage == null))
+        b.append("</b></span>\",\r\n");
+      else
+        b.append("</b></a>\",\r\n");
+    }
+
+    if ((root.getName().equals(rn) || "[name]".equals(rn)) && resource) {
+      if (!Utilities.noString(root.typeSummary())) {
+        b.append("  // from <a href=\""+prefix+"resource.html\">Resource</a>: <a href=\""+prefix+"resource.html#id\">id</a>, <a href=\""+prefix+"resource.html#meta\">meta</a>, <a href=\""+prefix+"resource.html#implicitRules\">implicitRules</a>, and <a href=\""+prefix+"resource.html#language\">language</a>\r\n");
+        if (isDomainResource(sd)) {
+          b.append("  // from <a href=\""+prefix+"domainresource.html\">DomainResource</a>: <a href=\""+prefix+"narrative.html#Narrative\">text</a>, <a href=\""+prefix+"references.html#contained\">contained</a>, <a href=\""+prefix+"extensibility.html\">extension</a>, and <a href=\""+prefix+"extensibility.html#modifierExtension\">modifierExtension</a>\r\n");
+        }
+      }
+    } else if (!resource) {
+      if (root.typeSummary().equals("BackboneElement"))
+        b.append("  // from BackboneElement: <a href=\""+prefix+"extensibility.html\">extension</a>, <a href=\""+prefix+"extensibility.html\">modifierExtension</a>\r\n");
+      else
+        b.append("  // from Element: <a href=\""+prefix+"extensibility.html\">extension</a>\r\n");
+    }
+    int c = 0;
+    for (ElementDefinition elem : children) {
+      generateCoreElemJson(b, elem, 1, rn, root.getName(), root.getName().equals(rn) && resource, ++c == children.size());
+    }
+
+    b.append("}\r\n");
   }
+
+
+  private void generateCoreElemJson(StringBuilder b, ElementDefinition elem, int indent,	String rootName, String pathName, boolean backbone, boolean last) throws Exception {
+    // base pattern: "name" : "value" // optionality documentation
+
+    int width = 0;
+    
+    if (elem.prohibited()) {
+      b.append("<span style=\"text-decoration: line-through\">");
+    }
+
+    String en = elem.getName();
+
+    if (en.contains("[x]") && elem.getType().size() == 1)
+      en = en.replace("[x]", elem.typeSummary());
+
+    if (en.contains("[x]")) {
+      // 1. name
+      for (int i = 0; i < indent; i++) {
+        b.append("  ");
+      }
+      if (elem.getType().size() > 1) {
+        b.append("<span style=\"color: Gray\">// "+en+": <span style=\"color: navy; opacity: 0.8\">" + docPrefix(width, indent, elem)+Utilities.escapeXml(elem.getShort()) + "</span>. One of these "+Integer.toString(elem.getType().size())+":</span>\r\n");
+        int c = 0;
+        for (ElementDefinition.TypeRefComponent t : elem.getType()) {
+          c++;
+          generateCoreElemDetailsJson(b, elem, indent, rootName, pathName, backbone, last && c == elem.getType().size(), width, en.replace("[x]", t.getName()), t, false);
+        }
+      } else {
+        List<TypesUtilities.WildcardInformation> tr = TypesUtilities.wildcards(context.getContext().getVersion());
+        b.append("<span style=\"color: Gray\">// "+en+": <span style=\"color: navy; opacity: 0.8\">" + docPrefix(width, indent, elem)+Utilities.escapeXml(elem.getShort()) + "</span>. One of these "+Integer.toString(tr.size())+":</span>\r\n");
+        int c = 0;
+        for (TypesUtilities.WildcardInformation t : tr) {
+          c++;
+          generateCoreElemDetailsJson(b, elem, indent, rootName, pathName, backbone, last && c == elem.getType().size(), width, en.replace("[x]", upFirst(t.getTypeName())), toTypeRef(t), false);
+        }
+      }
+    } else {
+      generateCoreElemDetailsJson(b, elem, indent, rootName, pathName, backbone, last, width, en, elem.getType().isEmpty() ? null : elem.getType().get(0), true);
+    }
+  }
+
+  private String upFirst(String s) {
+    return s.substring(0, 1).toUpperCase() + s.substring(1);
+  }
+
+  private String docPrefix(int widthSoFar, int indent, ElementDefinition elem) {
+    if (widthSoFar + elem.getShort().length()+8+elem.getName().length() > 105) {
+      String ret = "\r\n  ";
+      for (int i = 0; i < indent+2; i++)
+        ret = ret + " ";
+
+      return ret;
+    }
+    else
+      return "";
+  }
+
+
+  private ElementDefinition.TypeRefComponent toTypeRef(TypesUtilities.WildcardInformation t) {
+    ElementDefinition.TypeRefComponent r = new ElementDefinition.TypeRefComponent();
+    r.setCode(t.getTypeName());
+    return r;
+  }
+
+  private void generateCoreElemDetailsJson(StringBuilder b, ElementDefinition elem, int indent, String rootName, String pathName, boolean backbone, boolean last, int width, String en, ElementDefinition.TypeRefComponent type, boolean doco) throws Exception {
+    List<ElementDefinition> children = context.getProfileUtilities().getChildList(sd, elem);
+    
+    if (elem.getName().equals("extension")) {
+      b.append("  (<a href=\""+prefix+"extensibility.html\">Extensions</a> - see <a href=\""+prefix+"json.html#extensions\">JSON page</a>)\r\n");
+      return;
+    }
+    if (elem.getName().equals("modifierExtension")) {
+      b.append("  (<a href=\""+prefix+"extensibility.html#modifier\">Modifier Extensions</a> - see <a href=\""+prefix+"json.html#modifier\">JSON page</a>)\r\n");
+      return;
+    }
+
+    // 1. name
+    for (int i = 0; i < indent; i++) {
+      b.append("  ");
+    }
+
+    if (defPage == null) {
+      if (elem.getIsModifier() || elem.getMustSupport())
+        b.append("\"<span style=\"text-decoration: underline\" title=\"" + Utilities.escapeXml(elem.getDefinition())	+ "\">");
+      else
+        b.append("\"<span title=\"" + Utilities.escapeXml(elem.getDefinition()) + "\">");
+    } else if (elem.getIsModifier() || elem.getMustSupport())
+      b.append("\"<a href=\"" + (defPage + "#" + pathName + "." + en)+ "\" title=\"" + Utilities .escapeXml(elem.getDefinition())
+              + "\" class=\"dict\"><span style=\"text-decoration: underline\">");
+    else
+      b.append("\"<a href=\"" + (defPage + "#" + pathName + "." + en) + "\" title=\"" + Utilities.escapeXml(elem.getDefinition()) + "\" class=\"dict\">");
+
+    if (defPage == null) {
+      b.append(en+"</span>");
+    } else if (elem.getIsModifier() || elem.getMustSupport())
+      b.append(en + "</span></a>");
+    else
+      b.append(en + "</a>");
+
+    b.append("\" : ");
+
+    // 2. value
+    boolean delayedCloseArray = false;
+    if (elem.repeats())
+      b.append("[");
+
+    if (type == null) {
+      // inline definition
+      assert(children.size() > 0);
+      b.append("{");
+      delayedCloseArray = true;
+    } else if (type.getWorkingCode().equals("xhtml")) {
+      // element contains xhtml
+      b.append("\"(Escaped XHTML)\"");
+    } else if (context.getContextUtilities().isPrimitiveType(type.getName())) {
+      if (!(type.getName().equals("integer") || type.getName().equals("boolean") || type.getName().equals("decimal")))
+        b.append("\"");
+      b.append("&lt;<span style=\"color: darkgreen\"><a href=\"" + prefix+dtRoot + getLinkFor(type.getName()) + "\">" + type.getName()+ "</a></span>");
+      if (type.hasTargetProfile()) {
+        b.append("(");
+        boolean first = true;
+        for (CanonicalType p : type.getTargetProfile()) {
+          if (first) first = false; else b.append("|");
+          b.append("<a href=\"" + prefix+(dtRoot + getLinkFor(p.primitiveValue())) + "\">" + p.primitiveValue()+ "</a>");
+        }
+        b.append(")");
+      }
+      b.append("&gt;");
+      if (!(type.getName().equals("integer") || type.getName().equals("boolean") || type.getName().equals("decimal")))
+        b.append("\"");
+    } else {
+      b.append("{");
+      width = writeTypeLinksJson(b, elem, indent, type);
+      b.append(" }");
+    }
+
+    if (!delayedCloseArray && elem.repeats())
+      b.append("]");
+    if (!last && !delayedCloseArray)
+      b.append(",");
+
+    if (!elem.hasFixed() && doco) {
+      b.append(" <span style=\"color: Gray\">//</span>");
+
+      // 3. optionality
+      writeCardinality(b, elem);
+
+      // 4. doco
+      b.append(" ");
+
+      if (elem.getName().equals("extension")) {
+        b.append(" <a href=\""+prefix+"extensibility.html\"><span style=\"color: navy; opacity: 0.8\">See Extensions</span></a>");
+      } else if ("See Extensions".equals(elem.getShort())) {
+        b.append(" <a href=\""+prefix+"extensibility.html\"><span style=\"color: navy; opacity: 0.8\">"
+                + Utilities.escapeXml(elem.getShort())
+                + "</span></a>");
+      } else {
+        String ref = getBindingLink(elem);
+        b.append("<span style=\"color: navy; opacity: 0.8\"><a href=\""+(Utilities.isAbsoluteUrl(ref) ? "": prefix)+ref+"\" style=\"color: navy; opacity: 0.8\">" + Utilities.escapeXml(elem.getShort()) + "</a></span>");
+      }
+    }
+    if (elem.prohibited())
+      b.append("</span>");
+
+    if (children.size() > 0) {
+      b.append("\r\n");
+      int c = 0;
+      for (ElementDefinition child : children) {
+        generateCoreElemJson(b, child, indent + 1, rootName, pathName + "." + en, backbone, ++c == children.size());
+      }
+
+      for (int i = 0; i < indent; i++) {
+        b.append("  ");
+      }
+    }
+    if (children.size() > 0) {
+      b.append("}");
+      if (delayedCloseArray && elem.repeats())
+        b.append("]");
+      if (!last && delayedCloseArray)
+        b.append(",");
+    }
+
+    b.append("\r\n");
+  }
+
+  private String getLinkFor(String p) {
+    return getLinkFor(p);
+  }
+
+  private int writeTypeLinksJson(StringBuilder b, ElementDefinition elem, int indent, ElementDefinition.TypeRefComponent t) throws Exception {
+    b.append(" <span style=\"color: darkgreen\">");
+    int i = 0;
+    int w = indent + 12 + elem.getName().length(); // this is wrong if the type is an attribute, but the wrapping concern shouldn't apply in this case, so this is ok
+//     for (TypeRef t : elem.getTypes()) {
+    if (i > 0) {
+      b.append("|");
+      w++;
+    }
+    if (w + t.getName().length() > 80) {
+      throw new Error("this sholdn't happen");
+//        write("\r\n  ");
+//        for (int j = 0; j < indent; j++)
+//          write(" ");
+//        w = indent+2;
+    }
+    w = w + t.getName().length(); // again, could be wrong if this is an extension, but then it won't wrap
+    if (t.getWorkingCode().equals("xhtml"))
+      b.append(t.getName());
+    else if (t.getName().equals("Extension") && t.hasProfile()) {
+      b.append("<a href=\""+prefix+t.getProfile()+"\"><span style=\"color: DarkViolet\">@"+t.getProfile()+"</span></a>");
+    } else {
+      b.append("<a href=\"" + prefix + (dtRoot + getLinkFor(t.getName())
+              + ".html#" + t.getName() + "\">" + t.getName())
+              + "</a>");
+    }
+    if (t.hasTargetProfile()) {
+      b.append("(");
+      boolean firstp = true;
+      List<String> ap = new ArrayList<>();
+      for (CanonicalType p : t.getTargetProfile()) {
+        ap.add(p.primitiveValue());
+      }
+      Collections.sort(ap);
+      for (String p : ap) {
+        if (!firstp) {
+          b.append("|");
+          w++;
+        }
+
+        // again, p.length() could be wrong if this is an extension, but then it won't wrap
+        if (w + p.length() > 80) {
+          b.append("\r\n  ");
+          for (int j = 0; j < indent; j++)
+            b.append(" ");
+          w = indent+2;
+        }
+        w = w + p.length();
+
+        // TODO: Display action and/or profile information
+        if (p.equals("Any")) {
+          b.append("<a href=\"" + prefix+"resourcelist.html" + "\">" + p + "</a>");
+        }
+        else
+          b.append("<a href=\"" + prefix+(dtRoot + getLinkFor(p)
+                  + ".html#" + p) + "\">" + p + "</a>");
+        firstp = false;
+      }
+      b.append(")");
+      w++;
+    }
+
+    i++;
+    //}
+    b.append("</span>");
+    return w;
+  }
+
 }
 
 
