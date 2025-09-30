@@ -6614,7 +6614,7 @@ public class PublisherGenerator extends PublisherBase {
               code = pf.countryCodeForName.get("Virgin Islands, U.S.");
               break;
             default:
-              throw new Exception("Unable to find 3-character code having same country code as ISO 2-char code " + c.getCode() + " - " + c.getDisplay());
+              log("Unable to find 3-character code having same country code as ISO 2-char code " + c.getCode() + " - " + c.getDisplay());
           }
         }
         pf.countryCodeFor2Letter.put(c.getCode(), code);

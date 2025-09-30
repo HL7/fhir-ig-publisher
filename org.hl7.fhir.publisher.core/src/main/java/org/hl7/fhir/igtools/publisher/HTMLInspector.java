@@ -635,7 +635,7 @@ public class HTMLInspector {
             String cnt = c.getContent();
             int si = cnt.indexOf("§");
             int ei = cnt.substring(si).indexOf("§") + si;
-            span.addText(cnt.substring(si + 1, ei));
+            span.addText((si > -1 && ei > -1) ? cnt.substring(si + 1, ei) : cnt);
             x.getChildNodes().add(start + 1, span);
             String ss = cnt.substring(si);
             String es = cnt.substring(ei + 1);
