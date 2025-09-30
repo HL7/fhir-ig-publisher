@@ -583,11 +583,18 @@ public class HTMLInspector {
         XhtmlNodeHolder div = divs.get(0);
         div.end = x;
         String cnt = div.start.allText().substring(2);
+        String original = div.start.allText().substring(2);
+        if (!cnt.contains(":")) {
+          throw new FHIRException("Invalid conformance clause id: no ':' making the token in " +original);
+        }
         String id = cnt.substring(0, cnt.indexOf(":"));
         if (!id.matches("^[a-zA-Z0-9._-]+$")) {
-          throw new FHIRException("Invalid conformance clause id: '"+id+"' in " +cnt);
+          throw new FHIRException("Invalid conformance clause id: '"+id+"' in " +original);
         }
         cnt = cnt.substring(cnt.indexOf(":")+1);
+        if (!cnt.contains("^")) {
+          throw new FHIRException("Invalid conformance clause id: no '^' making the summary in " +original);
+        }
         String summary = cnt.substring(0, cnt.indexOf("^"));
         cnt = cnt.substring(cnt.indexOf("^")+1);
         x.setName("div");
@@ -600,6 +607,11 @@ public class HTMLInspector {
         x.getChildNodes().clear();
         x.para("!");
       }
+    } else if (x.allText() != null && "!§§".equals(x.allText())) {
+      // special placeholder for documentation
+      x.getChildNodes().clear();
+      x.tx("§§");
+      hasClauses.set(true);
     } else {
       do {
         int start = -1;
@@ -633,11 +645,11 @@ public class HTMLInspector {
             span.setAttribute("class", "fhir-conformance");
             XhtmlNode c = x.getChildNodes().get(start);
             String cnt = c.getContent();
-            int si = cnt.indexOf("§");
+            int si = cnt.indexOf("§")+1;
             int ei = cnt.substring(si).indexOf("§") + si;
-            span.addText((si > -1 && ei > -1) ? cnt.substring(si + 1, ei) : cnt);
+            span.addText((si > 0 && ei >= si) ? cnt.substring(si, ei) : cnt);
             x.getChildNodes().add(start + 1, span);
-            String ss = cnt.substring(si);
+            String ss = cnt.substring(0, si-1);
             String es = cnt.substring(ei + 1);
             c.setContent(ss);
             if (!Utilities.noString(es)) {
@@ -680,12 +692,17 @@ public class HTMLInspector {
         processMarkdownConformanceClauses(c, hasClauses, childDivs);
       }
       for (XhtmlNodeHolder childDiv : childDivs) {
-        int start = x.getChildNodes().indexOf(childDiv.start);
-        int end = x.getChildNodes().indexOf(childDiv.end);
-        for (int i = start+1; i < end-1; i++) {
-          childDiv.start.getChildNodes().add(x.getChildNodes().get(i));
+        if (childDiv.end != null) {
+          int start = x.getChildNodes().indexOf(childDiv.start);
+
+          int end = x.getChildNodes().indexOf(childDiv.end);
+          for (int i = start + 1; i < end - 1; i++) {
+            childDiv.start.getChildNodes().add(x.getChildNodes().get(i));
+          }
+          x.getChildNodes().subList(start + 1, end).clear();
+        } else {
+          DebugUtilities.breakpoint();
         }
-        x.getChildNodes().subList(start+1, end).clear();
       }
     }
   }
