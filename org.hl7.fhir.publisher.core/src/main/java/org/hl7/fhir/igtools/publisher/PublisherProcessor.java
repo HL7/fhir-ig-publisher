@@ -1671,9 +1671,6 @@ public class PublisherProcessor extends PublisherBase  {
       try {
         for (FetchedResource r : f.getResources()) {
           if (r.fhirType().equals("StructureDefinition")) {
-            if (r.getResource() == null) {
-              DebugUtilities.breakpoint();
-            }
             this.pf.extensionTracker.scan((StructureDefinition) r.getResource());
           }
           this.pf.extensionTracker.scan(r.getElement(), f.getName());

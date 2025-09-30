@@ -4278,7 +4278,7 @@ public class PublisherGenerator extends PublisherBase {
                 }
               }
             } catch (Exception e) {
-              System.out.println("ERROR: Unable to populate flag information");
+              System.out.println("ERROR: Unable to populate IG flag information: "+e.getMessage());
             }
           } else{
             jNode.add("name", pf.dr.displayDataType(cc));
