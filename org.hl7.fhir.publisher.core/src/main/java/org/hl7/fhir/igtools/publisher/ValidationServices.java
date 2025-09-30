@@ -482,7 +482,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
   @Override
   public Set<String> fetchCanonicalResourceVersions(IResourceValidator validator, Object appContext, String url) {
     Set<String> res = new HashSet<>();
-    for (Resource r : context.fetchResourcesByUrl(Resource.class, url)) {
+    for (Resource r : context.fetchResourceVersions(Resource.class, url)) {
       if (r instanceof CanonicalResource) {
         
         CanonicalResource cr = (CanonicalResource) r;
@@ -492,7 +492,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
         if (cr instanceof CodeSystem) {
           CodeSystem cs = (CodeSystem) cr;
           if (cs.getContent() == CodeSystemContentMode.NOTPRESENT) {
-            if (!context.isServerSideSystem(cs.getUrl())) {
+            if (!context.getTxSupportInfo(cs.getUrl(), cs.getVersion()).isServerSide()) {
               // ?? res.add(cr.hasVersion() ? cr.getVersion() : "{{unversioned}}");                          
             }
           } else {
@@ -508,7 +508,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
 
   public Map<String, String> fetchCanonicalResourceVersionMap(IResourceValidator validator, Object appContext, String url) {
     Map<String, String> res = new HashMap<>();
-    for (Resource r : context.fetchResourcesByUrl(Resource.class, url)) {
+    for (Resource r : context.fetchResourceVersions(Resource.class, url)) {
       if (r instanceof CanonicalResource) {        
         CanonicalResource cr = (CanonicalResource) r;
         if (cr.getUrl().contains("terminology.hl7.org") && cr.hasSourcePackage() && cr.getSourcePackage().isCore()) {
@@ -517,7 +517,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
         if (cr instanceof CodeSystem) {
           CodeSystem cs = (CodeSystem) cr;
           if (cs.getContent() == CodeSystemContentMode.NOTPRESENT) {
-            if (!context.isServerSideSystem(cs.getUrl())) {
+            if (!context.getTxSupportInfo(cs.getUrl(), cs.getVersion()).isServerSide()) {
               // ?? res.add(cr.hasVersion() ? cr.getVersion() : "{{unversioned}}");                          
             }
           } else {  

@@ -2443,8 +2443,12 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       b.append(" <li>"+Utilities.escapeXml(lrc.formatPhrase(RenderingI18nContext.SDR_NOT_USED, type))+"</li>\r\n");
     }
     b.append("</ul>\r\n");
+    b.append(xigReference());
     if (sd.hasUserData(UserDataNames.loader_custom_resource)) {
-      b.append("<p>This is an <a href=\"https://build.fhir.org/resource.html#additional\">Additional Resource</a>.");
+      b.append("<p><b>Additional Resource</b></p>\r\n<p>This is an <a href=\"https://build.fhir.org/resource.html#additional\">Additional Resource</a>.");
+      b.append(" As an additional resource, the instances carry a <code>resourceDefinition</code> <a href=\"https://build.fhir.org/json.html#additional\">property</a> or <a href=\"https://build.fhir.org/xml.html#additional\">attribute</a>. For this resource, the value of the resourceDefinition is:</p>\r\n");
+      b.append("<pre>"+sd.getVersionedUrl()+"</pre>\r\n");
+      b.append("<p>");
       boolean hasCompartments = false;
       for (Extension ext : sd.getExtensionsByUrl(ExtensionDefinitions.EXT_ADDITIONAL_COMPARTMENT)) {
         if (ext.hasExtension("param")) {
@@ -2491,7 +2495,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         b.append("</table>\r\n");
       }
     }
-    return b.toString()+xigReference()+changeSummary();
+    return b.toString()+changeSummary();
   }
 
   private String nn(String s) {
@@ -3117,7 +3121,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
       if (sd.hasExtension(ExtensionDefinitions.EXT_TYPE_OPERATION)) {
         for (Extension ext : sd.getExtensionsByUrl(ExtensionDefinitions.EXT_TYPE_OPERATION)) {
-          OperationDefinition od = context.fetchResource(OperationDefinition.class, ext.getValue().primitiveValue(), sd);
+          OperationDefinition od = context.fetchResource(OperationDefinition.class, ext.getValue().primitiveValue(), null, sd);
           if (od != null) {
             tr = tbl.tr();
             tr.style("padding: 0px; background-color: white");
