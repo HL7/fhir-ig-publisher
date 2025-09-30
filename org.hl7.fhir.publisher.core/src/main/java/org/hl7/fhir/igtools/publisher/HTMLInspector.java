@@ -700,8 +700,6 @@ public class HTMLInspector {
             childDiv.start.getChildNodes().add(x.getChildNodes().get(i));
           }
           x.getChildNodes().subList(start + 1, end).clear();
-        } else {
-          DebugUtilities.breakpoint();
         }
       }
     }
