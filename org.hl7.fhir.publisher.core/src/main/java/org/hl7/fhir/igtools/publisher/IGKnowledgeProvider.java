@@ -703,7 +703,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       return xver.getReference(url); 
     }
     if (sd != null && sd.hasWebPath()) {
-      if (url.contains("|") || hasMultipleVersions(context.fetchResourcesByUrl(StructureDefinition.class, url))) {
+      if (url.contains("|") || hasMultipleVersions(context.fetchResourceVersions(StructureDefinition.class, url))) {
         return sd.getWebPath()+"|"+sd.getName()+"("+sd.getVersion()+")";        
       } else {
         return sd.getWebPath()+"|"+sd.getName();

@@ -46,6 +46,7 @@ import org.hl7.fhir.r5.model.Enumeration;
 import org.hl7.fhir.r5.renderers.DataRenderer;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.terminologies.TerminologyFunctions;
+import org.hl7.fhir.r5.terminologies.utilities.CommonsTerminologyCapabilitiesCache;
 import org.hl7.fhir.r5.testfactory.TestDataFactory;
 import org.hl7.fhir.r5.tools.ExtensionConstants;
 import org.hl7.fhir.r5.utils.MappingSheetParser;
@@ -95,6 +96,8 @@ import static org.hl7.fhir.igtools.publisher.Publisher.TOOLING_IG_CURRENT_RELEAS
  */
 
 public class PublisherIGLoader extends PublisherBase {
+  private List<StructureDefinition> additionalResources = new ArrayList<>();
+
   public PublisherIGLoader(PublisherFields publisherFields) {
     super(publisherFields);
   }
@@ -142,8 +145,9 @@ public class PublisherIGLoader extends PublisherBase {
       initializeFromIg(ini);
     } else if (isTemplate())
       initializeTemplate();
-    else {
-      // initializeFromJson();
+    else if (pf.rootDir == null) {
+      throw new Error("The IG Publisher was unable to find an ig.ini, and hasn't been configured correctly - needs to know what directory to execute on");
+    } else {
       throw new Error("Old style JSON configuration is no longer supported. If you see this, then ig.ini wasn't found in '"+ pf.rootDir +"'");
     }
     pf.expectedJurisdiction = checkForJurisdiction();
@@ -558,7 +562,13 @@ public class PublisherIGLoader extends PublisherBase {
           pf.additionalResourceFiles.add(p.getValue());
           try {
             StructureDefinition sd = (StructureDefinition) new XmlParser().parse(new FileInputStream(Utilities.path(pf.rootDir, p.getValue())));
+            if (sd.hasExtension(ExtensionDefinitions.EXT_ADDITIONAL_RESOURCE)) {
+              sd.getExtensionByUrl(ExtensionDefinitions.EXT_ADDITIONAL_RESOURCE).setValue(new BooleanType(true));
+            } else {
+              sd.addExtension(ExtensionDefinitions.EXT_ADDITIONAL_RESOURCE, new BooleanType(true));
+            }
             pf.customResourceNames.add(sd.getType());
+            additionalResources.add(sd);
           } catch (Exception e) {
             throw new Error("Unable to parse additional resource definition "+p.getValue(), e);
           }
@@ -992,6 +1002,9 @@ public class PublisherIGLoader extends PublisherBase {
       if (sd != null) {
         pf.context.dropResource(sd.fhirType(), sd.getId());
       }
+    }
+    for (StructureDefinition t : additionalResources) {
+      pf.context.cacheResource(t);
     }
 
 
@@ -2022,6 +2035,7 @@ public class PublisherIGLoader extends PublisherBase {
     loadBundles(igf);
     loadTranslationSupplements(igf);
 
+    checkCustomResourceExamples();
     pf.context.getCutils().setMasterSourceNames(pf.specMaps.get(0).getTargets());
     pf.context.getCutils().setLocalFileNames(pageTargets());
 
@@ -2446,6 +2460,19 @@ public class PublisherIGLoader extends PublisherBase {
 
   }
 
+  private void checkCustomResourceExamples() {
+
+    for (FetchedFile f : pf.fileList) {
+      for (FetchedResource r : f.getResources()) {
+        StructureDefinition sd = r.getElement().getProperty().getStructure();
+        if (ExtensionUtilities.readBoolExtension(sd, ExtensionDefinitions.EXT_ADDITIONAL_RESOURCE)) {
+//          FetchedResource defn = (FetchedResource) sd.getUserData(UserDataNames.pub_source_filename);
+          r.getFoundProfiles().add(sd.getUrl());
+        }
+      }
+    }
+  }
+
   private boolean noteFile(String key, FetchedFile file) {
     FetchedFile existing = pf.altMap.get(key);
     if (existing == null || existing.getTime() != file.getTime() || existing.getHash() != file.getHash()) {
@@ -2760,21 +2787,21 @@ public class PublisherIGLoader extends PublisherBase {
     for (StructureDefinition sd : pf.context.fetchResourcesByType(StructureDefinition.class)) {
       if (sd.getKind() == StructureDefinition.StructureDefinitionKind.RESOURCE && sd.getDerivation() == StructureDefinition.TypeDerivationRule.SPECIALIZATION) {
         String scope = sd.getUrl().substring(0, sd.getUrl().lastIndexOf("/"));
-        if (!"http://hl7.org/fhir/StructureDefinition".equals(scope)) {
+        if (!"http://hl7.org/fhir/StructureDefinition".equals(scope) && !isCrossVersionScope(scope)) {
           pf.customResourceNames.add(sd.getTypeTail());
         }
       }
     }
-    // look for new additional resources in this IG
-    for (String s : pf.additionalResourceFiles) {
-      System.out.print("Load Additional Resource from "+s+":");
-      System.out.println(loadAdditionalResource(s, false));
-    }
+
     // look for new custom resources in this IG
     for (String s : pf.customResourceFiles) {
       System.out.print("Load Custom Resource from "+s+":");
       System.out.println(loadAdditionalResource(s, true));
     }
+  }
+
+  private boolean isCrossVersionScope(String scope) {
+    return Utilities.existsInList(scope, "http://hl7.org/fhir/3.0/StructureDefinition", "http://hl7.org/fhir/4.0/StructureDefinition", "http://hl7.org/fhir/4.3/StructureDefinition", "http://hl7.org/fhir/5.0/StructureDefinition");
   }
 
 
@@ -3976,18 +4003,22 @@ public class PublisherIGLoader extends PublisherBase {
   }
 
   public void loadResourceContent(String type, boolean isMandatory, FetchedFile f, FetchedResource r) throws Exception {
+
     if (r.fhirType().equals(type)) {
       logDebugMessage(LogCategory.PROGRESS, "process res: "+r.fhirType()+"/"+r.getId());
       if (r.getResource() == null) {
         try {
-          if (f.getBundleType() == FetchedFile.FetchedBundleType.NATIVE) {
-            r.setResource(parseInternal(f, r));
-          } else {
-            r.setResource(parse(f));
-          }
           if (isCustomResource(f)) {
             // actually, we already loaded it - we need to use that instance
-            r.setResource(pf.context.fetchResource(StructureDefinition.class, ((CanonicalResource) r.getResource()).getUrl()));
+            StructureDefinition sd = pf.context.fetchResource(StructureDefinition.class, r.getElement().getNamedChildValue("url"));
+            r.setResource(sd);
+            r.setElement(new ObjectConverter(this.pf.context).convert(sd));
+          } else {
+            if (f.getBundleType() == FetchedFile.FetchedBundleType.NATIVE) {
+              r.setResource(parseInternal(f, r));
+            } else {
+              r.setResource(parse(f));
+            }
           }
           r.getResource().setUserData(UserDataNames.pub_element, r.getElement());
         } catch (Exception e) {
