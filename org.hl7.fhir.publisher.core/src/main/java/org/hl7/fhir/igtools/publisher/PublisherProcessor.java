@@ -1670,8 +1670,9 @@ public class PublisherProcessor extends PublisherBase  {
       f.start("scanForUsageStats");
       try {
         for (FetchedResource r : f.getResources()) {
-          if (r.fhirType().equals("StructureDefinition"))
+          if (r.fhirType().equals("StructureDefinition")) {
             this.pf.extensionTracker.scan((StructureDefinition) r.getResource());
+          }
           this.pf.extensionTracker.scan(r.getElement(), f.getName());
         }
       } finally {
