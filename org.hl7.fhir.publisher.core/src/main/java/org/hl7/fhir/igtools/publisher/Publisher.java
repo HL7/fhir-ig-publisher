@@ -1103,7 +1103,9 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 
   public static void main(String[] args) throws Exception {
     int exitCode = 0;
-
+    if (true) {
+        System.exit(13);
+    }
     // Prevents SLF4J(I) from printing unnecessary info to the console.
     System.setProperty("slf4j.internal.verbosity", "WARN");
 
