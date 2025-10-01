@@ -1811,6 +1811,15 @@ public class PublisherGenerator extends PublisherBase {
       long start = System.currentTimeMillis();
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-search-params", sdr.searchParameters(), f.getOutputNames(), r, vars, null, start, "search-params", "StructureDefinition", lang);
     }
+    TemplateRenderer tr = new TemplateRenderer(pf.rc, sd);
+    if (wantGen(r, "template-xml") && sd.getKind() != StructureDefinition.StructureDefinitionKind.LOGICAL && sd.getDerivation() == StructureDefinition.TypeDerivationRule.SPECIALIZATION) {
+      long start = System.currentTimeMillis();
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-template-xml", tr.generateXml(), f.getOutputNames(), r, vars, null, start, "template-xml", "StructureDefinition", lang);
+    }
+    if (wantGen(r, "template-json") && sd.getKind() != StructureDefinition.StructureDefinitionKind.LOGICAL && sd.getDerivation() == StructureDefinition.TypeDerivationRule.SPECIALIZATION) {
+      long start = System.currentTimeMillis();
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-template-json", tr.generateJson(), f.getOutputNames(), r, vars, null, start, "template-json", "StructureDefinition", lang);
+    }
     if (wantGen(r, "changes")) {
       long start = System.currentTimeMillis();
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-sd-changes", sdr.changeSummary(), f.getOutputNames(), r, vars, null, start, "changes", "StructureDefinition", lang);
@@ -4278,7 +4287,7 @@ public class PublisherGenerator extends PublisherBase {
                 }
               }
             } catch (Exception e) {
-              System.out.println("ERROR: Unable to populate flag information");
+              System.out.println("ERROR: Unable to populate IG flag information: "+e.getMessage());
             }
           } else{
             jNode.add("name", pf.dr.displayDataType(cc));
@@ -6614,7 +6623,7 @@ public class PublisherGenerator extends PublisherBase {
               code = pf.countryCodeForName.get("Virgin Islands, U.S.");
               break;
             default:
-              throw new Exception("Unable to find 3-character code having same country code as ISO 2-char code " + c.getCode() + " - " + c.getDisplay());
+              log("Unable to find 3-character code having same country code as ISO 2-char code " + c.getCode() + " - " + c.getDisplay());
           }
         }
         pf.countryCodeFor2Letter.put(c.getCode(), code);
