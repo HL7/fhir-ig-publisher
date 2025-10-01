@@ -293,6 +293,9 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       return "extension";
     }
 //    if (sd.getKind() == StructureDefinitionKind.LOGICAL)
+    if (r.getElement().getChildValue("kind").equals("resource") && r.getElement().getChildValue("derivation").equals("specialization"))
+      return "resourcedefn";
+    
     return r.getElement().getChildValue("kind") + ("true".equals(r.getElement().getChildValue("abstract")) ? ":abstract" : "");
   }
 
