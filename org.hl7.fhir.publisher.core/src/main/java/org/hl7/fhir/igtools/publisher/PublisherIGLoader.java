@@ -984,7 +984,7 @@ public class PublisherIGLoader extends PublisherBase {
       }
     }
 
-    pf.inspector = new HTMLInspector(pf.outputDir, pf.specMaps, pf.linkSpecMaps, this, pf.igpkp.getCanonical(), pf.sourceIg.getPackageId(), pf.sourceIg.getVersion(), pf.trackedFragments, pf.fileList, pf.module, pf.mode == PublisherUtils.IGBuildMode.AUTOBUILD || pf.mode == PublisherUtils.IGBuildMode.WEBSERVER, pf.trackFragments ? pf.fragmentUses : null, pf.relatedIGs, noCIBuildIssues, allLangs());
+    pf.inspector = new HTMLInspector(pf.context, pf.outputDir, pf.specMaps, pf.linkSpecMaps, this, pf.igpkp.getCanonical(), pf.sourceIg.getPackageId(), pf.sourceIg.getVersion(), pf.trackedFragments, pf.fileList, pf.module, pf.mode == PublisherUtils.IGBuildMode.AUTOBUILD || pf.mode == PublisherUtils.IGBuildMode.WEBSERVER, pf.trackFragments ? pf.fragmentUses : null, pf.relatedIGs, noCIBuildIssues, allLangs());
     pf.inspector.getManual().add("full-ig.zip");
     if (pf.historyPage != null) {
       pf.inspector.getManual().add(pf.historyPage);
@@ -1006,7 +1006,6 @@ public class PublisherIGLoader extends PublisherBase {
     for (StructureDefinition t : additionalResources) {
       pf.context.cacheResource(t);
     }
-
 
     int i = 0;
     for (ImplementationGuide.ImplementationGuideDependsOnComponent dep : pf.sourceIg.getDependsOn()) {
