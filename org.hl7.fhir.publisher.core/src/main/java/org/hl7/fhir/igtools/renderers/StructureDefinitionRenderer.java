@@ -1035,33 +1035,37 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
   private String presentVersion(PackageInformation sourcePackage) {
-    switch (sourcePackage.getCanonical()) {
-      case "http://fhir.org/packages/fhir.dicom":
-        String[] vp = sourcePackage.getVersion().split("\\.");
-        return vp[0]+String.valueOf((char)('a' + (vp[1].charAt(0) - '1')));
-      default:
-        return VersionUtilities.getMajMin(sourcePackage.getVersion());
+    if (sourcePackage.getCanonical() != null) {
+      switch (sourcePackage.getCanonical()) {
+        case "http://fhir.org/packages/fhir.dicom":
+          String[] vp = sourcePackage.getVersion().split("\\.");
+          return vp[0] + String.valueOf((char) ('a' + (vp[1].charAt(0) - '1')));
+        default:
+      }
     }
+    return VersionUtilities.getMajMin(sourcePackage.getVersion());
   }
 
   private String getSourcePackageName(PackageInformation sourcePackage) {
-    switch (sourcePackage.getCanonical()) {
-      case "http://terminology.hl7.org":
-        return "THO";
-      case "http://hl7.org/fhir/us/core":
-        return "US Core";
-      case "http://fhir.org/packages/us.nlm.vsac":
-        return "VSAC";
-      case "http://fhir.org/packages/fhir.dicom":
-        return "DICOM";
-      default:
-        if (sourcePackage.getName() == null) {
-          return sourcePackage.getId();
-        } else if (sourcePackage.getName().contains("(")) {
-          return sourcePackage.getName().substring(0, sourcePackage.getName().indexOf("(")).replace(")", "");
-        } else {
-          return sourcePackage.getName();
-        }
+    if (sourcePackage.getCanonical() != null) {
+      switch (sourcePackage.getCanonical()) {
+        case "http://terminology.hl7.org":
+          return "THO";
+        case "http://hl7.org/fhir/us/core":
+          return "US Core";
+        case "http://fhir.org/packages/us.nlm.vsac":
+          return "VSAC";
+        case "http://fhir.org/packages/fhir.dicom":
+          return "DICOM";
+        default:
+      }
+    }
+    if (sourcePackage.getName() == null) {
+      return sourcePackage.getId();
+    } else if (sourcePackage.getName().contains("(")) {
+      return sourcePackage.getName().substring(0, sourcePackage.getName().indexOf("(")).replace(")", "");
+    } else {
+      return sourcePackage.getName();
     }
   }
 
