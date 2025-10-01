@@ -7464,20 +7464,20 @@
   },
   "2.0.18" : {
     "sync-date" : "2025-09-08",
-    "date" : "2025-09-30",
+    "date" : "2025-10-01",
     "hl7.fhir.template.ig" : {
       "errors" : 0,
       "warnings" : 0,
       "hints" : 0,
-      "time" : 897,
-      "memory" : 27080232
+      "time" : 887,
+      "memory" : 28891096
     },
     "hl7.fhir.us.ecr" : {
       "errors" : 152,
       "warnings" : 629,
       "hints" : 120,
-      "time" : 1215506,
-      "memory" : 3920366072
+      "time" : 1231301,
+      "memory" : 4400925088
     },
     "hl7.fhir.uv.ipa" : {
       "errors" : 35,
@@ -7543,11 +7543,11 @@
       "memory" : 4446630040
     },
     "hl7.fhir.uv.howto" : {
-      "errors" : 62,
+      "errors" : 63,
       "warnings" : 58,
       "hints" : 35,
-      "time" : 246430,
-      "memory" : 6291456
+      "time" : 243888,
+      "memory" : 2681559592
     },
     "smart.who.int.icvp" : {
       "errors" : 122,
