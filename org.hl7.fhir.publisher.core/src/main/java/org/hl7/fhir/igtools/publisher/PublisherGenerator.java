@@ -1820,6 +1820,10 @@ public class PublisherGenerator extends PublisherBase {
       long start = System.currentTimeMillis();
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-template-json", tr.generateJson(), f.getOutputNames(), r, vars, null, start, "template-json", "StructureDefinition", lang);
     }
+    if (wantGen(r, "template-ttl") && sd.getKind() != StructureDefinition.StructureDefinitionKind.LOGICAL && sd.getDerivation() == StructureDefinition.TypeDerivationRule.SPECIALIZATION) {
+      long start = System.currentTimeMillis();
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-template-ttl", tr.generateTtl(), f.getOutputNames(), r, vars, null, start, "template-ttl", "StructureDefinition", lang);
+    }
     if (wantGen(r, "changes")) {
       long start = System.currentTimeMillis();
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-sd-changes", sdr.changeSummary(), f.getOutputNames(), r, vars, null, start, "changes", "StructureDefinition", lang);
