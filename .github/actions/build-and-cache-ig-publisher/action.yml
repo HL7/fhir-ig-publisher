@@ -27,7 +27,7 @@ runs:
         path: ${{ github.workspace }}/core-build
     - name: Build Core Project
       if: inputs.core-ref != ''
-      run: mvn clean install -Dmaven.test.skip=true
+      run: mvn clean install -DskipTests
       shell: bash
       working-directory: ${{ github.workspace }}/core-build
     - name: Checkout IG Publisher Project
