@@ -742,6 +742,217 @@ public class TemplateRenderer {
     return w;
   }
 
+
+  public String generateTtl() throws Exception {
+    StringBuilder b = new StringBuilder();
+    b.append("<pre class=\"spec\">\r\n");
+
+    generateInnerTtl(b, sd.getDifferential().getElementFirstRep(), sd.getKind() == StructureDefinition.StructureDefinitionKind.RESOURCE, sd.getAbstract());
+
+    b.append("</pre>\r\n");
+    return b.toString();
+  }
+  private void generateInnerTtl(StringBuilder b, ElementDefinition root, boolean resource, boolean isAbstract) throws IOException, Exception {
+    List<ElementDefinition> children = context.getProfileUtilities().getChildList(sd, root);
+
+    String rn;
+    if (root.getName().equals("Extension"))
+      rn = "extension|modifierExtension";
+    else if (root.getName().equals("Meta"))
+      rn = "meta";
+    else if (root.getType().size() > 0 && (root.getType().get(0).getName().equals("Type")
+            || (root.getType().get(0).getName().equals("Structure"))) || isAbstract)
+      rn = "[name]";
+    else
+      rn = root.getName();
+
+    String prefix = context.getLink(RenderingContext.KnownLinkType.SPEC, true);
+
+    b.append("@prefix fhir: &lt;http://hl7.org/fhir/&gt; .");
+    if (resource)
+      b.append("<span style=\"float: right\"><a title=\"Documentation for this format\" href=\""+prefix+"rdf.html\"><img src=\""+prefix+"help.png\" alt=\"doco\"/></a></span>\r\n");
+    b.append("\r\n");
+    b.append("\r\n");
+    if (resource) {
+      b.append("[ a fhir:");
+      if (defPage == null)
+        b.append("<span title=\"" + Utilities.escapeXml(root.getDefinition())
+                + "\"><b>");
+      else
+        b.append("<a href=\"" + (defPage + "#" + root.getName()) + "\" title=\""
+                + Utilities.escapeXml(root.getDefinition())
+                + "\" class=\"dict\"><b>");
+      b.append(rn);
+      if ((defPage == null))
+        b.append("</b></span>;");
+      else
+        b.append("</b></a>;");
+      b.append("\r\n  fhir:nodeRole fhir:treeRoot; # if this is the parser root\r\n");
+    } else
+      b.append("[");
+    b.append("\r\n");
+    if (rn.equals(root.getName()) && resource) {
+      if (!Utilities.noString(root.typeSummary())) {
+        b.append("  # from <a href=\""+prefix+"resource.html\">Resource</a>: <a href=\""+prefix+"resource.html#id\">.id</a>, <a href=\""+prefix+"resource.html#meta\">.meta</a>, <a href=\""+prefix+"resource.html#implicitRules\">.implicitRules</a>, and <a href=\""+prefix+"resource.html#language\">.language</a>\r\n");
+        if (isDomainResource(sd)) {
+          b.append("  # from <a href=\""+prefix+"domainresource.html\">DomainResource</a>: <a href=\""+prefix+"narrative.html#Narrative\">.text</a>, <a href=\""+prefix+"references.html#contained\">.contained</a>, <a href=\""+prefix+"extensibility.html\">.extension</a>, and <a href=\""+prefix+"extensibility.html#modifierExtension\">.modifierExtension</a>\r\n");
+        }
+      }
+    } else {
+      if (root.typeSummary().equals("BackboneElement"))
+        b.append(" # from BackboneElement: <a href=\""+prefix+"extensibility.html\">Element.extension</a>, <a href=\""+prefix+"extensibility.html\">BackboneElement.modifierextension</a>\r\n");
+      else
+        b.append(" # from Element: <a href=\""+prefix+"extensibility.html\">Element.extension</a>\r\n");
+    }
+    for (ElementDefinition elem : children) {
+      generateCoreElemTtl(b, elem, 1, root.getName(), rn.equals(root.getName()) && resource);
+    }
+
+    b.append("]\r\n");
+  }
+
+  private void generateCoreElemTtl(StringBuilder b, ElementDefinition elem, int indent, String path, boolean backbone) throws Exception {
+    List<ElementDefinition> children = context.getProfileUtilities().getChildList(sd, elem);
+
+    String left = Utilities.padLeft("", ' ', indent * 2);
+    if (isChoice(elem)) {
+      b.append(left + "# ");
+      String en = elem.getName();
+      writeElementName(b, elem, path, en);
+      b.append(": ");
+      b.append(describeCardinality(elem));
+      writeInvariants(b, elem);
+      b.append(" <span style=\"color: navy\">");
+      b.append(Utilities.escapeXml(elem.getShort()));
+      b.append("</span>");
+      b.append(". One of these ");
+      b.append(Integer.toString(elem.getType().size()));
+      b.append("\r\n");
+      for (ElementDefinition.TypeRefComponent t : elem.getType()) {
+        generateElementTypeTtl(b, elem, path, left + "  ", t, elem.getName().replace("[x]", ""), true);
+        b.append("\r\n");
+      }
+    } else if (elem.getType().size() == 1) {
+      ElementDefinition.TypeRefComponent t = elem.getType().get(0);
+      String en = elem.getName();
+      generateElementTypeTtl(b, elem, path, left, t, en, false);
+      if (elem.repeats())
+        b.append(" ... ) ; # ");
+      else
+        b.append(" ; # ");
+      b.append(describeCardinality(elem));
+      writeInvariants(b, elem);
+      b.append(" <span style=\"color: navy\">");
+      b.append(Utilities.escapeXml(elem.getShort()));
+      b.append("</span>\r\n");
+    } else { // children elements
+      b.append(left + "fhir:");
+      String en = elem.getName();
+      writeElementName(b, elem, path, en);
+      if (elem.repeats()) b.append("( ");
+      b.append("[ # ");
+      b.append(describeCardinality(elem));
+      writeInvariants(b, elem);
+      b.append(" <span style=\"color: navy\">");
+      b.append(Utilities.escapeXml(elem.getShort()));
+      b.append("</span>\r\n");
+      for (ElementDefinition child : children) {
+        generateCoreElemTtl(b, child, indent + 1, path + "." + en, backbone);
+      }
+      if (elem.repeats())
+        b.append(left + "] ... ) ;\r\n");
+      else
+        b.append(left + "] ;\r\n");
+    }
+  }
+
+
+  private void generateElementTypeTtl(StringBuilder b, ElementDefinition elem, String path, String left, ElementDefinition.TypeRefComponent t, String en, boolean insertTypeTriple) throws IOException {
+    b.append(left+"fhir:");
+    writeElementName(b, elem, path, en);
+    if (elem.repeats()) b.append(" ( ");
+    b.append("[ ");
+    if (insertTypeTriple) b.append(" a fhir:" + t.getName() + " ; ");
+    renderTypeTtl(b, 0, 0, t);
+    b.append(" ]");
+  }
+
+
+  private int renderTypeTtl(StringBuilder b, int indent, int w, ElementDefinition.TypeRefComponent t) throws IOException {
+    if (t.getWorkingCode().equals("xhtml"))
+      b.append("fhir:value \"[escaped xhtml]\"^^xsd:string");
+    else if (t.getName().startsWith("@"))
+      b.append("<a href=\"#ttl-"+t.getName().substring(1)+"\"><span style=\"color: DarkViolet\">See "+t.getName().substring(1)+"</span></a>");
+    else
+      b.append("<a href=\"" + (getLinkFor(t.getName())+ "\">" + t.getName()) + "</a>");
+    if (t.hasTargetProfile()) {
+      b.append("(");
+      boolean firstp = true;
+      List<StructureDefinition> ap = new ArrayList<>();
+      for (CanonicalType p : t.getTargetProfile()) {
+        StructureDefinition sd = context.getContext().fetchResource(StructureDefinition.class, p.primitiveValue());
+        if (sd != null) {
+          ap.add(sd);
+        }
+      }
+      ap.sort(new StructureDefinitionSorterByUrl());
+      for (StructureDefinition sd : ap) {
+        String p = sd.getType();
+        if (!firstp) {
+          b.append("|");
+          w++;
+        }
+
+        // again, p.length() could be wrong if this is an extension, but then it won't wrap
+        if (w + p.length() > 80) {
+          b.append("\r\n  ");
+          for (int j = 0; j < indent; j++)
+            b.append(" ");
+          w = indent+2;
+        }
+        w = w + p.length();
+
+        b.append("<a href=\"" + sd.getWebPath() + "\">" + p + "</a>");
+
+        firstp = false;
+      }
+      b.append(")");
+      w++;
+    }
+    return w;
+  }
+
+  private boolean isChoice(ElementDefinition elem) {
+    return elem.getType().size() > 1 || elem.getName().endsWith("[x]") || elem.typeSummary().equals("*");
+  }
+
+  private void writeInvariants(StringBuilder b, ElementDefinition elem) throws IOException {
+    if (elem.getConstraint().size() > 0)
+      b.append(" <span style=\"color: brown\" title=\""+Utilities.escapeXml(getInvariants(elem))+ "\">"+INV_FLAG+"</span>");
+  }
+
+
+  private void writeElementName(StringBuilder b, ElementDefinition elem, String path, String en) throws IOException {
+    if (defPage == null) {
+      if (elem.getIsModifier() || elem.getMustSupport())
+        b.append("<span style=\"text-decoration: underline\" title=\"" + Utilities.escapeXml(elem.getDefinition()) + "\">");
+      else
+        b.append("<span title=\"" + Utilities.escapeXml(elem.getDefinition()) + "\">");
+    } else if (elem.getIsModifier() || elem.getMustSupport())
+      b.append("<a href=\"" + (defPage + "#" + path + "." + en)+ "\" title=\"" + Utilities .escapeXml(elem.getDefinition())
+              + "\" class=\"dict\"><span style=\"text-decoration: underline\">");
+    else
+      b.append("<a href=\"" + (defPage + "#" + path + "." + en) + "\" title=\"" + Utilities.escapeXml(elem.getDefinition()) + "\" class=\"dict\">");
+    b.append(en);
+    if (defPage == null)
+      b.append("</span>");
+    else if (elem.getIsModifier() || elem.getMustSupport())
+      b.append("</span></a>");
+    else
+      b.append("</a>");
+    b.append("<a name=\"ttl-"+en+"\"> </a>");
+  }
+
 }
 
 

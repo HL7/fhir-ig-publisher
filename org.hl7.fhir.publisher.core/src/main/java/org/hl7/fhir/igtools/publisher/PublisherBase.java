@@ -1267,7 +1267,7 @@ public class PublisherBase implements ILoggingService {
 
   }
 
-    public class CanonicalVisitor<T> implements DataTypeVisitor.IDatatypeVisitor {
+  public class CanonicalVisitor<T> implements DataTypeVisitor.IDatatypeVisitor {
     private FetchedFile f;
     private boolean snapshotMode;
 
@@ -1286,6 +1286,7 @@ public class PublisherBase implements ILoggingService {
     public boolean visit(String path, DataType node) {
       CanonicalType ct = (CanonicalType) node;
       String url = ct.asStringValue();
+
       if (url == null) {
         return false;
       }
@@ -1383,9 +1384,6 @@ public class PublisherBase implements ILoggingService {
         pp.setChildValue("name", pn);
         pp.setChildValue("valueUri", v);
         pp.setUserData(UserDataNames.auto_added_parameter, true);
-        if (pf.context.getExpansionParameters() != null) {
-          pf.context.getExpansionParameters().addParameter(pn, new UriType(v));
-        }
       }
     }
 

@@ -984,7 +984,7 @@ public class PublisherIGLoader extends PublisherBase {
       }
     }
 
-    pf.inspector = new HTMLInspector(pf.outputDir, pf.specMaps, pf.linkSpecMaps, this, pf.igpkp.getCanonical(), pf.sourceIg.getPackageId(), pf.sourceIg.getVersion(), pf.trackedFragments, pf.fileList, pf.module, pf.mode == PublisherUtils.IGBuildMode.AUTOBUILD || pf.mode == PublisherUtils.IGBuildMode.WEBSERVER, pf.trackFragments ? pf.fragmentUses : null, pf.relatedIGs, noCIBuildIssues, allLangs());
+    pf.inspector = new HTMLInspector(pf.context, pf.outputDir, pf.specMaps, pf.linkSpecMaps, this, pf.igpkp.getCanonical(), pf.sourceIg.getPackageId(), pf.sourceIg.getVersion(), pf.trackedFragments, pf.fileList, pf.module, pf.mode == PublisherUtils.IGBuildMode.AUTOBUILD || pf.mode == PublisherUtils.IGBuildMode.WEBSERVER, pf.trackFragments ? pf.fragmentUses : null, pf.relatedIGs, noCIBuildIssues, allLangs());
     pf.inspector.getManual().add("full-ig.zip");
     if (pf.historyPage != null) {
       pf.inspector.getManual().add(pf.historyPage);
@@ -1006,7 +1006,6 @@ public class PublisherIGLoader extends PublisherBase {
     for (StructureDefinition t : additionalResources) {
       pf.context.cacheResource(t);
     }
-
 
     int i = 0;
     for (ImplementationGuide.ImplementationGuideDependsOnComponent dep : pf.sourceIg.getDependsOn()) {
@@ -3978,6 +3977,11 @@ public class PublisherIGLoader extends PublisherBase {
       for (String s : metadataResourceNames()) {
         load(s, !Utilities.existsInList(s, "Evidence", "EvidenceVariable")); // things that have changed in R6 that aren't internally critical
       }
+      if (pf.pinDest != null) {
+        FetchedResource r = fetchByResource("Parameters", pf.pinDest);
+        Parameters pp = (Parameters) new ObjectConverter(pf.context).convert(r.getElement());
+        pf.context.getManager().setExpansionParameters(pp);
+      }
       log("Generating Snapshots");
       generateSnapshots();
       for (FetchedFile f : pf.fileList) {
@@ -4064,11 +4068,6 @@ public class PublisherIGLoader extends PublisherBase {
           altered = true;
           b.append("version="+ this.pf.defaultBusinessVersion);
           bc.setVersion(this.pf.defaultBusinessVersion);
-        }
-        if (!(bc instanceof StructureDefinition)) {
-          // can't do structure definitions yet, because snapshots aren't generated, and not all are registered.
-          // do it later when generating snapshots
-          altered = checkCanonicalsForVersions(f, bc, false) || altered;
         }
         if (!r.isExample()) {
           if (this.pf.wgm != null) {
@@ -4164,6 +4163,12 @@ public class PublisherIGLoader extends PublisherBase {
         }
         if (r.getResource() != null && pf.cql.processArtifact(f, r.getResource())) {
           altered = true;
+        }
+
+        if (!(bc instanceof StructureDefinition)) {
+          // can't do structure definitions yet, because snapshots aren't generated, and not all are registered.
+          // do it later when generating snapshots
+          altered = checkCanonicalsForVersions(f, bc, false) || altered;
         }
 
         if (altered) {

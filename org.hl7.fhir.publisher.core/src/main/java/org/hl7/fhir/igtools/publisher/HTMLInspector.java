@@ -45,9 +45,11 @@ import org.hl7.fhir.igtools.publisher.SpecMapManager.SpecialPackageType;
 import org.hl7.fhir.igtools.publisher.modules.IPublisherModule;
 import org.hl7.fhir.r5.context.ILoggingService;
 import org.hl7.fhir.r5.context.ILoggingService.LogCategory;
+import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.utilities.*;
+import org.hl7.fhir.utilities.i18n.I18nConstants;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
@@ -275,8 +277,9 @@ public class HTMLInspector {
   private XhtmlNode confHome;
   private LoadedFile confSource;
   private List<ConformanceClause> clauses = new ArrayList<>();
+  private IWorkerContext context;
 
-  public HTMLInspector(String rootFolder, List<SpecMapManager> specs, List<LinkedSpecification> linkSpecs, ILoggingService log, String canonical, String packageId, String version, Map<String, List<String>> trackedFragments, List<FetchedFile> sources, IPublisherModule module, boolean isCIBuild, Map<String, PublisherBase.FragmentUseRecord> fragmentUses, List<RelatedIG> relatedIGs, boolean noCIBuildIssues, List<String> langList) throws IOException {
+  public HTMLInspector(IWorkerContext context, String rootFolder, List<SpecMapManager> specs, List<LinkedSpecification> linkSpecs, ILoggingService log, String canonical, String packageId, String version, Map<String, List<String>> trackedFragments, List<FetchedFile> sources, IPublisherModule module, boolean isCIBuild, Map<String, PublisherBase.FragmentUseRecord> fragmentUses, List<RelatedIG> relatedIGs, boolean noCIBuildIssues, List<String> langList) throws IOException {
     this.rootFolder = rootFolder.replace("/", File.separator);
     this.specs = specs;
     this.linkSpecs = linkSpecs;
@@ -294,6 +297,7 @@ public class HTMLInspector {
     this.langList = langList;
     this.version = version;
     requirePublishBox = Utilities.startsWithInList(packageId, "hl7.");
+    this.context = context;
   }
 
   public void setAltRootFolder(String altRootFolder) throws IOException {
@@ -534,13 +538,13 @@ public class HTMLInspector {
         if (s.contains("SHALL")) {
           if (!hasWarning.ok()) {
             messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, source.path,
-                    "The html source contains the word 'SHALL' but it is not in a text phrase marked as a conformance clause", IssueSeverity.INFORMATION));
+                    context.formatMessage(I18nConstants.CONFORMANCE_STATEMENT_WORD,"SHALL"), IssueSeverity.INFORMATION).setMessageId(I18nConstants.CONFORMANCE_STATEMENT_WORD));
           }
           hasWarning.set(true);
         } else if (s.contains("SHOULD")) {
           if (!hasWarning.ok()) {
-            messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE,source.path,
-                    "The html source contains the word 'SHOULD' but it is not in a text phrase marked as a conformance clause", IssueSeverity.INFORMATION));
+            messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, source.path,
+                    context.formatMessage(I18nConstants.CONFORMANCE_STATEMENT_WORD,"SHOULD"), IssueSeverity.INFORMATION).setMessageId(I18nConstants.CONFORMANCE_STATEMENT_WORD));
           }
           hasWarning.set(true);
         }
