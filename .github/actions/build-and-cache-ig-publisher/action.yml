@@ -18,13 +18,25 @@ runs:
       with:
         java-version: 17
         distribution: zulu
-    - name: Checkout project
+    - name: Checkout Core Project
+      if: inputs.core-ref != ''
+      uses: actions/checkout@v4
+      with:
+        repository: hapifhir/org.hl7.fhir.core
+        ref: ${{ inputs.core-ref }}
+        path: ${{ github.workspace }}/core-build
+    - name: Build Core Project
+      if: inputs.core-ref != ''
+      run: mvn clean install -Dmaven.test.skip=true
+      shell: bash
+      working-directory: ${{ github.workspace }}/core-build
+    - name: Checkout IG Publisher Project
       uses: actions/checkout@v4
       with:
         repository: HL7/fhir-ig-publisher
         ref: ${{ inputs.ref }}
         path: ${{ github.workspace }}/ig-publisher-cli-build
-    - name: Build with Maven
+    - name: Build IG Publisher
       run: mvn clean install -Dmaven.test.skip=true
       shell: bash
       working-directory: ${{ github.workspace }}/ig-publisher-cli-build
