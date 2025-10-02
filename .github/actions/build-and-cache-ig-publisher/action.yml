@@ -5,6 +5,9 @@ inputs:
     description: "The GitHub ref to build the IG publisher from"
     required: false
     default: "master"
+  core-ref:
+    description: "An optional ref to build the core library from"
+    required: false
 
 runs:
   using: "composite"
