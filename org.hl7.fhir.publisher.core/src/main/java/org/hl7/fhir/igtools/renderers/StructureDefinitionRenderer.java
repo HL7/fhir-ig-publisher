@@ -53,6 +53,7 @@ import org.hl7.fhir.r5.profilemodel.PEDefinition;
 import org.hl7.fhir.r5.profilemodel.PEType;
 import org.hl7.fhir.r5.renderers.DataRenderer;
 import org.hl7.fhir.r5.renderers.Renderer.RenderingStatus;
+import org.hl7.fhir.r5.renderers.ResourceRenderer;
 import org.hl7.fhir.r5.renderers.StructureDefinitionRenderer.MapStructureMode;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.StructureDefinitionRendererMode;
@@ -1074,45 +1075,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     String actualVersion = vs == null ? null : vs.getVersion();
     boolean fromPackages = vs == null ? false : vs.hasSourcePackage();
     boolean fromThisPackage = vs == null ? false : !Utilities.isAbsoluteUrlLinkable(vs.getWebPath());
-    if (statedVersion != null && actualVersion != null && !statedVersion.equals(actualVersion) && fromPackages) {
-      td.attribute("title", gen.formatPhrase(RenderingI18nContext.VS_VERSION_WILDCARD_BY_PACKAGE, statedVersion, actualVersion));
-      td.tx("\uD83D\uDCCD");
-      td.tx(actualVersion);
-      td.tx(" → ");
-      td.tx(statedVersion);
-    } else if (statedVersion != null && actualVersion != null && !statedVersion.equals(actualVersion) && fromPackages) {
-      td.attribute("title", gen.formatPhrase(RenderingI18nContext.VS_VERSION_WILDCARD, statedVersion, actualVersion));
-      td.tx("\uD83D\uDCCD");
-      td.tx(actualVersion);
-      XhtmlNode span = td.span();
-      span.attribute("opacity", "0.5");
-      span.tx(" → ");
-      span.tx(statedVersion);
-  } else if (statedVersion != null) {
-      td.attribute("title", gen.formatPhrase(RenderingI18nContext.VS_VERSION_STATED, statedVersion));
-      td.tx("\uD83D\uDCCD");
-      td.tx(actualVersion);
-    } else if (fromThisPackage) {
-      td.attribute("title", gen.formatPhrase(RenderingI18nContext.VS_VERSION_THIS_PACKAGE));
-      td.tx("\uD83D\uDCE6");
-      td.tx(actualVersion);
-    } else if (fromPackages) {
-      td.attribute("title", gen.formatPhrase(RenderingI18nContext.VS_VERSION_BY_PACKAGE, actualVersion));
-      td.tx("\uD83D\uDCE6");
-      td.tx(actualVersion);
-    } else if (actualVersion != null) {
-      td.attribute("title", gen.formatPhrase(RenderingI18nContext.VS_VERSION_FOUND, actualVersion));
-      td.attribute("opacity", "0.5");
-      td.tx("\u23FF");
-      td.tx(actualVersion);
-    } else if (vs != null) {
-      td.attribute("title", gen.formatPhrase(RenderingI18nContext.VS_VERSION_NONE));
-      td.tx("\u2205");
-      td.tx(actualVersion);
-    } else {
-      td.attribute("title", gen.formatPhrase(RenderingI18nContext.VS_VERSION_NOTHING));
-      td.tx("?");
-    }
+    ResourceRenderer.renderVersionReference(gen, vs, statedVersion, actualVersion, fromPackages, td, fromThisPackage, gen.formatPhrase(RenderingContext.GENERAL_VALUESET), RenderingI18nContext.VS_VERSION_NOTHING_TEXT);
   }
 
   private String opacityStr(boolean inherited) {
