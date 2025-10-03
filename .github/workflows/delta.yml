@@ -3,9 +3,13 @@ on:
   workflow_dispatch:
     inputs:
       actual-ref:
-        description: 'Commit SHA'
+        description: 'IG Publisher Commit SHA'
         required: false
         default: 'master'
+        type: string
+      core-ref:
+        description: 'org.hly.fhir.core Commit SHA'
+        required: false
         type: string
 
 permissions:  # added using https://github.com/step-security/secure-repo
@@ -75,10 +79,18 @@ jobs:
         with:
           sparse-checkout: |
             .github
-      - name: Build and Cache IG Publisher
+      - name: Build and Cache IG Publisher (ref)
         uses: ./.github/actions/build-and-cache-ig-publisher
+        if: matrix.ref == inputs.actual-ref
         with:
           ref: ${{ matrix.ref }}
+          core-ref: ${{ inputs.core-ref }}
+      - name: Build and Cache IG Publisher (latest release)
+        uses: ./.github/actions/build-and-cache-ig-publisher
+        if: matrix.ref != inputs.actual-ref
+        with:
+          ref: ${{ matrix.ref }}
+
 
   generate-and-cache-qa:
     name: Generate and cache QA
