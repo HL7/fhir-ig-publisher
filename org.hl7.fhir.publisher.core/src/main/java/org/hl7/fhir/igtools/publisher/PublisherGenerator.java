@@ -26,6 +26,7 @@ import org.hl7.fhir.igtools.web.IGReleaseVersionUpdater;
 import org.hl7.fhir.r5.conformance.ConstraintJavaGenerator;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.context.ContextUtilities;
+import org.hl7.fhir.r5.context.ExpansionOptions;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.elementmodel.Manager;
 import org.hl7.fhir.r5.elementmodel.ObjectConverter;
@@ -247,7 +248,7 @@ public class PublisherGenerator extends PublisherBase {
     for (FetchedFile f : pf.changeList) {
       f.start("generate2");
       try {
-        generateHtmlOutputs(f, false, db);
+        generateHtmlOutputs(f, false, db, null);
       } finally {
         f.finish("generate2");
       }
@@ -458,6 +459,15 @@ public class PublisherGenerator extends PublisherBase {
         pf.ipsComparator.addOtherFiles(pf.inspector.getExceptions(), pf.outputDir);
       }
 
+      if (!pf.generationOff) {
+        AIProcessor ai = new AIProcessor(pf.inspector.getRootFolder());
+        if (isNewML()) {
+          ai.processNewTemplates(allLangs());
+        } else {
+          ai.processOldTemplates();
+        }
+      }
+
       List<ValidationMessage> linkmsgs = pf.generationOff ? new ArrayList<ValidationMessage>() : pf.inspector.check(statusMessage, statusMessages);
       int bl = 0;
       int lf = 0;
@@ -537,7 +547,7 @@ public class PublisherGenerator extends PublisherBase {
     this.pf.igpkp.findConfiguration(f, r);
     bc.setUserData(UserDataNames.pub_resource_config, r.getConfig());
     generateNativeOutputs(f, true, null);
-    generateHtmlOutputs(f, true, null);
+    generateHtmlOutputs(f, true, null, null);
   }
 
 
@@ -551,7 +561,7 @@ public class PublisherGenerator extends PublisherBase {
     }
   }
 
-  private void generateHtmlOutputs(FetchedFile f, boolean regen, DBBuilder db) throws Exception {
+  private void generateHtmlOutputs(FetchedFile f, boolean regen, DBBuilder db, String lang) throws Exception {
     if (this.pf.generationOff) {
       return;
     }
@@ -571,22 +581,22 @@ public class PublisherGenerator extends PublisherBase {
               }
               byte[] src = loadTranslationSource(f, l);
               if (f.getPath().endsWith(".md")) {
-                checkMakeFile(processCustomLiquid(db, stripFrontMatter(src), f), dst, f.getOutputNames());
+                checkMakeFile(processCustomLiquid(db, stripFrontMatter(src), f, lang), dst, f.getOutputNames());
               } else {
-                checkMakeFile(processCustomLiquid(db, src, f), dst, f.getOutputNames());
+                checkMakeFile(processCustomLiquid(db, src, f, lang), dst, f.getOutputNames());
               }
             }
             dst = Utilities.path(this.pf.tempDir, f.getRelativePath());
             if (f.getPath().endsWith(".md")) {
-              checkMakeFile(processCustomLiquid(db, stripFrontMatter(f.getSource()), f), dst, f.getOutputNames());
+              checkMakeFile(processCustomLiquid(db, stripFrontMatter(f.getSource()), f, lang), dst, f.getOutputNames());
             } else {
-              checkMakeFile(processCustomLiquid(db, f.getSource(), f), dst, f.getOutputNames());
+              checkMakeFile(processCustomLiquid(db, f.getSource(), f, lang), dst, f.getOutputNames());
             }
           } else {
             if (f.getPath().endsWith(".md")) {
-              checkMakeFile(processCustomLiquid(db, stripFrontMatter(f.getSource()), f), dst, f.getOutputNames());
+              checkMakeFile(processCustomLiquid(db, stripFrontMatter(f.getSource()), f, lang), dst, f.getOutputNames());
             } else {
-              checkMakeFile(processCustomLiquid(db, f.getSource(), f), dst, f.getOutputNames());
+              checkMakeFile(processCustomLiquid(db, f.getSource(), f, lang), dst, f.getOutputNames());
             }
           }
         }
@@ -609,10 +619,10 @@ public class PublisherGenerator extends PublisherBase {
                 dst = Utilities.path(this.pf.tempDir, l, f.getRelativePath());
               }
               byte[] src = loadTranslationSource(f, l);
-              checkMakeFile(processCustomLiquid(db, new XSLTransformer(this.pf.debug).transform(src, f.getXslt()), f), dst, f.getOutputNames());
+              checkMakeFile(processCustomLiquid(db, new XSLTransformer(this.pf.debug).transform(src, f.getXslt()), f, lang), dst, f.getOutputNames());
             }
           } else {
-            checkMakeFile(processCustomLiquid(db, new XSLTransformer(this.pf.debug).transform(f.getSource(), f.getXslt()), f), dst, f.getOutputNames());
+            checkMakeFile(processCustomLiquid(db, new XSLTransformer(this.pf.debug).transform(f.getSource(), f.getXslt()), f, lang), dst, f.getOutputNames());
           }
         }
       } catch (Exception e) {
@@ -1385,7 +1395,7 @@ public class PublisherGenerator extends PublisherBase {
 
         fragment("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", html, f.getOutputNames(), r, vars, null, start, "expansion", "ValueSet", lang);
       } else {
-        ValueSetExpansionOutcome exp = this.pf.context.expandVS(vs, true, true, true);
+        ValueSetExpansionOutcome exp = this.pf.context.expandVS(ExpansionOptions.cacheNoHeirarchy().withLanguage(lrc.getLocale().getLanguage()).withIncompleteOk(true), vs);
 
         if (db != null) {
           db.recordExpansion(vs, exp);
@@ -5596,14 +5606,14 @@ public class PublisherGenerator extends PublisherBase {
     }
   }
 
-  private byte[] processCustomLiquid(DBBuilder db, byte[] content, FetchedFile f) throws FHIRException {
+  private byte[] processCustomLiquid(DBBuilder db, byte[] content, FetchedFile f, String lang) throws FHIRException {
     if (!Utilities.existsInList(Utilities.getFileExtension(f.getPath()), "html", "md", "xml")) {
       return content;
     }
     String src = new String(content);
     try {
       boolean changed = false;
-      String[] keywords = {"sql", "fragment", "json", "class-diagram", "uml", "multi-map"};
+      String[] keywords = {"sql", "fragment", "json", "class-diagram", "uml", "multi-map", "lang-fragment"};
       for (String keyword: Arrays.asList(keywords)) {
 
         while (db != null && src.contains("{% " + keyword)) {
@@ -5631,6 +5641,14 @@ public class PublisherGenerator extends PublisherBase {
                 substitute = buildMultiMap(arguments, f);
                 break;
 
+              case "lang-fragment":
+                if (isNewML()) {
+                  substitute = "{% include " + arguments.trim().replace(".xhtml", "") + "-" + (lang == null ? "en" : lang) + ".xhtml %}";
+                } else {
+                  substitute = "{% include " + arguments +" %}";
+                }
+                break;
+
               case "fragment":
                 substitute = processFragment(arguments, f);
                 break;
@@ -5644,7 +5662,7 @@ public class PublisherGenerator extends PublisherBase {
                 break;
 
               default:
-                throw new FHIRException("Internal Error - unkonwn keyword "+keyword);
+                throw new FHIRException("Internal Error - unknown keyword "+keyword);
             }
           } catch (Exception e) {
             if (this.pf.debug) {
