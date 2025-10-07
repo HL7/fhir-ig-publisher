@@ -57,7 +57,7 @@ public class AIProcessor {
 
   /**
    * process this for an old template
-   * 
+   *
    * @throws IOException
    */
   public void processOldTemplates() throws IOException {
@@ -253,7 +253,18 @@ public class AIProcessor {
       String md = conv.convert(xhtml);
       String dest = FileUtilities.changeFileExt(p.f.getName(), ".md");
 
-      title = title.replace(npm.title(), "").replace(npm.id(), "").replace("v"+npm.version(), "").replace(npm.version(), "").replace(npm.id(), "");
+      if (npm.title() != null) {
+        title = title.replace(npm.title(), "")
+      }
+      if (npm.id() != null) {
+        title = title.replace(npm.id(), "");
+      }
+      if (npm.version() != null) {
+        title = title.replace("v" + npm.version(), "").replace(npm.version(), "");
+      }
+      if (npm.name() != null) {
+        title = title.replace(npm.name(), "");
+      }
       title = title.trim();
       if (title.endsWith("-")) {
         title = title.substring(0, title.length() - 1).trim();
