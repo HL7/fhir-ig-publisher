@@ -37,6 +37,7 @@ import java.util.Stack;
 
 import javax.annotation.Nonnull;
 
+import lombok.Getter;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.PublisherBase.FragmentUseRecord;
@@ -234,7 +235,7 @@ public class HTMLInspector {
   private static final String PLAIN_LANG_INSERTION = "\n<!--PlainLangHeader--><div id=\"plain-lang-box\">Plain Language Summary goes here</div><script src=\"https://hl7.org/fhir/plain-lang.js\"></script><script type=\"application/javascript\" src=\"https://hl7.org/fhir/history-cm.js\"> </script><script>showPlainLanguage('{0}', '{1}', '{2}');</script><!--EndPlainLangHeader-->";
 
   private boolean strict;
-  private String rootFolder;
+  @Getter private String rootFolder;
   private String altRootFolder;
   private List<SpecMapManager> specs;
   private List<LinkedSpecification> linkSpecs;
@@ -273,7 +274,6 @@ public class HTMLInspector {
   private String packageId;
   private String version;
   private List<String> langList;
-  private ZipGenerator zipGenerator;
   private XhtmlNode confHome;
   private LoadedFile confSource;
   private List<ConformanceClause> clauses = new ArrayList<>();
@@ -305,7 +305,6 @@ public class HTMLInspector {
   }
 
   public List<ValidationMessage> check(String statusMessageDef, Map<String, String> statusMessagesLang) throws IOException {
-    zipGenerator = new ZipGenerator(Utilities.path(rootFolder, "ai-md.zip"));
     this.statusMessageDef = statusMessageDef;
     this.statusMessagesLang = statusMessagesLang;
     iteration ++;
@@ -411,7 +410,6 @@ public class HTMLInspector {
       i++;
     }
     System.out.println();
-    zipGenerator.close();
 
     log.logDebugMessage(LogCategory.HTML, "Checking Other Links");
     // check other links:
@@ -721,9 +719,7 @@ public class HTMLInspector {
     conv.getIdFilters().add("^ppprofile");
     conv.setIgnoreGeneratedTables(true);
     conv.setAiMode(true);
-    String md = conv.convert(x);
-    String fn = "ai/"+lf.path.replace(".html", ".md");
-    zipGenerator.addBytes(fn, md.getBytes(StandardCharsets.UTF_8), false);
+    conv.convert(x);
   }
 
   private void checkVisibleFragments(String pageName, Stack<XhtmlNode> stack, XhtmlNode x) {
