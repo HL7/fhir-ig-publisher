@@ -21,6 +21,17 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.*;
 
+/**
+ * The AI generation code does this:
+ *
+ * create a file llms.txt which is actually mardkown (I don't know why they set it up that way)
+ * for every generated html file, figure out whether it is: authored page, base resource page, or other resource page
+ * for authored pages and base resource pages, convert the xhtml to markdown, stripping stuff from the templates
+ * link to them from llms.txt in an organised fashion
+ * create a zip file ai.zip so people can download all that
+ *
+ * I already processed all the already published IGs like thisGrahame Grieve: so see, say, http://hl7.org/fhir/us/core/llms.txt
+ */
 public class AIProcessor {
   private final String rootDir;
 
@@ -28,6 +39,12 @@ public class AIProcessor {
     this.rootDir = rootDir;
   }
 
+  /**
+   * process this on a per language basis
+   *
+   * @param langs
+   * @throws IOException
+   */
   public void processNewTemplates(List<String> langs) throws IOException {
     // processing new templates is different to old template because of the layout with regard to
     // languages, and because there's a specific .ai file
@@ -38,6 +55,11 @@ public class AIProcessor {
     }
   }
 
+  /**
+   * process this for an old template
+   * 
+   * @throws IOException
+   */
   public void processOldTemplates() throws IOException {
     NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(Utilities.path(rootDir, "package.tgz")));
     processFolderOld(new File(rootDir), npm);
@@ -308,11 +330,7 @@ public class AIProcessor {
   }
 
   private boolean isText(String contentType) {
-    if (contentType.startsWith("text/")) {
-      return true;
-    } else {
-      return false;
-    }
+    return (contentType.startsWith("text/"));
   }
 
   private void stripDiv(XhtmlNode x, String s) {

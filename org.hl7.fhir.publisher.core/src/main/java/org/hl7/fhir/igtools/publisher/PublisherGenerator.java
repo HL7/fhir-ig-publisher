@@ -2357,14 +2357,14 @@ public class PublisherGenerator extends PublisherBase {
     }
     if (pf.ipaComparator != null && pf.ipaComparator.hasLast() && !targetUrl().startsWith("file:")) {
       JsonObject diff = new JsonObject();
-      data.add("iga-diff", diff);
+      data.add("ipa-diff", diff);
       diff.add("name", Utilities.encodeUri(pf.ipaComparator.getLastName()));
       diff.add("current", Utilities.encodeUri(targetUrl()));
       diff.add("previous", Utilities.encodeUri(pf.ipaComparator.getLastUrl()));
     }
     if (pf.ipsComparator != null && pf.ipsComparator.hasLast() && !targetUrl().startsWith("file:")) {
       JsonObject diff = new JsonObject();
-      data.add("iga-diff", diff);
+      data.add("ips-diff", diff);
       diff.add("name", Utilities.encodeUri(pf.ipsComparator.getLastName()));
       diff.add("current", Utilities.encodeUri(targetUrl()));
       diff.add("previous", Utilities.encodeUri(pf.ipsComparator.getLastUrl()));

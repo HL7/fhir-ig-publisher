@@ -240,11 +240,7 @@ public class OldIGAIGenerator {
   }
 
   private boolean isText(String contentType) {
-    if (contentType.startsWith("text/")) {
-      return true;
-    } else {
-      return false;
-    }
+    return contentType.startsWith("text/");
   }
 
   private void stripDiv(XhtmlNode x, String s) {

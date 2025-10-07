@@ -355,7 +355,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       loader.load();
       pf.rc.setResolver(this);
       pf.rc.setResolveLinkResolver(this);
-      for (RenderingContext rc : pf.rcLangs.values()) {
+      for (RenderingContext rc : pf.rcLangs.langValues()) {
         rc.setResolver(this);
         rc.setResolveLinkResolver(this);
 
