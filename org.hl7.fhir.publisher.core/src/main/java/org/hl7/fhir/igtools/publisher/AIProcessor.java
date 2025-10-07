@@ -254,7 +254,7 @@ public class AIProcessor {
       String dest = FileUtilities.changeFileExt(p.f.getName(), ".md");
 
       if (npm.title() != null) {
-        title = title.replace(npm.title(), "")
+        title = title.replace(npm.title(), "");
       }
       if (npm.id() != null) {
         title = title.replace(npm.id(), "");
