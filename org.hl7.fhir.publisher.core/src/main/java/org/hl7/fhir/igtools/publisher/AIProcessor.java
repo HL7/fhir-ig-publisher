@@ -245,7 +245,7 @@ public class AIProcessor {
   }
 
   private String tail(String rt) {
-    return rt.substring(rt.lastIndexOf('/') + 1);
+    return rt.contains("/") ? rt.substring(rt.lastIndexOf('/') + 1) : rt;
   }
 
   private int produceMDForPage(StringBuilder llms, Page p, ZipGenerator zip, NpmPackage npm) throws IOException {
@@ -331,7 +331,7 @@ public class AIProcessor {
                 "\r\n```\r\n";
       }
       if (r.filename == null) {
-        r.filename = r.resource.asString("resourceType") + "-" + r.resource.asString("id") + ".html";
+        r.filename = tail(r.resource.asString("resourceType")) + "-" + r.resource.asString("id") + ".html";
       }
       String dest = FileUtilities.changeFileExt(r.filename, ".md");
       if (newML) {

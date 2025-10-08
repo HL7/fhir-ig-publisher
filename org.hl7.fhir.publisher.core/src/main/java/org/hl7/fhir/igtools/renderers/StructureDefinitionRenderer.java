@@ -919,7 +919,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (strength == null) {
       tr.td();
     } else {
-      tr.td().ah(Utilities.pathURL(corePath, "terminologies.html#" + tx.getStrengthElement())).setAttribute("opacity", opacityStr(strengthInh)).tx(gen.getTranslated(tx.getStrengthElement()));
+      tr.td().ah(Utilities.pathURL(corePath, "terminologies.html#" + tx.getStrengthElement())).style("opacity: "+opacityStr(strengthInh)).tx(gen.getTranslated(tx.getStrengthElement()));
     }
     XhtmlNode td = tr.td();
     if (tx.hasDescription()) {
@@ -935,16 +935,16 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (vs == null) {
       String name = getSpecialValueSetName(uri);
       if (name != null) {
-        td.ah(getSpecialValueSetUrl(uri)).setAttribute("opacity", opacityStr(inherited)).tx(name);
+        td.ah(getSpecialValueSetUrl(uri)).style("opacity: "+opacityStr(inherited)).tx(name);
       } else {
         BindingResolution br = igp.resolveActualUrl(uri);
         if (br.url == null) {
           td.markdown(br.display, "binding");
         } else if (Utilities.isAbsoluteUrlLinkable(br.url)) {
-          td.ah(br.url).setAttribute("opacity", opacityStr(inherited)).tx(br.display);
+          td.ah(br.url).style("opacity: "+opacityStr(inherited)).tx(br.display);
           td.button("btn-copy", gen.formatPhrase(RenderingI18nContext.SDR_CLICK_COPY)).setAttribute("data-clipboard-text", tx.getValueSet());
         } else {
-          td.ah(prefix + br.url).setAttribute("opacity", opacityStr(inherited)).tx(br.display);
+          td.ah(prefix + br.url).style("opacity: "+opacityStr(inherited)).tx(br.display);
           td.button("btn-copy", gen.formatPhrase(RenderingI18nContext.SDR_CLICK_COPY)).setAttribute("data-clipboard-text", tx.getValueSet());
         }
         showVersion(tr.td(), uri, null);
@@ -953,9 +953,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     } else {
       String p = vs.getWebPath();
       if (p == null) {
-        td.ah("??").setAttribute("opacity", opacityStr(inherited)).tx(gen.getTranslated(vs.getTitleElement(), vs.getNameElement()) + " (" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_MISSING_LINK)) + ")");
+        td.ah("??").style("opacity: "+opacityStr(inherited)).tx(gen.getTranslated(vs.getTitleElement(), vs.getNameElement()) + " (" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_MISSING_LINK)) + ")");
       } else {
-        td.ah(p).setAttribute("opacity", opacityStr(inherited)).tx(gen.getTranslated(vs.getTitleElement(), vs.getNameElement()));
+        td.ah(p).style("opacity: "+opacityStr(inherited)).tx(gen.getTranslated(vs.getTitleElement(), vs.getNameElement()));
       }
       td.button("btn-copy", gen.formatPhrase(RenderingI18nContext.SDR_CLICK_COPY)).setAttribute("data-clipboard-text", tx.getValueSet());
       if (vs.hasUserData(UserDataNames.render_external_link)) {
