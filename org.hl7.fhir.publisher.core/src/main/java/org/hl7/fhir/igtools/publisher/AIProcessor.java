@@ -183,6 +183,9 @@ public class AIProcessor {
     for (NpmPackage.PackagedResourceFile p : npm.listAllResources()) {
       JsonObject res = JsonParser.parseObject(npm.load(p.getFolder(), p.getFilename()));
       String rt = res.asString("resourceType");
+      if (Utilities.isAbsoluteUrl(rt)) {
+        rt = "Binary-"+tail(rt);
+      }
       String id = res.asString("id");
       if (id != null && !ids.contains(rt + "/" + id)) {
         LoadedResource lr = new LoadedResource();
@@ -239,6 +242,10 @@ public class AIProcessor {
       }
     }
     return npm;
+  }
+
+  private String tail(String rt) {
+    return rt.substring(rt.lastIndexOf('/') + 1);
   }
 
   private int produceMDForPage(StringBuilder llms, Page p, ZipGenerator zip, NpmPackage npm) throws IOException {
@@ -332,11 +339,15 @@ public class AIProcessor {
       } else {
         llms.append("* [" + r.name + "](" + dest + ")\r\n");
       }
-      FileUtilities.stringToFileIfDifferent(md, Utilities.path(dir, dest));
+      FileUtilities.stringToFile(md, Utilities.path(dir, dest));
       zip.addFileSource(dest, md, true);
       return md.length();
     } catch (Exception e) {
-      throw new FHIRException("Unable to process " + p.f.getAbsolutePath(), e);
+      if (p != null) {
+        throw new FHIRException("Unable to process page " + p.f.getAbsolutePath(), e);
+      } else {
+        throw new FHIRException("Unable to process resource " + r.filename, e);
+      }
     }
   }
 

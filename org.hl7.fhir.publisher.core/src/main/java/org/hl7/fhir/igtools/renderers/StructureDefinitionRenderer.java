@@ -913,7 +913,6 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       strength = txi.getStrength();
       strengthInh = true;
     }
-
     XhtmlNode tr = tbl.tr();
     tr.td().tx(Utilities.insertBreakingSpaces(path, new HashSet<>(Arrays.asList('.'))));
     tr.td().tx("Base");
@@ -932,12 +931,12 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (tx.getValueSet() != null) {
       uri = tx.getValueSet().trim();
     }
-    String name = getSpecialValueSetName(uri);
-    if (name != null) {
-      td.ah(getSpecialValueSetUrl(uri)).setAttribute("opacity", opacityStr(inherited)).tx(name);
-    } else {
-      ValueSet vs = context.findTxResource(ValueSet.class, canonicalise(uri));
-      if (vs == null) {
+    ValueSet vs = context.findTxResource(ValueSet.class, canonicalise(uri));
+    if (vs == null) {
+      String name = getSpecialValueSetName(uri);
+      if (name != null) {
+        td.ah(getSpecialValueSetUrl(uri)).setAttribute("opacity", opacityStr(inherited)).tx(name);
+      } else {
         BindingResolution br = igp.resolveActualUrl(uri);
         if (br.url == null) {
           td.markdown(br.display, "binding");
@@ -950,46 +949,47 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         }
         showVersion(tr.td(), uri, null);
         tr.td().tx("Unknown");
-      } else {
-        String p = vs.getWebPath();
-        if (p == null) {
-          td.ah("??").setAttribute("opacity", opacityStr(inherited)).tx(gen.getTranslated(vs.getTitleElement(), vs.getNameElement()) + " (" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_MISSING_LINK)) + ")");
-        } else {
-          td.ah(p).setAttribute("opacity", opacityStr(inherited)).tx(gen.getTranslated(vs.getTitleElement(), vs.getNameElement()));
-        }
-        td.button("btn-copy", gen.formatPhrase(RenderingI18nContext.SDR_CLICK_COPY)).setAttribute("data-clipboard-text", tx.getValueSet());
-        if (vs.hasUserData(UserDataNames.render_external_link)) {
-          td.img("external.png", ".");
-        }
-        showVersion(tr.td(), uri, vs);
-
-        String src = null;
-        String link = null;
-        if (vs.hasSourcePackage()) {
-          if (VersionUtilities.isCorePackage(vs.getSourcePackage().getId())) {
-            src = gen.formatPhrase(RenderingI18nContext.SDR_SRC_FHIR);
-            link = gen.getLink(RenderingContext.KnownLinkType.SPEC, true);
-          } else if (!Utilities.isAbsoluteUrlLinkable(vs.getWebPath())) {
-            src = gen.formatPhrase(RenderingI18nContext.SDR_SRC_IG);
-            link = null;
-          } else {
-            String pname = getSourcePackageName(vs.getSourcePackage());
-            src = pname + " v" + presentVersion(vs.getSourcePackage());
-            link = vs.getSourcePackage().getWeb();
-          }
-        } else if (vs.hasUserData(UserDataNames.render_external_link)) {
-          src =  vs.getUserString(UserDataNames.render_external_link);
-          link = vs.getUserString(UserDataNames.render_external_link);
-          try {
-            src = new URL(src).getHost();
-          } catch (Exception e) {
-            // nothing
-          }
-        } else {
-          src = "unknown?";
-        }
-        tr.td().ahOrNot(link).tx(src);
       }
+    } else {
+      String p = vs.getWebPath();
+      if (p == null) {
+        td.ah("??").setAttribute("opacity", opacityStr(inherited)).tx(gen.getTranslated(vs.getTitleElement(), vs.getNameElement()) + " (" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_MISSING_LINK)) + ")");
+      } else {
+        td.ah(p).setAttribute("opacity", opacityStr(inherited)).tx(gen.getTranslated(vs.getTitleElement(), vs.getNameElement()));
+      }
+      td.button("btn-copy", gen.formatPhrase(RenderingI18nContext.SDR_CLICK_COPY)).setAttribute("data-clipboard-text", tx.getValueSet());
+      if (vs.hasUserData(UserDataNames.render_external_link)) {
+        td.img("external.png", ".");
+      }
+      showVersion(tr.td(), uri, vs);
+
+      String src = null;
+      String link = null;
+      if (vs.hasSourcePackage()) {
+        if (VersionUtilities.isCorePackage(vs.getSourcePackage().getId())) {
+          src = gen.formatPhrase(RenderingI18nContext.SDR_SRC_FHIR);
+          link = gen.getLink(RenderingContext.KnownLinkType.SPEC, true);
+        } else if (!Utilities.isAbsoluteUrlLinkable(vs.getWebPath())) {
+          src = gen.formatPhrase(RenderingI18nContext.SDR_SRC_IG);
+          link = null;
+        } else {
+          String pname = getSourcePackageName(vs.getSourcePackage());
+          src = pname + " v" + presentVersion(vs.getSourcePackage());
+          link = vs.getSourcePackage().getWeb();
+        }
+      } else if (vs.hasUserData(UserDataNames.render_external_link)) {
+        src = vs.getUserString(UserDataNames.render_external_link);
+        link = vs.getUserString(UserDataNames.render_external_link);
+        try {
+          src = new URL(src).getHost();
+        } catch (Exception e) {
+          // nothing
+        }
+      } else {
+        src = "unknown?";
+      }
+      tr.td().ahOrNot(link).tx(src);
+
 //        String system = ValueSetUtilities.getAllCodesSystem(vs);
 //        if (system != null) {
 //          SystemReference sr = CodeSystemUtilities.getSystemReference(system, context);
