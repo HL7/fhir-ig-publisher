@@ -624,6 +624,8 @@ public class PublisherIGLoader extends PublisherBase {
             pf.anyExtensionsAllowed = true;
           else if (p.getValue().equals("check-aggregation"))
             pf.checkAggregation = true;
+          else if (p.getValue().equals("strict-identifier-systems"))
+            pf.strictIdentifierSystems = true;
           else if (p.getValue().equals("no-broken-links"))
             pf.brokenLinksError = true;
           else if (p.getValue().equals("show-reference-messages"))
@@ -1073,6 +1075,7 @@ public class PublisherIGLoader extends PublisherBase {
     pf.validator.setWantCheckSnapshotUnchanged(true);
     pf.validator.setForPublication(true);
     pf.validator.getSettings().setDisplayWarningMode(pf.displayWarnings);
+    pf.validator.setStrictIdentifierSystems(pf.strictIdentifierSystems);
     pf.cu = new ContextUtilities(pf.context, pf.suppressedMappings);
 
     pf.pvalidator = new ProfileValidator(pf.context, pf.validator.getSettings(), pf.context.getXVer(), pf.validatorSession);
