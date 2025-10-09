@@ -7707,5 +7707,107 @@
       "time" : 606821,
       "memory" : 6709915648
     }
+  },
+  "2.0.20" : {
+    "sync-date" : "2025-10-09",
+    "date" : "2025-10-09",
+    "hl7.fhir.template.ig" : {
+      "errors" : 0,
+      "warnings" : 0,
+      "hints" : 0,
+      "time" : 864,
+      "memory" : 8668536
+    },
+    "ihe.mhd.fhir" : {
+      "errors" : 3,
+      "warnings" : 169,
+      "hints" : 31,
+      "time" : 616171,
+      "memory" : 2319289232
+    },
+    "hl7.cda.uv.core" : {
+      "errors" : 19,
+      "warnings" : 17,
+      "hints" : 21,
+      "time" : 182420,
+      "memory" : 1764588520
+    },
+    "hl7.fhir.uv.ipa" : {
+      "errors" : 35,
+      "warnings" : 20,
+      "hints" : 53,
+      "time" : 222376,
+      "memory" : 2266935312
+    },
+    "hl7.fhir.uv.sdc" : {
+      "errors" : 213,
+      "warnings" : 2,
+      "hints" : 37,
+      "time" : 1574296,
+      "memory" : 2974791928
+    },
+    "hl7.base.template.ig" : {
+      "errors" : 0,
+      "warnings" : 0,
+      "hints" : 0,
+      "time" : 68,
+      "memory" : 6291456
+    },
+    "hl7.fhir.uv.howto" : {
+      "errors" : 64,
+      "warnings" : 58,
+      "hints" : 36,
+      "time" : 412008,
+      "memory" : 1631584256
+    },
+    "smart.who.int.icvp" : {
+      "errors" : 122,
+      "warnings" : 159,
+      "hints" : 78,
+      "time" : 575131,
+      "memory" : 4630731312
+    },
+    "fhir.base.template.ig" : {
+      "errors" : 0,
+      "warnings" : 0,
+      "hints" : 0,
+      "time" : 1194,
+      "memory" : 193524472
+    },
+    "hl7.fhir.au.base" : {
+      "errors" : 3,
+      "warnings" : 384,
+      "hints" : 35,
+      "time" : 1584460,
+      "memory" : 2395990016
+    },
+    "example.fhir.uv.myig" : {
+      "errors" : 32,
+      "warnings" : 28,
+      "hints" : 9,
+      "time" : 461361,
+      "memory" : 1547609760
+    },
+    "hl7.fhir.uv.extensions" : {
+      "errors" : 39,
+      "warnings" : 2,
+      "hints" : 34,
+      "time" : 854560,
+      "memory" : 3970672784
+    },
+    "hl7.fhir.uv.ips" : {
+      "errors" : 2,
+      "warnings" : 5,
+      "hints" : 19,
+      "time" : 3104154,
+      "memory" : 1961059120
+    },
+    "hl7.fhir.uv.tools" : {
+      "errors" : 5,
+      "warnings" : 6,
+      "hints" : 20,
+      "time" : 124974,
+      "memory" : 3519272320
+    }
   }
 }
