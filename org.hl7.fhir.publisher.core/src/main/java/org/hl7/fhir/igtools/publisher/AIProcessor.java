@@ -1,11 +1,12 @@
-package org.hl7.fhir.igtools.publisher.utils;
+package org.hl7.fhir.igtools.publisher;
 
 import org.apache.commons.codec.binary.Base64;
+import org.eclipse.persistence.internal.sessions.DirectCollectionChangeRecord;
 import org.hl7.fhir.exceptions.FHIRException;
-import org.hl7.fhir.igtools.publisher.SpecMapManager;
-import org.hl7.fhir.utilities.FileUtilities;
-import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.ZipGenerator;
+import org.hl7.fhir.igtools.publisher.utils.OldIGAIGenerator;
+import org.hl7.fhir.r5.model.ImplementationGuide;
+import org.hl7.fhir.utilities.*;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 import org.hl7.fhir.utilities.json.model.JsonElement;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
@@ -20,71 +21,150 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.*;
 
-public class OldIGAIGenerator {
+/**
+ * The AI generation code does this:
+ *
+ * create a file llms.txt which is actually mardkown (I don't know why they set it up that way)
+ * for every generated html file, figure out whether it is: authored page, base resource page, or other resource page
+ * for authored pages and base resource pages, convert the xhtml to markdown, stripping stuff from the templates
+ * link to them from llms.txt in an organised fashion
+ * create a zip file ai.zip so people can download all that
+ *
+ * I already processed all the already published IGs like thisGrahame Grieve: so see, say, http://hl7.org/fhir/us/core/llms.txt
+ */
+public class AIProcessor {
+  private final String rootDir;
 
-  public static void main(String[] args) throws IOException {
-    new OldIGAIGenerator().execute(new File("/Users/grahamegrieve/web/www.hl7.org.fhir"));
-    System.out.println("done");
+  public AIProcessor(String rootDir) {
+    this.rootDir = rootDir;
   }
 
-  private void execute(File dir) throws IOException {
-    for (File f : dir.listFiles()) {
-      if (f.isDirectory()) {
-        execute(f);
-      } else if (f.getName().equals("package.tgz")) {
-        processIg(dir);
-      }
+  /**
+   * process this on a per language basis
+   *
+   * @param langs
+   * @throws IOException
+   */
+  public void processNewTemplates(List<String> langs) throws IOException {
+    // processing new templates is different to old template because of the layout with regard to
+    // languages, and because there's a specific .ai file
+    NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(Utilities.path(rootDir, "package.tgz")));
+
+    for (String lang : langs) {
+      processFolderNew(new File(Utilities.path(rootDir, lang)), npm, lang);
     }
   }
 
-  private void processIg(File dir) throws IOException {
-    if (new File(Utilities.path(dir, "ai.zip")).exists()) {
-      return;
-    }
+  /**
+   * process this for an old template
+   *
+   * @throws IOException
+   */
+  public void processOldTemplates() throws IOException {
+    NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(Utilities.path(rootDir, "package.tgz")));
+    processFolderOld(new File(rootDir), npm);
+  }
+
+  public void processFolderNew(File dir, NpmPackage npm, String lang) throws IOException {
     List<LoadedResource> resources = new ArrayList<>();
     List<Page> pages = new ArrayList<>();
 
     // list all the resources in the IG, and note their type and whether they're an example
-    NpmPackage npm = loadResources(dir, resources);
-    if (npm != null) {
-      // now list all the pages in the IG, and decide whether they are a page, a resource, or an alternate view of a resource
-      long oldSize = loadPages(dir, pages, resources);
-      long newSize = 0;
+    loadResources(dir, resources, npm, true);
 
-      ZipGenerator zip = new ZipGenerator(Utilities.path(dir, "ai-prep.zip"));
-      StringBuilder llms = new StringBuilder();
-      llms.append("# " + npm.vid() + ": " + npm.title() + "\r\n\r\n");
-      llms.append("## Pages\r\n\r\n");
-      for (Page p : pages) {
-        if (p.f.getName().equals("index.html")) {
-          newSize += produceMDForPage(llms, p, zip);
-        }
+    // now list all the pages in the IG, and decide whether they are a page, a resource, or an alternate view of a resource
+    long oldSize = loadPages(dir, pages, resources);
+    long newSize = 0;
+
+    ZipGenerator zip = new ZipGenerator(Utilities.path(dir, "ai.zip"));
+    StringBuilder llms = new StringBuilder();
+    llms.append("# " + npm.vid() + ": " + npm.title() + "("+lang+")\r\n\r\n");
+    llms.append("## Pages\r\n\r\n");
+    for (Page p : pages) {
+      if (p.f.getName().equals("index.html")) {
+        newSize += produceMDForPage(llms, p, zip, npm);
       }
-      for (Page p : pages) {
-        if (!p.f.getName().equals("index.html") && p.kind == PageKind.PAGE) {
-          newSize += produceMDForPage(llms, p, zip);
-        }
-      }
-      llms.append("\r\n## Resources\r\n");
-      resources.sort(new LoadedResourceSorter());
-      String t = null;
-      for (LoadedResource r : resources) {
-        Page p = getPageForResource(r, pages);
-        if (!r.type.equals(t)) {
-          t = r.type;
-          llms.append("\r\n### " + t.substring(1) + "\r\n\r\n");
-        }
-        newSize += produceMDForResource(llms, r, p, dir, zip);
-      }
-      zip.addFileSource("llms.txt", llms.toString(), false);
-      zip.addFileSource("llms.md", llms.toString(), false);
-      zip.close();
-      new File(Utilities.path(dir, "ai-prep.zip")).renameTo(new File(Utilities.path(dir, "ai.zip")));
-      FileUtilities.stringToFileIfDifferent(llms.toString(), Utilities.path(dir, "llms.txt"));
-      newSize += llms.toString().length();
-      String pct = oldSize == 0 ? "n/a" : "" + (100 - ((newSize * 100) / oldSize));
-      System.out.println("Processed " + dir.getAbsolutePath() + " - % reduction = " + pct+" ("+oldSize+" ==> "+newSize+")");
     }
+    for (Page p : pages) {
+      if (!p.f.getName().equals("index.html") && p.kind == PageKind.PAGE) {
+        newSize += produceMDForPage(llms, p, zip, npm);
+      }
+    }
+    llms.append("\r\n## Resources\r\n");
+    resources.sort(new LoadedResourceSorter());
+    String t = null;
+    for (LoadedResource r : resources) {
+      Page p = getPageForResource(r, pages);
+      if (!r.type.equals(t)) {
+        t = r.type;
+        llms.append("\r\n### " + t.substring(1) + "\r\n\r\n");
+      }
+      String bn = r.filename;
+      r.filename = r.filename.replace(".html", ".ai.html");
+      newSize += produceMDForResource(llms, r, p, dir, zip, true);
+      file(dir, r.filename).delete();
+      file(dir, r.filename, ".md").renameTo(file(dir, bn, ".md"));
+    }
+    zip.addFileSource("llms.txt", llms.toString(), false);
+    zip.addFileSource("llms.md", llms.toString(), false);
+    zip.close();
+    FileUtilities.stringToFile(llms.toString(), Utilities.path(dir, "llms.txt"));
+    newSize += llms.toString().length();
+    String pct = oldSize == 0 ? "n/a" : "" + (100 - ((newSize * 100) / oldSize));
+    System.out.println("AI format for " + dir.getAbsolutePath() + " - % reduction = " + pct);
+  }
+
+  private File file(File dir, String s, String ext) throws IOException {
+    return ManagedFileAccess.file(Utilities.path(dir, FileUtilities.changeFileExt(s, ext)));
+  }
+
+  private File file(File dir, String s) throws IOException {
+    return ManagedFileAccess.file(Utilities.path(dir, s));
+  }
+
+  public void processFolderOld(File dir, NpmPackage npm) throws IOException {
+    List<LoadedResource> resources = new ArrayList<>();
+    List<Page> pages = new ArrayList<>();
+
+    // list all the resources in the IG, and note their type and whether they're an example
+    loadResources(dir, resources, npm, false);
+    // now list all the pages in the IG, and decide whether they are a page, a resource, or an alternate view of a resource
+    long oldSize = loadPages(dir, pages, resources);
+    long newSize = 0;
+
+    ZipGenerator zip = new ZipGenerator(Utilities.path(dir, "ai-prep.zip"));
+    StringBuilder llms = new StringBuilder();
+    llms.append("# " + npm.vid() + ": " + npm.title() + "\r\n\r\n");
+    llms.append("## Pages\r\n\r\n");
+    for (Page p : pages) {
+      if (p.f.getName().equals("index.html")) {
+        newSize += produceMDForPage(llms, p, zip, npm);
+      }
+    }
+    for (Page p : pages) {
+      if (!p.f.getName().equals("index.html") && p.kind == PageKind.PAGE) {
+        newSize += produceMDForPage(llms, p, zip, npm);
+      }
+    }
+    llms.append("\r\n## Resources\r\n");
+    resources.sort(new LoadedResourceSorter());
+    String t = null;
+    for (LoadedResource r : resources) {
+      Page p = getPageForResource(r, pages);
+      if (!r.type.equals(t)) {
+        t = r.type;
+        llms.append("\r\n### " + t.substring(1) + "\r\n\r\n");
+      }
+      newSize += produceMDForResource(llms, r, p, dir, zip, false);
+    }
+    zip.addFileSource("llms.txt", llms.toString(), false);
+    zip.addFileSource("llms.md", llms.toString(), false);
+    zip.close();
+    new File(Utilities.path(dir, "ai-prep.zip")).renameTo(new File(Utilities.path(dir, "ai.zip")));
+    FileUtilities.stringToFile(llms.toString(), Utilities.path(dir, "llms.txt"));
+    newSize += llms.toString().length();
+    String pct = oldSize == 0 ? "n/a" : "" + (100 - ((newSize * 100) / oldSize));
+    System.out.println("Processed " + dir.getAbsolutePath() + " - % reduction = " + pct + " (" + oldSize + " ==> " + newSize + ")");
   }
 
 
@@ -97,16 +177,15 @@ public class OldIGAIGenerator {
     return null;
   }
 
-  private NpmPackage loadResources(File dir, List<LoadedResource> resources) throws IOException {
-    NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(Utilities.path(dir, "package.tgz")));
-    if (npm.isCore() || !npm.hasFile("other", "spec.internals")) {
-      return null;
-    }
+  private NpmPackage loadResources(File dir, List<LoadedResource> resources, NpmPackage npm, boolean newML) throws IOException {
     SpecMapManager spm = new SpecMapManager(FileUtilities.streamToBytes(npm.load("other", "spec.internals")), npm.vid(), npm.fhirVersion());
     Set<String> ids = new HashSet<>();
     for (NpmPackage.PackagedResourceFile p : npm.listAllResources()) {
       JsonObject res = JsonParser.parseObject(npm.load(p.getFolder(), p.getFilename()));
       String rt = res.asString("resourceType");
+      if (Utilities.isAbsoluteUrl(rt)) {
+        rt = "Binary-"+tail(rt);
+      }
       String id = res.asString("id");
       if (id != null && !ids.contains(rt + "/" + id)) {
         LoadedResource lr = new LoadedResource();
@@ -115,13 +194,17 @@ public class OldIGAIGenerator {
           res.remove("text");
         }
         ids.add(rt + "/" + id);
-        if (res.has("url")) {
-          lr.filename = spm.getPath(res.asString("url"), null, rt, id);
+        if (newML) {
+          lr.filename = rt+"-"+id+".html";
         } else {
-          lr.filename = spm.getPath(rt, id);
-        }
-        if (Utilities.isAbsoluteUrl(lr.filename)) {
-          lr.filename = lr.filename.substring(lr.filename.lastIndexOf('/') + 1);
+          if (res.has("url")) {
+            lr.filename = spm.getPath(res.asString("url"), null, rt, id);
+          } else {
+            lr.filename = spm.getPath(rt, id);
+          }
+          if (Utilities.isAbsoluteUrl(lr.filename)) {
+            lr.filename = lr.filename.substring(lr.filename.lastIndexOf('/') + 1);
+          }
         }
         lr.resource = res;
         lr.name = readName(res);
@@ -161,17 +244,38 @@ public class OldIGAIGenerator {
     return npm;
   }
 
-  private int produceMDForPage(StringBuilder llms, Page p, ZipGenerator zip) throws IOException {
+  private String tail(String rt) {
+    return rt.contains("/") ? rt.substring(rt.lastIndexOf('/') + 1) : rt;
+  }
+
+  private int produceMDForPage(StringBuilder llms, Page p, ZipGenerator zip, NpmPackage npm) throws IOException {
 //    System.out.println("Processing "+p.f.getAbsolutePath());
     try {
       XhtmlNode xhtml = new XhtmlParser().setMustBeWellFormed(false).parse(new FileInputStream(p.f), "html");
-      XhtmlNode x =  xhtml.firstNamedDescendent("head");
+      XhtmlNode x = xhtml.firstNamedDescendent("head");
       x = x == null ? x : x.firstNamedDescendent("title");
       String title = x == null ? "Untitled" : x.allText();
       XhtmlToMarkdownConverter conv = new XhtmlToMarkdownConverter(false);
       conv.configureForIGs(true);
       String md = conv.convert(xhtml);
       String dest = FileUtilities.changeFileExt(p.f.getName(), ".md");
+
+      if (npm.title() != null) {
+        title = title.replace(npm.title(), "");
+      }
+      if (npm.id() != null) {
+        title = title.replace(npm.id(), "");
+      }
+      if (npm.version() != null) {
+        title = title.replace("v" + npm.version(), "").replace(npm.version(), "");
+      }
+      if (npm.name() != null) {
+        title = title.replace(npm.name(), "");
+      }
+      title = title.trim();
+      if (title.endsWith("-")) {
+        title = title.substring(0, title.length() - 1).trim();
+      }
       llms.append("* [" + title + "](" + dest + ")\r\n");
       FileUtilities.stringToFileIfDifferent(md, Utilities.path(FileUtilities.getDirectoryForFile(p.f), dest));
       zip.addFileSource(dest, md, false);
@@ -181,7 +285,7 @@ public class OldIGAIGenerator {
     }
   }
 
-  private int produceMDForResource(StringBuilder llms, LoadedResource r, Page p, File dir, ZipGenerator zip) throws IOException {
+  private int produceMDForResource(StringBuilder llms, LoadedResource r, Page p, File dir, ZipGenerator zip, boolean newML) throws IOException {
 //    System.out.println("Processing "+p.f.getAbsolutePath());
     try {
       String md;
@@ -211,12 +315,12 @@ public class OldIGAIGenerator {
       if ("Binary".equals(r.resource.asString("resourceType"))) {
         if (isText(r.resource.asString("contentType"))) {
           md = md + "\r\n\r\n## Resource Binary Content\r\n\r\n" +
-                  r.resource.asString("contentType")+":\r\n\r\n```\r\n" +
+                  r.resource.asString("contentType") + ":\r\n\r\n```\r\n" +
                   Base64.decodeBase64(r.resource.asString("data")) +
                   "\r\n```\r\n";
         } else {
           md = md + "\r\n\r\n## Resource Binary Content\r\n\r\n" +
-                  r.resource.asString("contentType")+":\r\n\r\n```\r\n" +
+                  r.resource.asString("contentType") + ":\r\n\r\n```\r\n" +
                   "{snip}" +
                   "\r\n```\r\n";
         }
@@ -227,20 +331,28 @@ public class OldIGAIGenerator {
                 "\r\n```\r\n";
       }
       if (r.filename == null) {
-        r.filename = r.resource.asString("resourceType") + "-" + r.resource.asString("id") + ".html";
+        r.filename = tail(r.resource.asString("resourceType")) + "-" + r.resource.asString("id") + ".html";
       }
       String dest = FileUtilities.changeFileExt(r.filename, ".md");
-      llms.append("* [" + r.name + "](" + dest + ")\r\n");
-      FileUtilities.stringToFileIfDifferent(md, Utilities.path(dir, dest));
+      if (newML) {
+        llms.append("* [" + r.name + "](" + dest.replace(".ai", "")+ ")\r\n");
+      } else {
+        llms.append("* [" + r.name + "](" + dest + ")\r\n");
+      }
+      FileUtilities.stringToFile(md, Utilities.path(dir, dest));
       zip.addFileSource(dest, md, true);
       return md.length();
     } catch (Exception e) {
-      throw new FHIRException("Unable to process " + p.f.getAbsolutePath(), e);
+      if (p != null) {
+        throw new FHIRException("Unable to process page " + p.f.getAbsolutePath(), e);
+      } else {
+        throw new FHIRException("Unable to process resource " + r.filename, e);
+      }
     }
   }
 
   private boolean isText(String contentType) {
-    return contentType.startsWith("text/");
+    return (contentType.startsWith("text/"));
   }
 
   private void stripDiv(XhtmlNode x, String s) {
@@ -353,4 +465,5 @@ public class OldIGAIGenerator {
       return o1.type.compareTo(o2.type);
     }
   }
+
 }

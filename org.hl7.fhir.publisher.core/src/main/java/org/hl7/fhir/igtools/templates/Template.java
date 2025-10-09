@@ -476,7 +476,9 @@ public class Template {
       ValidationMessage vm = ExtensionUtilities.readValidationMessage(issue, Source.Template);
       if (vm.getLevel() == IssueSeverity.FATAL)
         throw new FHIRException("Fatal Error from Template: "+vm.getMessage());
-      res.get(source).add(vm);
+      if (vm.getLevel() != null) {
+        res.get(source).add(vm);
+      }
     }    
   }
 

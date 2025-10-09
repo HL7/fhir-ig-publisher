@@ -506,6 +506,8 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     for (ValidationMessage vm : linkErrors) {
       if (vm.getSource() == Source.LinkChecker) {
         link++;
+      } else if (vm.getLevel() == null) {
+        err++;
       } else if (vm.getLevel().equals(ValidationMessage.IssueSeverity.FATAL)||vm.getLevel().equals(ValidationMessage.IssueSeverity.ERROR))
         err++;
       else if (vm.getLevel().equals(ValidationMessage.IssueSeverity.WARNING))
@@ -1009,7 +1011,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
           passesFilter = false;
         }
       }
-      if (message.getLevel().isError()) {
+      if (message.getLevel() != null && message.getLevel().isError()) {
         if (suppressedMessages.contains(message.getDisplay(), message) || suppressedMessages.contains(message.getMessage(), message) ||
             suppressedMessages.contains(message.getHtml(), message) || suppressedMessages.contains(message.getMessageId(), message) || 
             suppressedMessages.contains(message.getInvId(), message)) {
