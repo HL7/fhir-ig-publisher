@@ -72,7 +72,8 @@ public class AllGuidesTests {
     System.out.println("===== Analysis ======================================================================");
     System.out.println("-- output in "+Utilities.path(FhirSettings.getTestIgsPath(), "actual", id+".txt")+" --");
     
-    // to make diff programs easy to run
+    // to make diff programs eas
+    // .y to run
     File actual = new File(Utilities.path(FhirSettings.getTestIgsPath(), "actual", id + ".json"));
     IOUtils.copy(new FileInputStream(Utilities.path(FhirSettings.getTestIgsPath(), id, "output", "qa.json")), new FileOutputStream(actual));
     JsonObject o = JsonParser.parseObject(actual);
