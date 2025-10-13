@@ -1525,8 +1525,10 @@ public class PublisherGenerator extends PublisherBase {
       String displ = this.pf.context.validateCode(new ValidationOptions(FhirPublication.R5, "en-US"), new Coding("http://hl7.org/fhir/spdx-license",  lic, null), null).getDisplay();
       new OpenApiGenerator(this.pf.context, cpbs, oa).generate(displ, "http://spdx.org/licenses/"+lic+".html");
       oa.commit();
-      this.pf.otherFilesRun.add(Utilities.path(this.pf.tempDir, cpbs.getId()+lp+ ".openapi.json"));
-      addFileToNpm(NPMPackageGenerator.Category.OPENAPI, cpbs.getId()+ lp+".openapi.json", FileUtilities.fileToBytes(Utilities.path(this.pf.tempDir, cpbs.getId()+lp+".openapi.json")));
+      if (lang == null) {
+        this.pf.otherFilesRun.add(Utilities.path(this.pf.tempDir, cpbs.getId()+lp+ ".openapi.json"));
+        addFileToNpm(NPMPackageGenerator.Category.OPENAPI, cpbs.getId()+ lp+".openapi.json", FileUtilities.fileToBytes(Utilities.path(this.pf.tempDir, cpbs.getId()+lp+".openapi.json")));
+      }
     }
   }
 
