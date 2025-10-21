@@ -5,6 +5,7 @@ import org.hl7.fhir.convertors.factory.*;
 import org.hl7.fhir.convertors.txClient.TerminologyClientFactory;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.openehr.ArchetypeImporter;
+import org.hl7.fhir.igtools.openehr.CKMClient;
 import org.hl7.fhir.igtools.publisher.comparators.IpaComparator;
 import org.hl7.fhir.igtools.publisher.comparators.IpsComparator;
 import org.hl7.fhir.igtools.publisher.comparators.PreviousVersionComparator;
@@ -125,6 +126,15 @@ public class PublisherIGLoader extends PublisherBase {
       throw new Error("There is a space in the folder path: \""+focusDir()+"\". Please fix your directory arrangement to remove the space and try again");
     }
     if (pf.configFile != null) {
+      File ckm = new File(Utilities.path(focusDir(), "ckm.ini"));
+      if (ckm.exists()) {
+        IniFile ini = new IniFile(ckm.getAbsolutePath());
+        if (ini.getBooleanProperty("ckm", "process")) {
+          if (!new CKMClient().process(ini, new File(Utilities.path(focusDir(), ini.getStringProperty("ckm", "destination"))))) {
+            throw new Error("Failed to process CKM API - stopping");
+          }
+        }
+      }
       File fsh = new File(Utilities.path(focusDir(), "fsh"));
       if (fsh.exists() && fsh.isDirectory() && !pf.noSushi) {
         prescanSushiConfig(focusDir());
