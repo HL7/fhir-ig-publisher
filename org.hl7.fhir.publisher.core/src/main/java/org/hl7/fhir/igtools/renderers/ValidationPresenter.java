@@ -81,6 +81,8 @@ import org.stringtemplate.v4.ST;
 
 public class ValidationPresenter implements Comparator<FetchedFile> {
 
+  private int vmid = 0;
+
   public enum LanguagePopulationPolicy {
     NONE, IG, OTHERS, ALL;
     
@@ -1180,18 +1182,28 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       "   <tr style=\"background-color: $halfcolor$\">\r\n"+
       "     <td><a href=\"$xlink$\">$fpath$</a></td><td><b>$msg$</b>$comment$</td>\r\n"+
       "   </tr>\r\n";
-  
-  
-  private final String detailsTemplateTxLink = 
-      "   <tr style=\"background-color: $color$\">\r\n"+
-      "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$</a>, see <a href=\"$tx$\">log</a>) <span class=\"code-value code-hidden\" style=\"font-size: 8px; color: navy\">$mid$</span></td>\r\n"+
-      "   </tr>\r\n";
-  
-  private final String detailsTemplateTxNoLink = 
-      "   <tr style=\"background-color: $color$\">\r\n"+
-      "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$</a>) <span class=\"code-value code-hidden\" style=\"font-size: 8px; color: navy\">$mid$</span></td>\r\n"+
-      "   </tr>\r\n";
-  
+
+
+  private final String detailsTemplateTxLink =
+          "   <tr style=\"background-color: $color$\">\r\n"+
+                  "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$</a>, see <a href=\"$tx$\">log</a>) <span class=\"code-value code-hidden\" style=\"font-size: 8px; color: navy\">$mid$</span></td>\r\n"+
+                  "   </tr>\r\n";
+
+  private final String detailsTemplateTxLinkDiagnostics =
+          "   <tr style=\"background-color: $color$\">\r\n"+
+                  "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$</a>, see <a href=\"$tx$\">log</a>, or see <a href=\"#$vmid$\" onClick=\"document.getElementById('$vmid$').style.display='block'\">the servers logic</a>) <span class=\"code-value code-hidden\" style=\"font-size: 8px; color: navy\">$mid$</span><div id=\"$vmid$\" style=\"display:none\"><br/><pre>$diags$</pre></div></td>\r\n"+
+                  "   </tr>\r\n";
+
+  private final String detailsTemplateTxNoLink =
+          "   <tr style=\"background-color: $color$\">\r\n"+
+                  "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$</a>) <span class=\"code-value code-hidden\" style=\"font-size: 8px; color: navy\">$mid$</span></td>\r\n"+
+                  "   </tr>\r\n";
+
+  private final String detailsTemplateTxNoLinkDiagnostics =
+          "   <tr style=\"background-color: $color$\">\r\n"+
+                  "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$</a> - see <a href=\"#$vmid$\" onClick=\"document.getElementById('$vmid$').style.display='block'\">the servers logic</a>) <span class=\"code-value code-hidden\" style=\"font-size: 8px; color: navy\">$mid$</span><div id=\"$vmid$\" style=\"display:none\"><br/><pre>$diags$</pre></div></td>\r\n"+
+                  "   </tr>\r\n";
+
   private final String detailsTemplateWithExtraDetails = 
       "   <tr style=\"background-color: $color$\">\r\n"+
       "     <td><b><a href=\"$pathlink$\">$path$</a></b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ <span id=\"s$id$\" class=\"flip\" onclick=\"flip('$id$')\">Show Reasoning</span><div id=\"$id$\" style=\"display: none\"><p>&nbsp;</p>$msgdetails$</div> <span class=\"code-value code-hidden\" style=\"font-size: 8px; color: navy\">$mid$</span></td>\r\n"+
@@ -1707,9 +1719,17 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     } else if (vm.getLocationLink() != null) {
       tid = detailsTemplateWithLink;
     } else if (vm.getTxLink() != null) {
-      tid = detailsTemplateTxLink;
+      if (vm.getDiagnostics() != null) {
+        tid = detailsTemplateTxLinkDiagnostics;
+      } else {
+        tid = detailsTemplateTxLink;
+      }
     } else if (vm.getServer() != null) {
-      tid = detailsTemplateTxNoLink;
+      if (vm.getDiagnostics() != null) {
+        tid = detailsTemplateTxNoLinkDiagnostics;
+      } else {
+        tid = detailsTemplateTxNoLink;
+      }
     } else {
       tid = detailsTemplate;
     }
@@ -1727,6 +1747,8 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     t.add("halfcolor", halfColorForLevel(vm.getLevel(), vm.isSignpost()));
     t.add("id", "l"+id);
     t.add("mid", vm.getMessageId());
+    t.add("diags", vm.getDiagnostics());
+    t.add("vmid", "vmi"+(++vmid));
     t.add("msg", (isNewRule(vm) ? "<img style=\"vertical-align: text-bottom\" src=\"new.png\" height=\"16px\" width=\"36px\" alt=\"New Rule as of "+date(vm)+": \"> " : "")+ vm.getHtml());
     if (!vm.hasSliceInfo()) {      
       t.add("msgdetails",  vm.getHtml());
