@@ -1234,96 +1234,109 @@ public class HTMLInspector {
       subFolder = filename.substring(rootFolder.length()+1);
       subFolder = subFolder.substring(0, subFolder.lastIndexOf(File.separator));
     }
-    boolean resolved = Utilities.existsInList(ref, isSubFolder ? "../qa.html" : "qa.html", 
-        "http://hl7.org/fhir", "http://hl7.org", "http://www.hl7.org", "http://hl7.org/fhir/search.cfm") || 
-        ref.startsWith("http://gforge.hl7.org/gf/project/fhir/tracker/") || ref.startsWith("mailto:") || ref.startsWith("javascript:");
-    if (!resolved && forHL7)
-      resolved = Utilities.pathURL(canonical, "history.html").equals(ref) || ref.equals("searchform.html"); 
-    if (!resolved && filename != null)
-      resolved = filename.contains("searchform.html") && ref.equals("history.html"); 
-    if (!resolved)
-      resolved = manual.contains(rref);
-    if (!resolved) {
-      resolved = rref.startsWith("http://build.fhir.org/ig/FHIR/fhir-tools-ig") || rref.startsWith("http://build.fhir.org/ig/FHIR/ig-guidance"); // always allowed to refer to tooling or IG Guidance IG build location
+    // full-ig.zip doesn't exist yet
+    if (subFolder == null) {
+      if ("full-ig.zip".equals(ref)) {
+        return true;
+      }
+    } else {
+      if ("../full-ig.zip".equals(ref)) {
+        return true;
+      }
     }
-    if (!resolved && specs != null){
+    if (Utilities.existsInList(ref, isSubFolder ? "../qa.html" : "qa.html",
+        "http://hl7.org/fhir", "http://hl7.org", "http://www.hl7.org", "http://hl7.org/fhir/search.cfm") || 
+        ref.startsWith("http://gforge.hl7.org/gf/project/fhir/tracker/") || ref.startsWith("mailto:") || ref.startsWith("javascript:")) {
+      return true;
+    }
+    if (forHL7 && Utilities.pathURL(canonical, "history.html").equals(ref) || ref.equals("searchform.html")) {
+      return true;
+    }
+    if (filename != null && filename.contains("searchform.html") && ref.equals("history.html")) {
+      return true;
+    }
+    if (manual.contains(rref)) {
+      return true;
+    }
+    if (rref.startsWith("http://build.fhir.org/ig/FHIR/fhir-tools-ig") || rref.startsWith("http://build.fhir.org/ig/FHIR/ig-guidance")) { // always allowed to refer to tooling or IG Guidance IG build location
+      return true;
+    }
+    if (specs != null){
       for (SpecMapManager spec : specs) {
-        if (!resolved && spec.getBase() != null) {
-          resolved = resolved || spec.getBase().equals(rref) || (spec.getBase()).equals(rref+"/") || (spec.getBase()+"/").equals(rref)|| spec.hasTarget(rref) || 
+        if (spec.getBase() != null && (spec.getBase().equals(rref) || (spec.getBase()).equals(rref+"/") || (spec.getBase()+"/").equals(rref)|| spec.hasTarget(rref) ||
               Utilities.existsInList(rref, Utilities.pathURL(spec.getBase(), "definitions.json.zip"), 
                   Utilities.pathURL(spec.getBase(), "full-ig.zip"), Utilities.pathURL(spec.getBase(), "definitions.xml.zip"), 
-                  Utilities.pathURL(spec.getBase(), "package.tgz"), Utilities.pathURL(spec.getBase(), "history.html"));
+                  Utilities.pathURL(spec.getBase(), "package.tgz"), Utilities.pathURL(spec.getBase(), "history.html")))) {
+          return true;
         }
-        if (!resolved && spec.getBase2() != null) {
-          resolved = spec.getBase2().equals(rref) || (spec.getBase2()).equals(rref+"/") || 
-              Utilities.existsInList(rref, Utilities.pathURL(spec.getBase2(), "definitions.json.zip"), Utilities.pathURL(spec.getBase2(), "definitions.xml.zip"), Utilities.pathURL(spec.getBase2(), "package.tgz"), Utilities.pathURL(spec.getBase2(), "full-ig.zip")); 
+        if (spec.getBase2() != null && (spec.getBase2().equals(rref) || (spec.getBase2()).equals(rref+"/") ||
+              Utilities.existsInList(rref, Utilities.pathURL(spec.getBase2(), "definitions.json.zip"), Utilities.pathURL(spec.getBase2(), "definitions.xml.zip"), Utilities.pathURL(spec.getBase2(), "package.tgz"), Utilities.pathURL(spec.getBase2(), "full-ig.zip")))) {
+          return true;
         }
       }
     }
-    if (!resolved && linkSpecs != null){
+    if (linkSpecs != null){
       for (LinkedSpecification spec : linkSpecs) {
-        if (!resolved && spec.getSpm().getBase() != null) {
-          resolved = resolved || spec.getSpm().getBase().equals(rref) || (spec.getSpm().getBase()).equals(rref+"/") || (spec.getSpm().getBase()+"/").equals(rref)|| spec.getSpm().hasTarget(rref) || Utilities.existsInList(rref, Utilities.pathURL(spec.getSpm().getBase(), "history.html"));
+        if (spec.getSpm().getBase() != null && (spec.getSpm().getBase().equals(rref) || (spec.getSpm().getBase()).equals(rref+"/") || (spec.getSpm().getBase()+"/").equals(rref)|| spec.getSpm().hasTarget(rref) || Utilities.existsInList(rref, Utilities.pathURL(spec.getSpm().getBase(), "history.html")))) {
+          return true;
         }
-        if (!resolved && spec.getSpm().getBase2() != null) {
-          resolved = spec.getSpm().getBase2().equals(rref) || (spec.getSpm().getBase2()).equals(rref+"/"); 
+        if (spec.getSpm().getBase2() != null && (spec.getSpm().getBase2().equals(rref) || (spec.getSpm().getBase2()).equals(rref+"/"))) {
+          return true;
         }
       }
     }
 
-    if (!resolved) {
-      for (RelatedIG ig : relatedIGs) {
-        if (ig.getWebLocation() != null && rref.startsWith(ig.getWebLocation())) {
-          String tref = rref.substring(ig.getWebLocation().length());
-          if (tref.startsWith("/")) {
-            tref = tref.substring(1);
-            resolved = resolved || ig.getSpm().getBase().equals(rref) || (ig.getSpm().getBase()).equals(rref+"/") || (ig.getSpm().getBase()+"/").equals(rref)|| ig.getSpm().hasTarget(rref) || Utilities.existsInList(rref, Utilities.pathURL(ig.getSpm().getBase(), "history.html"));
-          } else {
-            resolved = resolved || "".equals(tref);
+    for (RelatedIG ig : relatedIGs) {
+      if (ig.getWebLocation() != null && rref.startsWith(ig.getWebLocation())) {
+        String tref = rref.substring(ig.getWebLocation().length());
+        if (tref.startsWith("/")) {
+          tref = tref.substring(1);
+          if (ig.getSpm().getBase().equals(rref) || (ig.getSpm().getBase()).equals(rref+"/") || (ig.getSpm().getBase()+"/").equals(rref)|| ig.getSpm().hasTarget(rref) || Utilities.existsInList(rref, Utilities.pathURL(ig.getSpm().getBase(), "history.html"))) {
+            return true;
           }
+        } else if ("".equals(tref)) {
+          return true;
         }
       }
     }
-    if (!resolved) {
-      if (Utilities.isAbsoluteFileName(ref)) {
-        if (new File(ref).exists()) {
-          addExternalReference(ExternalReferenceType.FILE, ref, parent == null ? x : parent, filename);
-          resolved = true;
-        }
-      } else if (!resolved && !Utilities.isAbsoluteUrl(ref) && !rref.startsWith("#") && filename != null) {
-        String fref =  buildRef(FileUtilities.getDirectoryForFile(filename), ref);
-        if (fref.equals(Utilities.path(rootFolder, "qa.html"))) {
-          resolved = true;
-        }
+
+    if (Utilities.isAbsoluteFileName(ref)) {
+      if (new File(ref).exists()) {
+        addExternalReference(ExternalReferenceType.FILE, ref, parent == null ? x : parent, filename);
+        return true;
+      }
+    } else if (!Utilities.isAbsoluteUrl(ref) && !rref.startsWith("#") && filename != null) {
+      String fref =  buildRef(FileUtilities.getDirectoryForFile(filename), ref);
+      if (fref.equals(Utilities.path(rootFolder, "qa.html"))) {
+        return true;
       }
     }
     // special case end-points that are always valid:
-    if (!resolved)
-      resolved = Utilities.existsInList(ref, "http://hl7.org/fhir/fhir-spec.zip", "http://hl7.org/fhir/R4/fhir-spec.zip", "http://hl7.org/fhir/STU3/fhir-spec.zip", "http://hl7.org/fhir/DSTU2/fhir-spec.zip", 
+    if (Utilities.existsInList(ref, "http://hl7.org/fhir/fhir-spec.zip", "http://hl7.org/fhir/R4/fhir-spec.zip", "http://hl7.org/fhir/STU3/fhir-spec.zip", "http://hl7.org/fhir/DSTU2/fhir-spec.zip",
           "http://hl7.org/fhir-issues", "http://hl7.org/registry") || 
-      matchesTarget(ref, "http://hl7.org", "http://hl7.org/fhir/DSTU2", "http://hl7.org/fhir/STU3", "http://hl7.org/fhir/R4", "http://hl7.org/fhir/smart-app-launch", "http://hl7.org/fhir/validator");
-
-    if (!resolved) { // updated table documentation
-      if (ref.startsWith("https://build.fhir.org/ig/FHIR/ig-guidance/readingIgs.html")) {
-        resolved = true;
-      }
+      matchesTarget(ref, "http://hl7.org", "http://hl7.org/fhir/DSTU2", "http://hl7.org/fhir/STU3", "http://hl7.org/fhir/R4", "http://hl7.org/fhir/smart-app-launch", "http://hl7.org/fhir/validator")) {
+      return true;
     }
+
+    if (ref.startsWith("https://build.fhir.org/ig/FHIR/ig-guidance/readingIgs.html")) { // updated table documentation
+      return true;
+    }
+
     // a local file may have been created by some poorly tracked process, so we'll consider that as a possible
-    if (!resolved && !Utilities.isAbsoluteUrl(rref) && !rref.contains("..") && filename != null) { // .. is security check. Maybe there's some ways it could be valid, but we're not interested for now
+    if (!Utilities.isAbsoluteUrl(rref) && !rref.contains("..") && filename != null) { // .. is security check. Maybe there's some ways it could be valid, but we're not interested for now
       String fname = buildRef(new File(filename).getParent(), rref);
       if (new File(fname).exists()) {
-        resolved = true;
+        return true;
       }
     }
 
     // external terminology resources 
-    if (!resolved) {
-      resolved = Utilities.startsWithInList(ref, "http://cts.nlm.nih.gov/fhir"); 
+    if (Utilities.startsWithInList(ref, "http://cts.nlm.nih.gov/fhir")) {
+      return true;
     }
 
-    if (!resolved) {
       if (rref.startsWith("http://") || rref.startsWith("https://") || rref.startsWith("ftp://") || rref.startsWith("tel:") || rref.startsWith("urn:")) {
-        resolved = true;
+        boolean resolved = true;
         addExternalReference(ExternalReferenceType.WEB, ref, parent == null ? x : parent, filename);
         if (rref.startsWith(canonical)) {
           if (rref.equals(canonical)) {
@@ -1352,6 +1365,7 @@ public class HTMLInspector {
             }
           }
         }
+        return resolved;
       } else if (!Utilities.isAbsoluteFileName(rref)) { 
         String page = rref;
         String name = null;
@@ -1394,29 +1408,31 @@ public class HTMLInspector {
           LoadedFile f = cache.get(page);
           if (f != null) {
             if (Utilities.noString(name))
-              resolved = true;
+              return true;
             else if (f.isLangRedirect) {
               String fn = filename.replace(rootFolder, rootFolder+"/"+langList.get(0));
               return checkTarget(fn, ref, rref, tgtList, bh, x, parent);
             } else {
-              resolved = f.targets.contains(name);
               tgtList.append(" (valid targets: "+(f.targets.size() > 40 ? Integer.toString(f.targets.size())+" targets"  :  f.targets.toString())+")");
               for (String s : f.targets) {
                 if (s.equalsIgnoreCase(name)) {
                   tgtList.append(" - case is wrong ('"+s+"')");
                 }
               }
+              return f.targets.contains(name);
             }
           }
+        } else if (new File(page).exists()) {
+          return true;
         } else {
-          resolved = false; 
+          return false;
         }
       }
-    }
+
     if (module.resolve(ref)) {
-      resolved = true;
+      return true;
     }
-    return resolved;
+    return false;
   }
 
   private void addExternalReference(ExternalReferenceType type, String ref, XhtmlNode x, String source) {
