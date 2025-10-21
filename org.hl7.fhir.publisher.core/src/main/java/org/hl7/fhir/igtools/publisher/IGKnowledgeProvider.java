@@ -80,6 +80,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   private List<FetchedFile> files;
   private IPublisherModule module;
   private Map<String, List<ExtensionUsage>> coreExtensionMap;
+  private ContextUtilities contextUtilities;
   
   public IGKnowledgeProvider(IWorkerContext context, String pathToSpec, String canonical, JsonObject igs, List<ValidationMessage> errors, boolean noXhtml, Template template, List<String> listedURLExemptions, String altCanonical, List<FetchedFile> files, IPublisherModule module) throws Exception {
     super();
@@ -99,6 +100,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     }
     this.xver = XVerExtensionManagerFactory.createExtensionManager(context);
     this.module = module;
+    contextUtilities = new ContextUtilities(context);
   }
   
   private void loadPaths(JsonObject igs) throws Exception {
@@ -569,6 +571,9 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     StructureDefinition sd = context.fetchResource(StructureDefinition.class, ProfileUtilities.sdNs(name, null));
     if (sd != null && sd.hasWebPath())
         return sd.getWebPath();
+    sd = contextUtilities.findType(name);
+    if (sd != null && sd.hasWebPath())
+      return sd.getWebPath();
     brokenLinkMessage(corepath, name, false);
     return name+".html";
   }
