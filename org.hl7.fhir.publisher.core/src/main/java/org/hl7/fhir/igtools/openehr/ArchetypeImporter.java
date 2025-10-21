@@ -8,34 +8,26 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
-import org.hl7.fhir.r5.model.Bundle;
+import org.hl7.fhir.r5.model.*;
 import org.hl7.fhir.r5.model.Bundle.BundleType;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
-import org.hl7.fhir.r5.model.Coding;
-import org.hl7.fhir.r5.model.ContactDetail;
 import org.hl7.fhir.r5.model.ContactPoint.ContactPointSystem;
-import org.hl7.fhir.r5.model.DecimalType;
-import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.ElementDefinition.DiscriminatorType;
 import org.hl7.fhir.r5.model.ElementDefinition.SlicingRules;
 import org.hl7.fhir.r5.model.Enumerations.BindingStrength;
 import org.hl7.fhir.r5.model.Enumerations.CodeSystemContentMode;
 import org.hl7.fhir.r5.model.Enumerations.FHIRVersion;
 import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
-import org.hl7.fhir.r5.model.IntegerType;
-import org.hl7.fhir.r5.model.StringType;
-import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
-import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
@@ -294,8 +286,12 @@ public class ArchetypeImporter {
             ElementDefinition ed = new ElementDefinition(path+"."+name);
             ed.setId(id+"."+name);
             defns.add(ed);
-            ed.setMinValue(new DecimalType(dbl.getLower()));
-            ed.setMaxValue(new DecimalType(dbl.getUpper()));
+            if (dbl.getLower() != null) {
+              ed.setMinValue(new DecimalType(dbl.getLower()));
+            }
+            if (dbl.getUpper() != null) {
+              ed.setMaxValue(new DecimalType(dbl.getUpper()));
+            }
           } else {
             System.out.println("not done yet: "+path+"."+name+": "+o.getClass().getName());           
           }
@@ -317,11 +313,15 @@ public class ArchetypeImporter {
             ElementDefinition ed = new ElementDefinition(path+"."+name);
             ed.setId(id+"."+name);
             defns.add(ed);
-            if (v.getLower().equals(v.getUpper())) {
-              ed.setFixed(new StringType(v.getLower().toString()));              
+            if (v.getLower() != null && v.getUpper() != null && v.getLower().equals(v.getUpper())) {
+              ed.setFixed(quantityFromPeriod(v.getLower().toString()));
             } else {
-              ed.setMinValue(new StringType(v.getLower().toString()));
-              ed.setMaxValue(new StringType(v.getUpper().toString()));
+              if (v.getLower() != null) {
+                ed.setMinValue(quantityFromPeriod(v.getLower().toString()));
+              }
+              if (v.getUpper() != null) {
+                ed.setMaxValue(quantityFromPeriod(v.getUpper().toString()));
+              }
             }
           } else {
             System.out.println("not done yet: "+path+"."+name+": "+o.getClass().getName());           
@@ -333,11 +333,15 @@ public class ArchetypeImporter {
             ElementDefinition ed = new ElementDefinition(path+"."+name);
             ed.setId(id+"."+name);
             defns.add(ed);
-            if (v.getLower() == v.getUpper()) {
+            if (v.getLower() != null && v.getUpper() != null && v.getLower() == v.getUpper()) {
               ed.setFixed(new IntegerType(v.getLower()));              
             } else {
-              ed.setMinValue(new IntegerType(v.getLower()));
-              ed.setMaxValue(new IntegerType(v.getUpper()));
+              if (v.getLower() != null) {
+                ed.setMinValue(new IntegerType(v.getLower()));
+              }
+              if (v.getUpper() != null) {
+                ed.setMaxValue(new IntegerType(v.getUpper()));
+              }
             }
           } else {
             System.out.println("not done yet: "+path+"."+name+": "+o.getClass().getName());           
@@ -387,6 +391,57 @@ public class ArchetypeImporter {
     }
   }
 
+  private DataType quantityFromPeriod(String iso8601Duration) {
+    if (iso8601Duration == null || iso8601Duration.isEmpty()) {
+      throw new IllegalArgumentException("Duration string cannot be null or empty");
+    }
+
+    // Pattern to parse ISO 8601 duration
+    Pattern pattern = Pattern.compile(
+            "P(?:(\\d+)Y)?(?:(\\d+)M)?(?:(\\d+)W)?(?:(\\d+)D)?(?:T(?:(\\d+)H)?(?:(\\d+)M)?(?:(\\d+(?:\\.\\d+)?)S)?)?"
+    );
+
+    Matcher matcher = pattern.matcher(iso8601Duration);
+    if (!matcher.matches()) {
+      throw new IllegalArgumentException("Invalid ISO 8601 duration format: " + iso8601Duration);
+    }
+
+    // Extract components
+    String years = matcher.group(1);
+    String months = matcher.group(2);
+    String weeks = matcher.group(3);
+    String days = matcher.group(4);
+    String hours = matcher.group(5);
+    String minutes = matcher.group(6);
+    String seconds = matcher.group(7);
+
+    // Find the most significant (first non-zero) component and return as Quantity
+    if (years != null) {
+      return new Quantity().setValue(Long.parseLong(years)).setUnit("a").setSystem("http://unitsofmeasure.org").setCode("a");
+    }
+    if (months != null) {
+      return new Quantity().setValue(Long.parseLong(months)).setUnit("mo").setSystem("http://unitsofmeasure.org").setCode("mo");
+    }
+    if (weeks != null) {
+      return new Quantity().setValue(Long.parseLong(weeks)).setUnit("wk").setSystem("http://unitsofmeasure.org").setCode("wk");
+    }
+    if (days != null) {
+      return new Quantity().setValue(Long.parseLong(days)).setUnit("d").setSystem("http://unitsofmeasure.org").setCode("d");
+    }
+    if (hours != null) {
+      return new Quantity().setValue(Long.parseLong(hours)).setUnit("h").setSystem("http://unitsofmeasure.org").setCode("h");
+    }
+    if (minutes != null) {
+      return new Quantity().setValue(Long.parseLong(minutes)).setUnit("min").setSystem("http://unitsofmeasure.org").setCode("min");
+    }
+    if (seconds != null) {
+      return new Quantity().setValue(Double.parseDouble(seconds)).setUnit("s").setSystem("http://unitsofmeasure.org").setCode("s");
+    }
+
+    // Default to 0 seconds
+    return new Quantity().setValue(0).setUnit("s").setSystem("http://unitsofmeasure.org").setCode("s");
+  }
+
   private boolean bindingGoesOnParent(String rmTypeName, String name) {
     switch (rmTypeName+"."+name) {
     case "DV_CODED_TEXT.defining_code": return true;
@@ -399,7 +454,11 @@ public class ArchetypeImporter {
     switch (rmTypeName+"."+name) {
     case "HISTORY.events": return false;
     case "ITEM_TREE.items": return false;
+    case "CLUSTER.items": return false;
     case "ELEMENT.value": return true;
+    case "DV_QUANTITY.magnitude" : return true;
+      case "DV_QUANTITY.units" : return true;
+      case "DV_QUANTITY.precision" : return true;
     default:
       throw new Error("unknown element "+rmTypeName+"."+name);
     }
@@ -409,7 +468,15 @@ public class ArchetypeImporter {
     defn.setLabel(source.getNodeId());
     defn.setShort(lookup(source.getNodeId()));
     defn.setDefinition(lookupDesc(source.getNodeId()));
-    defn.addType().setCode("http://openehr.org/fhir/StructureDefinition/"+source.getRmTypeName());
+    if (source.getRmTypeName().contains("<")) {
+      String base = source.getRmTypeName().substring(0, source.getRmTypeName().indexOf("<"));
+      String param = source.getRmTypeName().substring(source.getRmTypeName().indexOf("<") + 1, source.getRmTypeName().length()-1);
+      ElementDefinition.TypeRefComponent tr = defn.addType();
+      tr.setCode("http://openehr.org/fhir/StructureDefinition/" + base);
+      tr.addExtension("http://hl7.org/fhir/tools/StructureDefinition/type-parameter", new CodeType(param));
+    } else {
+      defn.addType().setCode("http://openehr.org/fhir/StructureDefinition/" + source.getRmTypeName());
+    }
     if (source.getOccurrences() != null) {
       if (source.getOccurrences().isLowerIncluded()) {
         defn.setMin(source.getOccurrences().getLower());
