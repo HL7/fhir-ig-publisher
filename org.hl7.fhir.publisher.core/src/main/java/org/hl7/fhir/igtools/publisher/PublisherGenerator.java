@@ -1916,7 +1916,7 @@ public class PublisherGenerator extends PublisherBase {
       if (!genParam.booleanValue())
         return false;
     }
-    return pf.igpkp.wantGen(r, code);
+    return pf.igpkp.wantGen(r, code) && pf.template.wantGenerateFragment(r.fhirType(), code);
   }
 
   private void lapsed(String msg) {

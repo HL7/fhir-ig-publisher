@@ -62,6 +62,7 @@ import org.hl7.fhir.igtools.ui.IGPublisherUI;
 import org.hl7.fhir.igtools.web.*;
 import org.hl7.fhir.r5.context.*;
 import org.hl7.fhir.r5.elementmodel.Element;
+import org.hl7.fhir.r5.elementmodel.ElementVisitor;
 import org.hl7.fhir.r5.elementmodel.Manager.FhirFormat;
 import org.hl7.fhir.r5.extensions.*;
 import org.hl7.fhir.r5.model.ActorDefinition;
@@ -352,7 +353,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   public void createIg() throws Exception, IOException, EOperationOutcome, FHIRException {
     try {
       TimeTracker.Session tts = pf.tt.start("loading");
-      loader.load();
+      FetchedFile igFile = loader.load();
       pf.rc.setResolver(this);
       pf.rc.setResolveLinkResolver(this);
       for (RenderingContext rc : pf.rcLangs.langValues()) {
@@ -365,6 +366,8 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 
       tts = pf.tt.start("generate");
       log("Processing Conformance Resources");
+
+      checkDependencies(igFile);
 
       log("Checking Language");
       processor.checkLanguage();
@@ -827,43 +830,54 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     }
   }
 
-  private void checkDependencies() {
+  public void checkDependencies(FetchedFile igf) throws IOException {
+    System.out.print("Checking dependencies...");
     // first, we load all the direct dependency lists
     for (FetchedFile f : pf.fileList) {
-      if (f.getDependencies() == null) {
-        loadDependencyList(f);
-      }
-    }
-
-    // now, we keep adding to the change list till there's no change
-    boolean changed;
-    do {
-      changed = false;
-      for (FetchedFile f : pf.fileList) {
-        if (!this.pf.changeList.contains(f)) {
-          boolean dep = false;
-          for (FetchedFile d : f.getDependencies())
-            if (this.pf.changeList.contains(d))
-              dep = true;
-          if (dep) {
-            this.pf.changeList.add(f);
-            changed = true;
-          }
+      if (igf != f) {
+        if (f.getDependencies() == null) {
+          loadDependencyList(f, igf);
         }
       }
-    } while (changed);
+    }
+
+    for (FetchedFile f : pf.fileList) {
+      f.calculateHash();
+    }
+
+    IniFile ini = new IniFile(Utilities.path(pf.vsCache, ".hashes.ini"));
+    for (FetchedFile f : pf.fileList) {
+      String hNow = Long.toString(f.getCalcHash());
+      String hThen = ini.getStringProperty("resources", f.getLoadPath());
+      if (!hNow.equals(hThen)) {
+        pf.changeList.add(f);
+        ini.setStringProperty("resources", f.getLoadPath(), hNow, null);
+      }
+    }
+    ini.save();
+
+    if (pf.changeList.isEmpty()) {
+      System.out.println(" perform a full build (no change)");
+      pf.changeList.addAll(pf.fileList);
+    } else if (pf.changeList.size() == pf.fileList.size()) {
+      System.out.println(" build everything");
+    } else {
+      System.out.println(" building "+pf.changeList.size()+" files");
+    }
   }
 
-  private void loadDependencyList(FetchedFile f) {
-    f.setDependencies(new ArrayList<FetchedFile>());
+  private void loadDependencyList(FetchedFile f, FetchedFile igf) {
+    f.setDependencies(new HashSet<FetchedFile>());
+    f.getDependencies().add(igf); // everything is dependent on the IG
+
     for (FetchedResource r : f.getResources()) {
-      if (r.fhirType().equals("ValueSet"))
-        loadValueSetDependencies(f, r);
-      else if (r.fhirType().equals("StructureDefinition"))
-        loadProfileDependencies(f, r);
-      else
-        ; // all other resource types don't have dependencies that we care about for rendering purposes
+      loadDepedencies(f, r, f.getDependencies());
     }
+  }
+
+  private void loadDepedencies(FetchedFile f, FetchedResource r, Set<FetchedFile> dependencies) {
+    ElementVisitor.IElementVisitor depVisitor = new DependencyElementVisitor(pf.fileList, dependencies, f);
+    new ElementVisitor(depVisitor).visit(r, r.getElement());
   }
 
   private void loadValueSetDependencies(FetchedFile f, FetchedResource r) {

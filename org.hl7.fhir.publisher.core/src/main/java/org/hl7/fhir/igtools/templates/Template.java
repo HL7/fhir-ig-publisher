@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import lombok.Getter;
 import org.apache.commons.io.FileUtils;
 import org.apache.tools.ant.DefaultLogger;
 import org.apache.tools.ant.Project;
@@ -98,7 +99,8 @@ public class Template {
   private Set<String> templateParams = new HashSet<>();
   private boolean wantLog;
   private Map<String, String> scriptMappings = new HashMap<>();
-  
+  @Getter Map<String, TemplateFragmentTypeLoader.PrefixGroup> usedFragmentTypes = new HashMap<>();
+
   /** unpack the template into /template 
    * 
    * @param rootDir  the root directory for the IG
@@ -176,6 +178,11 @@ public class Template {
       for (String s : configuration.asString("summaryRows").split("\\ "))
       summaryRows.add(s);
     }
+    loadFragmentTypes();
+  }
+
+  private void loadFragmentTypes() {
+    usedFragmentTypes = new TemplateFragmentTypeLoader().process(templateDir);
   }
 
   public void processTemplateTranslations(String defLang, List<String> langCodes) throws IOException {
@@ -607,5 +614,20 @@ public class Template {
     return scriptMappings ;
   }
 
-  
+  public boolean wantGenerateFragment(String s, String code) {
+    if (usedFragmentTypes == null) {
+      return true;
+    }
+    TemplateFragmentTypeLoader.PrefixGroup pfx = usedFragmentTypes.get(s);
+
+    if (pfx != null && pfx.suffixes.contains(code)) {
+      return true;
+    }
+    pfx = usedFragmentTypes.get("{{[type]}}");
+    if (pfx != null && pfx.suffixes.contains(code)) {
+      return true;
+    }
+    return false;
+  }
+
 }

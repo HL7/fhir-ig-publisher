@@ -161,7 +161,6 @@ public class PublisherIGLoader extends PublisherBase {
       throw new Error("Old style JSON configuration is no longer supported. If you see this, then ig.ini wasn't found in '"+ pf.rootDir +"'");
     }
     pf.expectedJurisdiction = checkForJurisdiction();
-
   }
 
   private void prescanSushiConfig(String dir) throws IOException {
@@ -1940,7 +1939,7 @@ public class PublisherIGLoader extends PublisherBase {
     }
   }
 
-  public void load() throws Exception {
+  public FetchedFile load() throws Exception {
     pf.validationFetcher.initOtherUrls();
     pf.fileList.clear();
     pf.changeList.clear();
@@ -2466,7 +2465,7 @@ public class PublisherIGLoader extends PublisherBase {
     }
     pf.extensionTracker.scan(pf.publishedIg);
     finishLoadingCustomResources();
-
+    return igf;
   }
 
   private void checkCustomResourceExamples() {

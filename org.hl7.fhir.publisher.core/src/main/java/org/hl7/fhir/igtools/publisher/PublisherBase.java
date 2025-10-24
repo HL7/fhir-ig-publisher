@@ -614,7 +614,7 @@ public class PublisherBase implements ILoggingService {
     pf.fileNames.add(file.getPath());
     if (file.getRelativePath()!=null)
       pf.relativeNames.put(file.getRelativePath(), file);
-    pf.changeList.add(file);
+//    pf.changeList.add(file);
     //  	}
   }
 
