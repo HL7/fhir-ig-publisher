@@ -64,7 +64,7 @@ public class FetchedFile {
   @Getter @Setter private long calcHash;
   private long time;
   private String contentType;
-  private Set<FetchedFile> dependencies;
+  private List<FetchedFile> dependencies;
   private List<FetchedResource> resources = new ArrayList<FetchedResource>();
   private List<ValidationMessage> errors = new ArrayList<ValidationMessage>();
   private FetchedResource bundle;
@@ -132,10 +132,10 @@ public class FetchedFile {
     this.contentType = contentType;
   }
  
-  public Set<FetchedFile> getDependencies() {
+  public List<FetchedFile> getDependencies() {
     return dependencies;
   }
-  public void setDependencies(Set<FetchedFile> dependencies) {
+  public void setDependencies(List<FetchedFile> dependencies) {
     this.dependencies = dependencies;
   }
   public long getHash() {

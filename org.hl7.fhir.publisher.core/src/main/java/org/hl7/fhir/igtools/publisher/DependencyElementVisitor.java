@@ -9,10 +9,10 @@ import java.util.Set;
 
 public class DependencyElementVisitor implements ElementVisitor.IElementVisitor {
   private final List<FetchedFile> fileList;
-  private final Set<FetchedFile> dependencies;
+  private final List<FetchedFile> dependencies;
   private final FetchedFile focus;
 
-  public DependencyElementVisitor(List<FetchedFile> fileList, Set<FetchedFile> dependencies, FetchedFile focus) {
+  public DependencyElementVisitor(List<FetchedFile> fileList, List<FetchedFile> dependencies, FetchedFile focus) {
     super();
     this.fileList = fileList;
     this.dependencies = dependencies;
@@ -58,7 +58,7 @@ public class DependencyElementVisitor implements ElementVisitor.IElementVisitor 
               dep = true;
             }
           }
-          if (dep) {
+          if (dep && !dependencies.contains(f)) {
             dependencies.add(f);
           }
         }
@@ -78,7 +78,7 @@ public class DependencyElementVisitor implements ElementVisitor.IElementVisitor 
               dep = true;
             }
           }
-          if (dep) {
+          if (dep && !dependencies.contains(f)) {
             dependencies.add(f);
           }
         }

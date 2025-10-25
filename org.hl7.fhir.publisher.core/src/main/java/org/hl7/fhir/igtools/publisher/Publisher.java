@@ -848,10 +848,10 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     IniFile ini = new IniFile(Utilities.path(pf.vsCache, ".hashes.ini"));
     for (FetchedFile f : pf.fileList) {
       String hNow = Long.toString(f.getCalcHash());
-      String hThen = ini.getStringProperty("resources", f.getLoadPath());
+      String hThen = ini.getStringProperty("files", f.getLoadPath());
       if (!hNow.equals(hThen)) {
         pf.changeList.add(f);
-        ini.setStringProperty("resources", f.getLoadPath(), hNow, null);
+        ini.setStringProperty("files", f.getLoadPath(), hNow, null);
       }
     }
     ini.save();
@@ -867,7 +867,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   }
 
   private void loadDependencyList(FetchedFile f, FetchedFile igf) {
-    f.setDependencies(new HashSet<FetchedFile>());
+    f.setDependencies(new ArrayList<FetchedFile>());
     f.getDependencies().add(igf); // everything is dependent on the IG
 
     for (FetchedResource r : f.getResources()) {
@@ -875,7 +875,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     }
   }
 
-  private void loadDepedencies(FetchedFile f, FetchedResource r, Set<FetchedFile> dependencies) {
+  private void loadDepedencies(FetchedFile f, FetchedResource r, List<FetchedFile> dependencies) {
     ElementVisitor.IElementVisitor depVisitor = new DependencyElementVisitor(pf.fileList, dependencies, f);
     new ElementVisitor(depVisitor).visit(r, r.getElement());
   }

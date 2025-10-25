@@ -1204,7 +1204,7 @@ public class PublisherProcessor extends PublisherBase  {
   public void generateNarratives(boolean isRegen) throws Exception {
     TimeTracker.Session tts = pf.tt.start("narrative generation");
     logDebugMessage(LogCategory.PROGRESS, isRegen ? "regen narratives" : "gen narratives");
-    for (FetchedFile f : pf.fileList) {
+    for (FetchedFile f : pf.changeList) {
       f.start("generateNarratives");
       try {
         for (FetchedResource r : f.getResources()) {
@@ -1944,7 +1944,7 @@ public class PublisherProcessor extends PublisherBase  {
 
 
   private void validate(String type) throws Exception {
-    for (FetchedFile f : pf.fileList) {
+    for (FetchedFile f : pf.changeList) {
       f.start("validate");
       try {
         for (FetchedResource r : f.getResources()) {
