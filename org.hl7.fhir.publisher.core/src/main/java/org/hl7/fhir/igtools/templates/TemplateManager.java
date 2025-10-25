@@ -155,13 +155,45 @@ public class TemplateManager {
     if (scriptReason == null) {
       for (String fn : files) {
         String n = FileUtilities.getRelativePath(templateDir, fn);
-        if (!Utilities.existsInList(n.toLowerCase(), "license", "readme")) {
+        String lower = n.toLowerCase();
+
+        if (!Utilities.existsInList(lower, "license", "readme")) {
+          // Normalize path separators and get basename
+          String unix = n.replace('\\', '/');
+          String base = unix.contains("/") ? unix.substring(unix.lastIndexOf('/') + 1) : unix;
+
+          // Allow a few harmless dotfiles anywhere
+          if (Utilities.existsInList(base, ".gitignore", ".gitattributes", ".gitkeep")) {
+            continue;
+          }
+
+          // Explicit, narrow allowlist for .github/ housekeeping files
+          if (unix.startsWith(".github/")) {
+            boolean safeGithub =
+                unix.equals(".github/CODEOWNERS") ||
+                unix.equals(".github/FUNDING.yml") ||
+                unix.equals(".github/SECURITY.md") ||
+                unix.equals(".github/dependabot.yml") ||
+                unix.equalsIgnoreCase(".github/pull_request_template.md") ||
+                (unix.startsWith(".github/workflows/") && (unix.endsWith(".yml") || unix.endsWith(".yaml"))) ||
+                (unix.startsWith(".github/ISSUE_TEMPLATE/") &&
+                    (unix.endsWith(".md") || unix.endsWith(".yml") || unix.endsWith(".yaml"))) ||
+                // Optionally allow docs in .github/ (Markdown only)
+                unix.endsWith(".md");
+
+            if (safeGithub) {
+              continue;
+            }
+          }
+
           String s = extension(n);
           if (antScripts.contains(n)) {
             // nah, if you overwrite an xml ant script, you're doing active content
-            scriptReason = "Template contains a registered ant script";              
-          } else if (!Utilities.existsInList(s, ".html", ".css", ".png", ".gif", ".oet", ".json", ".xml", ".ico", ".jpg", ".md", ".ini", ".eot", ".otf", ".svg", ".ttf", ".woff", ".woff2", ".txt", ".yml", ".yaml", ".liquid", ".gitignore")) {
-            // we don't track what other scripts are potentially active, so we only allow a whitelist of files. 
+            scriptReason = "Template contains a registered ant script";
+          } else if (!Utilities.existsInList(s,
+              ".html", ".css", ".png", ".gif", ".oet", ".json", ".xml", ".ico", ".jpg", ".md", ".ini",
+              ".eot", ".otf", ".svg", ".ttf", ".woff", ".woff2", ".txt", ".yml", ".yaml", ".liquid", ".gitignore")) {
+            // we don't track what other scripts are potentially active, so we only allow a whitelist of files.
             // this is safe if the base templates don't call out to scripts with weird file extensions (the template authors know about this rule)
             ext.add(s);
             break;
@@ -169,9 +201,10 @@ public class TemplateManager {
         }
       }
       if (!ext.isEmpty()) {
-        scriptReason = "Template has file extensions: "+ ext; 
+        scriptReason = "Template has file extensions: " + ext;
       }
     }
+
     // if it has active content, then we check to see if it's trusted. Locally: always trusted. auto-build: only some trusted
     if (scriptReason != null) {
       checkTemplateId(template, npm.name(), scriptReason);
