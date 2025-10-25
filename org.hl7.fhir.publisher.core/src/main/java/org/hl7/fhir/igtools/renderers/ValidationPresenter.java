@@ -857,7 +857,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     files = sorted(files);
 
     for (FetchedFile f : files) {
-      if (allIssues || hasIssues(f, filteredMessages)) {
+      if (!f.getResources().isEmpty() && (allIssues || hasIssues(f, filteredMessages))) {
         b.append(genSummaryRow(f, filteredMessages));
       }
     }
@@ -872,7 +872,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
 
     int i = 0;
     for (FetchedFile f : files) {
-      if (allIssues || hasIssues(f, filteredMessages)) {
+      if (!f.getResources().isEmpty() && (allIssues || hasIssues(f, filteredMessages))) {
         i++;
         b.append(genStart(f, i));
         if (countNonSignpostMessages(f, filteredMessages))

@@ -99,7 +99,8 @@ public class Template {
   private Set<String> templateParams = new HashSet<>();
   private boolean wantLog;
   private Map<String, String> scriptMappings = new HashMap<>();
-  @Getter Map<String, TemplateFragmentTypeLoader.PrefixGroup> usedFragmentTypes = new HashMap<>();
+  @Getter Map<String, TemplateFragmentTypeLoader.PrefixGroup> usedFragmentTypes;
+  private boolean rapido;
 
   /** unpack the template into /template 
    * 
@@ -109,12 +110,13 @@ public class Template {
    * 
    * @throws IOException - only if the path is incorrect or the disk runs out of space
    */
-  public Template(String rootDir, boolean canExecute, String templateThatCantExecute, String templateReason, boolean wantLog) throws IOException {
+  public Template(String rootDir, boolean canExecute, String templateThatCantExecute, String templateReason, boolean wantLog, boolean rapido) throws IOException {
     root = rootDir;
     this.canExecute = canExecute;
     this.templateThatCantExecute = templateThatCantExecute;
     this.templateReason = templateReason;
     this.wantLog = wantLog;
+    this.rapido = rapido;
 
     templateDir = Utilities.path(rootDir, "template");
 
@@ -614,10 +616,17 @@ public class Template {
     return scriptMappings ;
   }
 
+  private int fragments;
+  private int noproduced;
+
   public boolean wantGenerateFragment(String s, String code) {
     if (usedFragmentTypes == null) {
       return true;
     }
+    if (!rapido) {
+      return true;
+    }
+    fragments++;
     TemplateFragmentTypeLoader.PrefixGroup pfx = usedFragmentTypes.get(s);
 
     if (pfx != null && pfx.suffixes.contains(code)) {
@@ -627,7 +636,19 @@ public class Template {
     if (pfx != null && pfx.suffixes.contains(code)) {
       return true;
     }
+    if (Utilities.existsInList(code, "jekyll-data",
+            "xml", "json", "ttl",
+            "xml-html", "json-html", "ttl-html")) {
+      return true;
+    }
+
+    noproduced++;
     return false;
   }
 
+  public void rapidoSummary() {
+    if (rapido) {
+      System.out.println("Rapido Template Summary: don't produce "+noproduced+" of "+fragments+" fragments");
+    }
+  }
 }

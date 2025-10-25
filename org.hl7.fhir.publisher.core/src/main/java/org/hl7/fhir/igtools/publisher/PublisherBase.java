@@ -607,14 +607,22 @@ public class PublisherBase implements ILoggingService {
     return inferDefaultNarrativeLang(false);
   }
 
-  protected void addFile(FetchedFile file) {
+  protected void addFile(FetchedFile file, boolean add) {
     //  	if (fileNames.contains(file.getPath())) {
     //  		dlog("Found multiple definitions for file: " + file.getName()+ ".  Using first definition only.");
     //  	} else {
     pf.fileNames.add(file.getPath());
     if (file.getRelativePath()!=null)
       pf.relativeNames.put(file.getRelativePath(), file);
-//    pf.changeList.add(file);
+    if (file.getName().contains("menu")) {
+      System.out.println("");
+    }
+    if (add) {
+      pf.fileList.add(file);
+    }
+    if (!pf.rapidoMode || pf.hasCheckedDependencies) {
+      pf.changeList.add(file);
+    }
     //  	}
   }
 
@@ -625,7 +633,7 @@ public class PublisherBase implements ILoggingService {
       file.setXslt(ppinfo.getXslt());
       if (ppinfo.hasRelativePath())
         file.setRelativePath(ppinfo.getRelativePath() + File.separator + file.getRelativePath());
-      addFile(file);
+      addFile(file, true);
       pf.altMap.put("pre-page/"+file.getPath(), file);
       return true;
     } else {

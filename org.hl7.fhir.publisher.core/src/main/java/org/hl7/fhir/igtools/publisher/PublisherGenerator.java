@@ -289,6 +289,7 @@ public class PublisherGenerator extends PublisherBase {
         generateSummaryOutputs(db, null, pf.rc);
       }
     }
+    pf.template.rapidoSummary();
     genBasePages();
     if (db != null) {
       db.closeUp();
@@ -1815,9 +1816,9 @@ public class PublisherGenerator extends PublisherBase {
       long start = System.currentTimeMillis();
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-sd-xref", sdr.references(lang, lrc), f.getOutputNames(), r, vars, null, start, "xref", "StructureDefinition", lang);
     }
-    if (wantGen(r, "use-context")) {
+    if (wantGen(r, "sd-use-context")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-sd-use-context", sdr.useContext(), f.getOutputNames(), r, vars, null, start, "use-context", "StructureDefinition", lang);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-sd-use-context", sdr.useContext(), f.getOutputNames(), r, vars, null, start, "sd-use-context", "StructureDefinition", lang);
     }
     if (wantGen(r, "search-params")) {
       long start = System.currentTimeMillis();
@@ -4248,7 +4249,68 @@ public class PublisherGenerator extends PublisherBase {
         if (!contexts.isEmpty())
           item.add("contexts", String.join(", ", contexts));
       }
-      processFlags(item, cr, containedCr);
+      if (cr.hasJurisdiction() && !containedCr) {
+        File flagDir = new File(pf.tempDir + "/assets/images");
+        if (!flagDir.exists())
+          flagDir.mkdirs();
+        JsonArray jNodes = new JsonArray();
+        item.add("jurisdictions", jNodes);
+        ValueSet jvs = pf.context.fetchResource(ValueSet.class, "http://hl7.org/fhir/ValueSet/jurisdiction");
+        for (CodeableConcept cc : cr.getJurisdiction()) {
+          JsonObject jNode = new JsonObject();
+          jNodes.add(jNode);
+          ValidationResult vr = jvs==null ? null : pf.context.validateCode(new ValidationOptions(FhirPublication.R5, "en-US"),  cc, jvs);
+          if (vr != null && vr.asCoding()!=null) {
+            try {
+              Coding cd = vr.asCoding();
+              jNode.add("code", cd.getCode());
+              if (cd.getSystem().equals("http://unstats.un.org/unsd/methods/m49/m49.htm") && cd.getCode().equals("001")) {
+                jNode.add("name", "International");
+                jNode.add("flag", "001");
+              } else if (cd.getSystem().equals("urn:iso:std:iso:3166")) {
+                String code = translateCountryCode(cd.getCode()).toLowerCase();
+                jNode.add("name", displayForCountryCode(cd.getCode()));
+                File flagFile = new File(pf.vsCache + "/" + code + ".svg");
+                if (!flagFile.exists() && !pf.ignoreFlags.contains(code)) {
+                  URL url2 = new URL("https://flagcdn.com/" + pf.shortCountryCode.get(code.toUpperCase()).toLowerCase() + ".svg");
+                  try {
+                    InputStream in = url2.openStream();
+                    Files.copy(in, Paths.get(flagFile.getAbsolutePath()));
+                  } catch (Exception e2) {
+                    pf.ignoreFlags.add(code);
+                    System.out.println("Unable to access " + url2 + " or " + url2 + " (" + e2.getMessage() + ")");
+                  }
+                }
+                if (flagFile.exists()) {
+                  FileUtils.copyFileToDirectory(flagFile, flagDir);
+                  jNode.add("flag", code);
+                }
+              } else if (cd.getSystem().equals("urn:iso:std:iso:3166:-2")) {
+                String code = cd.getCode();
+                String[] codeParts = cd.getCode().split("-");
+                jNode.add("name", displayForStateCode(cd.getCode()) + " (" + displayForCountryCode(codeParts[0]) + ")");
+                File flagFile = new File(pf.vsCache + "/" + code + ".svg");
+                if (!flagFile.exists()) {
+                  URL url = new URL("http://flags.ox3.in/svg/" + codeParts[0].toLowerCase() + "/" + codeParts[1].toLowerCase() + ".svg");
+                  try (InputStream in = url.openStream()) {
+                    Files.copy(in, Paths.get(flagFile.getAbsolutePath()));
+                  } catch (Exception e) {
+                    // If we can't find the file, that's ok.
+                  }
+                }
+                if (flagFile.exists()) {
+                  FileUtils.copyFileToDirectory(flagFile, flagDir);
+                  jNode.add("flag", code);
+                }
+              }
+            } catch (Exception e) {
+              System.out.println("ERROR: Unable to populate IG flag information: "+e.getMessage());
+            }
+          } else{
+            jNode.add("name", pf.dr.displayDataType(cc));
+          }
+        }
+      }
       if (pcr != null && pcr.hasStatus())
         item.add("status", pcr.getStatus().toCode());
       if (cr.hasPurpose())
@@ -4331,70 +4393,6 @@ public class PublisherGenerator extends PublisherBase {
     }
   }
 
-  private void processFlags(JsonObject item, CanonicalResource cr, boolean containedCr) {
-    if (cr.hasJurisdiction() && !containedCr) {
-      File flagDir = new File(pf.tempDir + "/assets/images");
-      if (!flagDir.exists())
-        flagDir.mkdirs();
-      JsonArray jNodes = new JsonArray();
-      item.add("jurisdictions", jNodes);
-      ValueSet jvs = pf.context.fetchResource(ValueSet.class, "http://hl7.org/fhir/ValueSet/jurisdiction");
-      for (CodeableConcept cc : cr.getJurisdiction()) {
-        JsonObject jNode = new JsonObject();
-        jNodes.add(jNode);
-        ValidationResult vr = jvs==null ? null : pf.context.validateCode(new ValidationOptions(FhirPublication.R5, "en-US"),  cc, jvs);
-        if (vr != null && vr.asCoding()!=null) {
-          try {
-            Coding cd = vr.asCoding();
-            jNode.add("code", cd.getCode());
-            if (cd.getSystem().equals("http://unstats.un.org/unsd/methods/m49/m49.htm") && cd.getCode().equals("001")) {
-              jNode.add("name", "International");
-              jNode.add("flag", "001");
-            } else if (cd.getSystem().equals("urn:iso:std:iso:3166")) {
-              String code = translateCountryCode(cd.getCode()).toLowerCase();
-              jNode.add("name", displayForCountryCode(cd.getCode()));
-              File flagFile = new File(pf.vsCache + "/" + code + ".svg");
-              if (!flagFile.exists() && !pf.ignoreFlags.contains(code)) {
-                URL url2 = new URL("https://flagcdn.com/" + pf.shortCountryCode.get(code.toUpperCase()).toLowerCase() + ".svg");
-                try {
-                  InputStream in = url2.openStream();
-                  Files.copy(in, Paths.get(flagFile.getAbsolutePath()));
-                } catch (Exception e2) {
-                  pf.ignoreFlags.add(code);
-                  System.out.println("Unable to access " + url2 + " or " + url2 + " (" + e2.getMessage() + ")");
-                }
-              }
-              if (flagFile.exists()) {
-                FileUtils.copyFileToDirectory(flagFile, flagDir);
-                jNode.add("flag", code);
-              }
-            } else if (cd.getSystem().equals("urn:iso:std:iso:3166:-2")) {
-              String code = cd.getCode();
-              String[] codeParts = cd.getCode().split("-");
-              jNode.add("name", displayForStateCode(cd.getCode()) + " (" + displayForCountryCode(codeParts[0]) + ")");
-              File flagFile = new File(pf.vsCache + "/" + code + ".svg");
-              if (!flagFile.exists()) {
-                URL url = new URL("http://flags.ox3.in/svg/" + codeParts[0].toLowerCase() + "/" + codeParts[1].toLowerCase() + ".svg");
-                try (InputStream in = url.openStream()) {
-                  Files.copy(in, Paths.get(flagFile.getAbsolutePath()));
-                } catch (Exception e) {
-                  // If we can't find the file, that's ok.
-                }
-              }
-              if (flagFile.exists()) {
-                FileUtils.copyFileToDirectory(flagFile, flagDir);
-                jNode.add("flag", code);
-              }
-            }
-          } catch (Exception e) {
-            System.out.println("ERROR: Unable to populate IG flag information: "+e.getMessage());
-          }
-        } else{
-          jNode.add("name", pf.dr.displayDataType(cc));
-        }
-      }
-    }
-  }
 
 
   private void generateCanonicalSummary(String lang) throws IOException {

@@ -112,7 +112,13 @@ public class TemplateFragmentTypeLoader {
 
         // Get or create prefix group
         PrefixGroup group = groupedByPrefix.computeIfAbsent(prefix, PrefixGroup::new);
-        group.addSuffix(suffix);
+        if (suffix.contains("{{format}}")) {
+          group.addSuffix(suffix.replace("{{format}}", "json"));
+          group.addSuffix(suffix.replace("{{format}}", "xml"));
+          group.addSuffix(suffix.replace("{{format}}", "ttl"));
+        } else {
+          group.addSuffix(suffix);
+        }
       }
     }
 
@@ -143,8 +149,6 @@ public class TemplateFragmentTypeLoader {
 
       // Find all includes
       List<String> includes = findAllIncludes(directoryPath);
-
-      System.out.println("Found " + includes.size() + " unique included files");
 
       // Process and group includes
       Map<String, PrefixGroup> grouped = processIncludes(includes);

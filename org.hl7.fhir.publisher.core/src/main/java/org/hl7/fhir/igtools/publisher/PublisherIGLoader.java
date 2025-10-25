@@ -25,17 +25,14 @@ import org.hl7.fhir.igtools.spreadsheets.MappingSpace;
 import org.hl7.fhir.igtools.templates.TemplateManager;
 import org.hl7.fhir.r4.formats.FormatUtilities;
 import org.hl7.fhir.r5.conformance.R5ExtensionsLoader;
-import org.hl7.fhir.r5.conformance.profile.ProfileKnowledgeProvider;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.context.IContextResourceLoader;
-import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.elementmodel.*;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
 import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.fhirpath.FHIRPathEngine;
 import org.hl7.fhir.r5.formats.IParser;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.formats.XmlParser;
@@ -47,7 +44,6 @@ import org.hl7.fhir.r5.model.Enumeration;
 import org.hl7.fhir.r5.renderers.DataRenderer;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.terminologies.TerminologyFunctions;
-import org.hl7.fhir.r5.terminologies.utilities.CommonsTerminologyCapabilitiesCache;
 import org.hl7.fhir.r5.testfactory.TestDataFactory;
 import org.hl7.fhir.r5.tools.ExtensionConstants;
 import org.hl7.fhir.r5.utils.MappingSheetParser;
@@ -273,7 +269,7 @@ public class PublisherIGLoader extends PublisherBase {
     } catch (Exception e) {
       throw new Exception("Error Parsing File "+ pf.igName +": "+e.getMessage(), e);
     }
-    pf.template = pf.templateManager.loadTemplate(templateName, pf.rootDir, pf.sourceIg.getPackageId(), pf.mode == PublisherUtils.IGBuildMode.AUTOBUILD, pf.logOptions.contains("template"));
+    pf.template = pf.templateManager.loadTemplate(templateName, pf.rootDir, pf.sourceIg.getPackageId(), pf.mode == PublisherUtils.IGBuildMode.AUTOBUILD, pf.logOptions.contains("template"), pf.rapidoMode);
     if (pf.template.hasExtraTemplates()) {
       processExtraTemplates(pf.template.getExtraTemplates());
     }
@@ -863,14 +859,6 @@ public class PublisherIGLoader extends PublisherBase {
     }
     pf.pagesDirs.removeAll(missingDirs);
 
-    logDebugMessage(LogCategory.INIT, "Temp: "+ pf.tempDir);
-    FileUtilities.clearDirectory(pf.tempDir);
-    forceDir(pf.tempDir);
-    forceDir(Utilities.path(pf.tempDir, "_includes"));
-    forceDir(Utilities.path(pf.tempDir, "_data"));
-    for (String s : allLangs()) {
-      forceDir(Utilities.path(pf.tempDir, s));
-    }
     logDebugMessage(LogCategory.INIT, "Output: "+ pf.outputDir);
     forceDir(pf.outputDir);
     FileUtilities.clearDirectory(pf.outputDir);
@@ -1153,6 +1141,17 @@ public class PublisherIGLoader extends PublisherBase {
       pf.extensionTracker.setoptIn(!ini.getBooleanProperty("IG", "usage-stats-opt-out"));
 
     log("Initialization complete");
+  }
+
+  public void clearTempFolder() throws Exception {
+    logDebugMessage(LogCategory.INIT, "Temp: "+ pf.tempDir);
+    FileUtilities.clearDirectory(pf.tempDir);
+    forceDir(pf.tempDir);
+    forceDir(Utilities.path(pf.tempDir, "_includes"));
+    forceDir(Utilities.path(pf.tempDir, "_data"));
+    for (String s : allLangs()) {
+      forceDir(Utilities.path(pf.tempDir, s));
+    }
   }
 
   private IPublisherModule loadModule(String name) throws Exception {
@@ -2486,7 +2485,7 @@ public class PublisherIGLoader extends PublisherBase {
     if (existing == null || existing.getTime() != file.getTime() || existing.getHash() != file.getHash()) {
       pf.fileList.add(file);
       pf.altMap.put(key, file);
-      addFile(file);
+      addFile(file, false);
       return true;
     } else {
       for (FetchedFile f : pf.fileList) {
@@ -3540,7 +3539,7 @@ public class PublisherIGLoader extends PublisherBase {
           dir.setRelativePath(ppinfo.getRelativePath() + File.separator + dir.getRelativePath());
 
       }
-      addFile(dir);
+      addFile(dir, false);
     }
     for (String link : dir.getFiles()) {
       FetchedFile f = this.pf.fetcher.fetch(link);
@@ -3574,7 +3573,7 @@ public class PublisherIGLoader extends PublisherBase {
       changed = true;
       pf.altMap.put("page/"+dir.getPath(), dir);
       dir.setProcessMode(FetchedFile.PROCESS_NONE);
-      addFile(dir);
+      addFile(dir, true);
     }
     for (String link : dir.getFiles()) {
       FetchedFile f = this.pf.fetcher.fetch(link);
@@ -3591,7 +3590,7 @@ public class PublisherIGLoader extends PublisherBase {
     FetchedFile existing = pf.altMap.get("page/"+file.getPath());
     if (existing == null || existing.getTime() != file.getTime() || existing.getHash() != file.getHash()) {
       file.setProcessMode(FetchedFile.PROCESS_NONE);
-      addFile(file);
+      addFile(file, true);
       pf.altMap.put("page/"+file.getPath(), file);
       return true;
     } else {
@@ -3929,7 +3928,7 @@ public class PublisherIGLoader extends PublisherBase {
     if (existing == null || existing.getTime() != file.getTime() || existing.getHash() != file.getHash()) {
       pf.fileList.add(file);
       pf.fileMap.put(key, file);
-      addFile(file);
+      addFile(file, false);
       return true;
     } else {
       for (FetchedFile f : pf.fileList) {

@@ -340,4 +340,6 @@ public class PublisherFields {
 
     PublisherSigner signer;
 
+    public boolean rapidoMode;
+    public boolean hasCheckedDependencies;
 }

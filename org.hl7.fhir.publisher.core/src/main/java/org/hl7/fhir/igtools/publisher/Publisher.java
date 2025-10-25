@@ -830,8 +830,10 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     }
   }
 
-  public void checkDependencies(FetchedFile igf) throws IOException {
+  public void checkDependencies(FetchedFile igf) throws Exception {
     System.out.print("Checking dependencies...");
+    if (!pf.rapidoMode) return;
+    pf.hasCheckedDependencies = true;
     // first, we load all the direct dependency lists
     for (FetchedFile f : pf.fileList) {
       if (igf != f) {
@@ -859,8 +861,10 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     if (pf.changeList.isEmpty()) {
       System.out.println(" perform a full build (no change)");
       pf.changeList.addAll(pf.fileList);
+      loader.clearTempFolder();
     } else if (pf.changeList.size() == pf.fileList.size()) {
       System.out.println(" build everything");
+      loader.clearTempFolder();
     } else {
       System.out.println(" building "+pf.changeList.size()+" files");
     }
@@ -1374,6 +1378,10 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       }
       if (CliParams.hasNamedParam(args, "-milestone")) {
         self.setMilestoneBuild(true);
+      }
+      if (CliParams.hasNamedParam(args, "-rapido") || CliParams.hasNamedParam(args, "-cascais")) {
+        self.pf.rapidoMode = true;
+        System.out.println("Running in Cascais/Rapido mode. Report issues to Grahame on Zulip");
       }
       
       if (FhirSettings.isProhibitNetworkAccess()) {

@@ -489,32 +489,34 @@ public class PublisherProcessor extends PublisherBase  {
       try {
         logDebugMessage(LogCategory.PROGRESS, " .. validate "+f.getName());
         logDebugMessage(LogCategory.PROGRESS, " .. "+f.getName());
-        FetchedResource r0 = f.getResources().get(0);
-        if (f.getLogical() != null && f.getResources().size() == 1 && !r0.fhirType().equals("Binary")) {
-          throw new Error("Not done yet");
-        } else {
-          for (FetchedResource r : f.getResources()) {
-            if (!r.isValidated()) {
-              logDebugMessage(LogCategory.PROGRESS, "     validating "+r.getTitle());
+        if (!f.getResources().isEmpty()) {
+          FetchedResource r0 = f.getResources().get(0);
+          if (f.getLogical() != null && f.getResources().size() == 1 && !r0.fhirType().equals("Binary")) {
+            throw new Error("Not done yet");
+          } else {
+            for (FetchedResource r : f.getResources()) {
+              if (!r.isValidated()) {
+                logDebugMessage(LogCategory.PROGRESS, "     validating " + r.getTitle());
 //              log("     validating "+r.getTitle());
-              validate(f, r);
+                validate(f, r);
+              }
             }
-          }
-          if (f.getLogical() != null && f.getResources().size() == 1 && r0.fhirType().equals("Binary")) {
-            Binary bin = (Binary) r0.getResource();
-            StructureDefinition profile = this.pf.context.fetchResource(StructureDefinition.class, f.getLogical());
-            List<ValidationMessage> errs = new ArrayList<ValidationMessage>();
-            if (profile == null) {
-              errs.add(new ValidationMessage(ValidationMessage.Source.InstanceValidator, ValidationMessage.IssueType.NOTFOUND, "file", this.pf.context.formatMessage(I18nConstants.Bundle_BUNDLE_Entry_NO_LOGICAL_EXPL, r0.getId(), f.getLogical()), ValidationMessage.IssueSeverity.ERROR));
-            } else {
-              Manager.FhirFormat fmt = Manager.FhirFormat.readFromMimeType(bin.getContentType() == null ? f.getContentType() : bin.getContentType());
-              TimeTracker.Session tts = this.pf.tt.start("validation");
-              List<StructureDefinition> profiles = new ArrayList<>();
-              profiles.add(profile);
-              validate(f, r0, bin, errs, fmt, profiles);
-              tts.end();
+            if (f.getLogical() != null && f.getResources().size() == 1 && r0.fhirType().equals("Binary")) {
+              Binary bin = (Binary) r0.getResource();
+              StructureDefinition profile = this.pf.context.fetchResource(StructureDefinition.class, f.getLogical());
+              List<ValidationMessage> errs = new ArrayList<ValidationMessage>();
+              if (profile == null) {
+                errs.add(new ValidationMessage(ValidationMessage.Source.InstanceValidator, ValidationMessage.IssueType.NOTFOUND, "file", this.pf.context.formatMessage(I18nConstants.Bundle_BUNDLE_Entry_NO_LOGICAL_EXPL, r0.getId(), f.getLogical()), ValidationMessage.IssueSeverity.ERROR));
+              } else {
+                Manager.FhirFormat fmt = Manager.FhirFormat.readFromMimeType(bin.getContentType() == null ? f.getContentType() : bin.getContentType());
+                TimeTracker.Session tts = this.pf.tt.start("validation");
+                List<StructureDefinition> profiles = new ArrayList<>();
+                profiles.add(profile);
+                validate(f, r0, bin, errs, fmt, profiles);
+                tts.end();
+              }
+              processValidationOutcomes(f, r0, errs);
             }
-            processValidationOutcomes(f, r0, errs);
           }
         }
       } finally {
@@ -1944,7 +1946,7 @@ public class PublisherProcessor extends PublisherBase  {
 
 
   private void validate(String type) throws Exception {
-    for (FetchedFile f : pf.changeList) {
+    for (FetchedFile f : pf.fileList) {
       f.start("validate");
       try {
         for (FetchedResource r : f.getResources()) {
