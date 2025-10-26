@@ -203,6 +203,18 @@ public class PublisherGenerator extends PublisherBase {
     if (pf.simplifierMode) {
       return;
     }
+
+    for (String s : pf.context.getBinaryKeysAsSet()) {
+      if (needFile(s)) {
+        if (pf.makeQA)
+          checkMakeFile(pf.context.getBinaryForKey(s), Utilities.path(pf.qaDir, s), pf.otherFilesStartup);
+        checkMakeFile(pf.context.getBinaryForKey(s), Utilities.path(pf.tempDir, s), pf.otherFilesStartup);
+        for (String l : allLangs()) {
+          checkMakeFile(pf.context.getBinaryForKey(s), Utilities.path(pf.tempDir, l, s), pf.otherFilesStartup);
+        }
+      }
+    }
+
     Base.setCopyUserData(true); // just keep all the user data when copying while rendering
     pf.bdr = new BaseRenderer(pf.context, checkAppendSlash(pf.specPath), pf.igpkp, pf.specMaps, pageTargets(), pf.markdownEngine, pf.packge, pf.rc);
 
@@ -523,6 +535,20 @@ public class PublisherGenerator extends PublisherBase {
     }
   }
 
+  private boolean needFile(String s) {
+    if (s.endsWith(".css") && !isChild())
+      return true;
+    if (s.startsWith("tbl"))
+      return true;
+    if (s.endsWith(".js"))
+      return true;
+    if (s.startsWith("icon"))
+      return true;
+    if (Utilities.existsInList(s, "modifier.png", "alert.jpg", "tree-filter.png", "mustsupport.png", "information.png", "summary.png", "new.png", "lock.png", "external.png", "cc0.png", "target.png", "link.svg"))
+      return true;
+
+    return false;
+  }
 
   private void regenerate(String uri) throws Exception {
     Resource res ;

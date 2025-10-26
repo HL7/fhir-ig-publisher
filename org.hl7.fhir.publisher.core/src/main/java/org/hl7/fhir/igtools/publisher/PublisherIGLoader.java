@@ -1091,16 +1091,6 @@ public class PublisherIGLoader extends PublisherBase {
       pf.validator.getSettings().setMaxVersion(VersionUtilities.getMajMin(pf.generateVersions.get(pf.generateVersions.size()-1)));
     }
 
-    for (String s : pf.context.getBinaryKeysAsSet()) {
-      if (needFile(s)) {
-        if (pf.makeQA)
-          checkMakeFile(pf.context.getBinaryForKey(s), Utilities.path(pf.qaDir, s), pf.otherFilesStartup);
-        checkMakeFile(pf.context.getBinaryForKey(s), Utilities.path(pf.tempDir, s), pf.otherFilesStartup);
-        for (String l : allLangs()) {
-          checkMakeFile(pf.context.getBinaryForKey(s), Utilities.path(pf.tempDir, l, s), pf.otherFilesStartup);
-        }
-      }
-    }
     pf.otherFilesStartup.add(Utilities.path(pf.tempDir, "_data"));
     pf.otherFilesStartup.add(Utilities.path(pf.tempDir, "_data", "fhir.json"));
     pf.otherFilesStartup.add(Utilities.path(pf.tempDir, "_data", "structuredefinitions.json"));
@@ -1849,20 +1839,6 @@ public class PublisherIGLoader extends PublisherBase {
 
 
 
-  private boolean needFile(String s) {
-    if (s.endsWith(".css") && !isChild())
-      return true;
-    if (s.startsWith("tbl"))
-      return true;
-    if (s.endsWith(".js"))
-      return true;
-    if (s.startsWith("icon"))
-      return true;
-    if (Utilities.existsInList(s, "modifier.png", "alert.jpg", "tree-filter.png", "mustsupport.png", "information.png", "summary.png", "new.png", "lock.png", "external.png", "cc0.png", "target.png", "link.svg"))
-      return true;
-
-    return false;
-  }
 
   public SpecMapManager loadSpecDetails(byte[] bs, String name, NpmPackage npm, String path) throws IOException {
     SpecMapManager map = new SpecMapManager(bs, npm.vid(), pf.version);

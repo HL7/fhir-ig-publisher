@@ -55,7 +55,7 @@ public class PublisherProcessor extends PublisherBase  {
 
   public void checkLanguage() {
     if ((pf.langPolicy == ValidationPresenter.LanguagePopulationPolicy.ALL || pf.langPolicy == ValidationPresenter.LanguagePopulationPolicy.OTHERS)) {
-      for (FetchedFile f : pf.fileList) {
+      for (FetchedFile f : pf.changeList) {
         for (FetchedResource r : f.getResources()) {
           logDebugMessage(LogCategory.PROGRESS, "process language in res: "+r.fhirType()+"/"+r.getId());
           if (!this.pf.sourceIg.hasLanguage()) {
@@ -407,7 +407,7 @@ public class PublisherProcessor extends PublisherBase  {
 
   private void validateExpressions() {
     logDebugMessage(LogCategory.PROGRESS, "Validate Expressions");
-    for (FetchedFile f : pf.fileList) {
+    for (FetchedFile f : pf.changeList) {
       f.start("validateExpressions");
       try {
         for (FetchedResource r : f.getResources()) {
@@ -484,7 +484,7 @@ public class PublisherProcessor extends PublisherBase  {
     checkURLsUnique();
     checkOIDsUnique();
 
-    for (FetchedFile f : pf.fileList) {
+    for (FetchedFile f : pf.changeList) {
       f.start("validate");
       try {
         logDebugMessage(LogCategory.PROGRESS, " .. validate "+f.getName());
@@ -1412,7 +1412,7 @@ public class PublisherProcessor extends PublisherBase  {
 
   private void checkConformanceResources() throws IOException {
     log("Check profiles & code systems");
-    for (FetchedFile f : pf.fileList) {
+    for (FetchedFile f : pf.changeList) {
       f.start("checkConformanceResources");
       try {
         for (FetchedResource r : f.getResources()) {
@@ -1444,7 +1444,7 @@ public class PublisherProcessor extends PublisherBase  {
     if (!pf.realmRules.isExempt(pf.publishedIg.getPackageId())) {
       log("Check realm rules");
       pf.realmRules.startChecks(pf.publishedIg);
-      for (FetchedFile f : pf.fileList) {
+      for (FetchedFile f : pf.changeList) {
         f.start("checkConformanceResources2");
         try {
           for (FetchedResource r : f.getResources()) {
@@ -1471,7 +1471,7 @@ public class PublisherProcessor extends PublisherBase  {
     if (pf.ipsComparator != null) {
       pf.ipsComparator.startChecks(pf.publishedIg);
     }
-    for (FetchedFile f : pf.fileList) {
+    for (FetchedFile f : pf.changeList) {
       f.start("checkConformanceResources3");
       try {
         for (FetchedResource r : f.getResources()) {
@@ -1871,7 +1871,7 @@ public class PublisherProcessor extends PublisherBase  {
 
   public void checkSignBundles() throws Exception {
     log("Checking for Bundles to sign");
-    for (FetchedFile f : pf.fileList) {
+    for (FetchedFile f : pf.changeList) {
       for (FetchedResource r : f.getResources()) {
         if ("Bundle".equals(r.fhirType())) {
           Element sig = r.getElement().getNamedChild("signature");
@@ -1888,7 +1888,7 @@ public class PublisherProcessor extends PublisherBase  {
 
 
   public void processProvenanceDetails() throws Exception {
-    for (FetchedFile f : pf.fileList) {
+    for (FetchedFile f : pf.changeList) {
       f.start("processProvenanceDetails");
       try {
 
@@ -1931,7 +1931,7 @@ public class PublisherProcessor extends PublisherBase  {
 
     PublisherTranslator pt = new PublisherTranslator(pf.context, pf.sourceIg.hasLanguage() ? pf.sourceIg.getLanguage() : "en", pf.defaultTranslationLang, pf.translationLangs);
     pt.start(pf.tempLangDir);
-    for (FetchedFile f : pf.fileList) {
+    for (FetchedFile f : pf.changeList) {
       f.start("translate");
       try {
         for (FetchedResource r : f.getResources()) {
@@ -1946,7 +1946,7 @@ public class PublisherProcessor extends PublisherBase  {
 
 
   private void validate(String type) throws Exception {
-    for (FetchedFile f : pf.fileList) {
+    for (FetchedFile f : pf.changeList) {
       f.start("validate");
       try {
         for (FetchedResource r : f.getResources()) {

@@ -112,6 +112,7 @@ import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
+import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.hl7.fhir.validation.SQLiteINpmPackageIndexBuilderDBImpl;
 import org.hl7.fhir.validation.instance.utils.ValidationContext;
@@ -352,6 +353,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 
   public void createIg() throws Exception, IOException, EOperationOutcome, FHIRException {
     try {
+      IniFile buildTracker = new IniFile(Utilities.path(pf.vsCache, ".build-tracker.ini"));
       TimeTracker.Session tts = pf.tt.start("loading");
       FetchedFile igFile = loader.load();
       pf.rc.setResolver(this);
@@ -362,12 +364,10 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 
       }
 
+      checkDependencies(igFile, buildTracker);
       tts.end();
 
       tts = pf.tt.start("generate");
-      log("Processing Conformance Resources");
-
-      checkDependencies(igFile);
 
       log("Checking Language");
       processor.checkLanguage();
@@ -399,35 +399,15 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       generator.generate();
       clean();
       pf.dependentIgFinder.finish(pf.outputDir, pf.sourceIg.present());
-      List<FetchedResource> fragments = new ArrayList<>(); 
-      for (var f : pf.fileList) {
-        for (var r : f.getResources()) {
-          if (r.getResource() != null && r.getResource() instanceof CodeSystem && ((CodeSystem) r.getResource()).getContent() == CodeSystemContentMode.FRAGMENT) {
-            fragments.add(r);
-          }
-        }
-      }
+      List<FetchedResource> fragments = new ArrayList<>();
+      listFragments(fragments);
       checkForSnomedVersion();
       if (pf.txLog != null) {
         if (ManagedFileAccess.file(pf.txLog).exists()) {
            FileUtilities.copyFile(pf.txLog, Utilities.path(pf.rootDir, "output", "qa-tx.html"));
         }
       }
-      for (FetchedFile f : pf.fileList) {
-        for (FetchedResource r : f.getResources()) {
-          for (ValidationMessage vm : r.getErrors()) {
-            boolean inBase = false;
-            for (ValidationMessage t :f.getErrors()) {
-              if (vm.equals(t)) {
-                inBase = true;
-              }
-            }
-            if (!inBase) {
-              f.getErrors().add(vm);
-            }
-          }
-        }
-      }
+      deleteDuplicateMessages();
       ValidationPresenter val = new ValidationPresenter(pf.version, workingVersion(), pf.igpkp, pf.childPublisher == null? null : pf.childPublisher.getIgpkp(), pf.rootDir, pf.npmName, pf.childPublisher == null? null : pf.childPublisher.pf.npmName,
           IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), pf.realmRules, pf.previousVersionComparator, pf.ipaComparator, pf.ipsComparator,
           new DependencyRenderer(pf.pcm, pf.outputDir, pf.npmName, pf.templateManager, pf.dependencyList, pf.context, pf.markdownEngine, pf.rc, pf.specMaps).render(pf.publishedIg, true, false, false), new HTAAnalysisRenderer(pf.context, pf.outputDir, pf.markdownEngine).render(pf.publishedIg.getPackageId(), pf.fileList, pf.publishedIg.present()),
@@ -446,6 +426,8 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         log("Validation output in "+val.generate(pf.sourceIg.getName(), pf.errors, pf.fileList, Utilities.path(pf.destDir != null ? pf.destDir : pf.outputDir, "qa.html"), pf.suppressedMessages, pinSummary()));
       }
       recordOutcome(null, val);
+      buildTracker.setBooleanProperty("status", "complete", true, null);
+      buildTracker.save();
       log("Finished @ "+nowString()+". Max Memory Used = "+Utilities.describeSize(pf.maxMemory)+logSummary());
     } catch (Exception e) {
       try {
@@ -454,6 +436,34 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         ex.printStackTrace();
       }
       throw e;
+    }
+  }
+
+  private void listFragments(List<FetchedResource> fragments) {
+    for (var f : pf.fileList) {
+      for (var r : f.getResources()) {
+        if (r.getResource() != null && r.getResource() instanceof CodeSystem && ((CodeSystem) r.getResource()).getContent() == CodeSystemContentMode.FRAGMENT) {
+          fragments.add(r);
+        }
+      }
+    }
+  }
+
+  private void deleteDuplicateMessages() {
+    for (FetchedFile f : pf.fileList) {
+      for (FetchedResource r : f.getResources()) {
+        for (ValidationMessage vm : r.getErrors()) {
+          boolean inBase = false;
+          for (ValidationMessage t :f.getErrors()) {
+            if (vm.equals(t)) {
+              inBase = true;
+            }
+          }
+          if (!inBase) {
+            f.getErrors().add(vm);
+          }
+        }
+      }
     }
   }
 
@@ -830,10 +840,19 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     }
   }
 
-  public void checkDependencies(FetchedFile igf) throws Exception {
-    System.out.print("Checking dependencies...");
+  public void checkDependencies(FetchedFile igf, IniFile buildTracker) throws Exception {
     if (!pf.rapidoMode) return;
     pf.hasCheckedDependencies = true;
+
+    if (buildTracker.getBooleanProperty("status", "started") && !buildTracker.getBooleanProperty("status", "complete")) {
+      log("Complete Build after failure");
+      pf.changeList.addAll(pf.fileList);
+      loader.clearTempFolder();
+      return;
+    }
+    buildTracker.setBooleanProperty("status", "complete", false, null);
+    buildTracker.setBooleanProperty("status", "started", true, null);
+
     // first, we load all the direct dependency lists
     for (FetchedFile f : pf.fileList) {
       if (igf != f) {
@@ -847,26 +866,41 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       f.calculateHash();
     }
 
-    IniFile ini = new IniFile(Utilities.path(pf.vsCache, ".hashes.ini"));
+    Set<String> changed = new HashSet<>();
     for (FetchedFile f : pf.fileList) {
-      String hNow = Long.toString(f.getCalcHash());
-      String hThen = ini.getStringProperty("files", f.getLoadPath());
+      String hNow = Long.toString(f.getHash());
+      String hThen = buildTracker.getStringProperty("source", f.getLoadPath());
       if (!hNow.equals(hThen)) {
-        pf.changeList.add(f);
-        ini.setStringProperty("files", f.getLoadPath(), hNow, null);
+       changed.add(f.getLoadPath());
+       buildTracker.setStringProperty("source", f.getLoadPath(), hNow, null);
       }
     }
-    ini.save();
+    for (FetchedFile f : pf.fileList) {
+      String hNow = Long.toString(f.getCalcHash());
+      String hThen = buildTracker.getStringProperty("tracked", f.getLoadPath());
+      if (!hNow.equals(hThen)) {
+        pf.changeList.add(f);
+        buildTracker.setStringProperty("tracked", f.getLoadPath(), hNow, null);
+      }
+    }
+    buildTracker.save();
+
 
     if (pf.changeList.isEmpty()) {
-      System.out.println(" perform a full build (no change)");
+      log("Complete Build (no changes)");
       pf.changeList.addAll(pf.fileList);
       loader.clearTempFolder();
+      buildTracker.setStringProperty("status", "uuid", HierarchicalTableGenerator.uuid, null);
     } else if (pf.changeList.size() == pf.fileList.size()) {
-      System.out.println(" build everything");
+      log("Complete Build (all files)");
       loader.clearTempFolder();
+      buildTracker.setStringProperty("status", "uuid", HierarchicalTableGenerator.uuid, null);
     } else {
-      System.out.println(" building "+pf.changeList.size()+" files");
+      log("Differential Build ("+pf.changeList.size()+" files)");
+      for (String s : Utilities.sorted(changed)) {
+        System.out.println("  "+s);
+      }
+      HierarchicalTableGenerator.uuid = buildTracker.getStringProperty("status", "uuid");
     }
   }
 
@@ -1360,6 +1394,9 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         self.setMode(PublisherUtils.IGBuildMode.AUTOBUILD);
         self.pf.targetOutput = CliParams.getNamedParam(args, "-target");
         self.setRepoSource( CliParams.getNamedParam(args, "-repo"));
+      } else if (CliParams.hasNamedParam(args, "-rapido") || CliParams.hasNamedParam(args, "-cascais")) {
+        self.pf.rapidoMode = true;
+        System.out.println("Running in Cascais:Rapido mode. Report issues to Grahame on Zulip");
       }
 
       if (CliParams.hasNamedParam(args, "-no-narrative")) {
@@ -1378,12 +1415,8 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       }
       if (CliParams.hasNamedParam(args, "-milestone")) {
         self.setMilestoneBuild(true);
+        self.pf.rapidoMode = false;
       }
-      if (CliParams.hasNamedParam(args, "-rapido") || CliParams.hasNamedParam(args, "-cascais")) {
-        self.pf.rapidoMode = true;
-        System.out.println("Running in Cascais/Rapido mode. Report issues to Grahame on Zulip");
-      }
-      
       if (FhirSettings.isProhibitNetworkAccess()) {
         System.out.println("Running without network access - output may not be correct unless cache contents are correct");        
       }
