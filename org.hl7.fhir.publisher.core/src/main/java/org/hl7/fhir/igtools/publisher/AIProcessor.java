@@ -53,6 +53,16 @@ public class AIProcessor {
     for (String lang : langs) {
       processFolderNew(new File(Utilities.path(rootDir, lang)), npm, lang);
     }
+    for (File f : new File(rootDir).listFiles()) {
+      if (f.getName().endsWith(".ai.html")) {
+        f.delete();
+      }
+    }
+    if (!langs.isEmpty()) {
+      String llms = FileUtilities.fileToString(Utilities.path(rootDir, langs.get(0), "llms.txt"));
+      llms = llms.replace("](", "](" + langs.get(0) + "/");
+      FileUtilities.stringToFile(llms, Utilities.path(rootDir, "llms.txt"));
+    }
   }
 
   /**
