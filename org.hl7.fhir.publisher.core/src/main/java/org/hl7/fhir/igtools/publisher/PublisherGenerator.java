@@ -2386,7 +2386,7 @@ public class PublisherGenerator extends PublisherBase {
     data.add("totalFiles", pf.fileList.size());
     data.add("processedFiles", pf.changeList.size());
 
-    if (pf.repoSource != null) {
+    if (settings.getRepoSource() != null) {
       data.add("repoSource", gh());
     } else {
       String git= getGitSource();
@@ -2579,7 +2579,7 @@ public class PublisherGenerator extends PublisherBase {
   }
 
   private String gh() {
-    return pf.repoSource != null ? pf.repoSource : settings.getTargetOutput() != null ? settings.getTargetOutput().replace("https://build.fhir.org/ig", "https://github.com") : null;
+    return settings.getRepoSource() != null ? settings.getRepoSource() : settings.getTargetOutput() != null ? settings.getTargetOutput().replace("https://build.fhir.org/ig", "https://github.com") : null;
   }
 
 

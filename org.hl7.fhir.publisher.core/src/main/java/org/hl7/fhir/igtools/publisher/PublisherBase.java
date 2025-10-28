@@ -344,14 +344,6 @@ public class PublisherBase implements ILoggingService {
     return this.pf.isChild;
   }
 
-  public boolean isMilestoneBuild() {
-    return pf.milestoneBuild;
-  }
-
-  public void setMilestoneBuild(boolean milestoneBuild) {
-    this.pf.milestoneBuild = milestoneBuild;
-  }
-
   protected String targetUrl() {
     if (settings.getMode() == null)
       return "file://"+ pf.outputDir;

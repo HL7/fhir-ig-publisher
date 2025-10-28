@@ -60,9 +60,7 @@ public class PublisherFields {
     Map<String, Boolean> wantGenParams = new HashMap<String, Boolean>();
     Publisher childPublisher = null;
     boolean genExampleNarratives = true;
-    final List<String> noNarratives = new ArrayList<String>();
     List<FetchedResource> noNarrativeResources = new ArrayList<FetchedResource>();
-    final List<String> noValidate = new ArrayList<String>();
     final List<String> customResourceFiles = new ArrayList<String>();
     final List<String> additionalResourceFiles = new ArrayList<String>();
     List<FetchedResource> noValidateResources = new ArrayList<FetchedResource>();
@@ -169,7 +167,6 @@ public class PublisherFields {
     String rootDir;
     String templatePck;
     boolean templateLoaded;
-    String repoSource;
     String folderToDelete;
     NpmPackage packge;
     String txLog;
@@ -211,7 +208,6 @@ public class PublisherFields {
     List<String> codeSystemProps = new ArrayList<String>();
     List<PublisherUtils.JsonDependency> jsonDependencies = new ArrayList<PublisherUtils.JsonDependency>();
     Coding expectedJurisdiction;
-    boolean noSushi;
     Map<String, String> loadedIds;
     boolean duplicateInputResourcesDetected;
     List<String> comparisonVersions;
@@ -258,7 +254,6 @@ public class PublisherFields {
     RenderingContext.FixedValueFormat fixedFormat = RenderingContext.FixedValueFormat.JSON;
     static PublisherConsoleLogger consoleLogger;
     IPublisherModule module;
-    boolean milestoneBuild;
     BaseRenderer bdr;
     boolean noXigLink;
 

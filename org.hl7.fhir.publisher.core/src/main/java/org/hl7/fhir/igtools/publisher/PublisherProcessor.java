@@ -1384,7 +1384,7 @@ public class PublisherProcessor extends PublisherBase  {
   }
 
   private boolean passesNarrativeFilter(FetchedResource r) {
-    for (String s : pf.noNarratives) {
+    for (String s : settings.getNoNarratives()) {
       String[] p = s.split("\\/");
       if (p.length == 2) {
         if (("*".equals(p[0]) || r.fhirType().equals(p[0])) &&
@@ -1397,7 +1397,7 @@ public class PublisherProcessor extends PublisherBase  {
   }
 
   private boolean passesValidationFilter(FetchedResource r) {
-    for (String s : pf.noValidate) {
+    for (String s : settings.getNoValidate()) {
       String[] p = s.split("\\/");
       if (p.length == 2) {
         if (("*".equals(p[0]) || r.fhirType().equals(p[0])) &&

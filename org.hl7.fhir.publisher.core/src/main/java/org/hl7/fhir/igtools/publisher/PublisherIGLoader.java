@@ -132,13 +132,13 @@ public class PublisherIGLoader extends PublisherBase {
         }
       }
       File fsh = new File(Utilities.path(focusDir(), "fsh"));
-      if (fsh.exists() && fsh.isDirectory() && !pf.noSushi) {
+      if (fsh.exists() && fsh.isDirectory() && !settings.isNoSushi()) {
         prescanSushiConfig(focusDir());
         new FSHRunner(this).runFsh(new File(FileUtilities.getDirectoryForFile(fsh.getAbsolutePath())), settings.getMode());
         pf.isSushi = true;
       } else {
         File fsh2 = new File(Utilities.path(focusDir(), "input", "fsh"));
-        if (fsh2.exists() && fsh2.isDirectory() && !pf.noSushi) {
+        if (fsh2.exists() && fsh2.isDirectory() && !settings.isNoSushi()) {
           prescanSushiConfig(focusDir());
           new FSHRunner(this).runFsh(new File(FileUtilities.getDirectoryForFile(fsh.getAbsolutePath())), settings.getMode());
           pf.isSushi = true;
@@ -344,10 +344,10 @@ public class PublisherIGLoader extends PublisherBase {
           if (!s.contains("/")) {
             throw new Exception("Illegal value "+s+" for no-narrative: should be resource/id (see documentation at https://build.fhir.org/ig/FHIR/fhir-tools-ig/CodeSystem-ig-parameters.html)");
           }
-          pf.noNarratives.add(s);
+          settings.getNoNarratives().add(s);
           break;
         case "no-validate":
-          pf.noValidate.add(p.getValue());
+          settings.getNoValidate().add(p.getValue());
           break;
         case "path-resource":
           String dir = getPathResourceDirectory(p);
@@ -1890,7 +1890,7 @@ public class PublisherIGLoader extends PublisherBase {
       npm = null;
     }
     if (npm != null) {
-      if (isMilestoneBuild()) {
+      if (settings.isMilestoneBuild()) {
         return npm.canonical();
       } else {
         return npm.getWebLocation();
@@ -1910,7 +1910,7 @@ public class PublisherIGLoader extends PublisherBase {
     if (!rigV.equals(version)) {
       throw new FHIRException("The proposed publication for relatedIG  "+code+" is a different version: "+version+" instead of "+rigV);
     }
-    if ("milestone".equals(mode) && isMilestoneBuild()) {
+    if ("milestone".equals(mode) && settings.isMilestoneBuild()) {
       return canonical;
     } else {
       return location;

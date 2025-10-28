@@ -187,19 +187,12 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     NpmPackageIndexBuilder.setExtensionFactory(new SQLiteINpmPackageIndexBuilderDBImpl.SQLiteINpmPackageIndexBuilderDBImplFactory());
   }
 
-  public boolean isNoSushi() {
-    return pf.noSushi;
-  }
-
-  public void setNoSushi(boolean noSushi) {
-    pf.noSushi = noSushi;
-  }
 
   private void setRepoSource(final String repoSource) {
     if (repoSource == null) {
       return;
     }
-    this.pf.repoSource = GitUtilities.getURLWithNoUserInfo(repoSource, "-repo CLI parameter");
+    this.settings.setRepoSource(GitUtilities.getURLWithNoUserInfo(repoSource, "-repo CLI parameter"));
   }
 
   public void execute() throws Exception {
@@ -1429,7 +1422,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       if (CliParams.hasNamedParam(args, "-auto-ig-build")) {
         self.settings.setMode(PublisherUtils.IGBuildMode.AUTOBUILD);
         self.settings.setTargetOutput(CliParams.getNamedParam(args, "-target"));
-        self.setRepoSource(CliParams.getNamedParam(args, "-repo"));
+        self.settings.setRepoSource(CliParams.getNamedParam(args, "-repo"));
       } else if (CliParams.hasNamedParam(args, "-rapido") || CliParams.hasNamedParam(args, "-cascais")) {
         self.settings.setRapidoMode(true);
         if (CliParams.hasNamedParam(args, "-watch")) {
@@ -1455,7 +1448,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         self.settings.setTrackFragments(true);
       }
       if (CliParams.hasNamedParam(args, "-milestone")) {
-        self.setMilestoneBuild(true);
+        self.settings.setMilestoneBuild(true);
         self.settings.setRapidoMode(false);
       }
       if (FhirSettings.isProhibitNetworkAccess()) {
@@ -1569,7 +1562,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         self.settings.setCacheOption(PublisherUtils.CacheOption.LEAVE);
       }
       if (CliParams.hasNamedParam(args, "-no-sushi")) {
-        self.setNoSushi(true);
+        self.settings.setNoSushi(true);
       }
       if (CliParams.hasNamedParam(args, PACKAGE_CACHE_FOLDER_PARAM)) {
         self.settings.setPackageCacheFolder(CliParams.getNamedParam(args, PACKAGE_CACHE_FOLDER_PARAM));
@@ -1646,13 +1639,13 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 
   public static void parseAndAddNoNarrativeParam(Publisher self, String param) {
     for (String p : param.split("\\,")) {
-      self.pf.noNarratives.add(p);
+      self.settings.getNoNarratives().add(p);
     }
   }
 
   public static void parseAndAddNoValidateParam(Publisher publisher, String param) {
     for (String p : param.split("\\,")) {
-      publisher.pf.noValidate.add(p);
+      publisher.settings.getNoValidate().add(p);
     }
   }
 
@@ -1982,7 +1975,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       self.settings.setCacheOption(PublisherUtils.CacheOption.LEAVE);
     }
     if (noSushi2) {
-      self.setNoSushi(true);
+      self.settings.setNoSushi(true);
     }
     if (nonConformantTxServers) {
       TerminologyClientContext.setAllowNonConformantServers(true);

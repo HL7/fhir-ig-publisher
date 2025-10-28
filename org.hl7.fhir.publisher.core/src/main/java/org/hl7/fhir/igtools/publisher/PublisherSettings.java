@@ -4,7 +4,9 @@ import lombok.Getter;
 import lombok.Setter;
 import org.hl7.fhir.utilities.Utilities;
 
+import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.List;
 
 public class PublisherSettings {
 
@@ -30,4 +32,9 @@ public class PublisherSettings {
     @Getter @Setter private String configFile;
     @Getter @Setter private String packagesFolder;
     @Getter @Setter private PublisherUtils.CacheOption cacheOption;
+    @Getter @Setter private boolean noSushi;
+    @Getter @Setter private String repoSource;
+    @Getter @Setter private boolean milestoneBuild;
+    @Getter private final List<String> noNarratives = new ArrayList<String>();
+    @Getter private final List<String> noValidate = new ArrayList<String>();
 }
