@@ -358,7 +358,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
         if (cs != null) {
           return true;
         }
-      }      
+      }
       //if (targetsHas(targets, "ValueSet")) { - can't do this test because of implicit value sets etc
       ValueSet vs = context.findTxResource(ValueSet.class, url);
       if (vs != null) {

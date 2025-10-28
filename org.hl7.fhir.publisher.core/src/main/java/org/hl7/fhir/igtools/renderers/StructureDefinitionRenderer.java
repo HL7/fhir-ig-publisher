@@ -2779,7 +2779,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
 
     // description
-    sdr.generateDescription(new RenderingStatus(), gen, row, element.definition(), null, true, context.getSpecUrl(), null, sd, context.getSpecUrl(), destDir, false, false, allInvariants, true, false, false, sdr.getContext(), resE);
+    sdr.generateDescription(new RenderingStatus(), gen, row, element.definition(), null, context.getSpecUrl(), null, sd, context.getSpecUrl(), destDir, false, false, allInvariants, true, false, false, sdr.getContext(), resE);
 
     if (element.types().size() == 1) {
       PEType t = element.types().get(0);

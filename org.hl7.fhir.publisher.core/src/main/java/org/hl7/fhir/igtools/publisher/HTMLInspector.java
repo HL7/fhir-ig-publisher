@@ -25,7 +25,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -1534,8 +1533,9 @@ public class HTMLInspector {
             }
           }
         }
-      } else if (!ref.contains("#")) { 
-        String page = Utilities.path(filename == null ? rootFolder : FileUtilities.getDirectoryForFile(filename), ref.replace("/", File.separator));
+      } else if (!ref.contains("#")) {
+        String path = filename == null ? rootFolder : FileUtilities.getDirectoryForFile(filename);
+        String page = PathBuilder.getPathBuilder().withRequiredTarget(rootFolder).buildPath(path, ref.replace("/", File.separator));
         LoadedFile f = cache.get(page);
         resolved = f != null;
       }
