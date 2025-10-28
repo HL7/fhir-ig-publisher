@@ -252,6 +252,10 @@ public class PublisherGenerator extends PublisherBase {
 
     generateViewDefinitions(db);
     templateBeforeGenerate();
+    if (pf.saveExpansionParams) {
+      new JsonParser().setOutputStyle(IParser.OutputStyle.NORMAL).compose(new FileOutputStream(Utilities.path(pf.tempDir, "parameters-expansion-parameters.json")), pf.context.getExpansionParameters());
+      new XmlParser().setOutputStyle(IParser.OutputStyle.NORMAL).compose(new FileOutputStream(Utilities.path(pf.tempDir, "parameters-expansion-parameters.xml")), pf.context.getExpansionParameters());
+    }
 
     logMessage("Generate HTML Outputs");
     for (FetchedFile f : pf.changeList) {
@@ -1538,13 +1542,19 @@ public class PublisherGenerator extends PublisherBase {
   }
 
   private void generateOutputsImplementationGuide(FetchedFile f, FetchedResource r, ImplementationGuide ig, Map<String, String> vars, String prefixForContainer, RenderingContext lrc, String lang) throws IOException, FHIRException {
-    trackedFragment("5","ImplentationGuide-summary", renderExpansionParameters(), f.getOutputNames(), System.currentTimeMillis(), "expansion-params", "ImplementationGuide", lang);
   }
 
   private String renderExpansionParameters() throws IOException {
     DataRenderer resourceRenderer = new DataRenderer(pf.rc);
     Parameters p = pf.context.getExpansionParameters();
-    if (p == null || p.getParameter().isEmpty()) {
+
+    boolean hasInterestingParams = false;
+    if (p != null) {
+      for (Parameters.ParametersParameterComponent pp : p.getParameter()) {
+        hasInterestingParams = hasInterestingParams || !Utilities.existsInList(pp.getName(), "x-system-cache-id", "defaultDisplayLanguage");
+      }
+    }
+    if (!hasInterestingParams) {
       return "";
     } else {
       XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
@@ -1553,9 +1563,22 @@ public class PublisherGenerator extends PublisherBase {
       tr.th().tx("Parameter");
       tr.th().tx("Value");
       for (Parameters.ParametersParameterComponent pp : p.getParameter()) {
-        tr = tbl.tr();
-        tr.td().tx(pp.getName());
-        resourceRenderer.renderDataType(new Renderer.RenderingStatus(), tr.td(), ResourceWrapper.forType(pf.rc.getContextUtilities(), pp.getValue()));
+        if (!Utilities.existsInList(pp.getName(), "x-system-cache-id", "defaultDisplayLanguage")) {
+          tr = tbl.tr();
+          tr.td().tx(pp.getName());
+          if (Utilities.existsInList(pp.getName(), "exclude-system", "system-version", "check-system-version", "force-system-version", "default-valueset-version", "check-valueset-version", "force-valueset-version")) {
+            String canonical = pp.getValue().primitiveValue();
+            if (canonical.contains("|")) {
+              String system = canonical.substring(0, canonical.indexOf("|"));
+              String version = canonical.substring(canonical.indexOf("|")+1);
+              tr.td().tx(resourceRenderer.displayCodeSource(system, version));
+            } else {
+              resourceRenderer.renderDataType(new Renderer.RenderingStatus(), tr.td(), ResourceWrapper.forType(pf.rc.getContextUtilities(), pp.getValue()));
+            }
+          } else {
+            resourceRenderer.renderDataType(new Renderer.RenderingStatus(), tr.td(), ResourceWrapper.forType(pf.rc.getContextUtilities(), pp.getValue()));
+          }
+        }
       }
       return new XhtmlComposer(true, true).compose(x.getChildNodes());
     }
@@ -2687,6 +2710,12 @@ public class PublisherGenerator extends PublisherBase {
     trackedFragment("3", "dependency-table-short", depr.render(pf.publishedIg, false, false, false), pf.otherFilesRun, System.currentTimeMillis(), "dependency-table-short", "Cross", lang);
     trackedFragment("3", "dependency-table-nontech", depr.renderNonTech(pf.publishedIg), pf.otherFilesRun, System.currentTimeMillis(), "dependency-table-nontech", "Cross", lang);
     trackedFragment("4", "globals-table", depr.renderGlobals(), pf.otherFilesRun, System.currentTimeMillis(), "globals-table", "Cross", lang);
+    String expr = renderExpansionParameters();
+    if (Utilities.noString(expr)) {
+      fragment("expansion-params", expr, pf.otherFilesRun, System.currentTimeMillis(), "expansion-params", "Cross", lang);
+    } else {
+      trackedFragment("5", "expansion-params", expr, pf.otherFilesRun, System.currentTimeMillis(), "expansion-params", "Cross", lang);
+    }
 
     fragment("related-igs-list", relatedIgsList(), pf.otherFilesRun, System.currentTimeMillis(), "related-igs-list", "Cross", lang);
     fragment("related-igs-table", relatedIgsTable(), pf.otherFilesRun, System.currentTimeMillis(), "related-igs-table", "Cross", lang);

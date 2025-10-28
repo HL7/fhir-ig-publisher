@@ -415,6 +415,8 @@ public class PublisherIGLoader extends PublisherBase {
           break;
         case "path-expansion-params":
           expParams = p.getValue();
+          pf.saveExpansionParams = true;
+          pf.sourceIg.getDefinition().addExtension(ExtensionDefinitions.EXT_IG_EXPANSION_PARAMETERS, new Reference().setReference("Parameters/expansion-parameters"));
           break;
         case "path-suppressed-warnings":
           loadSuppressedMessages(Utilities.path(pf.rootDir, p.getValue()), "ImplementationGuide.definition.parameter["+count+"].value");

@@ -306,4 +306,5 @@ public class PublisherFields {
     PublisherSigner signer;
 
     public boolean hasCheckedDependencies;
+    public boolean saveExpansionParams;
 }
