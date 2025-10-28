@@ -1,5 +1,6 @@
 package org.hl7.fhir.igtools.web;
 
+import org.hl7.fhir.utilities.xml.XMLUtil;
 import org.w3c.dom.*;
 import org.xml.sax.SAXException;
 
@@ -228,7 +229,7 @@ public class PackageFeedUpdater {
   private static Set<String> loadExistingPackages(String feedFile) throws Exception {
     Set<String> packages = new HashSet<>();
 
-    DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+    DocumentBuilderFactory factory =  XMLUtil.newXXEProtectedDocumentBuilderFactory();
     DocumentBuilder builder = factory.newDocumentBuilder();
     Document doc = builder.parse(new File(feedFile));
 
@@ -250,7 +251,7 @@ public class PackageFeedUpdater {
    * Adds missing packages to the feed XML
    */
   private static void addPackagesToFeed(String feedFile, List<PackageInfo> packages) throws Exception {
-    DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+    DocumentBuilderFactory factory =  XMLUtil.newXXEProtectedDocumentBuilderFactory();
     factory.setNamespaceAware(true);
     DocumentBuilder builder = factory.newDocumentBuilder();
     Document doc = builder.parse(new File(feedFile));
@@ -383,7 +384,7 @@ public class PackageFeedUpdater {
    * Saves the document back to file with proper formatting
    */
   private static void saveDocument(Document doc, String filePath) throws Exception {
-    TransformerFactory transformerFactory = TransformerFactory.newInstance();
+    TransformerFactory transformerFactory = XMLUtil.newXXEProtectedTransformerFactory();
     Transformer transformer = transformerFactory.newTransformer();
     transformer.setOutputProperty(OutputKeys.INDENT, "no"); // We handle indentation manually
     transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
