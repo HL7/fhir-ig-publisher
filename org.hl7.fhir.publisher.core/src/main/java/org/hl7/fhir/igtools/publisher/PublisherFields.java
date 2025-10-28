@@ -39,29 +39,14 @@ import java.io.File;
 import java.util.*;
 
 public class PublisherFields {
-    @Getter
-    @Setter
-    String sourceDir;
-    @Getter
-    @Setter
-    String destDir;
 
     FHIRToolingClient webTxServer;
-    @Getter
-    String txServer;
+    @Getter private Calendar execTime = Calendar.getInstance();
 
-    public void setTxServer(String s) {
-        if (!Utilities.noString(s))
-            txServer = s;
-    }
-
-    String configFile;
 
     Locale forcedLanguage;
     String igPack = "";
-    boolean debug;
     boolean isChild;
-    boolean cacheVersion;
     boolean appendTrailingSlashInDataFile;
     boolean newIg = false;
     Map<String, String> countryCodeForName = null;
@@ -99,7 +84,6 @@ public class PublisherFields {
     SuppressedMessageInformation suppressedMessages = new SuppressedMessageInformation();
     boolean tabbedSnapshots = false;
     String igName;
-    PublisherUtils.IGBuildMode mode; // for the IG publication infrastructure
     SimpleFetcher fetcher = new SimpleFetcher(null);
 
     @Getter
@@ -125,7 +109,6 @@ public class PublisherFields {
     ImplementationGuide sourceIg;
     ImplementationGuide publishedIg;
     List<ValidationMessage> errors = new ArrayList<ValidationMessage>();
-    Calendar execTime = Calendar.getInstance();
     Set<String> otherFilesStartup = new HashSet<String>();
     Set<String> otherFilesRun = new HashSet<String>();
     Set<String> regenList = new HashSet<String>();
@@ -172,7 +155,6 @@ public class PublisherFields {
     Enumeration<ImplementationGuide.SPDXLicense> defaultLicenseInfo;
     StringType defaultPublisher;
     String defaultBusinessVersion;
-    PublisherUtils.CacheOption cacheOption;
     String configFileRootPath;
     MarkDownProcessor markdownEngine;
     boolean savingExpansions = true;
@@ -187,12 +169,8 @@ public class PublisherFields {
     String rootDir;
     String templatePck;
     boolean templateLoaded;
-    String packagesFolder;
-    String targetOutput;
     String repoSource;
-    String targetOutputNested;
     String folderToDelete;
-    String specifiedVersion;
     NpmPackage packge;
     String txLog;
     boolean includeHeadings;
@@ -241,18 +219,8 @@ public class PublisherFields {
     List<String> ipsComparisons;
     String versionToAnnotate;
     TimeTracker tt;
-    boolean publishing = false;
     String igrealm;
     String copyrightYear;
-    @Getter
-    @Setter
-    boolean validationOff;
-    @Getter
-    @Setter
-    boolean generationOff;
-    @Getter
-    @Setter
-    String packageCacheFolder = null;
     String fmtDateTime = "yyyy-MM-dd HH:mm:ssZZZ";
     String fmtDate = "yyyy-MM-dd";
     DependentIGFinder dependentIgFinder;
@@ -284,7 +252,6 @@ public class PublisherFields {
     boolean showReferenceMessages = false;
     boolean noExperimentalContent = false;
     boolean displayWarnings = false;
-    boolean newMultiLangTemplateFormat = false;
     List<RelatedIG> relatedIGs = new ArrayList<RelatedIG>();
     long last = System.currentTimeMillis();
     List<String> unknownParams = new ArrayList<String>();
@@ -302,11 +269,9 @@ public class PublisherFields {
     LanguageSubtagRegistry registry;
 
     public Map<String, PublisherBase.FragmentUseRecord> fragmentUses = new HashMap<>();
-    boolean trackFragments = false;
 
     LanguageUtils langUtils;
 
-    boolean simplifierMode;
 
     ContextUtilities cu;
 
@@ -340,6 +305,5 @@ public class PublisherFields {
 
     PublisherSigner signer;
 
-    public boolean rapidoMode;
     public boolean hasCheckedDependencies;
 }

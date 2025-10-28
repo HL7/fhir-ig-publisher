@@ -74,10 +74,7 @@ import org.hl7.fhir.utilities.settings.FhirSettings;
 import org.hl7.fhir.utilities.turtle.Turtle;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationOptions;
-import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator;
-import org.hl7.fhir.utilities.xhtml.NodeType;
-import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
-import org.hl7.fhir.utilities.xhtml.XhtmlNode;
+import org.hl7.fhir.utilities.xhtml.*;
 import org.hl7.fhir.utilities.xml.XmlEscaper;
 
 import java.io.*;
@@ -195,12 +192,12 @@ public class PublisherGenerator extends PublisherBase {
     }
   }
 
-  public PublisherGenerator(PublisherFields publisherFields) {
-    super(publisherFields);
+  public PublisherGenerator(PublisherSettings settings) {
+    super(settings);
   }
 
   public void generate() throws Exception {
-    if (pf.simplifierMode) {
+    if (settings.isSimplifierMode()) {
       return;
     }
 
@@ -348,12 +345,12 @@ public class PublisherGenerator extends PublisherBase {
       pf.childPublisher = new Publisher();
       pf.childPublisher.setConfigFile(Utilities.path(FileUtilities.getDirectoryForFile(this.getConfigFile()), pf.nestedIgConfig));
       pf.childPublisher.setJekyllCommand(this.getJekyllCommand());
-      pf.childPublisher.pf.setTxServer(this.pf.getTxServer());
-      pf.childPublisher.setDebug(this.pf.debug);
-      pf.childPublisher.setCacheOption(this.getCacheOption());
+      pf.childPublisher.settings.setTxServer(this.settings.getTxServer());
+      pf.childPublisher.settings.setDebug(this.settings.isDebug());
+      pf.childPublisher.settings.setCacheOption(this.settings.getCacheOption());
       pf.childPublisher.setIsChild(true);
-      pf.childPublisher.setMode(this.getMode());
-      pf.childPublisher.setTargetOutput(this.getTargetOutputNested());
+      pf.childPublisher.settings.setMode(this.getMode());
+      pf.childPublisher.settings.setTargetOutput(this.getTargetOutputNested());
 
       try {
         pf.childPublisher.execute();
@@ -367,12 +364,12 @@ public class PublisherGenerator extends PublisherBase {
       createToc(pf.childPublisher.getPublishedIg().getDefinition().getPage(), pf.igArtifactsPage, pf.nestedIgOutput);
     }
     fixSearchForm();
-    if (!pf.generationOff) {
+    if (!settings.isGenerationOff()) {
       templateBeforeJekyll();
     }
 
     if (runTool()) {
-      if (!pf.generationOff) {
+      if (!settings.isGenerationOff()) {
         templateOnCheck();
       }
 
@@ -396,8 +393,8 @@ public class PublisherGenerator extends PublisherBase {
             logMessage("Other Directory not found: "+n);
           }
         }
-        File pr = new File(Utilities.path(FileUtilities.getDirectoryForFile(pf.configFile), "publication-request.json"));
-        if (pf.mode != PublisherUtils.IGBuildMode.PUBLICATION && pr.exists()) {
+        File pr = new File(Utilities.path(FileUtilities.getDirectoryForFile(settings.getConfigFile()), "publication-request.json"));
+        if (settings.getMode() != PublisherUtils.IGBuildMode.PUBLICATION && pr.exists()) {
           addFileToNpm(NPMPackageGenerator.Category.OTHER, "publication-request.json", FileUtilities.fileToBytes(pr));
         }
         pf.npm.finish();
@@ -415,8 +412,8 @@ public class PublisherGenerator extends PublisherBase {
           }
         }
 
-        if (pf.mode == null || pf.mode == PublisherUtils.IGBuildMode.MANUAL) {
-          if (pf.cacheVersion) {
+        if (settings.getMode() == null || settings.getMode() == PublisherUtils.IGBuildMode.MANUAL) {
+          if (settings.isCacheVersion()) {
             pf.pcm.addPackageToCache(pf.publishedIg.getPackageId(), pf.publishedIg.getVersion(), new FileInputStream(pf.npm.filename()), "[output]");
           } else {
             pf.pcm.addPackageToCache(pf.publishedIg.getPackageId(), "dev", new FileInputStream(pf.npm.filename()), "[output]");
@@ -424,7 +421,7 @@ public class PublisherGenerator extends PublisherBase {
               pf.pcm.addPackageToCache(pf.publishedIg.getPackageId(), "dev$"+ pf.branchName, new FileInputStream(pf.npm.filename()), "[output]");
             }
           }
-        } else if (pf.mode == PublisherUtils.IGBuildMode.PUBLICATION) {
+        } else if (settings.getMode() == PublisherUtils.IGBuildMode.PUBLICATION) {
           pf.pcm.addPackageToCache(pf.publishedIg.getPackageId(), pf.publishedIg.getVersion(), new FileInputStream(pf.npm.filename()), "[output]");
         }
         JsonArray json = new JsonArray();
@@ -446,12 +443,12 @@ public class PublisherGenerator extends PublisherBase {
       log("Checking Output HTML");
       String statusMessage;
       Map<String, String> statusMessages = new HashMap<>();
-      if (pf.mode == PublisherUtils.IGBuildMode.AUTOBUILD) {
+      if (settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD) {
         statusMessage = pf.rc.formatPhrase(RenderingI18nContext.STATUS_MSG_AUTOBUILD, Utilities.escapeXml(pf.sourceIg.present()), Utilities.escapeXml(pf.sourceIg.getPublisher()), Utilities.escapeXml(workingVersion()), gh(), pf.igpkp.getCanonical());
         for (String lang : allLangs()) {
           statusMessages.put(lang, pf.rcLangs.get(lang).formatPhrase(RenderingI18nContext.STATUS_MSG_AUTOBUILD, Utilities.escapeXml(pf.sourceIg.present()), Utilities.escapeXml(pf.sourceIg.getPublisher()), Utilities.escapeXml(workingVersion()), gh(), pf.igpkp.getCanonical()));
         }
-      } else if (pf.mode == PublisherUtils.IGBuildMode.PUBLICATION) {
+      } else if (settings.getMode() == PublisherUtils.IGBuildMode.PUBLICATION) {
         statusMessage = pf.rc.formatPhrase(RenderingI18nContext.STATUS_MSG_PUBLICATION_HOLDER);
         for (String lang : allLangs()) {
           statusMessages.put(lang, pf.rcLangs.get(lang).formatPhrase(RenderingI18nContext.STATUS_MSG_PUBLICATION_HOLDER));
@@ -472,7 +469,7 @@ public class PublisherGenerator extends PublisherBase {
         pf.ipsComparator.addOtherFiles(pf.inspector.getExceptions(), pf.outputDir);
       }
 
-      if (!pf.generationOff) {
+      if (!settings.isGenerationOff()) {
         AIProcessor ai = new AIProcessor(pf.inspector.getRootFolder());
         if (isNewML()) {
           ai.processNewTemplates(allLangs());
@@ -481,7 +478,7 @@ public class PublisherGenerator extends PublisherBase {
         }
       }
 
-      List<ValidationMessage> linkmsgs = pf.generationOff ? new ArrayList<ValidationMessage>() : pf.inspector.check(statusMessage, statusMessages);
+      List<ValidationMessage> linkmsgs = settings.isGenerationOff() ? new ArrayList<ValidationMessage>() : pf.inspector.check(statusMessage, statusMessages);
       int bl = 0;
       int lf = 0;
       for (ValidationMessage m : ValidationPresenter.filterMessages(null, linkmsgs, true, pf.suppressedMessages)) {
@@ -501,12 +498,12 @@ public class PublisherGenerator extends PublisherBase {
       if (pf.brokenLinksError && linkmsgs.size() > 0) {
         throw new Error("Halting build because broken links have been found, and these are disallowed in the IG control file");
       }
-      if (pf.mode == PublisherUtils.IGBuildMode.AUTOBUILD && !pf.inspector.getPublishBoxOK()) {
+      if (settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD && !pf.inspector.getPublishBoxOK()) {
         throw new FHIRException("The auto-build infrastructure does not publish IGs unless the publish-box is present ("+ pf.inspector.getPublishboxParsingSummary()+"). For further information, see note at http://wiki.hl7.org/index.php?title=FHIR_Implementation_Guide_Publishing_Requirements#HL7_HTML_Standards_considerations");
       }
       generateFragmentUsage();
       log("Build final .zip");
-      if (pf.mode == PublisherUtils.IGBuildMode.PUBLICATION) {
+      if (settings.getMode() == PublisherUtils.IGBuildMode.PUBLICATION) {
         IGReleaseVersionUpdater igvu = new IGReleaseVersionUpdater(pf.outputDir, null, null, new ArrayList<>(), new ArrayList<>(), null, pf.outputDir);
         String fragment = pf.sourceIg.present()+" - Downloaded Version "+ pf.businessVersion +" See the <a href=\""+ pf.igpkp.getCanonical()+"/history.html\">Directory of published versions</a></p>";
         igvu.updateStatement(fragment, 0, null);
@@ -589,7 +586,7 @@ public class PublisherGenerator extends PublisherBase {
   }
 
   private void generateHtmlOutputs(FetchedFile f, boolean regen, DBBuilder db, String lang) throws Exception {
-    if (this.pf.generationOff) {
+    if (this.settings.isGenerationOff()) {
       return;
     }
     if (f.getProcessMode() == FetchedFile.PROCESS_NONE) {
@@ -646,10 +643,10 @@ public class PublisherGenerator extends PublisherBase {
                 dst = Utilities.path(this.pf.tempDir, l, f.getRelativePath());
               }
               byte[] src = loadTranslationSource(f, l);
-              checkMakeFile(processCustomLiquid(db, new XSLTransformer(this.pf.debug).transform(src, f.getXslt()), f, lang), dst, f.getOutputNames());
+              checkMakeFile(processCustomLiquid(db, new XSLTransformer(this.settings.isDebug()).transform(src, f.getXslt()), f, lang), dst, f.getOutputNames());
             }
           } else {
-            checkMakeFile(processCustomLiquid(db, new XSLTransformer(this.pf.debug).transform(f.getSource(), f.getXslt()), f, lang), dst, f.getOutputNames());
+            checkMakeFile(processCustomLiquid(db, new XSLTransformer(this.settings.isDebug()).transform(f.getSource(), f.getXslt()), f, lang), dst, f.getOutputNames());
           }
         }
       } catch (Exception e) {
@@ -783,7 +780,7 @@ public class PublisherGenerator extends PublisherBase {
   }
 
   private void generateSpreadsheets(FetchedFile f, boolean regen, DBBuilder db) throws Exception {
-    if (this.pf.generationOff) {
+    if (this.settings.isGenerationOff()) {
       return;
     }
     //    System.out.println("gen2: "+f.getName());
@@ -803,7 +800,7 @@ public class PublisherGenerator extends PublisherBase {
   private void saveNativeResourceOutputFormats(FetchedFile f, FetchedResource r, Element element, String lang) throws IOException, FileNotFoundException {
     String path;
     if (wantGen(r, "xml") || forHL7orFHIR()) {
-      if (this.pf.newMultiLangTemplateFormat && lang != null) {
+      if (this.settings.isNewMultiLangTemplateFormat() && lang != null) {
         path = Utilities.path(this.pf.tempDir, lang, r.fhirType()+"-"+r.getId()+".xml");
       } else {
         path = Utilities.path(this.pf.tempDir, r.fhirType()+"-"+r.getId()+".xml");
@@ -818,7 +815,7 @@ public class PublisherGenerator extends PublisherBase {
       stream.close();
     }
     if (wantGen(r, "json") || forHL7orFHIR()) {
-      if (this.pf.newMultiLangTemplateFormat && lang != null) {
+      if (this.settings.isNewMultiLangTemplateFormat() && lang != null) {
         path = Utilities.path(this.pf.tempDir, lang, r.fhirType()+"-"+r.getId()+".json");
       } else {
         path = Utilities.path(this.pf.tempDir, r.fhirType()+"-"+r.getId()+".json");
@@ -833,7 +830,7 @@ public class PublisherGenerator extends PublisherBase {
       stream.close();
     }
     if (wantGen(r, "ttl")) {
-      if (this.pf.newMultiLangTemplateFormat && lang != null) {
+      if (this.settings.isNewMultiLangTemplateFormat() && lang != null) {
         path = Utilities.path(this.pf.tempDir, lang, r.fhirType()+"-"+r.getId()+".ttl");
       } else {
         path = Utilities.path(this.pf.tempDir, r.fhirType()+"-"+r.getId()+".ttl");
@@ -1191,7 +1188,7 @@ public class PublisherGenerator extends PublisherBase {
 
   private String genValidation(FetchedFile f, FetchedResource r) throws FHIRException {
     StringBuilder b = new StringBuilder();
-    String version = this.pf.mode == PublisherUtils.IGBuildMode.AUTOBUILD ? "current" : this.pf.mode == PublisherUtils.IGBuildMode.PUBLICATION ? this.pf.publishedIg.getVersion() : "dev";
+    String version = this.settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD ? "current" : this.settings.getMode() == PublisherUtils.IGBuildMode.PUBLICATION ? this.pf.publishedIg.getVersion() : "dev";
     if (isExample(f, r)) {
       // we're going to use javascript to determine the relative path of this for the user.
       b.append("<p data-fhir=\"generated\"><b>Validation Links:</b></p><ul><li><a href=\"https://confluence.hl7.org/display/FHIR/Using+the+FHIR+Validator\">Validate using FHIR Validator</a> (Java): <code id=\"vl-"+r.fhirType()+"-"+r.getId()+"\">$cmd$</code></li></ul>\r\n");
@@ -1250,7 +1247,7 @@ public class PublisherGenerator extends PublisherBase {
 
   private void genWrapperInner(FetchedFile ff, FetchedResource r, String template, String outputName, Set<String> outputTracker, Map<String, String> vars, String format, String extension, boolean recordPath, String lang) throws FileNotFoundException, IOException, FHIRException {
 
-    template = pf.fetcher.openAsString(Utilities.path(pf.fetcher.pathForFile(pf.configFile), template));
+    template = pf.fetcher.openAsString(Utilities.path(pf.fetcher.pathForFile(settings.getConfigFile()), template));
     if (vars == null) {
       vars = new HashMap<String, String>();
     }
@@ -1302,7 +1299,7 @@ public class PublisherGenerator extends PublisherBase {
         if (isNewML() && lang == null) {
           genWrapperRedirect(ff, r, outputName, outputTracker, vars, format, extension, true);
         } else {
-          template = pf.fetcher.openAsString(Utilities.path(pf.fetcher.pathForFile(pf.configFile), template));
+          template = pf.fetcher.openAsString(Utilities.path(pf.fetcher.pathForFile(settings.getConfigFile()), template));
           template = pf.igpkp.doReplacements(template, r, res, vars, format, prefixForContained);
 
           if (!outputName.contains("#")) {
@@ -1540,12 +1537,36 @@ public class PublisherGenerator extends PublisherBase {
     }
   }
 
+  private void generateOutputsImplementationGuide(FetchedFile f, FetchedResource r, ImplementationGuide ig, Map<String, String> vars, String prefixForContainer, RenderingContext lrc, String lang) throws IOException, FHIRException {
+    trackedFragment("5","ImplentationGuide-summary", renderExpansionParameters(), f.getOutputNames(), System.currentTimeMillis(), "expansion-params", "ImplementationGuide", lang);
+  }
+
+  private String renderExpansionParameters() throws IOException {
+    DataRenderer resourceRenderer = new DataRenderer(pf.rc);
+    Parameters p = pf.context.getExpansionParameters();
+    if (p == null || p.getParameter().isEmpty()) {
+      return "";
+    } else {
+      XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
+      XhtmlNode tbl = x.table("grid");
+      XhtmlNode tr = tbl.tr();
+      tr.th().tx("Parameter");
+      tr.th().tx("Value");
+      for (Parameters.ParametersParameterComponent pp : p.getParameter()) {
+        tr = tbl.tr();
+        tr.td().tx(pp.getName());
+        resourceRenderer.renderDataType(new Renderer.RenderingStatus(), tr.td(), ResourceWrapper.forType(pf.rc.getContextUtilities(), pp.getValue()));
+      }
+      return new XhtmlComposer(true, true).compose(x.getChildNodes());
+    }
+  }
+
   private void generateOutputsCapabilityStatement(FetchedFile f, FetchedResource r, CapabilityStatement cpbs, Map<String, String> vars, String prefixForContainer, RenderingContext lrc, String lang) throws Exception {
     if (wantGen(r, "swagger") || wantGen(r, "openapi")) {
       String lp = isNewML() && lang != null && !lang.equals(this.pf.defaultTranslationLang) ? "-"+lang : "";
       org.hl7.fhir.r5.openapi.Writer oa = null;
       if (this.pf.openApiTemplate != null)
-        oa = new org.hl7.fhir.r5.openapi.Writer(new FileOutputStream(Utilities.path(this.pf.tempDir, cpbs.getId()+ lp+".openapi.json")), new FileInputStream(Utilities.path(FileUtilities.getDirectoryForFile(this.pf.configFile), this.pf.openApiTemplate)));
+        oa = new org.hl7.fhir.r5.openapi.Writer(new FileOutputStream(Utilities.path(this.pf.tempDir, cpbs.getId()+ lp+".openapi.json")), new FileInputStream(Utilities.path(FileUtilities.getDirectoryForFile(this.settings.getConfigFile()), this.pf.openApiTemplate)));
       else
         oa = new Writer(new FileOutputStream(Utilities.path(this.pf.tempDir, cpbs.getId()+ lp+".openapi.json")));
       String lic = license();
@@ -2247,7 +2268,7 @@ public class PublisherGenerator extends PublisherBase {
   }
 
   private void fragment(String name, String content, Set<String> outputTracker, FetchedResource r, Map<String, String> vars, String format, long start, String code, String context, String lang) throws IOException, FHIRException {
-    String fixedContent = (r==null? content : pf.igpkp.doReplacements(content, r, vars, format))+(pf.trackFragments ? "<!-- fragment:"+context+"."+code+" -->" : "");
+    String fixedContent = (r==null? content : pf.igpkp.doReplacements(content, r, vars, format))+(settings.isTrackFragments() ? "<!-- fragment:"+context+"."+code+" -->" : "");
 
     PublisherBase.FragmentUseRecord frag = pf.fragmentUses.get(context+"."+code);
     if (frag == null) {
@@ -2257,7 +2278,7 @@ public class PublisherGenerator extends PublisherBase {
     frag.record(System.currentTimeMillis() - start, fixedContent.length());
 
     if (checkMakeFile(FileUtilities.stringToBytes(wrapLiquid(fixedContent)), Utilities.path(pf.tempDir, "_includes", name+(lang == null ? "" : "-" + lang)+".xhtml"), outputTracker)) {
-      if (pf.mode != PublisherUtils.IGBuildMode.AUTOBUILD && pf.makeQA) {
+      if (settings.getMode() != PublisherUtils.IGBuildMode.AUTOBUILD && pf.makeQA) {
         FileUtilities.stringToFile(pageWrap(fixedContent, name), Utilities.path(pf.qaDir, name+".html"));
       }
     }
@@ -2495,7 +2516,7 @@ public class PublisherGenerator extends PublisherBase {
         PublisherProvider pprov = new PublisherProvider(pf.context, pf.npmList, pf.fileList, pf.igpkp.getCanonical());
         runner.setProvider(pprov);
         runner.setStorage(new StorageSqlite3(db.getConnection()));
-        JsonObject vd = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(new File(Utilities.path(FileUtilities.getDirectoryForFile(pf.configFile), vdn)));
+        JsonObject vd = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(new File(Utilities.path(FileUtilities.getDirectoryForFile(settings.getConfigFile()), vdn)));
         pprov.inspect(vd);
         runner.execute(vd);
         captureIssues(vdn, runner.getIssues());
@@ -2525,26 +2546,26 @@ public class PublisherGenerator extends PublisherBase {
 
 
   private String getGitStatus() throws IOException {
-    File gitDir = new File(FileUtilities.getDirectoryForFile(pf.configFile));
+    File gitDir = new File(FileUtilities.getDirectoryForFile(settings.getConfigFile()));
     return GitUtilities.getGitStatus(gitDir);
   }
 
   private String getGitSource() throws IOException {
-    File gitDir = new File(FileUtilities.getDirectoryForFile(pf.configFile));
+    File gitDir = new File(FileUtilities.getDirectoryForFile(settings.getConfigFile()));
     return GitUtilities.getGitSource(gitDir);
   }
 
   private String gh() {
-    return pf.repoSource != null ? pf.repoSource : pf.targetOutput != null ? pf.targetOutput.replace("https://build.fhir.org/ig", "https://github.com") : null;
+    return pf.repoSource != null ? pf.repoSource : settings.getTargetOutput() != null ? settings.getTargetOutput().replace("https://build.fhir.org/ig", "https://github.com") : null;
   }
 
 
   private String genTime() {
-    return new SimpleDateFormat("EEE, MMM d, yyyy HH:mmZ", new Locale("en", "US")).format(pf.execTime.getTime());
+    return new SimpleDateFormat("EEE, MMM d, yyyy HH:mmZ", new Locale("en", "US")).format(pf.getExecTime().getTime());
   }
 
   private String genDate() {
-    return new SimpleDateFormat("dd/MM/yyyy", new Locale("en", "US")).format(pf.execTime.getTime());
+    return new SimpleDateFormat("dd/MM/yyyy", new Locale("en", "US")).format(pf.getExecTime().getTime());
   }
 
   private void generateSummaryOutputs(DBBuilder db, String lang, RenderingContext rc) throws Exception {
@@ -3611,10 +3632,10 @@ public class PublisherGenerator extends PublisherBase {
   }
 
   private boolean runTool() throws Exception {
-    if (pf.simplifierMode) {
+    if (settings.isSimplifierMode()) {
       return true;
     }
-    if (pf.generationOff) {
+    if (settings.isGenerationOff()) {
       FileUtils.copyDirectory(new File(pf.tempDir), new File(pf.outputDir));
       return true;
     }
@@ -3781,7 +3802,7 @@ public class PublisherGenerator extends PublisherBase {
   }
 
   private File makeSpecFile() throws Exception {
-    SpecMapManager map = new SpecMapManager(pf.npmName, pf.npmName +"#"+ pf.version, pf.version, Constants.VERSION, Integer.toString(ToolsVersion.TOOLS_VERSION), pf.execTime, pf.igpkp.getCanonical());
+    SpecMapManager map = new SpecMapManager(pf.npmName, pf.npmName +"#"+ pf.version, pf.version, Constants.VERSION, Integer.toString(ToolsVersion.TOOLS_VERSION), pf.getExecTime(), pf.igpkp.getCanonical());
     for (FetchedFile f : pf.fileList) {
       for (FetchedResource r : f.getResources()) {
         String u = this.pf.igpkp.getCanonical()+r.getUrlTail();
@@ -3903,7 +3924,7 @@ public class PublisherGenerator extends PublisherBase {
       Bundle exp = new Bundle();
       exp.setType(Bundle.BundleType.COLLECTION);
       exp.setId(UUID.randomUUID().toString());
-      exp.getMeta().setLastUpdated(pf.execTime.getTime());
+      exp.getMeta().setLastUpdated(pf.getExecTime().getTime());
       for (ValueSet vs : pf.expansions) {
         exp.addEntry().setResource(vs).setFullUrl(vs.getUrl());
       }
@@ -4100,7 +4121,7 @@ public class PublisherGenerator extends PublisherBase {
     String is = "[FHIR]\r\nversion="+version+"\r\n";
     IniFile ini = new IniFile(new ByteArrayInputStream(FileUtilities.stringToBytes(is)));
     ini.setStringProperty("IG", "version", version, null);
-    ini.setStringProperty("IG", "date",  new SimpleDateFormat("yyyyMMddhhmmssZ", new Locale("en", "US")).format(pf.execTime.getTime()), null);
+    ini.setStringProperty("IG", "date",  new SimpleDateFormat("yyyyMMddhhmmssZ", new Locale("en", "US")).format(pf.getExecTime().getTime()), null);
     ByteArrayOutputStream b = new ByteArrayOutputStream();
     ini.save(b);
     return b.toByteArray();
@@ -4879,7 +4900,9 @@ public class PublisherGenerator extends PublisherBase {
         case ConceptMap:
           generateOutputsConceptMap(f, r, (ConceptMap) res, vars, prefixForContainer, lrc, lang);
           break;
-
+        case ImplementationGuide:
+          generateOutputsImplementationGuide(f, r, (ImplementationGuide) res, vars, prefixForContainer, lrc, lang);
+          break;
         case List:
           generateOutputsList(f, r, (ListResource) res, vars, prefixForContainer, lrc, lang);
           break;
@@ -5079,7 +5102,7 @@ public class PublisherGenerator extends PublisherBase {
       String id = ExtensionUtilities.readStringExtension(ext, "id");
       String name = ExtensionUtilities.readStringExtension(ext, "name");
       String dfn = Utilities.path(this.pf.tempDir, id+".tgz");
-      NPMPackageGenerator gen = NPMPackageGenerator.subset(this.pf.npm, dfn, id, name, this.pf.execTime.getTime(), !this.pf.publishing);
+      NPMPackageGenerator gen = NPMPackageGenerator.subset(this.pf.npm, dfn, id, name, this.pf.getExecTime().getTime(), !this.settings.isPublishing());
       for (ListItemEntry i : list) {
         if (i.element != null) {
           ByteArrayOutputStream bs = new ByteArrayOutputStream();
@@ -5694,7 +5717,7 @@ public class PublisherGenerator extends PublisherBase {
                 throw new FHIRException("Internal Error - unknown keyword "+keyword);
             }
           } catch (Exception e) {
-            if (this.pf.debug) {
+            if (this.settings.isDebug()) {
               e.printStackTrace();
             } else {
               System.out.println("Error processing custom liquid in "+f.getName()+": " + e.getMessage());
@@ -5732,7 +5755,7 @@ public class PublisherGenerator extends PublisherBase {
         return content;
       }
     } catch (Exception e) {
-      if (this.pf.debug) {
+      if (this.settings.isDebug()) {
         e.printStackTrace();
       } else {
         System.out.println("Error processing custom liquid in "+f.getName()+": " + e.getMessage());
@@ -5818,8 +5841,8 @@ public class PublisherGenerator extends PublisherBase {
     String cnt = null;
     try {
       String args = arguments.trim();
-      File src = new File(Utilities.path(FileUtilities.getDirectoryForFile(this.pf.configFile), args.substring(0, args.indexOf(" ")).trim()));
-      File tsrc = new File(Utilities.path(FileUtilities.getDirectoryForFile(this.pf.configFile), args.substring(args.indexOf(" ")+1).trim()));
+      File src = new File(Utilities.path(FileUtilities.getDirectoryForFile(this.settings.getConfigFile()), args.substring(0, args.indexOf(" ")).trim()));
+      File tsrc = new File(Utilities.path(FileUtilities.getDirectoryForFile(this.settings.getConfigFile()), args.substring(args.indexOf(" ")+1).trim()));
 
       JsonObject json = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(src);
       LiquidEngine liquid = new LiquidEngine(this.pf.context, this.pf.rc.getServices());
@@ -5937,7 +5960,7 @@ public class PublisherGenerator extends PublisherBase {
     b.append("Time (ms)");
     b.append(",");
     b.append("Size (bytes)");
-    if (pf.trackFragments) {
+    if (settings.isTrackFragments()) {
       b.append(",");
       b.append("Used?");
     }

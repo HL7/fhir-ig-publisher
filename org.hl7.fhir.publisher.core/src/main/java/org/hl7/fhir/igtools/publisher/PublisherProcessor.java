@@ -48,8 +48,8 @@ import static org.hl7.fhir.igtools.publisher.Publisher.FMM_DERIVATION_MAX;
  */
 
 public class PublisherProcessor extends PublisherBase  {
-  public PublisherProcessor(PublisherFields publisherFields) {
-    super(publisherFields);
+  public PublisherProcessor(PublisherSettings settings) {
+    super(settings);
   }
 
 
@@ -93,7 +93,7 @@ public class PublisherProcessor extends PublisherBase  {
     log("Generating Narratives");
     doActorScan();
     generateNarratives(false);
-    if (!pf.validationOff) {
+    if (!settings.isValidationOff()) {
       log("Validating Conformance Resources");
       for (String s : metadataResourceNames()) {
         validate(s);
@@ -477,7 +477,7 @@ public class PublisherProcessor extends PublisherBase  {
 
 
   public void validate() throws Exception {
-    if (pf.validationOff) {
+    if (settings.isValidationOff()) {
       return;
     }
 

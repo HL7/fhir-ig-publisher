@@ -95,15 +95,15 @@ import static org.hl7.fhir.igtools.publisher.Publisher.TOOLING_IG_CURRENT_RELEAS
 public class PublisherIGLoader extends PublisherBase {
   private List<StructureDefinition> additionalResources = new ArrayList<>();
 
-  public PublisherIGLoader(PublisherFields publisherFields) {
-    super(publisherFields);
+  public PublisherIGLoader(PublisherSettings settings) {
+    super(settings);
   }
 
 
   public void initialize() throws Exception {
     pf.pcm = getFilesystemPackageCacheManager();
-    log("Build FHIR IG from "+ pf.configFile);
-    if (pf.mode == PublisherUtils.IGBuildMode.PUBLICATION)
+    log("Build FHIR IG from "+ settings.getConfigFile());
+    if (settings.getMode() == PublisherUtils.IGBuildMode.PUBLICATION)
       log("Build Formal Publication package, intended for "+getTargetOutput());
 
     log("API keys loaded from "+ FhirSettings.getFilePath());
@@ -112,16 +112,16 @@ public class PublisherIGLoader extends PublisherBase {
     pf.templateProvider = new IGPublisherLiquidTemplateServices();
     pf.extensionTracker = new ExtensionTracker();
     log("Package Cache: "+ pf.pcm.getFolder());
-    if (pf.packagesFolder != null) {
-      log("Also loading Packages from "+ pf.packagesFolder);
-      pf.pcm.loadFromFolder(pf.packagesFolder);
+    if (settings.getPackagesFolder() != null) {
+      log("Also loading Packages from "+ settings.getPackagesFolder());
+      pf.pcm.loadFromFolder(settings.getPackagesFolder());
     }
     pf.fetcher.setRootDir(pf.rootDir);
     pf.fetcher.setResourceDirs(pf.resourceDirs);
-    if (pf.configFile != null && focusDir().contains(" ")) {
+    if (settings.getConfigFile() != null && focusDir().contains(" ")) {
       throw new Error("There is a space in the folder path: \""+focusDir()+"\". Please fix your directory arrangement to remove the space and try again");
     }
-    if (pf.configFile != null) {
+    if (settings.getConfigFile() != null) {
       File ckm = new File(Utilities.path(focusDir(), "ckm.ini"));
       if (ckm.exists()) {
         IniFile ini = new IniFile(ckm.getAbsolutePath());
@@ -134,13 +134,13 @@ public class PublisherIGLoader extends PublisherBase {
       File fsh = new File(Utilities.path(focusDir(), "fsh"));
       if (fsh.exists() && fsh.isDirectory() && !pf.noSushi) {
         prescanSushiConfig(focusDir());
-        new FSHRunner(this).runFsh(new File(FileUtilities.getDirectoryForFile(fsh.getAbsolutePath())), pf.mode);
+        new FSHRunner(this).runFsh(new File(FileUtilities.getDirectoryForFile(fsh.getAbsolutePath())), settings.getMode());
         pf.isSushi = true;
       } else {
         File fsh2 = new File(Utilities.path(focusDir(), "input", "fsh"));
         if (fsh2.exists() && fsh2.isDirectory() && !pf.noSushi) {
           prescanSushiConfig(focusDir());
-          new FSHRunner(this).runFsh(new File(FileUtilities.getDirectoryForFile(fsh.getAbsolutePath())), pf.mode);
+          new FSHRunner(this).runFsh(new File(FileUtilities.getDirectoryForFile(fsh.getAbsolutePath())), settings.getMode());
           pf.isSushi = true;
         }
       }
@@ -208,16 +208,16 @@ public class PublisherIGLoader extends PublisherBase {
   }
 
   private IniFile checkNewIg() throws IOException {
-    if (pf.configFile == null)
+    if (settings.getConfigFile() == null)
       return null;
-    if (pf.configFile.endsWith(File.separatorChar+".")) {
-      pf.configFile = pf.configFile.substring(0, pf.configFile.length() - 2);
+    if (settings.getConfigFile().endsWith(File.separatorChar+".")) {
+      settings.setConfigFile(settings.getConfigFile().substring(0, settings.getConfigFile().length() - 2));
     }
-    File cf = pf.mode == PublisherUtils.IGBuildMode.AUTOBUILD ? new File(pf.configFile) : new CSFile(pf.configFile);
+    File cf = settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD ? new File(settings.getConfigFile()) : new CSFile(settings.getConfigFile());
     if (!cf.exists())
       return null;
     if (cf.isDirectory())
-      cf = pf.mode == PublisherUtils.IGBuildMode.AUTOBUILD ? new File(Utilities.path(pf.configFile, "ig.ini")) : new CSFile(Utilities.path(pf.configFile, "ig.ini"));
+      cf = settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD ? new File(Utilities.path(settings.getConfigFile(), "ig.ini")) : new CSFile(Utilities.path(settings.getConfigFile(), "ig.ini"));
     if (!cf.exists())
       return null;
     String s = FileUtilities.fileToString(cf);
@@ -229,11 +229,11 @@ public class PublisherIGLoader extends PublisherBase {
 
 
   private void initializeFromIg(IniFile ini) throws Exception {
-    pf.configFile = ini.getFileName();
+    settings.setConfigFile(ini.getFileName());
     pf.igMode = true;
     pf.repoRoot = FileUtilities.getDirectoryForFile(ini.getFileName());
     pf.rootDir = pf.repoRoot;
-    if (!pf.rootDir.equals(pf.configFile)) {
+    if (!pf.rootDir.equals(settings.getConfigFile())) {
       log("Root directory: " + pf.rootDir);
     }
     pf.fetcher.setRootDir(pf.rootDir);
@@ -269,7 +269,7 @@ public class PublisherIGLoader extends PublisherBase {
     } catch (Exception e) {
       throw new Exception("Error Parsing File "+ pf.igName +": "+e.getMessage(), e);
     }
-    pf.template = pf.templateManager.loadTemplate(templateName, pf.rootDir, pf.sourceIg.getPackageId(), pf.mode == PublisherUtils.IGBuildMode.AUTOBUILD, pf.logOptions.contains("template"), pf.rapidoMode);
+    pf.template = pf.templateManager.loadTemplate(templateName, pf.rootDir, pf.sourceIg.getPackageId(), settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD, pf.logOptions.contains("template"), settings.isRapidoMode());
     if (pf.template.hasExtraTemplates()) {
       processExtraTemplates(pf.template.getExtraTemplates());
     }
@@ -403,7 +403,7 @@ public class PublisherIGLoader extends PublisherBase {
             throw new Exception("Temp directory must be a sub-folder of the base directory");
           break;
         case "path-output":
-          if (pf.mode != PublisherUtils.IGBuildMode.WEBSERVER) {
+          if (settings.getMode() != PublisherUtils.IGBuildMode.WEBSERVER) {
             // Can't override outputDir if building using webserver
             pf.outputDir = Utilities.path(pf.rootDir, p.getValue());
             if (!pf.outputDir.startsWith(pf.rootDir))
@@ -818,10 +818,10 @@ public class PublisherIGLoader extends PublisherBase {
       pf.resourceDirs.add(Utilities.path(pf.rootDir, "resources"));
     if (pf.pagesDirs.isEmpty())
       pf.pagesDirs.add(Utilities.path(pf.rootDir, "pages"));
-    if (pf.mode == PublisherUtils.IGBuildMode.WEBSERVER)
+    if (settings.getMode() == PublisherUtils.IGBuildMode.WEBSERVER)
       pf.vsCache = Utilities.path(System.getProperty("java.io.tmpdir"), "fhircache");
     else if (pf.vsCache == null) {
-      if (pf.mode == PublisherUtils.IGBuildMode.AUTOBUILD)
+      if (settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD)
         pf.vsCache = Utilities.path(System.getProperty("java.io.tmpdir"), "fhircache");
       else
         pf.vsCache = Utilities.path(System.getProperty("user.home"), "fhircache");
@@ -866,7 +866,7 @@ public class PublisherIGLoader extends PublisherBase {
       logDebugMessage(LogCategory.INIT, "QA Dir: "+ pf.qaDir);
       forceDir(pf.qaDir);
     }
-    pf.makeQA = pf.mode == PublisherUtils.IGBuildMode.WEBSERVER ? false : pf.qaDir != null;
+    pf.makeQA = settings.getMode() == PublisherUtils.IGBuildMode.WEBSERVER ? false : pf.qaDir != null;
 
     if (Utilities.existsInList(pf.version.substring(0,  3), "1.0", "1.4", "1.6", "3.0"))
       pf.markdownEngine = new MarkDownProcessor(MarkDownProcessor.Dialect.DARING_FIREBALL);
@@ -876,13 +876,13 @@ public class PublisherIGLoader extends PublisherBase {
 
     // initializing the tx sub-system
     FileUtilities.createDirectory(pf.vsCache);
-    if (pf.cacheOption == PublisherUtils.CacheOption.CLEAR_ALL) {
+    if (settings.getCacheOption() == PublisherUtils.CacheOption.CLEAR_ALL) {
       log("Terminology Cache is at "+ pf.vsCache +". Clearing now");
       FileUtilities.clearDirectory(pf.vsCache);
-    } else if (pf.mode == PublisherUtils.IGBuildMode.AUTOBUILD) {
+    } else if (settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD) {
       log("Terminology Cache is at "+ pf.vsCache +". Trimming now");
       FileUtilities.clearDirectory(pf.vsCache, "snomed.cache", "loinc.cache", "ucum.cache");
-    } else if (pf.cacheOption == PublisherUtils.CacheOption.CLEAR_ERRORS) {
+    } else if (settings.getCacheOption() == PublisherUtils.CacheOption.CLEAR_ERRORS) {
       log("Terminology Cache is at "+ pf.vsCache +". Clearing Errors now");
       logDebugMessage(LogCategory.INIT, "Deleted "+Integer.toString(clearErrors(pf.vsCache))+" files");
     } else {
@@ -911,14 +911,14 @@ public class PublisherIGLoader extends PublisherBase {
     pf.langUtils = new LanguageUtils(pf.context);
     pf.txLog = FileUtilities.createTempFile("fhir-ig-", ".html").getAbsolutePath();
     System.out.println("Running Terminology Log: "+ pf.txLog);
-    if (pf.mode != PublisherUtils.IGBuildMode.WEBSERVER) {
-      if (pf.txServer == null || !pf.txServer.contains(":")) {
+    if (settings.getMode() != PublisherUtils.IGBuildMode.WEBSERVER) {
+      if (settings.getTxServer() == null || !settings.getTxServer().contains(":")) {
         log("WARNING: Running without terminology server - terminology content will likely not publish correctly");
         pf.context.setCanRunWithoutTerminology(true);
         pf.txLog = null;
       } else {
-        log("Connect to Terminology Server at "+ pf.txServer);
-        pf.context.connectToTSServer(new TerminologyClientFactory(pf.version), pf.txServer, "fhir/publisher", pf.txLog, true);
+        log("Connect to Terminology Server at "+ settings.getTxServer());
+        pf.context.connectToTSServer(new TerminologyClientFactory(pf.version), settings.getTxServer(), "fhir/publisher", pf.txLog, true);
       }
     } else {
       pf.context.connectToTSServer(new TerminologyClientFactory(pf.version), pf.webTxServer.getAddress(), "fhir/publisher", pf.txLog, true);
@@ -935,7 +935,7 @@ public class PublisherIGLoader extends PublisherBase {
       pf.context.getExpansionParameters().addParameter(n, expParamMap.get(n));
     }
 
-    pf.newMultiLangTemplateFormat = pf.template.config().asBoolean("multilanguage-format");
+    settings.setNewMultiLangTemplateFormat(pf.template.config().asBoolean("multilanguage-format"));
     loadPubPack();
     pf.igpkp = new IGKnowledgeProvider(pf.context, checkAppendSlash(pf.specPath), determineCanonical(pf.sourceIg.getUrl(), "ImplementationGuide.url"), pf.template.config(), pf.errors, VersionUtilities.isR2Ver(pf.version), pf.template, pf.listedURLExemptions, pf.altCanonical, pf.fileList, pf.module);
     if (pf.autoLoad) {
@@ -981,7 +981,8 @@ public class PublisherIGLoader extends PublisherBase {
       }
     }
 
-    pf.inspector = new HTMLInspector(pf.context, pf.outputDir, pf.specMaps, pf.linkSpecMaps, this, pf.igpkp.getCanonical(), pf.sourceIg.getPackageId(), pf.sourceIg.getVersion(), pf.trackedFragments, pf.fileList, pf.module, pf.mode == PublisherUtils.IGBuildMode.AUTOBUILD || pf.mode == PublisherUtils.IGBuildMode.WEBSERVER, pf.trackFragments ? pf.fragmentUses : null, pf.relatedIGs, noCIBuildIssues, allLangs());
+    pf.inspector = new HTMLInspector(pf.context, pf.outputDir, pf.specMaps, pf.linkSpecMaps, this, pf.igpkp.getCanonical(), pf.sourceIg.getPackageId(), pf.sourceIg.getVersion(),
+            pf.trackedFragments, pf.fileList, pf.module, settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD || settings.getMode() == PublisherUtils.IGBuildMode.WEBSERVER, settings.isTrackFragments() ? pf.fragmentUses : null, pf.relatedIGs, noCIBuildIssues, allLangs());
     pf.inspector.getManual().add("full-ig.zip");
     if (pf.historyPage != null) {
       pf.inspector.getManual().add(pf.historyPage);
@@ -1049,7 +1050,7 @@ public class PublisherIGLoader extends PublisherBase {
 
     // set up validator;
     pf.validatorSession = new ValidatorSession();
-    IGPublisherHostServices hs = new IGPublisherHostServices(pf.igpkp, pf.fileList, pf.context, new DateTimeType(pf.execTime), new StringType(pf.igpkp.specPath()));
+    IGPublisherHostServices hs = new IGPublisherHostServices(pf.igpkp, pf.fileList, pf.context, new DateTimeType(pf.getExecTime()), new StringType(pf.igpkp.specPath()));
     hs.registerFunction(new GlobalObject.GlobalObjectRandomFunction());
     hs.registerFunction(new BaseTableWrapper.TableColumnFunction());
     hs.registerFunction(new BaseTableWrapper.TableDateColumnFunction());
@@ -1121,7 +1122,7 @@ public class PublisherIGLoader extends PublisherBase {
     for (Extension e : pf.sourceIg.getDefinition().getExtensionsByUrl(ExtensionDefinitions.EXT_IGP_BUNDLE)) {
       pf.bundles.add(e.getValue().primitiveValue());
     }
-    if (pf.mode == PublisherUtils.IGBuildMode.AUTOBUILD)
+    if (settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD)
       pf.extensionTracker.setoptIn(true);
     else if (pf.npmName.contains("hl7.") || pf.npmName.contains("argonaut.") || pf.npmName.contains("ihe."))
       pf.extensionTracker.setoptIn(true);
@@ -1155,7 +1156,7 @@ public class PublisherIGLoader extends PublisherBase {
 
 
   private void initializeTemplate() throws IOException {
-    pf.rootDir = pf.configFile;
+    pf.rootDir = settings.getConfigFile();
     pf.outputDir = Utilities.path(pf.rootDir, "output");
     pf.tempDir = Utilities.path(pf.rootDir, "temp");
   }
@@ -1773,7 +1774,7 @@ public class PublisherIGLoader extends PublisherBase {
       return;
     }
 
-    if (pf.mode == PublisherUtils.IGBuildMode.PUBLICATION) {
+    if (settings.getMode() == PublisherUtils.IGBuildMode.PUBLICATION) {
       pf.relatedIGs.add(new RelatedIG(code, id, RelatedIG.RelatedIGLoadingMode.WEB, RelatedIG.RelatedIGRole.fromCode(role), npm, determineLocation(code, id)));
     } else if (Utilities.startsWithInList(npm.getWebLocation(), "http://", "https://")) {
       pf.relatedIGs.add(new RelatedIG(code, id, RelatedIG.RelatedIGLoadingMode.CIBUILD, RelatedIG.RelatedIGRole.fromCode(role), npm));
@@ -1872,7 +1873,7 @@ public class PublisherIGLoader extends PublisherBase {
     // if it's already published, we use that location
     // if it's to be published, we find #current, extract that publication request, and use that path (check version)
     // otherwise, bang
-    JsonObject pr = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(new File(Utilities.path(FileUtilities.getDirectoryForFile(pf.configFile), "publication-request.json")));
+    JsonObject pr = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(new File(Utilities.path(FileUtilities.getDirectoryForFile(settings.getConfigFile()), "publication-request.json")));
     String rigV = pr.forceObject("related").asString(code);
     if (rigV == null) {
       throw new FHIRException("No specified Publication version for relatedIG "+code);
@@ -1976,7 +1977,7 @@ public class PublisherIGLoader extends PublisherBase {
     }
 
     if (!VersionUtilities.isSemVer(pf.publishedIg.getVersion())) {
-      if (pf.mode == PublisherUtils.IGBuildMode.AUTOBUILD) {
+      if (settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD) {
         throw new Error("The version "+ pf.publishedIg.getVersion()+" is not a valid semantic version so cannot be published in the ci-build");
       } else {
         log("The version "+ pf.publishedIg.getVersion()+" is not a valid semantic version so cannot be published in the ci-build");
@@ -1998,7 +1999,7 @@ public class PublisherIGLoader extends PublisherBase {
     } else if (!id.equals(pf.publishedIg.getId()))
       pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE, "ImplementationGuide.id", "The Implementation Guide Resource id should be "+id, ValidationMessage.IssueSeverity.WARNING));
 
-    pf.packageInfo = new PackageInformation(pf.publishedIg.getPackageId(), pf.publishedIg.getVersion(), pf.context.getVersion(), new Date(), pf.publishedIg.getName(), pf.igpkp.getCanonical(), pf.targetOutput);
+    pf.packageInfo = new PackageInformation(pf.publishedIg.getPackageId(), pf.publishedIg.getVersion(), pf.context.getVersion(), new Date(), pf.publishedIg.getName(), pf.igpkp.getCanonical(), settings.getTargetOutput());
 
     // Cql Compile
     pf.cql = new CqlSubSystem(pf.npmList, pf.binaryPaths, new CqlResourceLoader(pf.version), this, pf.context.getUcumService(), pf.publishedIg.getPackageId(), pf.igpkp.getCanonical());
@@ -2010,7 +2011,7 @@ public class PublisherIGLoader extends PublisherBase {
     pf.duplicateInputResourcesDetected = false;
     loadCustomResources();
 
-    if (pf.sourceDir != null || pf.igpkp.isAutoPath()) {
+    if (settings.getSourceDir() != null || pf.igpkp.isAutoPath()) {
       loadResources(igf);
     }
     loadSpreadsheets(igf);
@@ -2229,21 +2230,20 @@ public class PublisherIGLoader extends PublisherBase {
       if (!dep.hasPackageId())
         throw new FHIRException("Unknown package id for "+dep.getUri());
     }
-    pf.npm = new NPMPackageGenerator(pf.publishedIg.getPackageId(), Utilities.path(pf.outputDir, "package.tgz"), pf.igpkp.getCanonical(), targetUrl(), PackageGenerator.PackageType.IG, pf.publishedIg, pf.execTime.getTime(), relatedIgMap(), !pf.publishing);
+    pf.npm = new NPMPackageGenerator(pf.publishedIg.getPackageId(), Utilities.path(pf.outputDir, "package.tgz"), pf.igpkp.getCanonical(), targetUrl(), PackageGenerator.PackageType.IG, pf.publishedIg, pf.getExecTime().getTime(), relatedIgMap(), !settings.isPublishing());
     for (String v : pf.generateVersions) {
       ImplementationGuide vig = pf.publishedIg.copy();
       checkIgDeps(vig, v);
       pf.vnpms.put(v, new NPMPackageGenerator(pf.publishedIg.getPackageId()+"."+v, Utilities.path(pf.outputDir, pf.publishedIg.getPackageId()+"."+v+".tgz"),
-              pf.igpkp.getCanonical(), targetUrl(), PackageGenerator.PackageType.IG,  vig, pf.execTime.getTime(), relatedIgMap(), !pf.publishing, VersionUtilities.versionFromCode(v)));
+              pf.igpkp.getCanonical(), targetUrl(), PackageGenerator.PackageType.IG,  vig, pf.getExecTime().getTime(), relatedIgMap(), !settings.isPublishing(), VersionUtilities.versionFromCode(v)));
     }
     if (isNewML()) {
       for (String l : allLangs()) {
         ImplementationGuide vig = (ImplementationGuide) pf.langUtils.copyToLanguage(pf.publishedIg, l, true, pf.defaultTranslationLang, igf.getErrors());
         pf.lnpms.put(l, new NPMPackageGenerator(pf.publishedIg.getPackageId()+"."+l, Utilities.path(pf.outputDir, pf.publishedIg.getPackageId()+"."+l+".tgz"),
-                pf.igpkp.getCanonical(), targetUrl(), PackageGenerator.PackageType.IG, vig, pf.execTime.getTime(), relatedIgMap(), !pf.publishing, pf.context.getVersion()));
+                pf.igpkp.getCanonical(), targetUrl(), PackageGenerator.PackageType.IG, vig, pf.getExecTime().getTime(), relatedIgMap(), !settings.isPublishing(), pf.context.getVersion()));
       }
     }
-    pf.execTime = Calendar.getInstance();
 
     pf.rc = new RenderingContext(pf.context, pf.markdownEngine, ValidationOptions.defaults(), checkAppendSlash(pf.specPath), "", locale, RenderingContext.ResourceRendererMode.TECHNICAL, RenderingContext.GenerationRules.IG_PUBLISHER);
     pf.rc.setTemplateProvider(pf.templateProvider);
@@ -2253,9 +2253,9 @@ public class PublisherIGLoader extends PublisherBase {
     pf.rc.setQuestionnaireMode(RenderingContext.QuestionnaireRendererMode.TREE);
     pf.rc.getCodeSystemPropList().addAll(pf.codeSystemProps);
     pf.rc.setParser(getTypeLoader(pf.version));
-    pf.rc.addLink(RenderingContext.KnownLinkType.SELF, pf.targetOutput);
+    pf.rc.addLink(RenderingContext.KnownLinkType.SELF, settings.getTargetOutput());
     pf.rc.setFixedFormat(pf.fixedFormat);
-    pf.rc.setDebug(pf.debug);
+    pf.rc.setDebug(settings.isDebug());
     pf.module.defineTypeMap(pf.rc.getTypeMap());
     pf.rc.setDateFormatString(pf.fmtDate);
     pf.rc.setDateTimeFormatString(pf.fmtDateTime);
@@ -2800,7 +2800,7 @@ public class PublisherIGLoader extends PublisherBase {
     // we load it as an R5 resource.
     StructureDefinition def = null;
     try {
-      def = (StructureDefinition) org.hl7.fhir.r5.formats.FormatUtilities.loadFile(Utilities.uncheckedPath(FileUtilities.getDirectoryForFile(pf.configFile), filename));
+      def = (StructureDefinition) org.hl7.fhir.r5.formats.FormatUtilities.loadFile(Utilities.uncheckedPath(FileUtilities.getDirectoryForFile(settings.getConfigFile()), filename));
     } catch (Exception e) {
       return "Exception loading: "+e.getMessage();
     }
@@ -2907,7 +2907,7 @@ public class PublisherIGLoader extends PublisherBase {
 
 
   private void loadResources(FetchedFile igf) throws Exception { // igf is not currently used, but it was about relative references?
-    List<FetchedFile> resources = pf.fetcher.scan(pf.sourceDir, pf.context, pf.igpkp.isAutoPath(), makeExemptions());
+    List<FetchedFile> resources = pf.fetcher.scan(settings.getSourceDir(), pf.context, pf.igpkp.isAutoPath(), makeExemptions());
     for (FetchedFile ff : resources) {
       ff.start("loadResources");
       if (ff.getContentType().equals("adl")) {
@@ -3028,7 +3028,7 @@ public class PublisherIGLoader extends PublisherBase {
     if (changed) {
       f.getValuesetsToLoad().clear();
       logDebugMessage(LogCategory.INIT, "load "+f.getPath());
-      Bundle bnd = new IgSpreadsheetParser(this.pf.context, this.pf.execTime, this.pf.igpkp.getCanonical(), f.getValuesetsToLoad(), this.pf.mappingSpaces, knownValueSetIds).parse(f);
+      Bundle bnd = new IgSpreadsheetParser(this.pf.context, this.pf.getExecTime(), this.pf.igpkp.getCanonical(), f.getValuesetsToLoad(), this.pf.mappingSpaces, knownValueSetIds).parse(f);
       f.setBundle(new FetchedResource(f.getName()+" (ex spreadsheet)"));
       f.setBundleType(FetchedFile.FetchedBundleType.SPREADSHEET);
       f.getBundle().setResource(bnd);
@@ -3245,6 +3245,16 @@ public class PublisherIGLoader extends PublisherBase {
       for (File f : dir.listFiles()) {
         if (!this.pf.usedLangFiles.contains(f.getAbsolutePath())) {
           loadTranslationSupplement(f);
+        }
+      }
+      for (String s : Utilities.stringSet("po", "json", "xliff")) {
+        File fdir = new File(Utilities.path(pf.rootDir, p));
+        if (fdir.exists()) {
+          for (File f : fdir.listFiles()) {
+            if (!this.pf.usedLangFiles.contains(f.getAbsolutePath())) {
+              loadTranslationSupplement(f);
+            }
+          }
         }
       }
     }
@@ -3704,7 +3714,7 @@ public class PublisherIGLoader extends PublisherBase {
                 altered = true;
               }
               if (Utilities.noString(id)) {
-                if (pf.simplifierMode) {
+                if (settings.isSimplifierMode()) {
                   id = file.getName();
                   System.out.println("Resource has no id in "+file.getPath()+" and canonical URL ("+url+") does not start with the IG canonical URL ("+prefix+")");
                 } else {
@@ -4130,7 +4140,7 @@ public class PublisherIGLoader extends PublisherBase {
         if (!bc.hasDate()) {
           altered = true;
           b.append("date");
-          bc.setDateElement(new DateTimeType(this.pf.execTime));
+          bc.setDateElement(new DateTimeType(this.pf.getExecTime()));
         }
         if (!bc.hasStatus()) {
           altered = true;
@@ -4237,7 +4247,7 @@ public class PublisherIGLoader extends PublisherBase {
   private void processFactories(List<String> factories) throws IOException {
     LiquidEngine liquid = new LiquidEngine(pf.context, pf.validator.getExternalHostServices());
     for (String f : factories) {
-      String rootFolder = FileUtilities.getDirectoryForFile(this.pf.configFile);
+      String rootFolder = FileUtilities.getDirectoryForFile(this.settings.getConfigFile());
       File path = new File(Utilities.path(rootFolder, f));
       if (!path.exists()) {
         throw new FHIRException("factory source '"+f+"' not found");
