@@ -226,6 +226,11 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
         }
       }
     }
+
+    if ("Parameters/expansion-parameters".equals(url)) {
+      Element expr = new ObjectConverter(context).convert(context.getExpansionParameters());
+      return expr;
+    }
     return null;
   }
 
