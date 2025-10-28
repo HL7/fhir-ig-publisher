@@ -144,7 +144,7 @@ public class FileChangeMonitor {
     private final WatchService watchService;
     private final Map<WatchKey, Path> watchKeys;
     private final Set<Path> monitoredFiles;
-    private final ExecutorService executor;
+    private ExecutorService executor;
     private final BlockingQueue<FileChangeEvent> changeQueue;
     private volatile boolean monitoring;
 
@@ -195,6 +195,11 @@ public class FileChangeMonitor {
     @Override
     public void startMonitoring() {
       if (monitoring) return;
+
+      // If executor was shutdown, create a new one
+      if (executor.isShutdown() || executor.isTerminated()) {
+        executor = Executors.newSingleThreadExecutor();
+      }
       monitoring = true;
 
       executor.submit(() -> {
@@ -331,12 +336,19 @@ public class FileChangeMonitor {
     @Override
     public void stopMonitoring() {
       monitoring = false;
-      executor.shutdown();
-      try {
-        executor.awaitTermination(5, TimeUnit.SECONDS);
-        watchService.close();
-      } catch (InterruptedException | IOException e) {
-        System.err.println("Error stopping monitor: " + e.getMessage());
+      if (executor != null && !executor.isShutdown()) {
+        executor.shutdown();
+        try {
+          if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+            executor.shutdownNow();
+          }
+          watchService.close();
+        } catch (InterruptedException e) {
+          executor.shutdownNow();
+          Thread.currentThread().interrupt();
+        } catch (IOException e) {
+          System.err.println("Error closing watch service: " + e.getMessage());
+        }
       }
     }
   }
@@ -345,7 +357,7 @@ public class FileChangeMonitor {
   private static class PollingFileChangeMonitorImpl implements FileChangeMonitorImpl {
     private final Map<Path, FileSnapshot> fileSnapshots;
     private final List<MonitoredPath> monitoredPaths;
-    private final ScheduledExecutorService scheduler;
+    private ScheduledExecutorService scheduler;
     private final BlockingQueue<FileChangeEvent> changeQueue;
     private volatile boolean monitoring;
     private final long pollIntervalMs;
@@ -438,6 +450,12 @@ public class FileChangeMonitor {
     @Override
     public void startMonitoring() {
       if (monitoring) return;
+
+      // If scheduler was shutdown, create a new one
+      if (scheduler.isShutdown() || scheduler.isTerminated()) {
+        scheduler = Executors.newScheduledThreadPool(1);
+      }
+
       monitoring = true;
 
       scheduler.scheduleAtFixedRate(() -> {
@@ -578,11 +596,16 @@ public class FileChangeMonitor {
     @Override
     public void stopMonitoring() {
       monitoring = false;
-      scheduler.shutdown();
-      try {
-        scheduler.awaitTermination(5, TimeUnit.SECONDS);
-      } catch (InterruptedException e) {
-        System.err.println("Error stopping monitor: " + e.getMessage());
+      if (scheduler != null && !scheduler.isShutdown()) {
+        scheduler.shutdown();
+        try {
+          if (!scheduler.awaitTermination(5, TimeUnit.SECONDS)) {
+            scheduler.shutdownNow();
+          }
+        } catch (InterruptedException e) {
+          scheduler.shutdownNow();
+          Thread.currentThread().interrupt();
+        }
       }
     }
   }
