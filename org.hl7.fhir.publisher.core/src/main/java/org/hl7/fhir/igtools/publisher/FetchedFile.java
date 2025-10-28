@@ -353,27 +353,36 @@ public class FetchedFile {
       long result = hash;
       if (dependencies != null) {
         for (FetchedFile f : dependencies) {
-          result = 37 * result + f.calculateHash(this);
+          result = 37 * result + f.calculateHash(addToSet( null, this));
         }
       }
       calcHash = result;
     }
   }
 
-  private long calculateHash(FetchedFile start) {
-    if (start == this) {
+  private long calculateHash(Set<FetchedFile> trail) {
+    if (trail.contains(this)) {
       return 0;
     }
     if (calcHash == 0) {
       long result = hash;
       if (dependencies != null) {
         for (FetchedFile f : dependencies) {
-          result = 37 * result + f.calculateHash(start);
+          result = 37 * result + f.calculateHash(addToSet(trail, this));
         }
       }
       calcHash = result;
     }
     return calcHash;
+  }
+
+  private Set<FetchedFile> addToSet(Set<FetchedFile> trail, FetchedFile focus) {
+    Set<FetchedFile> result = new HashSet<>();
+    if (trail != null) {
+      result.addAll(trail);
+    }
+    result.add(focus);
+    return result;
   }
 
 }

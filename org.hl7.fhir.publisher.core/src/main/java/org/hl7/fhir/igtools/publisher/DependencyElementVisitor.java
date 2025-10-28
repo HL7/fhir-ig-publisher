@@ -2,10 +2,8 @@ package org.hl7.fhir.igtools.publisher;
 
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.elementmodel.ElementVisitor;
-import org.hl7.fhir.r5.utils.CanonicalResourceUtilities;
 
 import java.util.List;
-import java.util.Set;
 
 public class DependencyElementVisitor implements ElementVisitor.IElementVisitor {
   private final List<FetchedFile> fileList;
@@ -22,11 +20,11 @@ public class DependencyElementVisitor implements ElementVisitor.IElementVisitor 
   @Override
   public ElementVisitor.ElementVisitorInstruction visit(Object context, Element element) {
     ElementVisitor.ElementVisitorInstruction result = ElementVisitor.ElementVisitorInstruction.NO_VISIT_CHILDREN;
-    if (element.isElementOf("ValueSet.compose.include", "ValueSet.compose.exclude", "Coding.value")) {
+    if (element.isElementForPath("ValueSet.compose.include", "ValueSet.compose.exclude", "Coding.value")) {
       String url = element.getNamedChildValue("system");
       String version = element.getNamedChildValue("version");
       checkDependencies(url, version);
-    } else if (element.isElementOf("Quantity")) {
+    } else if (element.isElementForPath("Quantity")) {
       String url = element.getNamedChildValue("system");
       checkDependencies(url);
     } else if (element.isPrimitive() ) {

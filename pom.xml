@@ -378,6 +378,11 @@
             <artifactId>referencemodels</artifactId>
             <version>${nedap-healthcare-archie.version}</version>
         </dependency>
+        <dependency>
+            <groupId>io.methvin</groupId>
+            <artifactId>directory-watcher</artifactId>
+            <version>0.18.0</version>
+        </dependency>
 
     </dependencies>
 
