@@ -638,6 +638,7 @@ public class Template {
     }
     if (Utilities.existsInList(code, "jekyll-data",
             "xml", "json", "ttl",
+            "csv", "xlsx", "sch",
             "xml-html", "json-html", "ttl-html")) {
       return true;
     }
