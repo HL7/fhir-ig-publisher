@@ -538,7 +538,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       if (!f.getErrors().isEmpty()) {
         oo = new OperationOutcome();
         validationBundle.addEntry(new BundleEntryComponent().setResource(oo));
-        ExtensionUtilities.addStringExtension(oo, ExtensionDefinitions.EXT_OO_FILE, f.getName());
+        ExtensionUtilities.addStringExtension(oo, ExtensionDefinitions.EXT_OO_FILE, f.getStatedPath());
         for (ValidationMessage vm : filterMessages(f, f.getErrors(), false, filteredMessages)) {
           oo.getIssue().add(OperationOutcomeUtilities.convertToIssue(vm, oo));
         }

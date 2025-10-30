@@ -576,6 +576,11 @@ public class PublisherIGLoader extends PublisherBase {
             }
             pf.customResourceNames.add(sd.getType());
             additionalResources.add(sd);
+            // have to hunt down and remove the special resources in the resources if Sushi added it
+            pf.sourceIg.getDefinition().getResource().removeIf(igr ->
+                    igr.hasReference() && igr.getReference().hasReference() && igr.getReference().getReference().startsWith("Bundle") && igr.getReference().getReference().contains("search-params"));
+            pf.sourceIg.getDefinition().getResource().removeIf(igr ->
+                    igr.hasReference() && igr.getReference().hasReference() && igr.getReference().getReference().equals("StructureDefinition/"+sd.getType()));
           } catch (Exception e) {
             throw new Error("Unable to parse additional resource definition "+p.getValue(), e);
           }
@@ -1932,6 +1937,7 @@ public class PublisherIGLoader extends PublisherBase {
       pf.sourceIg.setLanguage(pf.defaultTranslationLang);
       // but we won't load the translations yet - it' yet to be fully populated. we'll wait till everything else is loaded
     }
+
     log("Load Content");
     pf.publishedIg = pf.sourceIg.copy();
     FetchedResource igr = igf.addResource("$IG");
