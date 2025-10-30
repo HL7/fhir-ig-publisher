@@ -874,7 +874,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     pf.hasCheckedDependencies = true;
 
     if (buildTracker.getBooleanProperty("status", "started") && !buildTracker.getBooleanProperty("status", "complete")) {
-      log("Complete Build after failure");
+      log("Rapido Mode: Complete Build after failure");
       pf.changeList.addAll(pf.fileList);
       loader.clearTempFolder();
       return;
@@ -916,16 +916,16 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 
 
     if (pf.changeList.isEmpty()) {
-      log("Complete Build (no changes)");
+      log("Rapido Mode: Complete Build (no changes)");
       pf.changeList.addAll(pf.fileList);
       loader.clearTempFolder();
       buildTracker.setStringProperty("status", "uuid", HierarchicalTableGenerator.uuid, null);
     } else if (pf.changeList.size() == pf.fileList.size()) {
-      log("Complete Build (all files)");
+      log("Rapido Mode: Complete Build (all files)");
       loader.clearTempFolder();
       buildTracker.setStringProperty("status", "uuid", HierarchicalTableGenerator.uuid, null);
     } else {
-      log("Differential Build ("+pf.changeList.size()+" files)");
+      log("Rapido Mode: Differential Build ("+pf.changeList.size()+" files)");
       for (String s : Utilities.sorted(changed)) {
         System.out.println("  "+s);
       }

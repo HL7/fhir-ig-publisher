@@ -1421,8 +1421,6 @@ public class HTMLInspector {
               return f.targets.contains(name);
             }
           }
-        } else if (new File(page).exists()) {
-          return true;
         } else {
           return false;
         }
