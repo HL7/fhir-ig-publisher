@@ -673,9 +673,6 @@ public class PublisherIGLoader extends PublisherBase {
           pf.translationLangs.add(p.getValue());
           break;
         case "translation-supplements":
-          pf.hasTranslations = true;
-          pf.translationSources.add(p.getValue());
-          break;
         case "translation-sources":
           pf.hasTranslations = true;
           pf.translationSources.add(p.getValue());
@@ -1383,7 +1380,7 @@ public class PublisherIGLoader extends PublisherBase {
     SpecMapManager spm = loadSpecDetails(FileUtilities.streamToBytes(pi.load("other", "spec.internals")), "basespec", pi, pf.specPath);
     SimpleWorkerContext sp;
     IContextResourceLoader loader = new PublisherLoader(pi, spm, pf.specPath, pf.igpkp, false).makeLoader();
-    sp = new SimpleWorkerContext.SimpleWorkerContextBuilder().withTerminologyCachePath(pf.vsCache).fromPackage(pi, loader, false);
+    sp = new SimpleWorkerContext.SimpleWorkerContextBuilder().withAllowLoadingDuplicates(true).withTerminologyCachePath(pf.vsCache).fromPackage(pi, loader, false); // allowDuplicates because of problem in R4 package
     sp.loadBinariesFromFolder(pi);
     sp.setForPublication(true);
     sp.setSuppressedMappings(pf.suppressedMappings);
