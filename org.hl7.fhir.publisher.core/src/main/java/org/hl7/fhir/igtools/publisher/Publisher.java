@@ -870,7 +870,11 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   }
 
   public void checkDependencies(FetchedFile igf, IniFile buildTracker) throws Exception {
-    if (!settings.isRapidoMode()) return;
+    if (!settings.isRapidoMode()) {
+      buildTracker.setStringProperty("status", "uuid", HierarchicalTableGenerator.uuid, null);
+      buildTracker.save();
+      return;
+    }
     pf.hasCheckedDependencies = true;
 
     if (buildTracker.getBooleanProperty("status", "started") && !buildTracker.getBooleanProperty("status", "complete")) {
