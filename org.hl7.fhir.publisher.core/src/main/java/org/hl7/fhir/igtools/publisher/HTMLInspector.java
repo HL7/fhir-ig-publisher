@@ -1531,11 +1531,15 @@ public class HTMLInspector {
             }
           }
         }
-      } else if (!ref.contains("#")) {
-        String path = filename == null ? rootFolder : FileUtilities.getDirectoryForFile(filename);
-        String page = PathBuilder.getPathBuilder().withRequiredTarget(rootFolder).buildPath(path, ref.replace("/", File.separator));
-        LoadedFile f = cache.get(page);
-        resolved = f != null;
+      } else if (!ref.contains("#") ) {
+        try {
+          String path = filename == null ? rootFolder : FileUtilities.getDirectoryForFile(filename);
+          String page = PathBuilder.getPathBuilder().withRequiredTarget(rootFolder).buildPath(path, ref.replace("/", File.separator));
+          LoadedFile f = cache.get(page);
+          resolved = f != null;
+        } catch (Exception e) {
+          resolved = false;
+        }
       }
     }
     if (resolved) {
