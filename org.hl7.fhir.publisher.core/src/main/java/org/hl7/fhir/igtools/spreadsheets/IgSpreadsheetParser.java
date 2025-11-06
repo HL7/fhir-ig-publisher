@@ -515,7 +515,7 @@ public class IgSpreadsheetParser {
 //        throw new Error("Code list is not yet supported in "+ getLocation(row));
         String ref = sheet.getColumn(row, "Reference");
 
-        ValueSet vs = ValueSetUtilities.makeShareable(new ValueSet());
+        ValueSet vs = ValueSetUtilities.makeShareable(new ValueSet(), true);
         vs.setId(ref.substring(1));
         vs.setUrl(base+"/ValueSet/"+ref.substring(1));
         if (sheet.hasColumn("Version"))
