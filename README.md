@@ -15,7 +15,7 @@ Please maintain this README.md as a linkable document, as other documentation ma
 --->
 
 # HL7 FHIR IG Publisher Artifacts
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/HL7/fhir-ig-publisher/badge)](https://scorecard.dev/viewer/?uri=github.com/HL7/fhir-ig-publisher)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/HL7/fhir-ig-publisher/badge)](https://scorecard.dev/viewer/?uri=github.com/HL7/fhir-ig-publisher) [![CodeQL](https://github.com/HL7/fhir-ig-publisher/actions/workflows/codeql.yml/badge.svg)](https://github.com/HL7/fhir-ig-publisher/actions/workflows/codeql.yml) [![OWASP Security Scans](https://github.com/HL7/fhir-ig-publisher/actions/workflows/owasp.yml/badge.svg)](https://github.com/HL7/fhir-ig-publisher/actions/workflows/owasp.yml) [![Trivy Security Scans](https://github.com/HL7/fhir-ig-publisher/actions/workflows/trivy.yml/badge.svg)](https://github.com/HL7/fhir-ig-publisher/actions/workflows/trivy.yml)
 
 
 |                           CI Status (master)                           |                                                           Current Release |                Latest SNAPSHOT                |
