@@ -18,9 +18,9 @@ Please maintain this README.md as a linkable document, as other documentation ma
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/HL7/fhir-ig-publisher/badge)](https://scorecard.dev/viewer/?uri=github.com/HL7/fhir-ig-publisher)
 
 
-| CI Status (master) | Release Pipeline | Current Release | Latest SNAPSHOT |
-| :---: | :---: | :---: | :---: |
-| [![Build Status][Badge-AzureMasterPipeline]][Link-AzureMasterPipeline] | [![Build Status][Badge-AzureReleasePipeline]][Link-AzureReleasePipeline] | [![Release Artifacts][Badge-SonatypeReleases]][Link-GithubZipRelease] | [![Snapshot Artifact][Badge-SonatypeSnapshots]][Link-SonatypeSnapshots] |
+|                           CI Status (master)                           |                                                           Current Release |                Latest SNAPSHOT                |
+|:----------------------------------------------------------------------:|--------------------------------------------------------------------------:|:---------------------------------------------:|
+| [![Build Status][Badge-AzureMasterPipeline]][Link-AzureMasterPipeline] |                    [![Badge-MavenCentralReleases]][Link-GithubZipRelease] | ![Snapshot Artifact][Badge-SonatypeSnapshots] |
 
 This is the code for the HL7 IG publisher: a tool to take a set of inputs
 and create a standard FHIR IG. The HL7 FHIR IG publisher does not provide 
@@ -122,7 +122,6 @@ This project is maintained by [Grahame Grieve][Link-grahameGithub] and [Lloyd Mc
 [Link-GithubIssues]: https://github.com/HL7/fhir-ig-publisher/issues
 [Link-GithubReleases]: https://github.com/HL7/fhir-ig-publisher/releases
 [Link-GithubZipRelease]: https://github.com/HL7/fhir-ig-publisher/releases/latest/download/publisher.jar "Sonatype Releases"
-[Link-SonatypeSnapshots]: https://oss.sonatype.org/service/local/artifact/maven/redirect?r=snapshots&g=org.hl7.fhir.publisher&a=org.hl7.fhir.publisher.cli&v=LATEST "Sonatype Snapshots"
 [Link-AzureProject]: https://dev.azure.com/fhir-pipelines/ig-publisher
 [Link-Maven]: http://maven.apache.org
 
@@ -134,9 +133,9 @@ This project is maintained by [Grahame Grieve][Link-grahameGithub] and [Lloyd Mc
 
 [Badge-AzureMasterPipeline]: https://dev.azure.com/fhir-pipelines/ig-publisher/_apis/build/status/Master%20Branch%20Pipeline?branchName=master
 [Badge-AzureReleasePipeline]: https://dev.azure.com/fhir-pipelines/ig-publisher/_apis/build/status/Release%20Branch%20Pipeline?branchName=master
-[Badge-SonatypeReleases]: https://img.shields.io/nexus/r/https/oss.sonatype.org/org.hl7.fhir.publisher/org.hl7.fhir.publisher.svg "Sonatype Releases"
-[Badge-SonatypeSnapshots]: https://img.shields.io/nexus/s/https/oss.sonatype.org/org.hl7.fhir.publisher/org.hl7.fhir.publisher.svg "Sonatype Snapshots"
-
+<!-- Badges-->
+[Badge-MavenCentralReleases]: https://img.shields.io/maven-metadata/v?metadataUrl=https%3A%2F%2Frepo1.maven.org%2Fmaven2%2Forg%2Fhl7%2Ffhir%2Fpublisher%2Forg.hl7.fhir.publisher%2Fmaven-metadata.xml "Maven Central Releases"
+[Badge-SonatypeSnapshots]:https://img.shields.io/maven-metadata/v?metadataUrl=https%3A%2F%2Fcentral.sonatype.com%2Frepository%2Fmaven-snapshots%2Forg%2Fhl7%2Ffhir%2Fpublisher%2Forg.hl7.fhir.publisher%2Fmaven-metadata.xml "Sonatype Snapshots"
 ## Debugging this project with VS-Code
 Setup a launch.json file in the .vscode folder with the following content:
 ``` json
