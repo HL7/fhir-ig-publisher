@@ -21,6 +21,7 @@
   "HL7/davinci-pct",
   "WorldHealthOrganization/smart-icvp",
   "openehr-fhir/base-spec",
-  "FHIR/openehr-test"
+  "FHIR/openehr-test",
+  "FHIR/hl7.fhir.r4.pt"
 ]
 
