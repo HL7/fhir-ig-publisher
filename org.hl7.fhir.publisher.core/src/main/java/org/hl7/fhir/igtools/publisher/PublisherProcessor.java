@@ -387,6 +387,7 @@ public class PublisherProcessor extends PublisherBase  {
       StructureDefinition sd = pva.convert(resource, log);
       r.getOtherVersions().put(v+"-StructureDefinition", new FetchedResource.AlternativeVersionResource(log, sd));
     } catch (Exception e) {
+      e.printStackTrace();
       System.out.println("Error converting "+r.getId()+" to "+v+": "+e.getMessage());
       log.add(new ProfileVersionAdaptor.ConversionMessage(e.getMessage(), ProfileVersionAdaptor.ConversionMessageStatus.ERROR));
       r.getOtherVersions().put(v+"-StructureDefinition", new FetchedResource.AlternativeVersionResource(log, null));
@@ -399,6 +400,7 @@ public class PublisherProcessor extends PublisherBase  {
       SearchParameter sp = pva.convert(resource, log);
       r.getOtherVersions().put(v+"-SearchParameter", new FetchedResource.AlternativeVersionResource(log, sp));
     } catch (Exception e) {
+      e.printStackTrace();
       System.out.println("Error converting "+r.getId()+" to "+v+": "+e.getMessage());
       log.add(new ProfileVersionAdaptor.ConversionMessage(e.getMessage(), ProfileVersionAdaptor.ConversionMessageStatus.ERROR));
       r.getOtherVersions().put(v+"-SearchParameter", new FetchedResource.AlternativeVersionResource(log, null));
