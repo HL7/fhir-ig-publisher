@@ -13,6 +13,8 @@ import java.util.regex.Pattern;
 
 import javax.xml.parsers.ParserConfigurationException;
 
+import com.nedap.archie.adlparser.modelconstraints.BMMConstraintImposer;
+import com.nedap.archie.rminfo.MetaModels;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
@@ -225,8 +227,17 @@ public class ArchetypeImporter {
 
   private Archetype load14(InputStream stream) throws ParserConfigurationException, SAXException, IOException, ADLParseException {
     ADL14ConversionConfiguration conversionConfiguration = new ADL14ConversionConfiguration();
-    ADL14Parser parser = new ADL14Parser(BuiltinReferenceModels.getMetaModels());
-    Archetype archetype = parser.parse(stream, conversionConfiguration);
+//    ADL14Parser parser = new ADL14Parser(BuiltinReferenceModels.getMetaModels());
+    MetaModels mms = BuiltinReferenceModels.getMetaModels();
+    ADL14Parser adl14Parser = new ADL14Parser(mms);
+    Archetype archetype = adl14Parser.parse(stream, conversionConfiguration);
+    if (archetype.getRmRelease() == null) { // It is always null in a real-life adl1.4 archetype.
+      archetype.setRmRelease("1.1.0"); // Without it the bmm cannot be found - 1.1.0 is required for DV_SCALE support.
+    }
+    mms.selectModel(archetype);
+    BMMConstraintImposer constraintImposer = new BMMConstraintImposer(mms.getSelectedBmmModel());
+    constraintImposer.imposeConstraints(archetype.getDefinition()); // After this the archetype has the right existence constraints.
+//    Archetype archetype = parser.parse(stream, conversionConfiguration);
     return archetype;
   }
   
