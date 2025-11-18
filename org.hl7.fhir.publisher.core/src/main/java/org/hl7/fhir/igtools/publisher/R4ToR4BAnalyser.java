@@ -15,13 +15,10 @@ import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_43_50;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.loaders.PublisherLoader;
-import org.hl7.fhir.r4b.model.Bundle;
+import org.hl7.fhir.r4b.model.*;
 import org.hl7.fhir.r4b.model.Bundle.BundleEntryComponent;
 import org.hl7.fhir.r4b.model.Enumerations.FHIRVersion;
-import org.hl7.fhir.r4b.model.MarkdownType;
-import org.hl7.fhir.r4b.model.OperationDefinition;
 import org.hl7.fhir.r4b.model.OperationDefinition.OperationDefinitionParameterComponent;
-import org.hl7.fhir.r4b.model.Resource;
 import org.hl7.fhir.r4b.utils.DataTypeVisitor;
 import org.hl7.fhir.r4b.utils.DataTypeVisitor.IDatatypeVisitor;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
@@ -433,11 +430,11 @@ public class R4ToR4BAnalyser {
 
   public void clonePackage(String pid, String filename) throws IOException {
     if (VersionUtilities.isR4Ver(context.getVersion())) {
-      genSameVersionPackage(pid, filename, FileUtilities.changeFileExt(filename, ".r4.tgz"), true, "4.0.0", "r4");
-      genOtherVersionPackage(pid, filename, FileUtilities.changeFileExt(filename, ".r4b.tgz"), "hl7.fhir.r4b.core", "4.3.0", "r4b", "4.0.0", VersionUtilities.getSpecUrl("4.0"), VersionUtilities.getSpecUrl("4.3"));
+      genSameVersionPackage(pid, filename, FileUtilities.changeFileExt(filename, ".r4.tgz"), true, "4.0.1", "r4");
+      genOtherVersionPackage(pid, filename, FileUtilities.changeFileExt(filename, ".r4b.tgz"), "hl7.fhir.r4b.core", "4.3.0", "r4b", "4.0.1", VersionUtilities.getSpecUrl("4.0"), VersionUtilities.getSpecUrl("4.3"));
     } else if (VersionUtilities.isR4BVer(context.getVersion())) {
       genSameVersionPackage(pid, filename, FileUtilities.changeFileExt(filename, ".r4b.tgz"), false, "4.3.0", "r4b");
-      genOtherVersionPackage(pid, filename, FileUtilities.changeFileExt(filename, ".r4.tgz"), "hl7.fhir.r4.core", "4.0.0", "r4", "4.3.0", VersionUtilities.getSpecUrl("4.3"), VersionUtilities.getSpecUrl("4.0"));
+      genOtherVersionPackage(pid, filename, FileUtilities.changeFileExt(filename, ".r4.tgz"), "hl7.fhir.r4.core", "4.0.1", "r4", "4.3.0", VersionUtilities.getSpecUrl("4.3"), VersionUtilities.getSpecUrl("4.0"));
     } else {
       throw new Error("Should not happen");
     }
@@ -529,7 +526,7 @@ public class R4ToR4BAnalyser {
     gen.finish();
   }
 
-  // we use R4B here, whether it's r4 or r4b - if the content is in the differences, we won't get to the this point
+  // we use R4B here, whether it's r4 or r4b - if the content is in the differences, we won't get to them at this point
   private void processFileOther(NPMPackageGenerator gen, String folder, String filename, byte[] content, String ver, String pver, String nver, Map<String, ResPointer> exemptions, String pathS, String pathT) throws IOException {
     if (Utilities.existsInList(folder, "package", "example")) {
       if (!Utilities.existsInList(filename, "package.json", ".index.json", ".index.db")) {
@@ -635,6 +632,9 @@ public class R4ToR4BAnalyser {
 
   private boolean reVersionSD(org.hl7.fhir.r4b.model.StructureDefinition sd, String ver, String nver, String pathS, String pathT) {
     sd.setFhirVersion(org.hl7.fhir.r4b.model.Enumerations.FHIRVersion.fromCode(ver));
+    reVersionExtList(sd.getDifferential().getExtension(), nver, ver);
+    reVersionExtList(sd.getSnapshot().getExtension(), nver, ver);
+    reVersionExtList(sd.getExtension(), nver, ver);
     for (org.hl7.fhir.r4b.model.ElementDefinition ed : sd.getDifferential().getElement()) {
       reVersionED(ed, ver, nver);
     }
@@ -645,12 +645,53 @@ public class R4ToR4BAnalyser {
   }
 
   private boolean reVersionED(org.hl7.fhir.r4b.model.ElementDefinition ed, String ver, String nver) {
+    boolean changed = false;
+    changed = reVersionExtList(ed.getExtension(), nver, ver) || changed;
+    for (org.hl7.fhir.r4b.model.ElementDefinition.TypeRefComponent t : ed.getType()) {
+      changed = reVersionExtList(t.getExtension(), nver, ver) || changed;
+      for (org.hl7.fhir.r4b.model.CanonicalType ct : t.getProfile()) {
+        if (ct.hasValue() && ct.getValue().endsWith("|"+nver) && ct.getValue().startsWith("http://hl7.org/fhir/StructureDefinition/")) {
+          ct.setValue(ct.getValue().replace("|"+nver, "|"+ver));
+          changed = true;
+        }
+      }
+      for (org.hl7.fhir.r4b.model.CanonicalType ct : t.getTargetProfile()) {
+        if (ct.hasValue() && ct.getValue().endsWith("|"+nver) && ct.getValue().startsWith("http://hl7.org/fhir/StructureDefinition/")) {
+          ct.setValue(ct.getValue().replace("|"+nver, "|"+ver));
+          changed = true;
+        }
+      }
+    }
+    changed = reVersionExtList(ed.getBinding().getExtension(), nver, ver) || changed;
     if (ed.hasBinding() && ed.getBinding().hasValueSet() && ed.getBinding().getValueSet().endsWith("|"+nver) && ed.getBinding().getValueSet().startsWith("http://hl7.org/fhir/ValueSet")) {
       ed.getBinding().setValueSet(ed.getBinding().getValueSet().replace("|"+nver, "|"+ver));
-      return true;
-    } else {
-      return false;
+      changed = true;
     }
+    return changed;
+  }
+
+  private boolean reVersionExtList(List<Extension> extensions, String nver, String ver) {
+    boolean changed = false;
+    for (Extension e : extensions) {
+      changed = reVersionExt(e, nver, ver) || changed;
+    }
+    return changed;
+  }
+
+  private boolean reVersionExt(Extension extension, String nver, String ver) {
+    boolean changed = false;
+    if (extension.getValue() instanceof org.hl7.fhir.r4b.model.CanonicalType) {
+      org.hl7.fhir.r4b.model.CanonicalType ct = extension.getValueCanonicalType();
+      if (ct.hasValue() && ct.getValue().endsWith("|"+nver) && ct.getValue().startsWith("http://hl7.org/fhir/StructureDefinition/")) {
+        ct.setValue(ct.getValue().replace("|"+nver, "|"+ver));
+        changed = true;
+      }
+    }
+    if ("http://hl7.org/fhir/tools/StructureDefinition/snapshot-base-version".equals(extension.getUrl()) && extension.hasValueStringType() && extension.getValue().primitiveValue().equals(nver)) {
+      extension.setValue(new StringType(ver));
+      changed = true;
+    }
+    return reVersionExtList(extension.getExtension(), nver, ver) || changed;
   }
 
   private boolean reVersionCS(org.hl7.fhir.r4b.model.CapabilityStatement cs, String ver, String pathS, String pathT) {

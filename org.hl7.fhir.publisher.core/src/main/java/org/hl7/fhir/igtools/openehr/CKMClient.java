@@ -208,7 +208,7 @@ public class CKMClient {
 
       // post processing
       String src = FileUtilities.fileToString(file);
-      src = src.replace("adl_version=1.4;", "adl_version=1.4; rm_release=1.1.0;");
+//      src = src.replace("adl_version=1.4;", "adl_version=1.4; rm_release=1.1.0;");
       FileUtilities.stringToFile(src, file);
 
       System.out.println("  Downloaded: " + filename);

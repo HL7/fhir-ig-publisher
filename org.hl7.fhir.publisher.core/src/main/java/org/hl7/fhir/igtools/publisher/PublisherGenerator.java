@@ -6217,7 +6217,7 @@ public class PublisherGenerator extends PublisherBase {
     JsonArray items = new JsonArray();
     json.add("codeSystems", items);
 
-    b.append("URL,Version,Status,OIDs,Name,Title,Descriptino,Uses,Used,Sources\r\n");
+    b.append("URL,Version,Status,OIDs,Name,Title,Description,Uses,Used,Sources\r\n");
 
     for (ValueSet vs : vslist) {
 

@@ -3249,6 +3249,7 @@ public class PublisherIGLoader extends PublisherBase {
       FileUtilities.createDirectory(dir.getAbsolutePath());
       for (File f : dir.listFiles()) {
         if (!this.pf.usedLangFiles.contains(f.getAbsolutePath())) {
+          this.pf.usedLangFiles.add(f.getAbsolutePath());
           loadTranslationSupplement(f);
         }
       }
@@ -3257,6 +3258,7 @@ public class PublisherIGLoader extends PublisherBase {
         if (fdir.exists()) {
           for (File f : fdir.listFiles()) {
             if (!this.pf.usedLangFiles.contains(f.getAbsolutePath())) {
+              this.pf.usedLangFiles.add(f.getAbsolutePath());
               loadTranslationSupplement(f);
             }
           }

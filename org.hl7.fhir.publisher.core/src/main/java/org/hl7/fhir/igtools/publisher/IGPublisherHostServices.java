@@ -7,6 +7,7 @@ import org.apache.commons.lang3.NotImplementedException;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.PathEngineException;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
+import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.fhirpath.BaseHostServices;
 import org.hl7.fhir.r5.fhirpath.FHIRPathEngine;
 import org.hl7.fhir.r5.fhirpath.TypeDetails;
@@ -110,4 +111,22 @@ public class IGPublisherHostServices extends BaseHostServices {
   public ValueSet resolveValueSet(FHIRPathEngine engine, Object appContext, String url) {
     throw new NotImplementedException("Not done yet (IGPublisherHostServices.resolveValueSet)"); // cause I don't know when we 'd need to do this
   }
+
+  @Override
+  public Base findContainingResource(Object appContext, Base item) {
+    if (item instanceof Element element) {
+      while (element != null && !element.isResource()) {
+        element = element.getParentForValidator();
+      }
+      if (element != null) {
+        return element;
+      }
+    }
+    if (item instanceof Resource) {
+      return item;
+    }
+    // now it gets hard
+    return null; // for now
+  }
+
 }

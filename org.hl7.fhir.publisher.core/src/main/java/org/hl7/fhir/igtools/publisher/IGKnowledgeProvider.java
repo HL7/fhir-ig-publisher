@@ -737,7 +737,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   @Override
   public String resolveProperty(Property property) {
     String path = property.getDefinition().getPath();
-    return property.getStructure().getWebPath()+"#"+path;
+    return property.getStructure().getWebPath()+"#s-"+path;
   }
 
   @Override
