@@ -7,6 +7,7 @@ import org.apache.commons.exec.PumpStreamHandler;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
+import org.apache.commons.text.StringEscapeUtils;
 import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_10_50;
 import org.hl7.fhir.convertors.factory.*;
 import org.hl7.fhir.convertors.misc.NpmPackageVersionConverter;
@@ -75,8 +76,13 @@ import org.hl7.fhir.utilities.turtle.Turtle;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationOptions;
 import org.hl7.fhir.utilities.xhtml.*;
+import org.hl7.fhir.utilities.xml.XMLUtil;
 import org.hl7.fhir.utilities.xml.XmlEscaper;
+import org.w3c.dom.Document;
+import org.xml.sax.InputSource;
 
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.*;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -316,7 +322,7 @@ public class PublisherGenerator extends PublisherBase {
     }
 
     pf.realmRules.addOtherFiles(pf.otherFilesRun, pf.outputDir);
-    pf.previousVersionComparator.addOtherFiles(pf.otherFilesRun, pf.outputDir);
+    pf.previousVersionComparator.addOtherFiles(pf.otherFilesRun, pf.outputDir, pf.getExemptHtmlPatterns());
     if (pf.ipaComparator != null) {
       pf.ipaComparator.addOtherFiles(pf.otherFilesRun, pf.outputDir);
     }
@@ -465,7 +471,7 @@ public class PublisherGenerator extends PublisherBase {
       }
 
       pf.realmRules.addOtherFiles(pf.inspector.getExceptions(), pf.outputDir);
-      pf.previousVersionComparator.addOtherFiles(pf.inspector.getExceptions(), pf.outputDir);
+      pf.previousVersionComparator.addOtherFiles(pf.inspector.getExceptions(), pf.outputDir, pf.getExemptHtmlPatterns());
       if (pf.ipaComparator != null) {
         pf.ipaComparator.addOtherFiles(pf.inspector.getExceptions(), pf.outputDir);
       }
@@ -1796,8 +1802,8 @@ public class PublisherGenerator extends PublisherBase {
     if (this.pf.generateUml != PublisherUtils.UMLGenerationMode.NONE) {
       long start = System.currentTimeMillis();
       try {
-        ClassDiagramRenderer cdr = new ClassDiagramRenderer(Utilities.path(this.pf.rootDir, "input", "diagrams"), Utilities.path(this.pf.rootDir, "temp", "diagrams"), sd.getId(), null, this.pf.rc, lang);
-        String src = sd.getDerivation() == StructureDefinition.TypeDerivationRule.SPECIALIZATION ? cdr.buildClassDiagram(sd) : cdr.buildConstraintDiagram(sd);
+        ClassDiagramRenderer cdr = new ClassDiagramRenderer(Utilities.path(this.pf.rootDir, "input", "diagrams"), Utilities.path(this.pf.rootDir, "temp", "diagrams"), sd.getId(), "uml-", this.pf.rc, lang);
+        String src = sd.getDerivation() == StructureDefinition.TypeDerivationRule.SPECIALIZATION ? cdr.buildClassDiagram(sd,this.pf.igpkp.getDefinitionsName(r) ) : cdr.buildConstraintDiagram(sd, this.pf.igpkp.getDefinitionsName(r));
         if (this.pf.generateUml == PublisherUtils.UMLGenerationMode.ALL || cdr.hasSource()) {
           r.setUmlGenerated(true);
         } else {
@@ -1809,8 +1815,8 @@ public class PublisherGenerator extends PublisherBase {
         fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-uml", e.getMessage(), null, f.getOutputNames(), start, "uml", "StructureDefinition", lang);
       }
       try {
-        ClassDiagramRenderer cdr = new ClassDiagramRenderer(Utilities.path(this.pf.rootDir, "input", "diagrams"), Utilities.path(this.pf.rootDir, "temp", "diagrams"), sd.getId(), "all-", this.pf.rc, lang);
-        String src = sd.getDerivation() == StructureDefinition.TypeDerivationRule.SPECIALIZATION ? cdr.buildClassDiagram(sd) : cdr.buildConstraintDiagram(sd);
+        ClassDiagramRenderer cdr = new ClassDiagramRenderer(Utilities.path(this.pf.rootDir, "input", "diagrams"), Utilities.path(this.pf.rootDir, "temp", "diagrams"), sd.getId(), "all-uml-", this.pf.rc, lang);
+        String src = sd.getDerivation() == StructureDefinition.TypeDerivationRule.SPECIALIZATION ? cdr.buildClassDiagram(sd, this.pf.igpkp.getDefinitionsName(r)) : cdr.buildConstraintDiagram(sd, this.pf.igpkp.getDefinitionsName(r));
         if (this.pf.generateUml == PublisherUtils.UMLGenerationMode.ALL || cdr.hasSource()) {
           r.setUmlGenerated(true);
         } else {
@@ -1894,7 +1900,7 @@ public class PublisherGenerator extends PublisherBase {
       long start = System.currentTimeMillis();
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-search-params", sdr.searchParameters(), f.getOutputNames(), r, vars, null, start, "search-params", "StructureDefinition", lang);
     }
-    TemplateRenderer tr = new TemplateRenderer(pf.rc, sd);
+    TemplateRenderer tr = new TemplateRenderer(pf.rc, sd, this.pf.igpkp.getDefinitionsName(r));
     if (wantGen(r, "template-xml") && sd.getKind() != StructureDefinition.StructureDefinitionKind.LOGICAL && sd.getDerivation() == StructureDefinition.TypeDerivationRule.SPECIALIZATION) {
       long start = System.currentTimeMillis();
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-template-xml", tr.generateXml(), f.getOutputNames(), r, vars, null, start, "template-xml", "StructureDefinition", lang);
@@ -5691,7 +5697,13 @@ public class PublisherGenerator extends PublisherBase {
     if (!Utilities.existsInList(Utilities.getFileExtension(f.getPath()), "html", "md", "xml")) {
       return content;
     }
+
     String src = new String(content);
+    try {
+      scanForValidationFragments(f, src);
+    } catch (Exception e) {
+      System.out.println("Error scanning for validation fragments: "+e.getMessage());
+    }
     try {
       boolean changed = false;
       String[] keywords = {"sql", "fragment", "json", "class-diagram", "uml", "multi-map", "lang-fragment"};
@@ -5790,6 +5802,53 @@ public class PublisherGenerator extends PublisherBase {
         System.out.println("Error processing custom liquid in "+f.getName()+": " + e.getMessage());
       }
       return content;
+    }
+  }
+
+  private void scanForValidationFragments(FetchedFile f, String html) {
+    int i = 0;
+    Pattern pattern = Pattern.compile(
+            "<pre[^>]*\\bvalidationRule=[\"']([^\"']*)[\"'][^>]*>(.*?)</pre>",
+            Pattern.DOTALL
+    );
+    Matcher matcher = pattern.matcher(html);
+
+    while (matcher.find()) {
+      String validationRule = matcher.group(1);
+      String content = matcher.group(2);
+
+      String path = "pre["+i+"]";
+      if (validationRule.contains(":")) {
+        path = validationRule.substring(validationRule.indexOf(":") + 1);
+        validationRule = validationRule.substring(0, validationRule.indexOf(":"));
+      }
+      // Process the content
+      validateFragment(f, validationRule, content, path);
+      i++;
+    }
+  }
+
+  private void validateFragment(FetchedFile f, String type, String content, String path) {
+    String src = StringEscapeUtils.unescapeHtml4(content).trim();
+    try {
+      if (src.startsWith("{")) {
+        org.hl7.fhir.r5.elementmodel.JsonParser p = (org.hl7.fhir.r5.elementmodel.JsonParser) Manager.makeParser(pf.context, Manager.FhirFormat.JSON);
+        p.setupValidation(ParserBase.ValidationPolicy.QUICK);
+        p.parse(src, type, false);
+      } else {
+        src = "<"+type+" xmlns=\"http://hl7.org/fhir\">"+src+"</"+type+">";
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        factory.setNamespaceAware(true);
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        InputSource is = new InputSource(new StringReader(src));
+        Document doc = builder.parse(is);
+        org.w3c.dom.Element base = doc.getDocumentElement();
+        org.hl7.fhir.r5.elementmodel.XmlParser p = (org.hl7.fhir.r5.elementmodel.XmlParser) Manager.makeParser(pf.context, Manager.FhirFormat.XML);
+        p.setupValidation(ParserBase.ValidationPolicy.QUICK);
+        p.parse(null, XMLUtil.getFirstChild(base), type);
+      }
+    } catch (Exception e) {
+      f.getErrors().add(new ValidationMessage(ValidationMessage.Source.TerminologyEngine, ValidationMessage.IssueType.STRUCTURE, path, e.getMessage(), ValidationMessage.IssueSeverity.ERROR));
     }
   }
 
