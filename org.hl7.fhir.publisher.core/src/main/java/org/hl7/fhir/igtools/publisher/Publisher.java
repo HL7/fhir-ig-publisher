@@ -116,6 +116,7 @@ import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.hl7.fhir.validation.SQLiteINpmPackageIndexBuilderDBImpl;
 import org.hl7.fhir.validation.instance.utils.ValidationContext;
+import org.jetbrains.annotations.Nullable;
 
 
 /**
@@ -792,39 +793,13 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     }
 
     for (SpecMapManager sp : pf.specMaps) {
-      String fp = Utilities.isAbsoluteUrl(url) ? url : sp.getBase()+"/"+url;
-      
-      String path;
-      try {
-        path = sp.getPath(fp, null, null, null);
-      } catch (Exception e) {
-        path = null;
-      }
-      
-      
-      // hack around an error in the R5 specmap file 
-      if (path != null && sp.isCore() && path.startsWith("http://terminology.hl7.org")) {
-        path = null;
-      }
-      
-      if (path != null) {
-        InputStream s = null;
-        if (sp.getNpm() != null && fp.contains("/") && sp.getLoader() != null) {
-          String[] pl = fp.split("\\/");
-          String rt = pl[pl.length-2];
-          String id = pl[pl.length-1]; 
-          s = sp.getNpm().loadExampleResource(rt, id);
-        }
-        if (s == null) {
-          return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, url, path, null);
-        } else {
-          IContextResourceLoader loader = sp.getLoader();
-          Resource res = loader.loadResource(s, true);
-          res.setWebPath(path);
-          return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, url, path, ResourceWrapper.forResource(context, res));
-          
-        }
-      }
+      ResourceWithReference res = getResourceFromMap(context, url, sp);
+      if (res != null) return res;
+    }
+
+    for (PublisherUtils.LinkedSpecification sp : pf.linkSpecMaps) {
+      ResourceWithReference res = getResourceFromMap(context, url, sp.getSpm());
+      if (res != null) return res;
     }
 
     for (FetchedFile f : pf.fileList) {
@@ -856,6 +831,47 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     }
     return null;
 
+  }
+
+  private static @Nullable ResourceWithReference getResourceFromMap(RenderingContext context, String url, SpecMapManager sp) throws IOException {
+
+    String[] pl = url.split("\\/");
+    String rt = pl.length >= 2 ? pl[pl.length-2] : null;
+    String id = pl.length >= 2 ? pl[pl.length-1] : null;
+    String fp = Utilities.isAbsoluteUrl(url) ? url : sp.getBase()+"/"+ url;
+
+    if (rt != null && !context.getContext().getResourceNamesAsSet().contains(rt)) {
+      rt = null;
+      id = null;
+    }
+    String path;
+    try {
+      path = sp.getPath(fp, null, rt, id);
+    } catch (Exception e) {
+      path = null;
+    }
+
+    // hack around an error in the R5 specmap file
+    if (path != null && sp.isCore() && path.startsWith("http://terminology.hl7.org")) {
+      path = null;
+    }
+
+    if (path != null) {
+      InputStream s = null;
+      if (sp.getNpm() != null && fp.contains("/") && sp.getLoader() != null) {
+        s = sp.getNpm().loadExampleResource(rt, id);
+      }
+      if (s == null) {
+        return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, url, path, null);
+      } else {
+        IContextResourceLoader loader = sp.getLoader();
+        Resource res = loader.loadResource(s, true);
+        res.setWebPath(path);
+        return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, url, path, ResourceWrapper.forResource(context, res));
+
+      }
+    }
+    return null;
   }
 
   private void clean() throws Exception {
