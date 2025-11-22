@@ -302,4 +302,5 @@ public class PublisherFields {
 
     public boolean hasCheckedDependencies;
     public boolean saveExpansionParams;
+    @Getter private List<String> exemptHtmlPatterns = new ArrayList<>();
 }

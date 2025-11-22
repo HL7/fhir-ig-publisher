@@ -867,7 +867,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     files = sorted(files);
 
     for (FetchedFile f : files) {
-      if (!f.getResources().isEmpty() && (allIssues || hasIssues(f, filteredMessages))) {
+      if (hasIssues(f, filteredMessages) || (!f.getResources().isEmpty() || allIssues)) {
         b.append(genSummaryRow(f, filteredMessages));
       }
     }
@@ -882,7 +882,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
 
     int i = 0;
     for (FetchedFile f : files) {
-      if (!f.getResources().isEmpty() && (allIssues || hasIssues(f, filteredMessages))) {
+      if (hasIssues(f, filteredMessages) || (!f.getResources().isEmpty() || allIssues)) {
         i++;
         b.append(genStart(f, i));
         if (countNonSignpostMessages(f, filteredMessages))
@@ -1659,9 +1659,9 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     t.add("link", makelink(f));
     t.add("filename", f.getName());
     t.add("path", makeLocal(f.getPath()));
-    String link = provider.getLinkFor(f.getResources().get(0), true);
+    String link = f.getResources().isEmpty() ? null : provider.getLinkFor(f.getResources().get(0), true);
     if (link==null) {
-      link = altProvider.getLinkFor(f.getResources().get(0), true);
+      link = f.getResources().isEmpty() ? null : altProvider.getLinkFor(f.getResources().get(0), true);
     }
     if (link != null) { 
       link = link.replace("{{[id]}}", f.getResources().get(0).getId());
