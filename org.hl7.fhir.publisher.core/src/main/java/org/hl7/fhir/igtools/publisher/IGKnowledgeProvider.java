@@ -36,19 +36,18 @@ import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.elementmodel.ParserBase;
 import org.hl7.fhir.r5.elementmodel.Property;
 import org.hl7.fhir.r5.formats.FormatUtilities;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.CodeSystem;
+import org.hl7.fhir.r5.model.*;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
-import org.hl7.fhir.r5.model.Resource;
-import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
-import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.utils.UserDataNames;
+import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.r5.utils.xver.XVerExtensionManager;
 import org.hl7.fhir.r5.utils.xver.XVerExtensionManagerFactory;
+import org.hl7.fhir.utilities.DebugUtilities;
 import org.hl7.fhir.utilities.LoincLinker;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.json.model.JsonElement;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.model.JsonPrimitive;
@@ -736,8 +735,35 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
 
   @Override
   public String resolveProperty(Property property) {
-    String path = property.getDefinition().getPath();
-    return property.getStructure().getWebPath()+"#s-"+path;
+    ElementDefinition ed = property.getDefinition();
+    StructureDefinition sd = property.getStructure();
+    String path = ed.getPath();
+    if ("Observation.id".equals(path)) {
+      DebugUtilities.breakpoint();
+    }
+    if (ed.getBase().hasPath() && !path.equals(ed.getBase().getPath())) {
+      StructureDefinition sdt = context.fetchTypeDefinition(head(ed.getBase().getPath()));
+      if (sdt != null) {
+        sd = sdt;
+      }
+    }
+    while (sd.getDerivation() == TypeDerivationRule.CONSTRAINT) {
+      StructureDefinition sdt = context.fetchResource(StructureDefinition.class, sd.getBaseDefinition());
+      if (sdt != null) {
+        sd = sdt;
+      } else {
+        break;
+      }
+    }
+    if (sd.getSourcePackage() != null && sd.getSourcePackage().isCore() && VersionUtilities.isR5Plus(sd.getFhirVersion().toCode())) {
+      return sd.getWebPath() + "#X" + path.replace("[x]", "_x_");
+    } else {
+      return sd.getWebPath() + "#" + path.replace("[x]", "_x_");
+    }
+  }
+
+  private String head(String path) {
+    return path.contains(".") ? path.substring(0, path.indexOf(".")) : path;
   }
 
   @Override
