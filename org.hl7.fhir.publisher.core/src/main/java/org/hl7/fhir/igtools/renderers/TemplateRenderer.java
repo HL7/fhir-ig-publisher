@@ -5,36 +5,53 @@ import org.hl7.fhir.r5.formats.XmlParser;
 import org.hl7.fhir.r5.model.*;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.utils.TypesUtilities;
-import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
-import org.hl7.fhir.utilities.StringPair;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.VersionUtilities;
+import org.hl7.fhir.utilities.npm.PackageHacker;
 import org.hl7.fhir.validation.instance.utils.StructureDefinitionSorterByUrl;
 
 import java.io.*;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 public class TemplateRenderer {
 
-  public static final String INV_FLAG = "<a style=\"padding-left: 3px; padding-right: 3px; border: 1px maroon solid; font-weight: bold; color: #301212; background-color: #fdeeee;\" href=\"conformance-rules.html#constraints\" title=\"This element has or is affected by some invariants\">I</a>";
   private final StructureDefinition sd;
 
   private RenderingContext context;
   private String defPage;
+  private String pathToSpec;
+  private String invFlag;
 
-  public TemplateRenderer(RenderingContext context, StructureDefinition sd) throws UnsupportedEncodingException {
+  public TemplateRenderer(RenderingContext context, StructureDefinition sd, String defPage) throws UnsupportedEncodingException {
     this.context = context;
     this.sd = sd;
-    this.defPage = getLinkFor(sd.getType());
+    this.defPage = defPage;
+    this.pathToSpec = VersionUtilities.getSpecUrl(context.getContext().getVersion());
+    this.invFlag = "<a style=\"padding-left: 3px; padding-right: 3px; border: 1px maroon solid; font-weight: bold; color: #301212; background-color: #fdeeee;\" href=\""+
+            specPath("conformance-rules.html#constraints")+
+            "\" title=\"This element has or is affected by some invariants\">I</a>";
+  }
+
+
+  protected String specPath(String path) {
+    if (Utilities.isAbsoluteUrl(path)) {
+      return PackageHacker.fixPackageUrl(path);
+    } else {
+      assert pathToSpec != null;
+      return Utilities.pathURL(pathToSpec, path);
+    }
   }
 
   protected String getBindingLink(ElementDefinition e) throws Exception {
+    if (!e.hasBinding()) {
+      return null;
+    }
     ElementDefinition.ElementDefinitionBindingComponent bs = e.getBinding();
     if (bs == null)
-      return "terminologies.html#unbound";
+      return specPath("terminologies.html#unbound");
     if (bs.getValueSet() == null)
-      return "terminologies.html#unbound";
+      return specPath("terminologies.html#unbound");
     ValueSet vs = context.getContext().findTxResource(ValueSet.class, bs.getValueSet());
     if (vs == null) {
       return bs.getValueSet();
@@ -89,21 +106,23 @@ public class TemplateRenderer {
     }
     boolean resource = sd.getKind() == StructureDefinition.StructureDefinitionKind.RESOURCE;
     if (resource) {
-      b.append("&gt; <span style=\"float: right\"><a title=\"Documentation for this format\" href=\"" + "xml.html\"><img src=\"" + "help.png\" alt=\"doco\"/></a></span>\r\n");
+      b.append("&gt; <span style=\"float: right\"><a title=\"Documentation for this format\" href=\"" + specPath("xml.html")+"\"><img src=\"" + "help.png\" alt=\"doco\"/></a></span>\r\n");
     } else {
       b.append("&gt;\r\n");
     }
     if (rn.equals(root.getName()) && resource) {
       if (!Utilities.noString(root.typeSummary())) {
-        b.append(" &lt;!-- from <a href=\"" + "resource.html\">Resource</a>: <a href=\"" + "resource.html#id\">id</a>, <a href=\"" + "resource.html#meta\">meta</a>, <a href=\"" + "resource.html#implicitRules\">implicitRules</a>, and <a href=\"" + "resource.html#language\">language</a> -->\r\n");
+        b.append(" &lt;!-- from <a href=\"" + specPath("resource.html")+"\">Resource</a>: <a href=\"" + specPath("resource.html#id")+"\">id</a>, <a href=\"" + specPath("resource.html#meta")+"\">meta</a>, <a href=\"" +
+                specPath("resource.html")+"#implicitRules\">implicitRules</a>, and <a href=\"" + specPath("resource.html")+"#language\">language</a> -->\r\n");
         if (isDomainResource(sd)) {
-          b.append(" &lt;!-- from <a href=\"" + "domainresource.html\">DomainResource</a>: <a href=\"" + "narrative.html#Narrative\">text</a>, <a href=\"" + "references.html#contained\">contained</a>, <a href=\"" + "extensibility.html\">extension</a>, and <a href=\"" + "extensibility.html#modifierExtension\">modifierExtension</a> -->\r\n");
+          b.append(" &lt;!-- from <a href=\"" + specPath("domainresource.html\">DomainResource</a>: <a href=\"" + specPath("narrative.html")+"#Narrative\">text</a>, <a href=\"" +
+                  specPath("references.html")+"#contained\">contained</a>, <a href=\"" + specPath("extensibility.html")+"\">extension</a>, and <a href=\"" + specPath("extensibility.html")+"#modifierExtension")+"\">modifierExtension</a> -->\r\n");
         }
       }
     } else if (root.typeSummary().equals("BackboneElement")) {
-      b.append(" &lt;!-- from BackboneElement: <a href=\"" + "extensibility.html\">extension</a>, <a href=\"" + "extensibility.html\">modifierExtension</a> -->\r\n");
+      b.append(" &lt;!-- from BackboneElement: <a href=\"" + specPath("extensibility.html")+"\">extension</a>, <a href=\"" + specPath("extensibility.html")+"\">modifierExtension</a> -->\r\n");
     } else {
-      b.append(" &lt;!-- from Element: <a href=\"" + "extensibility.html\">extension</a> -->\r\n");
+      b.append(" &lt;!-- from Element: <a href=\"" + specPath("extensibility.html")+"\">extension</a> -->\r\n");
     }
     for (ElementDefinition elem : children) {
       if (!elem.hasRepresentation(ElementDefinition.PropertyRepresentation.XMLATTR)) {
@@ -224,11 +243,11 @@ public class TemplateRenderer {
           width = writeTypeLinksXml(b, elem, indent);
         }
       } else if (elem.getName().equals("extension")) {
-        b.append(" <a href=\"" + "extensibility.html\"><span style=\"color: navy\">See Extensions</span></a> ");
+        b.append(" <a href=\"" + specPath("extensibility.html")+"\"><span style=\"color: navy\">See Extensions</span></a> ");
       } else if (elem.getType().size() == 1) {
         writeCardinality(b, elem);
         b.append(" <span style=\"color: darkgreen\">");
-        b.append("<a href=\"" + "datatypes.html#open\">*</a>");
+        b.append("<a href=\"" + specPath("datatypes.html#open")+"\">*</a>");
         b.append("</span>");
         listed = true;
       }
@@ -239,14 +258,18 @@ public class TemplateRenderer {
       b.append(" ");
       if (children.isEmpty()) {
         if ("See Extensions".equals(elem.getShort())) {
-          b.append(" <a href=\"" + "extensibility.html\"><span style=\"color: navy\">"
+          b.append(" <a href=\"" + specPath("extensibility.html")+"\"><span style=\"color: navy\">"
                   + Utilities.escapeXml(elem.getShort())
                   + "</span></a> ");
         } else {
           if (elem.prohibited())
             b.append("<span style=\"text-decoration: line-through\">");
           String ref = getBindingLink(elem);
-          b.append("<span style=\"color: navy\"><a href=\"" + (Utilities.isAbsoluteUrl(ref) ? "" : "") + ref + "\" style=\"color: navy\">" + Utilities.escapeXml(elem.getShort()) + "</a></span>");
+          if (ref != null) {
+            b.append("<span style=\"color: navy\"><a href=\"" + (Utilities.isAbsoluteUrl(ref) ? "" : "") + ref + "\" style=\"color: navy\">" + Utilities.escapeXml(elem.getShort()) + "</a></span>");
+          } else {
+            b.append("<span style=\"color: navy\">"+ Utilities.escapeXml(elem.getShort()) + "</span>");
+          }
           if (elem.prohibited())
             b.append("</span>");
         }
@@ -336,7 +359,7 @@ public class TemplateRenderer {
   private void writeCardinality(StringBuilder b, ElementDefinition elem) throws IOException {
     if (elem.getConstraint().size() > 0)
       b.append(" <span style=\"color: brown\" title=\""
-              + Utilities.escapeXml(getInvariants(elem)) + "\"><b>" + INV_FLAG + " "
+              + Utilities.escapeXml(getInvariants(elem)) + "\"><b>" + invFlag + " "
               + describeCardinality(elem) + "</b></span>");
     else
       b.append(" <span style=\"color: brown\"><b>"
@@ -444,7 +467,7 @@ public class TemplateRenderer {
 
     boolean resource = sd.getKind() == StructureDefinition.StructureDefinitionKind.RESOURCE;
 
-    b.append("{<span style=\"float: right\"><a title=\"Documentation for this format\" href=\""+""+"json.html\"><img src=\""+""+"help.png\" alt=\"doco\"/></a></span>\r\n");
+    b.append("{<span style=\"float: right\"><a title=\"Documentation for this format\" href=\""+""+specPath("json.html")+"\"><img src=\""+""+"help.png\" alt=\"doco\"/></a></span>\r\n");
     if (resource) {
       b.append("  \"resourceType\" : \"");
       if (defPage == null)
@@ -463,16 +486,18 @@ public class TemplateRenderer {
 
     if ((root.getName().equals(rn) || "[name]".equals(rn)) && resource) {
       if (!Utilities.noString(root.typeSummary())) {
-        b.append("  // from <a href=\""+"resource.html\">Resource</a>: <a href=\""+"resource.html#id\">id</a>, <a href=\""+"resource.html#meta\">meta</a>, <a href=\""+"resource.html#implicitRules\">implicitRules</a>, and <a href=\""+"resource.html#language\">language</a>\r\n");
+        b.append("  // from <a href=\""+specPath("resource.html")+"\">Resource</a>: <a href=\""+specPath("resource.html")+"#id\">id</a>, <a href=\""+specPath("resource.html")+"#meta\">meta</a>, <a href=\""+specPath("resource.html")
+        +"#implicitRules\">implicitRules</a>, and <a href=\""+specPath("resource.html")+"#language\">language</a>\r\n");
         if (isDomainResource(sd)) {
-          b.append("  // from <a href=\""+"domainresource.html\">DomainResource</a>: <a href=\""+"narrative.html#Narrative\">text</a>, <a href=\""+"references.html#contained\">contained</a>, <a href=\""+"extensibility.html\">extension</a>, and <a href=\""+"extensibility.html#modifierExtension\">modifierExtension</a>\r\n");
+          b.append("  // from <a href=\""+specPath("domainresource.html")+"\">DomainResource</a>: <a href=\""+specPath("narrative.html")+"#Narrative\">text</a>, <a href=\""+specPath("references.html")+
+                  "#contained\">contained</a>, <a href=\""+specPath("extensibility.html")+"\">extension</a>, and <a href=\""+specPath("extensibility.html#modifierExtension")+"\">modifierExtension</a>\r\n");
         }
       }
     } else if (!resource) {
       if (root.typeSummary().equals("BackboneElement"))
-        b.append("  // from BackboneElement: <a href=\""+"extensibility.html\">extension</a>, <a href=\""+"extensibility.html\">modifierExtension</a>\r\n");
+        b.append("  // from BackboneElement: <a href=\""+specPath("extensibility.html")+"\">extension</a>, <a href=\""+specPath("extensibility.html")+"\">modifierExtension</a>\r\n");
       else
-        b.append("  // from Element: <a href=\""+"extensibility.html\">extension</a>\r\n");
+        b.append("  // from Element: <a href=\""+specPath("extensibility.html")+"\">extension</a>\r\n");
     }
     int c = 0;
     for (ElementDefinition elem : children) {
@@ -507,7 +532,7 @@ public class TemplateRenderer {
         int c = 0;
         for (ElementDefinition.TypeRefComponent t : elem.getType()) {
           c++;
-          generateCoreElemDetailsJson(b, elem, indent, rootName, pathName, backbone, last && c == elem.getType().size(), width, en.replace("[x]", t.getName()), t, false);
+          generateCoreElemDetailsJson(b, elem, indent, rootName, pathName, backbone, last && c == elem.getType().size(), width, en.replace("[x]", upFirst(t.getName())), en, t, false);
         }
       } else {
         List<TypesUtilities.WildcardInformation> tr = TypesUtilities.wildcards(context.getContext().getVersion());
@@ -515,11 +540,11 @@ public class TemplateRenderer {
         int c = 0;
         for (TypesUtilities.WildcardInformation t : tr) {
           c++;
-          generateCoreElemDetailsJson(b, elem, indent, rootName, pathName, backbone, last && c == elem.getType().size(), width, en.replace("[x]", upFirst(t.getTypeName())), toTypeRef(t), false);
+          generateCoreElemDetailsJson(b, elem, indent, rootName, pathName, backbone, last && c == elem.getType().size(), width, en.replace("[x]", upFirst(t.getTypeName())), en, toTypeRef(t), false);
         }
       }
     } else {
-      generateCoreElemDetailsJson(b, elem, indent, rootName, pathName, backbone, last, width, en, elem.getType().isEmpty() ? null : elem.getType().get(0), true);
+      generateCoreElemDetailsJson(b, elem, indent, rootName, pathName, backbone, last, width, en, en, elem.getType().isEmpty() ? null : elem.getType().get(0), true);
     }
   }
 
@@ -546,15 +571,15 @@ public class TemplateRenderer {
     return r;
   }
 
-  private void generateCoreElemDetailsJson(StringBuilder b, ElementDefinition elem, int indent, String rootName, String pathName, boolean backbone, boolean last, int width, String en, ElementDefinition.TypeRefComponent type, boolean doco) throws Exception {
+  private void generateCoreElemDetailsJson(StringBuilder b, ElementDefinition elem, int indent, String rootName, String pathName, boolean backbone, boolean last, int width, String en, String dn, ElementDefinition.TypeRefComponent type, boolean doco) throws Exception {
     List<ElementDefinition> children = context.getProfileUtilities().getChildList(sd, elem);
     
     if (elem.getName().equals("extension")) {
-      b.append("  (<a href=\""+"extensibility.html\">Extensions</a> - see <a href=\""+"json.html#extensions\">JSON page</a>)\r\n");
+      b.append("  (<a href=\""+specPath("extensibility.html")+"\">Extensions</a> - see <a href=\""+specPath("json.html")+"#extensions\">JSON page</a>)\r\n");
       return;
     }
     if (elem.getName().equals("modifierExtension")) {
-      b.append("  (<a href=\""+"extensibility.html#modifier\">Modifier Extensions</a> - see <a href=\""+"json.html#modifier\">JSON page</a>)\r\n");
+      b.append("  (<a href=\""+specPath("extensibility.html")+"#modifier\">Modifier Extensions</a> - see <a href=\""+specPath("json.html")+"#modifier\">JSON page</a>)\r\n");
       return;
     }
 
@@ -569,10 +594,10 @@ public class TemplateRenderer {
       else
         b.append("\"<span title=\"" + Utilities.escapeXml(elem.getDefinition()) + "\">");
     } else if (elem.getIsModifier() || elem.getMustSupport())
-      b.append("\"<a href=\"" + (defPage + "#" + pathName + "." + en)+ "\" title=\"" + Utilities .escapeXml(elem.getDefinition())
+      b.append("\"<a href=\"" + (defPage + "#" + pathName + "." + dn)+ "\" title=\"" + Utilities .escapeXml(elem.getDefinition())
               + "\" class=\"dict\"><span style=\"text-decoration: underline\">");
     else
-      b.append("\"<a href=\"" + (defPage + "#" + pathName + "." + en) + "\" title=\"" + Utilities.escapeXml(elem.getDefinition()) + "\" class=\"dict\">");
+      b.append("\"<a href=\"" + (defPage + "#" + pathName + "." + dn) + "\" title=\"" + Utilities.escapeXml(elem.getDefinition()) + "\" class=\"dict\">");
 
     if (defPage == null) {
       b.append(en+"</span>");
@@ -636,14 +661,18 @@ public class TemplateRenderer {
       b.append(" ");
 
       if (elem.getName().equals("extension")) {
-        b.append(" <a href=\""+"extensibility.html\"><span style=\"color: navy; opacity: 0.8\">See Extensions</span></a>");
+        b.append(" <a href=\""+specPath("extensibility.html")+"\"><span style=\"color: navy; opacity: 0.8\">See Extensions</span></a>");
       } else if ("See Extensions".equals(elem.getShort())) {
-        b.append(" <a href=\""+"extensibility.html\"><span style=\"color: navy; opacity: 0.8\">"
+        b.append(" <a href=\""+specPath("extensibility.html")+"\"><span style=\"color: navy; opacity: 0.8\">"
                 + Utilities.escapeXml(elem.getShort())
                 + "</span></a>");
       } else {
         String ref = getBindingLink(elem);
-        b.append("<span style=\"color: navy; opacity: 0.8\"><a href=\""+(Utilities.isAbsoluteUrl(ref) ? "": "")+ref+"\" style=\"color: navy; opacity: 0.8\">" + Utilities.escapeXml(elem.getShort()) + "</a></span>");
+        if (ref != null) {
+          b.append("<span style=\"color: navy; opacity: 0.8\"><a href=\"" + (Utilities.isAbsoluteUrl(ref) ? "" : "") + ref + "\" style=\"color: navy; opacity: 0.8\">" + Utilities.escapeXml(elem.getShort()) + "</a></span>");
+        } else {
+          b.append("<span style=\"color: navy; opacity: 0.8\">" + Utilities.escapeXml(elem.getShort()) + "</span>");
+        }
       }
     }
     if (elem.prohibited())
@@ -698,7 +727,7 @@ public class TemplateRenderer {
       b.append("<a href=\""+t.getProfile()+"\"><span style=\"color: DarkViolet\">@"+t.getProfile()+"</span></a>");
     } else {
       b.append("<a href=\"" + (getLinkFor(t.getName())
-              + ".html#" + t.getName() + "\">" + t.getName())
+              + "#" + t.getName() + "\">" + t.getName())
               + "</a>");
     }
     if (t.hasTargetProfile()) {
@@ -793,9 +822,11 @@ public class TemplateRenderer {
     b.append("\r\n");
     if (rn.equals(root.getName()) && resource) {
       if (!Utilities.noString(root.typeSummary())) {
-        b.append("  # from <a href=\""+prefix+"resource.html\">Resource</a>: <a href=\""+prefix+"resource.html#id\">.id</a>, <a href=\""+prefix+"resource.html#meta\">.meta</a>, <a href=\""+prefix+"resource.html#implicitRules\">.implicitRules</a>, and <a href=\""+prefix+"resource.html#language\">.language</a>\r\n");
+        b.append("  # from <a href=\""+prefix+"resource.html\">Resource</a>: <a href=\""+prefix+"resource.html#id\">.id</a>, <a href=\""+prefix+"resource.html#meta\">.meta</a>, <a href=\""+
+                prefix+"resource.html#implicitRules\">.implicitRules</a>, and <a href=\""+prefix+"resource.html#language\">.language</a>\r\n");
         if (isDomainResource(sd)) {
-          b.append("  # from <a href=\""+prefix+"domainresource.html\">DomainResource</a>: <a href=\""+prefix+"narrative.html#Narrative\">.text</a>, <a href=\""+prefix+"references.html#contained\">.contained</a>, <a href=\""+prefix+"extensibility.html\">.extension</a>, and <a href=\""+prefix+"extensibility.html#modifierExtension\">.modifierExtension</a>\r\n");
+          b.append("  # from <a href=\""+prefix+"domainresource.html\">DomainResource</a>: <a href=\""+prefix+"narrative.html#Narrative\">.text</a>, <a href=\""+prefix+"references.html#contained\">.contained</a>, <a href=\""+
+                  prefix+"extensibility.html\">.extension</a>, and <a href=\""+prefix+"extensibility.html#modifierExtension\">.modifierExtension</a>\r\n");
         }
       }
     } else {
@@ -818,7 +849,7 @@ public class TemplateRenderer {
     if (isChoice(elem)) {
       b.append(left + "# ");
       String en = elem.getName();
-      writeElementName(b, elem, path, en);
+      writeElementName(b, elem, path, en, en, true);
       b.append(": ");
       b.append(describeCardinality(elem));
       writeInvariants(b, elem);
@@ -829,13 +860,13 @@ public class TemplateRenderer {
       b.append(Integer.toString(elem.getType().size()));
       b.append("\r\n");
       for (ElementDefinition.TypeRefComponent t : elem.getType()) {
-        generateElementTypeTtl(b, elem, path, left + "  ", t, elem.getName().replace("[x]", ""), true);
+        generateElementTypeTtl(b, elem, path, left + "  ", t, elem.getName().replace("[x]", ""),  elem.getName(), true, false);
         b.append("\r\n");
       }
     } else if (elem.getType().size() == 1) {
       ElementDefinition.TypeRefComponent t = elem.getType().get(0);
       String en = elem.getName();
-      generateElementTypeTtl(b, elem, path, left, t, en, false);
+      generateElementTypeTtl(b, elem, path, left, t, en, en,false, true);
       if (elem.repeats())
         b.append(" ... ) ; # ");
       else
@@ -848,7 +879,7 @@ public class TemplateRenderer {
     } else { // children elements
       b.append(left + "fhir:");
       String en = elem.getName();
-      writeElementName(b, elem, path, en);
+      writeElementName(b, elem, path, en, en, true);
       if (elem.repeats()) b.append("( ");
       b.append("[ # ");
       b.append(describeCardinality(elem));
@@ -867,9 +898,9 @@ public class TemplateRenderer {
   }
 
 
-  private void generateElementTypeTtl(StringBuilder b, ElementDefinition elem, String path, String left, ElementDefinition.TypeRefComponent t, String en, boolean insertTypeTriple) throws IOException {
+  private void generateElementTypeTtl(StringBuilder b, ElementDefinition elem, String path, String left, ElementDefinition.TypeRefComponent t, String en, String dn, boolean insertTypeTriple, boolean anchor) throws IOException {
     b.append(left+"fhir:");
-    writeElementName(b, elem, path, en);
+    writeElementName(b, elem, path, en, dn, anchor);
     if (elem.repeats()) b.append(" ( ");
     b.append("[ ");
     if (insertTypeTriple) b.append(" a fhir:" + t.getName() + " ; ");
@@ -928,21 +959,21 @@ public class TemplateRenderer {
 
   private void writeInvariants(StringBuilder b, ElementDefinition elem) throws IOException {
     if (elem.getConstraint().size() > 0)
-      b.append(" <span style=\"color: brown\" title=\""+Utilities.escapeXml(getInvariants(elem))+ "\">"+INV_FLAG+"</span>");
+      b.append(" <span style=\"color: brown\" title=\""+Utilities.escapeXml(getInvariants(elem))+ "\">"+invFlag+"</span>");
   }
 
 
-  private void writeElementName(StringBuilder b, ElementDefinition elem, String path, String en) throws IOException {
+  private void writeElementName(StringBuilder b, ElementDefinition elem, String path, String en, String dn, boolean anchor) throws IOException {
     if (defPage == null) {
       if (elem.getIsModifier() || elem.getMustSupport())
         b.append("<span style=\"text-decoration: underline\" title=\"" + Utilities.escapeXml(elem.getDefinition()) + "\">");
       else
         b.append("<span title=\"" + Utilities.escapeXml(elem.getDefinition()) + "\">");
     } else if (elem.getIsModifier() || elem.getMustSupport())
-      b.append("<a href=\"" + (defPage + "#" + path + "." + en)+ "\" title=\"" + Utilities .escapeXml(elem.getDefinition())
+      b.append("<a href=\"" + (defPage + "#" + path + "." + dn)+ "\" title=\"" + Utilities .escapeXml(elem.getDefinition())
               + "\" class=\"dict\"><span style=\"text-decoration: underline\">");
     else
-      b.append("<a href=\"" + (defPage + "#" + path + "." + en) + "\" title=\"" + Utilities.escapeXml(elem.getDefinition()) + "\" class=\"dict\">");
+      b.append("<a href=\"" + (defPage + "#" + path + "." + dn) + "\" title=\"" + Utilities.escapeXml(elem.getDefinition()) + "\" class=\"dict\">");
     b.append(en);
     if (defPage == null)
       b.append("</span>");
@@ -950,7 +981,9 @@ public class TemplateRenderer {
       b.append("</span></a>");
     else
       b.append("</a>");
-    b.append("<a name=\"ttl-"+en+"\"> </a>");
+    if (anchor) {
+      b.append("<a name=\"ttl-" + en + "\"> </a>");
+    }
   }
 
 }
