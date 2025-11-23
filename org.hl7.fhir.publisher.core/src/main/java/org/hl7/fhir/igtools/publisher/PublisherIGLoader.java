@@ -304,7 +304,6 @@ public class PublisherIGLoader extends PublisherBase {
     pf.templateProvider.clear();
 
     String expParams = null;
-    List<String> exemptHtmlPatterns = new ArrayList<>();
 
     pf.copyrightYear = null;
     Boolean useStatsOptOut = null;
@@ -422,7 +421,7 @@ public class PublisherIGLoader extends PublisherBase {
           loadSuppressedMessages(Utilities.path(pf.rootDir, p.getValue()), "ImplementationGuide.definition.parameter["+count+"].value");
           break;
         case "html-exempt":
-          exemptHtmlPatterns.add(p.getValue());
+          pf.getExemptHtmlPatterns().add(p.getValue());
           break;
         case "usage-stats-opt-out":
           useStatsOptOut = "true".equals(p.getValue());
@@ -995,7 +994,7 @@ public class PublisherIGLoader extends PublisherBase {
     pf.inspector.getManual().add("qa.html");
     pf.inspector.getManual().add("qa-tx.html");
     pf.inspector.getManual().add("qa-ipreview.html");
-    pf.inspector.getExemptHtmlPatterns().addAll(exemptHtmlPatterns);
+    pf.inspector.setExemptHtmlPatterns(pf.getExemptHtmlPatterns());
     pf.inspector.setPcm(pf.pcm);
 
     for (String name : pf.customResourceNames) {

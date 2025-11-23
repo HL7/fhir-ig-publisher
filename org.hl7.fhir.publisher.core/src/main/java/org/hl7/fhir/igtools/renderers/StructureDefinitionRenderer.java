@@ -2561,7 +2561,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
             inc = true;
           } 
         }
-        if (inc) {
+        if (inc && cst.hasWebPath()) {
           capStmts.put(cst.getWebPath(), cst.present());
         }
       }
@@ -2633,7 +2633,11 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         b.append(", ");
       }
 
-      b.append("<a href=\"" + s + "\">" + base.get(s) + "</a>");
+      if (s == null) {
+        b.append(base.get(s));
+      } else {
+        b.append("<a href=\"" + s + "\">" + base.get(s) + "</a>");
+      }
       if (c % 80 == 0) {
         b.append("\r\n");
       }

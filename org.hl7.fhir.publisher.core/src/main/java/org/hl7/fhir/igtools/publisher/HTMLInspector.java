@@ -37,6 +37,7 @@ import java.util.Stack;
 import javax.annotation.Nonnull;
 
 import lombok.Getter;
+import lombok.Setter;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.PublisherBase.FragmentUseRecord;
@@ -252,7 +253,7 @@ public class HTMLInspector {
 
   private String statusMessageDef;
   private Map<String, String> statusMessagesLang;
-  private List<String> exemptHtmlPatterns = new ArrayList<>();
+  @Getter @Setter private List<String> exemptHtmlPatterns;
   private List<String> parseProblems = new ArrayList<>();
   private List<String> publishBoxProblems = new ArrayList<>();
   private Set<String> exceptions = new HashSet<>();
@@ -348,7 +349,6 @@ public class HTMLInspector {
     for (String s : sorted(cache.keySet())) {
       log.logDebugMessage(LogCategory.HTML, "Check "+s);
       LoadedFile lf = cache.get(s);
-
       if (lf.getHl7State() != null && !lf.getHl7State()) {
         boolean check = true;
         for (String pattern : exemptHtmlPatterns ) {
@@ -1596,10 +1596,6 @@ public class HTMLInspector {
 
   public void setPcm(FilesystemPackageCacheManager pcm) {
     this.pcm = pcm; 
-  }
-
-  public List<String> getExemptHtmlPatterns() {
-    return exemptHtmlPatterns;
   }
 
   public boolean getPublishBoxOK() {
