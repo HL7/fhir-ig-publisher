@@ -116,8 +116,6 @@ import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.hl7.fhir.validation.SQLiteINpmPackageIndexBuilderDBImpl;
 import org.hl7.fhir.validation.instance.utils.ValidationContext;
-import org.jetbrains.annotations.Nullable;
-
 
 /**
  * Implementation Guide Publisher
@@ -833,7 +831,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 
   }
 
-  private static @Nullable ResourceWithReference getResourceFromMap(RenderingContext context, String url, SpecMapManager sp) throws IOException {
+  private static ResourceWithReference getResourceFromMap(RenderingContext context, String url, SpecMapManager sp) throws IOException {
 
     String[] pl = url.split("\\/");
     String rt = pl.length >= 2 ? pl[pl.length-2] : null;

@@ -5837,7 +5837,7 @@ public class PublisherGenerator extends PublisherBase {
         p.parse(src, type, false);
       } else {
         src = "<"+type+" xmlns=\"http://hl7.org/fhir\">"+src+"</"+type+">";
-        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        DocumentBuilderFactory factory = XMLUtil.newXXEProtectedDocumentBuilderFactory();
         factory.setNamespaceAware(true);
         DocumentBuilder builder = factory.newDocumentBuilder();
         InputSource is = new InputSource(new StringReader(src));
