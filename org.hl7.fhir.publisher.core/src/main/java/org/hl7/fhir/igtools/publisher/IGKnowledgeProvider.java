@@ -44,7 +44,6 @@ import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.r5.utils.xver.XVerExtensionManager;
 import org.hl7.fhir.r5.utils.xver.XVerExtensionManagerFactory;
-import org.hl7.fhir.utilities.DebugUtilities;
 import org.hl7.fhir.utilities.LoincLinker;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
@@ -738,9 +737,6 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     ElementDefinition ed = property.getDefinition();
     StructureDefinition sd = property.getStructure();
     String path = ed.getPath();
-    if ("Observation.id".equals(path)) {
-      DebugUtilities.breakpoint();
-    }
     if (ed.getBase().hasPath() && !path.equals(ed.getBase().getPath())) {
       StructureDefinition sdt = context.fetchTypeDefinition(head(ed.getBase().getPath()));
       if (sdt != null) {
