@@ -3570,6 +3570,12 @@ public class PublisherGenerator extends PublisherBase {
         exampleArray.add(exampleItem);
         exampleItem.add("url", examplePage.getName());
         exampleItem.add("title", examplePage.getTitle());
+
+        jsonTitle = new JsonObject();
+        exampleItem.add("titlelang", jsonTitle);
+        for (String l : allLangs()) {
+          jsonTitle.add(l, pf.rcLangs.get(l).getTranslated(examplePage.getTitleElement()));
+        }
       }
     }
 
