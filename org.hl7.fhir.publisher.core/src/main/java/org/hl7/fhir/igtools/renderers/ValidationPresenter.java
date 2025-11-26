@@ -373,6 +373,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   boolean hintAboutNonMustSupport = false;
   boolean anyExtensionsAllowed = false;
   boolean checkAggregation = false;
+  boolean strictIdentifierSystems = false;
   boolean autoLoad = false;
   boolean showReferenceMessages = false;
   boolean noExperimentalContent = false;
@@ -424,11 +425,12 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     determineCode();
   }
 
-  public void setValidationFlags(boolean hintAboutNonMustSupport, boolean anyExtensionsAllowed, boolean checkAggregation, boolean autoLoad, boolean showReferenceMessages, boolean noExperimentalContent, boolean displayWarnings) {
+  public void setValidationFlags(boolean hintAboutNonMustSupport, boolean anyExtensionsAllowed, boolean checkAggregation, boolean strictIdentifierSystems, boolean autoLoad, boolean showReferenceMessages, boolean noExperimentalContent, boolean displayWarnings) {
 
     this.hintAboutNonMustSupport = hintAboutNonMustSupport;
     this.anyExtensionsAllowed = anyExtensionsAllowed;
     this.checkAggregation = checkAggregation;
+    this.strictIdentifierSystems = strictIdentifierSystems;
     this.autoLoad = autoLoad;
     this.showReferenceMessages = showReferenceMessages;
     this.noExperimentalContent = noExperimentalContent;
@@ -1360,6 +1362,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     (hintAboutNonMustSupport ? t : f).append("hintAboutNonMustSupport");
     (anyExtensionsAllowed ? t : f).append("anyExtensionsAllowed");
     (checkAggregation ? t : f).append("checkAggregation");
+    (strictIdentifierSystems ? t : f).append("strictIdentifierSystems");
     (autoLoad ? t : f).append("autoLoad");
     (showReferenceMessages ? t : f).append("showReferenceMessages");
     (noExperimentalContent ? t : f).append("noExperimentalContent");
