@@ -1,3 +1,4 @@
+* General: fix various typos and update package dependencies
 * Loader: fix loading problem in language packs
 * Loader: fix problem generating R4B packages
 * Validator: Fix problem resolving contained references in inner resources
