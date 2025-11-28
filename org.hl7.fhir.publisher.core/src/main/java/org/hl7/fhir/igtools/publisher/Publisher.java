@@ -1460,7 +1460,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         parseAndAddNoValidateParam(self, param);
       }
       if (CliParams.hasNamedParam(args, "-no-network")) {
-        FhirSettings.setProhibitNetworkAccess(true);
+        ManagedWebAccess.setAccessPolicy(ManagedWebAccess.WebAccessPolicy.PROHIBITED);
       }
       if (CliParams.hasNamedParam(args, "-trackFragments")) {
         self.settings.setTrackFragments(true);
