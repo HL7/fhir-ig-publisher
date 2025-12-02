@@ -29,12 +29,11 @@ import java.util.List;
 import java.util.Set;
 
 import org.hl7.fhir.exceptions.FHIRException;
-import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
-import org.hl7.fhir.igtools.publisher.RelatedIG;
-import org.hl7.fhir.igtools.publisher.SpecMapManager;
+import org.hl7.fhir.igtools.publisher.*;
 import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.CanonicalResourceComparison;
 import org.hl7.fhir.r5.comparison.VersionComparisonAnnotation;
 import org.hl7.fhir.r5.context.IWorkerContext;
+import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
 import org.hl7.fhir.r5.model.*;
 import org.hl7.fhir.r5.model.Enumerations.CodeSystemContentMode;
@@ -125,7 +124,7 @@ public class CodeSystemRenderer extends CanonicalRenderer {
     //    }
   }
 
-  public String xref() throws FHIRException {
+  public String xref() throws FHIRException, IOException {
     StringBuilder b = new StringBuilder();
     boolean first = true;
     b.append("\r\n");
@@ -155,9 +154,9 @@ public class CodeSystemRenderer extends CanonicalRenderer {
     } else {
       b.append("</ul>\r\n");
     }
-    return b.toString() + changeSummary();
+    String pr = getProvenanceReferences(cs);
+    return b.toString() +pr+ changeSummary();
   }
-
 
   public String nsInfo() throws FHIRException {
     List<NamingSystem> nsl = new ArrayList<>();

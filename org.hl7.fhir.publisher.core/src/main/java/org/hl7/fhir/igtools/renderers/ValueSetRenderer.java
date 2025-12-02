@@ -102,7 +102,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
     }
   }
 
-  public String xref() throws FHIRException {
+  public String xref() throws FHIRException, IOException {
     try {
     StringBuilder b = new StringBuilder();
     boolean first = true;
@@ -141,7 +141,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
         e.printStackTrace();
         nsFailHasFailed  = true;
       }
-      return " <p>"+Utilities.escapeXml(e.getMessage())+"</p>\r\n";
+      return " <p>"+Utilities.escapeXml(e.getMessage())+"</p>\r\n"+getProvenanceReferences(vs);
     }
   }
 

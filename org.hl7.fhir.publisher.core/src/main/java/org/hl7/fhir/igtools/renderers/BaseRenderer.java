@@ -1,14 +1,17 @@
 package org.hl7.fhir.igtools.renderers;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Set;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.FetchedFile;
+import org.hl7.fhir.igtools.publisher.FetchedResource;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
+import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
 import org.hl7.fhir.r5.extensions.ExtensionUtilities;
 import org.hl7.fhir.r5.model.CanonicalResource;
@@ -27,6 +30,9 @@ import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.StringPair;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.hl7.fhir.utilities.xhtml.NodeType;
+import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
+import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 
 public class BaseRenderer implements IMarkdownProcessor {
   protected IWorkerContext context;
@@ -227,4 +233,26 @@ public class BaseRenderer implements IMarkdownProcessor {
     this.prefix = prefix;
   }
 
+
+  protected String getProvenanceReferences(Resource src) throws IOException {
+    XhtmlNode div = new XhtmlNode(NodeType.Element, "div");
+    div.para(gen.formatPhrase(RenderingContext.PROV_REFERENCE, src.fhirType()));
+    XhtmlNode ul = div.ul();
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.isExample()) {
+          if ("Provenance".equals(r.fhirType())) {
+            for (Element e : r.getElement().getChildrenByName("target")) {
+              String ref = e.getNamedChildValue("reference");
+              if (("CodeSystem/" + src.getId()).equals(ref)) {
+                ul.li().ah(r.getPath()).tx("Provenance " + (r.getTitle() == null ? r.getId() : r.getTitle()));
+              }
+            }
+          }
+        }
+      }
+    }
+    String pr = ul.getChildNodes().isEmpty() ? "" : new XhtmlComposer(true, false).compose(div.getChildNodes());
+    return pr;
+  }
 }
