@@ -48,14 +48,14 @@ import static org.hl7.fhir.igtools.publisher.Publisher.FMM_DERIVATION_MAX;
  */
 
 public class PublisherProcessor extends PublisherBase  {
-  public PublisherProcessor(PublisherFields publisherFields) {
-    super(publisherFields);
+  public PublisherProcessor(PublisherSettings settings) {
+    super(settings);
   }
 
 
   public void checkLanguage() {
     if ((pf.langPolicy == ValidationPresenter.LanguagePopulationPolicy.ALL || pf.langPolicy == ValidationPresenter.LanguagePopulationPolicy.OTHERS)) {
-      for (FetchedFile f : pf.fileList) {
+      for (FetchedFile f : pf.changeList) {
         for (FetchedResource r : f.getResources()) {
           logDebugMessage(LogCategory.PROGRESS, "process language in res: "+r.fhirType()+"/"+r.getId());
           if (!this.pf.sourceIg.hasLanguage()) {
@@ -93,7 +93,7 @@ public class PublisherProcessor extends PublisherBase  {
     log("Generating Narratives");
     doActorScan();
     generateNarratives(false);
-    if (!pf.validationOff) {
+    if (!settings.isValidationOff()) {
       log("Validating Conformance Resources");
       for (String s : metadataResourceNames()) {
         validate(s);
@@ -387,6 +387,7 @@ public class PublisherProcessor extends PublisherBase  {
       StructureDefinition sd = pva.convert(resource, log);
       r.getOtherVersions().put(v+"-StructureDefinition", new FetchedResource.AlternativeVersionResource(log, sd));
     } catch (Exception e) {
+      e.printStackTrace();
       System.out.println("Error converting "+r.getId()+" to "+v+": "+e.getMessage());
       log.add(new ProfileVersionAdaptor.ConversionMessage(e.getMessage(), ProfileVersionAdaptor.ConversionMessageStatus.ERROR));
       r.getOtherVersions().put(v+"-StructureDefinition", new FetchedResource.AlternativeVersionResource(log, null));
@@ -399,6 +400,7 @@ public class PublisherProcessor extends PublisherBase  {
       SearchParameter sp = pva.convert(resource, log);
       r.getOtherVersions().put(v+"-SearchParameter", new FetchedResource.AlternativeVersionResource(log, sp));
     } catch (Exception e) {
+      e.printStackTrace();
       System.out.println("Error converting "+r.getId()+" to "+v+": "+e.getMessage());
       log.add(new ProfileVersionAdaptor.ConversionMessage(e.getMessage(), ProfileVersionAdaptor.ConversionMessageStatus.ERROR));
       r.getOtherVersions().put(v+"-SearchParameter", new FetchedResource.AlternativeVersionResource(log, null));
@@ -407,7 +409,7 @@ public class PublisherProcessor extends PublisherBase  {
 
   private void validateExpressions() {
     logDebugMessage(LogCategory.PROGRESS, "Validate Expressions");
-    for (FetchedFile f : pf.fileList) {
+    for (FetchedFile f : pf.changeList) {
       f.start("validateExpressions");
       try {
         for (FetchedResource r : f.getResources()) {
@@ -477,44 +479,46 @@ public class PublisherProcessor extends PublisherBase  {
 
 
   public void validate() throws Exception {
-    if (pf.validationOff) {
+    if (settings.isValidationOff()) {
       return;
     }
 
     checkURLsUnique();
     checkOIDsUnique();
 
-    for (FetchedFile f : pf.fileList) {
+    for (FetchedFile f : pf.changeList) {
       f.start("validate");
       try {
         logDebugMessage(LogCategory.PROGRESS, " .. validate "+f.getName());
         logDebugMessage(LogCategory.PROGRESS, " .. "+f.getName());
-        FetchedResource r0 = f.getResources().get(0);
-        if (f.getLogical() != null && f.getResources().size() == 1 && !r0.fhirType().equals("Binary")) {
-          throw new Error("Not done yet");
-        } else {
-          for (FetchedResource r : f.getResources()) {
-            if (!r.isValidated()) {
-              logDebugMessage(LogCategory.PROGRESS, "     validating "+r.getTitle());
+        if (!f.getResources().isEmpty()) {
+          FetchedResource r0 = f.getResources().get(0);
+          if (f.getLogical() != null && f.getResources().size() == 1 && !r0.fhirType().equals("Binary")) {
+            throw new Error("Not done yet");
+          } else {
+            for (FetchedResource r : f.getResources()) {
+              if (!r.isValidated()) {
+                logDebugMessage(LogCategory.PROGRESS, "     validating " + r.getTitle());
 //              log("     validating "+r.getTitle());
-              validate(f, r);
+                validate(f, r);
+              }
             }
-          }
-          if (f.getLogical() != null && f.getResources().size() == 1 && r0.fhirType().equals("Binary")) {
-            Binary bin = (Binary) r0.getResource();
-            StructureDefinition profile = this.pf.context.fetchResource(StructureDefinition.class, f.getLogical());
-            List<ValidationMessage> errs = new ArrayList<ValidationMessage>();
-            if (profile == null) {
-              errs.add(new ValidationMessage(ValidationMessage.Source.InstanceValidator, ValidationMessage.IssueType.NOTFOUND, "file", this.pf.context.formatMessage(I18nConstants.Bundle_BUNDLE_Entry_NO_LOGICAL_EXPL, r0.getId(), f.getLogical()), ValidationMessage.IssueSeverity.ERROR));
-            } else {
-              Manager.FhirFormat fmt = Manager.FhirFormat.readFromMimeType(bin.getContentType() == null ? f.getContentType() : bin.getContentType());
-              TimeTracker.Session tts = this.pf.tt.start("validation");
-              List<StructureDefinition> profiles = new ArrayList<>();
-              profiles.add(profile);
-              validate(f, r0, bin, errs, fmt, profiles);
-              tts.end();
+            if (f.getLogical() != null && f.getResources().size() == 1 && r0.fhirType().equals("Binary")) {
+              Binary bin = (Binary) r0.getResource();
+              StructureDefinition profile = this.pf.context.fetchResource(StructureDefinition.class, f.getLogical());
+              List<ValidationMessage> errs = new ArrayList<ValidationMessage>();
+              if (profile == null) {
+                errs.add(new ValidationMessage(ValidationMessage.Source.InstanceValidator, ValidationMessage.IssueType.NOTFOUND, "file", this.pf.context.formatMessage(I18nConstants.Bundle_BUNDLE_Entry_NO_LOGICAL_EXPL, r0.getId(), f.getLogical()), ValidationMessage.IssueSeverity.ERROR));
+              } else {
+                Manager.FhirFormat fmt = Manager.FhirFormat.readFromMimeType(bin.getContentType() == null ? f.getContentType() : bin.getContentType());
+                TimeTracker.Session tts = this.pf.tt.start("validation");
+                List<StructureDefinition> profiles = new ArrayList<>();
+                profiles.add(profile);
+                validate(f, r0, bin, errs, fmt, profiles);
+                tts.end();
+              }
+              processValidationOutcomes(f, r0, errs);
             }
-            processValidationOutcomes(f, r0, errs);
           }
         }
       } finally {
@@ -1204,7 +1208,7 @@ public class PublisherProcessor extends PublisherBase  {
   public void generateNarratives(boolean isRegen) throws Exception {
     TimeTracker.Session tts = pf.tt.start("narrative generation");
     logDebugMessage(LogCategory.PROGRESS, isRegen ? "regen narratives" : "gen narratives");
-    for (FetchedFile f : pf.fileList) {
+    for (FetchedFile f : pf.changeList) {
       f.start("generateNarratives");
       try {
         for (FetchedResource r : f.getResources()) {
@@ -1220,7 +1224,7 @@ public class PublisherProcessor extends PublisherBase  {
               } else {
                 List<Locale> langs = translationLocales();
                 logDebugMessage(LogCategory.PROGRESS, "narrative for "+f.getName()+" : "+r.getId());
-                if (r.getResource() != null && isConvertableResource(r.getResource().fhirType())) {
+                if (r.getResource() != null && r.getResource() instanceof DomainResource && isConvertableResource(r.getResource().fhirType())) {
                   boolean regen = false;
                   boolean first = true;
                   for (Locale lang : langs) {
@@ -1382,7 +1386,7 @@ public class PublisherProcessor extends PublisherBase  {
   }
 
   private boolean passesNarrativeFilter(FetchedResource r) {
-    for (String s : pf.noNarratives) {
+    for (String s : settings.getNoNarratives()) {
       String[] p = s.split("\\/");
       if (p.length == 2) {
         if (("*".equals(p[0]) || r.fhirType().equals(p[0])) &&
@@ -1395,7 +1399,7 @@ public class PublisherProcessor extends PublisherBase  {
   }
 
   private boolean passesValidationFilter(FetchedResource r) {
-    for (String s : pf.noValidate) {
+    for (String s : settings.getNoValidate()) {
       String[] p = s.split("\\/");
       if (p.length == 2) {
         if (("*".equals(p[0]) || r.fhirType().equals(p[0])) &&
@@ -1410,7 +1414,7 @@ public class PublisherProcessor extends PublisherBase  {
 
   private void checkConformanceResources() throws IOException {
     log("Check profiles & code systems");
-    for (FetchedFile f : pf.fileList) {
+    for (FetchedFile f : pf.changeList) {
       f.start("checkConformanceResources");
       try {
         for (FetchedResource r : f.getResources()) {
@@ -1442,7 +1446,7 @@ public class PublisherProcessor extends PublisherBase  {
     if (!pf.realmRules.isExempt(pf.publishedIg.getPackageId())) {
       log("Check realm rules");
       pf.realmRules.startChecks(pf.publishedIg);
-      for (FetchedFile f : pf.fileList) {
+      for (FetchedFile f : pf.changeList) {
         f.start("checkConformanceResources2");
         try {
           for (FetchedResource r : f.getResources()) {
@@ -1469,7 +1473,7 @@ public class PublisherProcessor extends PublisherBase  {
     if (pf.ipsComparator != null) {
       pf.ipsComparator.startChecks(pf.publishedIg);
     }
-    for (FetchedFile f : pf.fileList) {
+    for (FetchedFile f : pf.changeList) {
       f.start("checkConformanceResources3");
       try {
         for (FetchedResource r : f.getResources()) {
@@ -1670,8 +1674,9 @@ public class PublisherProcessor extends PublisherBase  {
       f.start("scanForUsageStats");
       try {
         for (FetchedResource r : f.getResources()) {
-          if (r.fhirType().equals("StructureDefinition"))
+          if (r.fhirType().equals("StructureDefinition")) {
             this.pf.extensionTracker.scan((StructureDefinition) r.getResource());
+          }
           this.pf.extensionTracker.scan(r.getElement(), f.getName());
         }
       } finally {
@@ -1868,7 +1873,7 @@ public class PublisherProcessor extends PublisherBase  {
 
   public void checkSignBundles() throws Exception {
     log("Checking for Bundles to sign");
-    for (FetchedFile f : pf.fileList) {
+    for (FetchedFile f : pf.changeList) {
       for (FetchedResource r : f.getResources()) {
         if ("Bundle".equals(r.fhirType())) {
           Element sig = r.getElement().getNamedChild("signature");
@@ -1885,7 +1890,7 @@ public class PublisherProcessor extends PublisherBase  {
 
 
   public void processProvenanceDetails() throws Exception {
-    for (FetchedFile f : pf.fileList) {
+    for (FetchedFile f : pf.changeList) {
       f.start("processProvenanceDetails");
       try {
 
@@ -1928,7 +1933,7 @@ public class PublisherProcessor extends PublisherBase  {
 
     PublisherTranslator pt = new PublisherTranslator(pf.context, pf.sourceIg.hasLanguage() ? pf.sourceIg.getLanguage() : "en", pf.defaultTranslationLang, pf.translationLangs);
     pt.start(pf.tempLangDir);
-    for (FetchedFile f : pf.fileList) {
+    for (FetchedFile f : pf.changeList) {
       f.start("translate");
       try {
         for (FetchedResource r : f.getResources()) {
@@ -1943,7 +1948,7 @@ public class PublisherProcessor extends PublisherBase  {
 
 
   private void validate(String type) throws Exception {
-    for (FetchedFile f : pf.fileList) {
+    for (FetchedFile f : pf.changeList) {
       f.start("validate");
       try {
         for (FetchedResource r : f.getResources()) {

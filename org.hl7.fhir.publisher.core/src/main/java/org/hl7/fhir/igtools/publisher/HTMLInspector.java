@@ -25,7 +25,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -37,6 +36,9 @@ import java.util.Stack;
 
 import javax.annotation.Nonnull;
 
+import lombok.Getter;
+import lombok.Setter;
+import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.PublisherBase.FragmentUseRecord;
 import org.hl7.fhir.igtools.publisher.PublisherUtils.LinkedSpecification;
@@ -44,9 +46,11 @@ import org.hl7.fhir.igtools.publisher.SpecMapManager.SpecialPackageType;
 import org.hl7.fhir.igtools.publisher.modules.IPublisherModule;
 import org.hl7.fhir.r5.context.ILoggingService;
 import org.hl7.fhir.r5.context.ILoggingService.LogCategory;
+import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.utilities.*;
+import org.hl7.fhir.utilities.i18n.I18nConstants;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
@@ -57,7 +61,10 @@ import org.hl7.fhir.utilities.xhtml.XhtmlNode.Location;
 import org.hl7.fhir.validation.BaseValidator.BooleanHolder;
 
 public class HTMLInspector {
-
+  public class XhtmlNodeHolder {
+    XhtmlNode start;
+    XhtmlNode end;
+  }
 
   public enum ExternalReferenceType { FILE, WEB, IMG }
 
@@ -151,9 +158,11 @@ public class HTMLInspector {
 
   private class ConformanceClause {
     LoadedFile source;
-    int index;
+    String id;
+    String summary;
     XhtmlNode heading;
     XhtmlNode node;
+    boolean div;
   }
 
   public class LoadedFile {
@@ -226,7 +235,7 @@ public class HTMLInspector {
   private static final String PLAIN_LANG_INSERTION = "\n<!--PlainLangHeader--><div id=\"plain-lang-box\">Plain Language Summary goes here</div><script src=\"https://hl7.org/fhir/plain-lang.js\"></script><script type=\"application/javascript\" src=\"https://hl7.org/fhir/history-cm.js\"> </script><script>showPlainLanguage('{0}', '{1}', '{2}');</script><!--EndPlainLangHeader-->";
 
   private boolean strict;
-  private String rootFolder;
+  @Getter private String rootFolder;
   private String altRootFolder;
   private List<SpecMapManager> specs;
   private List<LinkedSpecification> linkSpecs;
@@ -244,7 +253,7 @@ public class HTMLInspector {
 
   private String statusMessageDef;
   private Map<String, String> statusMessagesLang;
-  private List<String> exemptHtmlPatterns = new ArrayList<>();
+  @Getter @Setter private List<String> exemptHtmlPatterns;
   private List<String> parseProblems = new ArrayList<>();
   private List<String> publishBoxProblems = new ArrayList<>();
   private Set<String> exceptions = new HashSet<>();
@@ -265,12 +274,12 @@ public class HTMLInspector {
   private String packageId;
   private String version;
   private List<String> langList;
-  private ZipGenerator zipGenerator;
   private XhtmlNode confHome;
   private LoadedFile confSource;
   private List<ConformanceClause> clauses = new ArrayList<>();
+  private IWorkerContext context;
 
-  public HTMLInspector(String rootFolder, List<SpecMapManager> specs, List<LinkedSpecification> linkSpecs, ILoggingService log, String canonical, String packageId, String version, Map<String, List<String>> trackedFragments, List<FetchedFile> sources, IPublisherModule module, boolean isCIBuild, Map<String, PublisherBase.FragmentUseRecord> fragmentUses, List<RelatedIG> relatedIGs, boolean noCIBuildIssues, List<String> langList) throws IOException {
+  public HTMLInspector(IWorkerContext context, String rootFolder, List<SpecMapManager> specs, List<LinkedSpecification> linkSpecs, ILoggingService log, String canonical, String packageId, String version, Map<String, List<String>> trackedFragments, List<FetchedFile> sources, IPublisherModule module, boolean isCIBuild, Map<String, PublisherBase.FragmentUseRecord> fragmentUses, List<RelatedIG> relatedIGs, boolean noCIBuildIssues, List<String> langList) throws IOException {
     this.rootFolder = rootFolder.replace("/", File.separator);
     this.specs = specs;
     this.linkSpecs = linkSpecs;
@@ -288,6 +297,7 @@ public class HTMLInspector {
     this.langList = langList;
     this.version = version;
     requirePublishBox = Utilities.startsWithInList(packageId, "hl7.");
+    this.context = context;
   }
 
   public void setAltRootFolder(String altRootFolder) throws IOException {
@@ -295,7 +305,6 @@ public class HTMLInspector {
   }
 
   public List<ValidationMessage> check(String statusMessageDef, Map<String, String> statusMessagesLang) throws IOException {
-    zipGenerator = new ZipGenerator(Utilities.path(rootFolder, "ai-md.zip"));
     this.statusMessageDef = statusMessageDef;
     this.statusMessagesLang = statusMessagesLang;
     iteration ++;
@@ -340,7 +349,6 @@ public class HTMLInspector {
     for (String s : sorted(cache.keySet())) {
       log.logDebugMessage(LogCategory.HTML, "Check "+s);
       LoadedFile lf = cache.get(s);
-
       if (lf.getHl7State() != null && !lf.getHl7State()) {
         boolean check = true;
         for (String pattern : exemptHtmlPatterns ) {
@@ -371,7 +379,11 @@ public class HTMLInspector {
         XhtmlNode x = new XhtmlParser().setMustBeWellFormed(strict).parse(new FileInputStream(lf.filename), null);
         BooleanHolder bh = new BooleanHolder(false);
         readConformanceClauses(lf, x, bh, new BooleanHolder(false), messages);
-        processAsMarkdown(lf, x);
+        try {
+          processAsMarkdown(lf, x);
+        } catch (Exception e) {
+          messages.add(new ValidationMessage(Source.Publisher, IssueType.INVALID, s, "Illegal HTML: "+e.getMessage(), IssueSeverity.WARNING));
+        }
         referencesValidatorPack = false;
         DuplicateAnchorTracker dat = new DuplicateAnchorTracker();
         Stack<XhtmlNode> stack = new Stack<XhtmlNode>();
@@ -397,7 +409,6 @@ public class HTMLInspector {
       i++;
     }
     System.out.println();
-    zipGenerator.close();
 
     log.logDebugMessage(LogCategory.HTML, "Checking Other Links");
     // check other links:
@@ -412,13 +423,34 @@ public class HTMLInspector {
       int ci = 0;
       for (ConformanceClause clause : clauses) {
         sources.add(clause.source);
-        ci++;
+        String id = clause.id;
+        if (Utilities.noString(id)) {
+          ci++;
+          id = "cnf-"+ci;
+        }
         XhtmlNode li = confHome.li();
-        li.ah(clause.source.path+"#ci-c-"+ci).tx("§"+ci);
-        li.an("ci-c-"+ci).tx(" ");
-        li.getChildNodes().addAll(clause.node.getChildNodes());
-        clause.node.an("ci-c-"+ci).tx(" ");
-        clause.node.ah(confSource.path+"#ci-c-"+ci).supr("§"+ci);
+        li.ah(clause.source.path+"#ci-c-"+id).tx("§"+id);
+        li.an("ci-c-"+id).tx(": ");
+        if (clause.summary != null) {
+          li.tx(clause.summary);
+        } else {
+          li.getChildNodes().addAll(clause.node.getChildNodes());
+        }
+        XhtmlNode focus = clause.node;
+        if (clause.div) {
+          focus = clause.node.firstNamedDescendent("p");
+          if (focus == null) {
+            focus = clause.node;
+          }
+        }
+        focus.an("ci-c-" + ci).tx(" ");
+        XhtmlNode f = focus.ah(confSource.path + "#ci-c-" + id);
+        if (clause.div) {
+          f.img("conformance.png", "conf").attribute("width", "20").attribute("class", "self-link").attribute("height", "20");
+          f.tx("§" + id);
+        } else {
+          f.supr("§" + id);
+        }
       }
       for (LoadedFile lf : sources) {
         saveFile(lf, lf.xhtml);
@@ -443,13 +475,17 @@ public class HTMLInspector {
   private void readConformanceClauses(LoadedFile source, XhtmlNode x, BooleanHolder hasClauses, BooleanHolder hasWarning, List<ValidationMessage> messages) {
     // there's two kinds of conformance clauses:
     // from XML
-    //  <span class="fhir-conformance">clause</span>
+    //  <span class="fhir-conformance" id="id">clause</span> - in paragraph clause id is optional but recommended
+    //  <div class=="fhir-conformance" id="id" summary="summary">multi-paragraphs</div> - summary is mandatory
     // and from markdown
-    //  §clause$.
-    // the first pass is finding and fixing the markdown clauses, and then we process the
+    //  §id:clause$. in-paragraph clause. Id must be a token if present. it's optional but recommended
+    //  §§id:summary. both id and summary are mandatory
+    //
+    // the first pass is finding and fixing the markdown clauses, and then we process them at the end
     // spans
 
-    processMarkdownConformanceClauses(x, hasClauses);
+    List<XhtmlNodeHolder> divs = new ArrayList<>();
+    processMarkdownConformanceClauses(x, hasClauses, divs);
     List<XhtmlNode> parents = new ArrayList<>();
     processConformanceClauses(source, parents, x, hasClauses, hasWarning, messages);
     if (hasClauses.ok()) {
@@ -467,6 +503,19 @@ public class HTMLInspector {
         clause.heading = getHeading(parents, x);
         clause.node = c;
         clause.source = source;
+        clause.id = c.getAttribute("id");
+        clauses.add(clause);
+      } else if (c.getNodeType() == NodeType.Element && "div".equals(c.getName()) && c.isClass("fhir-conformance")) {
+        ConformanceClause clause = new ConformanceClause();
+        clause.heading = getHeading(parents, x);
+        clause.node = c;
+        clause.source = source;
+        clause.id = c.getAttribute("id");
+        clause.summary = c.getAttribute("summary");
+        if (Utilities.noString(clause.summary)) {
+          throw new FHIRException("no summary provided for conformance statement '"+clause.id+"'");
+        }
+        clause.div = true;
         clauses.add(clause);
       } else if (c.getNodeType() == NodeType.Element && "ul".equals(c.getName()) && c.isClass("fhir-conformance-list")) {
         confHome = c;
@@ -486,13 +535,13 @@ public class HTMLInspector {
         if (s.contains("SHALL")) {
           if (!hasWarning.ok()) {
             messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, source.path,
-                    "The html source contains the word 'SHALL' but it is not in a text phrase marked as a conformance clause", IssueSeverity.WARNING));
+                    context.formatMessage(I18nConstants.CONFORMANCE_STATEMENT_WORD,"SHALL"), IssueSeverity.INFORMATION).setMessageId(I18nConstants.CONFORMANCE_STATEMENT_WORD));
           }
           hasWarning.set(true);
         } else if (s.contains("SHOULD")) {
           if (!hasWarning.ok()) {
-            messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE,source.path,
-                    "The html source contains the word 'SHOULD' but it is not in a text phrase marked as a conformance clause", IssueSeverity.WARNING));
+            messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, source.path,
+                    context.formatMessage(I18nConstants.CONFORMANCE_STATEMENT_WORD,"SHOULD"), IssueSeverity.INFORMATION).setMessageId(I18nConstants.CONFORMANCE_STATEMENT_WORD));
           }
           hasWarning.set(true);
         }
@@ -516,7 +565,7 @@ public class HTMLInspector {
     return null;
   }
 
-  private void processMarkdownConformanceClauses(XhtmlNode x, BooleanHolder hasClauses) {
+  private void processMarkdownConformanceClauses(XhtmlNode x, BooleanHolder hasClauses, List<XhtmlNodeHolder> divs) {
     boolean found = false;
     boolean tryAgain = false; // for if there's more than one clause in a run of text
     if ("p".equals(x.getName()) && "§§§".equals(x.allText())) {
@@ -525,73 +574,134 @@ public class HTMLInspector {
       x.setAttribute("class", "fhir-conformance-list");
       return;
     }
-    do {
-      int start = -1;
-      int end = -1;
-      tryAgain = false;
-      for (int i = 0; i < x.getChildNodes().size(); i++) {
-        XhtmlNode c = x.getChildNodes().get(i);
-        if (c.getNodeType() == NodeType.Text && c.getContent().contains("§")) {
-          int offset = c.getContent().indexOf("§");
-          if (start == -1) {
-            start = i;
-            String s = c.getContent().substring(offset+1);
-            if (s.contains("§")) {
+
+    if (x.allText() != null && "p".equals(x.getName()) && x.allText().startsWith("§§")) {
+      if (divs.isEmpty() || divs.get(0).end != null) {
+        // this is the starting node
+        divs.add(0, new XhtmlNodeHolder());
+        divs.get(0).start = x;
+      } else {
+        XhtmlNodeHolder div = divs.get(0);
+        div.end = x;
+        String cnt = div.start.allText().substring(2);
+        String original = div.start.allText().substring(2);
+        if (!cnt.contains(":")) {
+          throw new FHIRException("Invalid conformance clause id: no ':' making the token in " +original);
+        }
+        String id = cnt.substring(0, cnt.indexOf(":"));
+        if (!id.matches("^[a-zA-Z0-9._-]+$")) {
+          throw new FHIRException("Invalid conformance clause id: '"+id+"' in " +original);
+        }
+        cnt = cnt.substring(cnt.indexOf(":")+1);
+        if (!cnt.contains("^")) {
+          throw new FHIRException("Invalid conformance clause id: no '^' making the summary in " +original);
+        }
+        String summary = cnt.substring(0, cnt.indexOf("^"));
+        cnt = cnt.substring(cnt.indexOf("^")+1);
+        x.setName("div");
+        div.start.setName("div");
+        div.start.setAttribute("class", "fhir-conformance");
+        div.start.setAttribute("id", id);
+        div.start.setAttribute("summary", summary);
+        div.start.getChildNodes().clear();
+        div.start.para(cnt);
+        x.getChildNodes().clear();
+        x.para("!");
+      }
+    } else if (x.allText() != null && "!§§".equals(x.allText())) {
+      // special placeholder for documentation
+      x.getChildNodes().clear();
+      x.tx("§§");
+      hasClauses.set(true);
+    } else {
+      do {
+        int start = -1;
+        int end = -1;
+        tryAgain = false;
+        for (int i = 0; i < x.getChildNodes().size(); i++) {
+          XhtmlNode c = x.getChildNodes().get(i);
+          if (c.getNodeType() == NodeType.Text && c.getContent().contains("§")) {
+            int offset = c.getContent().indexOf("§");
+            if (start == -1) {
+              start = i;
+              String s = c.getContent().substring(offset+1);
+              if (s.contains("§")) {
+                end = i;
+                break;
+              }
+            } else if (end == -1) {
               end = i;
               break;
+            } else {
+              // we ignore it - we'll get back to it
             }
-          } else if (end == -1) {
-            end = i;
-            break;
+          }
+        }
+        if (end > -1) {
+          hasClauses.set(true);
+          found = true;
+          tryAgain = true;
+          if (end == start) {
+            XhtmlNode span = new XhtmlNode(NodeType.Element, "span");
+            span.setAttribute("class", "fhir-conformance");
+            XhtmlNode c = x.getChildNodes().get(start);
+            String cnt = c.getContent();
+            int si = cnt.indexOf("§")+1;
+            int ei = cnt.substring(si).indexOf("§") + si;
+            span.addText((si > 0 && ei >= si) ? cnt.substring(si, ei) : cnt);
+            x.getChildNodes().add(start + 1, span);
+            String ss = cnt.substring(0, si-1);
+            String es = cnt.substring(ei + 1);
+            c.setContent(ss);
+            if (!Utilities.noString(es)) {
+              XhtmlNode t = new XhtmlNode(NodeType.Text);
+              t.setContent(es);
+              x.getChildNodes().add(start + 2, span);
+            }
           } else {
-            // we ignore it - we'll get back to it
+            XhtmlNode sc = x.getChildNodes().get(start);
+            XhtmlNode ec = x.getChildNodes().get(end);
+            XhtmlNode span = new XhtmlNode(NodeType.Element, "span");
+            span.setAttribute("class", "fhir-conformance");
+            int si = sc.getContent().indexOf("§");
+            int ei = ec.getContent().indexOf("§");
+            String cnt = sc.getContent().substring(si + 1);
+            if (cnt.contains(":")) {
+              String token = cnt.substring(0, cnt.indexOf(":"));
+              if (token.matches("^[a-zA-Z0-9._-]+$")) {
+                span.setAttribute("id", token);
+                cnt = cnt.substring(cnt.indexOf(":")+1);
+              }
+            }
+            span.addText(cnt);
+            for (int i = start + 1; i < end; i++) {
+              span.add(x.getChildNodes().get(start + 1));
+              x.getChildNodes().remove(start + 1);
+            }
+            span.addText(ec.getContent().substring(0, ei));
+            x.getChildNodes().add(start + 1, span);
+            sc.setContent(sc.getContent().substring(0, si));
+            ec.setContent(ec.getContent().substring(ei + 1));
           }
         }
-      }
-      if (end > -1) {
-        hasClauses.set(true);
-        found = true;
-        tryAgain = true;
-        if (end == start) {
-          XhtmlNode span = new XhtmlNode(NodeType.Element, "span");
-          span.setAttribute("class", "fhir-conformance");
-          XhtmlNode c = x.getChildNodes().get(start);
-          String cnt = c.getContent();
-          int si = cnt.indexOf("§");
-          int ei = cnt.substring(si).indexOf("§") + si;
-          span.addText(cnt.substring(si + 1, ei));
-          x.getChildNodes().add(start + 1, span);
-          String ss = cnt.substring(si);
-          String es = cnt.substring(ei + 1);
-          c.setContent(ss);
-          if (!Utilities.noString(es)) {
-            XhtmlNode t = new XhtmlNode(NodeType.Text);
-            t.setContent(es);
-            x.getChildNodes().add(start + 2, span);
-          }
-        } else {
-          XhtmlNode sc = x.getChildNodes().get(start);
-          XhtmlNode ec = x.getChildNodes().get(end);
-          XhtmlNode span = new XhtmlNode(NodeType.Element, "span");
-          span.setAttribute("class", "fhir-conformance");
-          int si = sc.getContent().indexOf("§");
-          int ei = ec.getContent().indexOf("§");
-          span.addText(sc.getContent().substring(si + 1));
-          for (int i = start + 1; i < end; i++) {
-            span.add(x.getChildNodes().get(start + 1));
-            x.getChildNodes().remove(start + 1);
-          }
-          span.addText(ec.getContent().substring(0, ei));
-          x.getChildNodes().add(start + 1, span);
-          sc.setContent(sc.getContent().substring(0, si));
-          ec.setContent(ec.getContent().substring(ei + 1));
-        }
-      }
-    } while (tryAgain);
+      } while (tryAgain);
+    }
 
     if (!found) {
+      List<XhtmlNodeHolder> childDivs = new ArrayList<>();
       for (XhtmlNode c : x.getChildNodes()) {
-        processMarkdownConformanceClauses(c, hasClauses);
+        processMarkdownConformanceClauses(c, hasClauses, childDivs);
+      }
+      for (XhtmlNodeHolder childDiv : childDivs) {
+        if (childDiv.end != null) {
+          int start = x.getChildNodes().indexOf(childDiv.start);
+
+          int end = x.getChildNodes().indexOf(childDiv.end);
+          for (int i = start + 1; i < end - 1; i++) {
+            childDiv.start.getChildNodes().add(x.getChildNodes().get(i));
+          }
+          x.getChildNodes().subList(start + 1, end).clear();
+        }
       }
     }
   }
@@ -608,9 +718,7 @@ public class HTMLInspector {
     conv.getIdFilters().add("^ppprofile");
     conv.setIgnoreGeneratedTables(true);
     conv.setAiMode(true);
-    String md = conv.convert(x);
-    String fn = "ai/"+lf.path.replace(".html", ".md");
-    zipGenerator.addBytes(fn, md.getBytes(StandardCharsets.UTF_8), false);
+    conv.convert(x);
   }
 
   private void checkVisibleFragments(String pageName, Stack<XhtmlNode> stack, XhtmlNode x) {
@@ -1125,96 +1233,109 @@ public class HTMLInspector {
       subFolder = filename.substring(rootFolder.length()+1);
       subFolder = subFolder.substring(0, subFolder.lastIndexOf(File.separator));
     }
-    boolean resolved = Utilities.existsInList(ref, isSubFolder ? "../qa.html" : "qa.html", 
-        "http://hl7.org/fhir", "http://hl7.org", "http://www.hl7.org", "http://hl7.org/fhir/search.cfm") || 
-        ref.startsWith("http://gforge.hl7.org/gf/project/fhir/tracker/") || ref.startsWith("mailto:") || ref.startsWith("javascript:");
-    if (!resolved && forHL7)
-      resolved = Utilities.pathURL(canonical, "history.html").equals(ref) || ref.equals("searchform.html"); 
-    if (!resolved && filename != null)
-      resolved = filename.contains("searchform.html") && ref.equals("history.html"); 
-    if (!resolved)
-      resolved = manual.contains(rref);
-    if (!resolved) {
-      resolved = rref.startsWith("http://build.fhir.org/ig/FHIR/fhir-tools-ig") || rref.startsWith("http://build.fhir.org/ig/FHIR/ig-guidance"); // always allowed to refer to tooling or IG Guidance IG build location
+    // full-ig.zip doesn't exist yet
+    if (subFolder == null) {
+      if ("full-ig.zip".equals(ref)) {
+        return true;
+      }
+    } else {
+      if ("../full-ig.zip".equals(ref)) {
+        return true;
+      }
     }
-    if (!resolved && specs != null){
+    if (Utilities.existsInList(ref, isSubFolder ? "../qa.html" : "qa.html",
+        "http://hl7.org/fhir", "http://hl7.org", "http://www.hl7.org", "http://hl7.org/fhir/search.cfm") || 
+        ref.startsWith("http://gforge.hl7.org/gf/project/fhir/tracker/") || ref.startsWith("mailto:") || ref.startsWith("javascript:")) {
+      return true;
+    }
+    if (forHL7 && Utilities.pathURL(canonical, "history.html").equals(ref) || ref.equals("searchform.html")) {
+      return true;
+    }
+    if (filename != null && filename.contains("searchform.html") && ref.equals("history.html")) {
+      return true;
+    }
+    if (manual.contains(rref)) {
+      return true;
+    }
+    if (rref.startsWith("http://build.fhir.org/ig/FHIR/fhir-tools-ig") || rref.startsWith("http://build.fhir.org/ig/FHIR/ig-guidance")) { // always allowed to refer to tooling or IG Guidance IG build location
+      return true;
+    }
+    if (specs != null){
       for (SpecMapManager spec : specs) {
-        if (!resolved && spec.getBase() != null) {
-          resolved = resolved || spec.getBase().equals(rref) || (spec.getBase()).equals(rref+"/") || (spec.getBase()+"/").equals(rref)|| spec.hasTarget(rref) || 
+        if (spec.getBase() != null && (spec.getBase().equals(rref) || (spec.getBase()).equals(rref+"/") || (spec.getBase()+"/").equals(rref)|| spec.hasTarget(rref) ||
               Utilities.existsInList(rref, Utilities.pathURL(spec.getBase(), "definitions.json.zip"), 
                   Utilities.pathURL(spec.getBase(), "full-ig.zip"), Utilities.pathURL(spec.getBase(), "definitions.xml.zip"), 
-                  Utilities.pathURL(spec.getBase(), "package.tgz"), Utilities.pathURL(spec.getBase(), "history.html"));
+                  Utilities.pathURL(spec.getBase(), "package.tgz"), Utilities.pathURL(spec.getBase(), "history.html")))) {
+          return true;
         }
-        if (!resolved && spec.getBase2() != null) {
-          resolved = spec.getBase2().equals(rref) || (spec.getBase2()).equals(rref+"/") || 
-              Utilities.existsInList(rref, Utilities.pathURL(spec.getBase2(), "definitions.json.zip"), Utilities.pathURL(spec.getBase2(), "definitions.xml.zip"), Utilities.pathURL(spec.getBase2(), "package.tgz"), Utilities.pathURL(spec.getBase2(), "full-ig.zip")); 
+        if (spec.getBase2() != null && (spec.getBase2().equals(rref) || (spec.getBase2()).equals(rref+"/") ||
+              Utilities.existsInList(rref, Utilities.pathURL(spec.getBase2(), "definitions.json.zip"), Utilities.pathURL(spec.getBase2(), "definitions.xml.zip"), Utilities.pathURL(spec.getBase2(), "package.tgz"), Utilities.pathURL(spec.getBase2(), "full-ig.zip")))) {
+          return true;
         }
       }
     }
-    if (!resolved && linkSpecs != null){
+    if (linkSpecs != null){
       for (LinkedSpecification spec : linkSpecs) {
-        if (!resolved && spec.getSpm().getBase() != null) {
-          resolved = resolved || spec.getSpm().getBase().equals(rref) || (spec.getSpm().getBase()).equals(rref+"/") || (spec.getSpm().getBase()+"/").equals(rref)|| spec.getSpm().hasTarget(rref) || Utilities.existsInList(rref, Utilities.pathURL(spec.getSpm().getBase(), "history.html"));
+        if (spec.getSpm().getBase() != null && (spec.getSpm().getBase().equals(rref) || (spec.getSpm().getBase()).equals(rref+"/") || (spec.getSpm().getBase()+"/").equals(rref)|| spec.getSpm().hasTarget(rref) || Utilities.existsInList(rref, Utilities.pathURL(spec.getSpm().getBase(), "history.html")))) {
+          return true;
         }
-        if (!resolved && spec.getSpm().getBase2() != null) {
-          resolved = spec.getSpm().getBase2().equals(rref) || (spec.getSpm().getBase2()).equals(rref+"/"); 
+        if (spec.getSpm().getBase2() != null && (spec.getSpm().getBase2().equals(rref) || (spec.getSpm().getBase2()).equals(rref+"/"))) {
+          return true;
         }
       }
     }
 
-    if (!resolved) {
-      for (RelatedIG ig : relatedIGs) {
-        if (ig.getWebLocation() != null && rref.startsWith(ig.getWebLocation())) {
-          String tref = rref.substring(ig.getWebLocation().length());
-          if (tref.startsWith("/")) {
-            tref = tref.substring(1);
-            resolved = resolved || ig.getSpm().getBase().equals(rref) || (ig.getSpm().getBase()).equals(rref+"/") || (ig.getSpm().getBase()+"/").equals(rref)|| ig.getSpm().hasTarget(rref) || Utilities.existsInList(rref, Utilities.pathURL(ig.getSpm().getBase(), "history.html"));
-          } else {
-            resolved = resolved || "".equals(tref);
+    for (RelatedIG ig : relatedIGs) {
+      if (ig.getWebLocation() != null && rref.startsWith(ig.getWebLocation())) {
+        String tref = rref.substring(ig.getWebLocation().length());
+        if (tref.startsWith("/")) {
+          tref = tref.substring(1);
+          if (ig.getSpm().getBase().equals(rref) || (ig.getSpm().getBase()).equals(rref+"/") || (ig.getSpm().getBase()+"/").equals(rref)|| ig.getSpm().hasTarget(rref) || Utilities.existsInList(rref, Utilities.pathURL(ig.getSpm().getBase(), "history.html"))) {
+            return true;
           }
+        } else if ("".equals(tref)) {
+          return true;
         }
       }
     }
-    if (!resolved) {
-      if (Utilities.isAbsoluteFileName(ref)) {
-        if (new File(ref).exists()) {
-          addExternalReference(ExternalReferenceType.FILE, ref, parent == null ? x : parent, filename);
-          resolved = true;
-        }
-      } else if (!resolved && !Utilities.isAbsoluteUrl(ref) && !rref.startsWith("#") && filename != null) {
-        String fref =  buildRef(FileUtilities.getDirectoryForFile(filename), ref);
-        if (fref.equals(Utilities.path(rootFolder, "qa.html"))) {
-          resolved = true;
-        }
+
+    if (Utilities.isAbsoluteFileName(ref)) {
+      if (new File(ref).exists()) {
+        addExternalReference(ExternalReferenceType.FILE, ref, parent == null ? x : parent, filename);
+        return true;
+      }
+    } else if (!Utilities.isAbsoluteUrl(ref) && !rref.startsWith("#") && filename != null) {
+      String fref =  buildRef(FileUtilities.getDirectoryForFile(filename), ref);
+      if (fref.equals(Utilities.path(rootFolder, "qa.html"))) {
+        return true;
       }
     }
     // special case end-points that are always valid:
-    if (!resolved)
-      resolved = Utilities.existsInList(ref, "http://hl7.org/fhir/fhir-spec.zip", "http://hl7.org/fhir/R4/fhir-spec.zip", "http://hl7.org/fhir/STU3/fhir-spec.zip", "http://hl7.org/fhir/DSTU2/fhir-spec.zip", 
+    if (Utilities.existsInList(ref, "http://hl7.org/fhir/fhir-spec.zip", "http://hl7.org/fhir/R4/fhir-spec.zip", "http://hl7.org/fhir/STU3/fhir-spec.zip", "http://hl7.org/fhir/DSTU2/fhir-spec.zip",
           "http://hl7.org/fhir-issues", "http://hl7.org/registry") || 
-      matchesTarget(ref, "http://hl7.org", "http://hl7.org/fhir/DSTU2", "http://hl7.org/fhir/STU3", "http://hl7.org/fhir/R4", "http://hl7.org/fhir/smart-app-launch", "http://hl7.org/fhir/validator");
-
-    if (!resolved) { // updated table documentation
-      if (ref.startsWith("https://build.fhir.org/ig/FHIR/ig-guidance/readingIgs.html")) {
-        resolved = true;
-      }
+      matchesTarget(ref, "http://hl7.org", "http://hl7.org/fhir/DSTU2", "http://hl7.org/fhir/STU3", "http://hl7.org/fhir/R4", "http://hl7.org/fhir/smart-app-launch", "http://hl7.org/fhir/validator")) {
+      return true;
     }
+
+    if (ref.startsWith("https://build.fhir.org/ig/FHIR/ig-guidance/readingIgs.html")) { // updated table documentation
+      return true;
+    }
+
     // a local file may have been created by some poorly tracked process, so we'll consider that as a possible
-    if (!resolved && !Utilities.isAbsoluteUrl(rref) && !rref.contains("..") && filename != null) { // .. is security check. Maybe there's some ways it could be valid, but we're not interested for now
+    if (!Utilities.isAbsoluteUrl(rref) && !rref.contains("..") && filename != null) { // .. is security check. Maybe there's some ways it could be valid, but we're not interested for now
       String fname = buildRef(new File(filename).getParent(), rref);
       if (new File(fname).exists()) {
-        resolved = true;
+        return true;
       }
     }
 
     // external terminology resources 
-    if (!resolved) {
-      resolved = Utilities.startsWithInList(ref, "http://cts.nlm.nih.gov/fhir"); 
+    if (Utilities.startsWithInList(ref, "http://cts.nlm.nih.gov/fhir")) {
+      return true;
     }
 
-    if (!resolved) {
       if (rref.startsWith("http://") || rref.startsWith("https://") || rref.startsWith("ftp://") || rref.startsWith("tel:") || rref.startsWith("urn:")) {
-        resolved = true;
+        boolean resolved = true;
         addExternalReference(ExternalReferenceType.WEB, ref, parent == null ? x : parent, filename);
         if (rref.startsWith(canonical)) {
           if (rref.equals(canonical)) {
@@ -1243,6 +1364,7 @@ public class HTMLInspector {
             }
           }
         }
+        return resolved;
       } else if (!Utilities.isAbsoluteFileName(rref)) { 
         String page = rref;
         String name = null;
@@ -1285,29 +1407,29 @@ public class HTMLInspector {
           LoadedFile f = cache.get(page);
           if (f != null) {
             if (Utilities.noString(name))
-              resolved = true;
+              return true;
             else if (f.isLangRedirect) {
               String fn = filename.replace(rootFolder, rootFolder+"/"+langList.get(0));
               return checkTarget(fn, ref, rref, tgtList, bh, x, parent);
             } else {
-              resolved = f.targets.contains(name);
               tgtList.append(" (valid targets: "+(f.targets.size() > 40 ? Integer.toString(f.targets.size())+" targets"  :  f.targets.toString())+")");
               for (String s : f.targets) {
                 if (s.equalsIgnoreCase(name)) {
                   tgtList.append(" - case is wrong ('"+s+"')");
                 }
               }
+              return f.targets.contains(name);
             }
           }
         } else {
-          resolved = false; 
+          return false;
         }
       }
-    }
+
     if (module.resolve(ref)) {
-      resolved = true;
+      return true;
     }
-    return resolved;
+    return false;
   }
 
   private void addExternalReference(ExternalReferenceType type, String ref, XhtmlNode x, String source) {
@@ -1409,10 +1531,15 @@ public class HTMLInspector {
             }
           }
         }
-      } else if (!ref.contains("#")) { 
-        String page = Utilities.path(filename == null ? rootFolder : FileUtilities.getDirectoryForFile(filename), ref.replace("/", File.separator));
-        LoadedFile f = cache.get(page);
-        resolved = f != null;
+      } else if (!ref.contains("#") ) {
+        try {
+          String path = filename == null ? rootFolder : FileUtilities.getDirectoryForFile(filename);
+          String page = PathBuilder.getPathBuilder().withRequiredTarget(rootFolder).buildPath(path, ref.replace("/", File.separator));
+          LoadedFile f = cache.get(page);
+          resolved = f != null;
+        } catch (Exception e) {
+          resolved = false;
+        }
       }
     }
     if (resolved) {
@@ -1469,10 +1596,6 @@ public class HTMLInspector {
 
   public void setPcm(FilesystemPackageCacheManager pcm) {
     this.pcm = pcm; 
-  }
-
-  public List<String> getExemptHtmlPatterns() {
-    return exemptHtmlPatterns;
   }
 
   public boolean getPublishBoxOK() {

@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import lombok.Getter;
 import org.apache.commons.io.FileUtils;
 import org.apache.tools.ant.DefaultLogger;
 import org.apache.tools.ant.Project;
@@ -98,7 +99,9 @@ public class Template {
   private Set<String> templateParams = new HashSet<>();
   private boolean wantLog;
   private Map<String, String> scriptMappings = new HashMap<>();
-  
+  @Getter Map<String, TemplateFragmentTypeLoader.PrefixGroup> usedFragmentTypes;
+  private boolean rapido;
+
   /** unpack the template into /template 
    * 
    * @param rootDir  the root directory for the IG
@@ -107,12 +110,13 @@ public class Template {
    * 
    * @throws IOException - only if the path is incorrect or the disk runs out of space
    */
-  public Template(String rootDir, boolean canExecute, String templateThatCantExecute, String templateReason, boolean wantLog) throws IOException {
+  public Template(String rootDir, boolean canExecute, String templateThatCantExecute, String templateReason, boolean wantLog, boolean rapido) throws IOException {
     root = rootDir;
     this.canExecute = canExecute;
     this.templateThatCantExecute = templateThatCantExecute;
     this.templateReason = templateReason;
     this.wantLog = wantLog;
+    this.rapido = rapido;
 
     templateDir = Utilities.path(rootDir, "template");
 
@@ -176,6 +180,11 @@ public class Template {
       for (String s : configuration.asString("summaryRows").split("\\ "))
       summaryRows.add(s);
     }
+    loadFragmentTypes();
+  }
+
+  private void loadFragmentTypes() {
+    usedFragmentTypes = new TemplateFragmentTypeLoader().process(templateDir);
   }
 
   public void processTemplateTranslations(String defLang, List<String> langCodes) throws IOException {
@@ -476,7 +485,9 @@ public class Template {
       ValidationMessage vm = ExtensionUtilities.readValidationMessage(issue, Source.Template);
       if (vm.getLevel() == IssueSeverity.FATAL)
         throw new FHIRException("Fatal Error from Template: "+vm.getMessage());
-      res.get(source).add(vm);
+      if (vm.getLevel() != null) {
+        res.get(source).add(vm);
+      }
     }    
   }
 
@@ -605,5 +616,40 @@ public class Template {
     return scriptMappings ;
   }
 
-  
+  private int fragments;
+  private int noproduced;
+
+  public boolean wantGenerateFragment(String s, String code) {
+    if (usedFragmentTypes == null) {
+      return true;
+    }
+    if (!rapido) {
+      return true;
+    }
+    fragments++;
+    TemplateFragmentTypeLoader.PrefixGroup pfx = usedFragmentTypes.get(s);
+
+    if (pfx != null && pfx.suffixes.contains(code)) {
+      return true;
+    }
+    pfx = usedFragmentTypes.get("{{[type]}}");
+    if (pfx != null && pfx.suffixes.contains(code)) {
+      return true;
+    }
+    if (Utilities.existsInList(code, "jekyll-data",
+            "xml", "json", "ttl",
+            "csv", "xlsx", "sch",
+            "xml-html", "json-html", "ttl-html")) {
+      return true;
+    }
+
+    noproduced++;
+    return false;
+  }
+
+  public void rapidoSummary() {
+    if (rapido) {
+      System.out.println("Rapido Template Summary: don't produce "+noproduced+" of "+fragments+" fragments");
+    }
+  }
 }

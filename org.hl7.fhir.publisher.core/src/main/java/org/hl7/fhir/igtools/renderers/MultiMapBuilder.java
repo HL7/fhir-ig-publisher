@@ -12,14 +12,9 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
 import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.model.CanonicalType;
-import org.hl7.fhir.r5.model.CodeSystem;
+import org.hl7.fhir.r5.model.*;
 import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
-import org.hl7.fhir.r5.model.Coding;
-import org.hl7.fhir.r5.model.ConceptMap;
 import org.hl7.fhir.r5.model.ConceptMap.TargetElementComponent;
-import org.hl7.fhir.r5.model.DataType;
-import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionContainsComponent;
 import org.hl7.fhir.r5.renderers.DataRenderer;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
@@ -188,7 +183,7 @@ public class MultiMapBuilder extends DataRenderer {
         }
         CanonicalType ct = trip.getGrp().getTargetElement();
         Coding code = new Coding().setSystem(ct.baseUrl()).setVersion(ct.version()).setCode(trip.getTgt().getCode());
-        addCoding(code, x, showSystem);
+        addCoding(code, x, showSystem, null);
         if (ccm.hasComment()) {
           x.title(ccm.getComment());
         }
@@ -338,7 +333,7 @@ public class MultiMapBuilder extends DataRenderer {
 
     private void cellTgt(XhtmlNode x, ConceptDefinitionComponent cd, RenderingStatus status) throws FHIRFormatError, DefinitionException, IOException {
       Coding code = new Coding().setSystem(cs.getUrl()).setVersion(cs.getVersion()).setCode(cd.getCode()).setDisplay(cd.getDisplay());
-      addCoding(code, x, showSystem);
+      addCoding(code, x, showSystem, cs);
     }
 
     private void findMatchingConcepts(List<ConceptDefinitionComponent> list, Coding c, List<ConceptDefinitionComponent> concepts) {
@@ -417,7 +412,7 @@ public class MultiMapBuilder extends DataRenderer {
           for (Coding c : section.getCodings()) {
             if (source.hasCoding(c)) {
               done.add(c.toToken());
-              addDataRow(c, tbl, status, source, maps);
+              addDataRow(c, tbl, status, source, maps, section.vs);
             }
           }
         }
@@ -430,12 +425,12 @@ public class MultiMapBuilder extends DataRenderer {
         if (!others.isEmpty()) {
           addHeaderRow(source.getOtherTitle(), tbl, maps);
           for (Coding c : others) {
-            addDataRow(c, tbl, status, source, maps);
+            addDataRow(c, tbl, status, source, maps, null);
           }
         }
       } else {
         for (Coding c : source.getCodings()) {
-          addDataRow(c, tbl, status, source, maps);
+          addDataRow(c, tbl, status, source, maps, null);
         }
       }
       return new XhtmlComposer(false, true).compose(node.getChildNodes());
@@ -451,18 +446,18 @@ public class MultiMapBuilder extends DataRenderer {
     td.b().tx(title);
   }
 
-  private void addDataRow(Coding c, XhtmlNode tbl, RenderingStatus status, SourceDataProvider source, List<MappingDataProvider> maps) throws Exception {
+  private void addDataRow(Coding c, XhtmlNode tbl, RenderingStatus status, SourceDataProvider source, List<MappingDataProvider> maps, Resource src) throws Exception {
     XhtmlNode tr = tbl.tr();
     XhtmlNode td = tr.td();
-    addCoding(c, td, source.showSystem);
+    addCoding(c, td, source.showSystem, src);
 
     for (MappingDataProvider map : maps) {
       map.cell(tr.td(), c, status);
     }
   }
 
-  private void addCoding(Coding c, XhtmlNode td, boolean showSystem) {
-    String link = getLinkForCode(c.getSystem(), c.getVersion(), c.getCode());
+  private void addCoding(Coding c, XhtmlNode td, boolean showSystem, Resource source) {
+    String link = getLinkForCode(c.getSystem(), c.getVersion(), c.getCode(), source);
     XhtmlNode x = td.ahOrNot(link);
     if (showSystem) {
       x.tx(displaySystem(c.getSystem()));

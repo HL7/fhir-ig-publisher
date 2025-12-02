@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.hl7.fhir.publisher</groupId>
         <artifactId>org.hl7.fhir.publisher</artifactId>
-        <version>2.0.18-SNAPSHOT</version>
+        <version>2.0.28-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <modelVersion>4.0.0</modelVersion>
@@ -15,7 +15,7 @@
 
     <properties>
         <!-- GraalVM uses the JDK numbering scheme. These should always be LTS versions (17, 21, etc). -->
-        <graalvm.version>21.3.13</graalvm.version>
+        <graalvm.version>21.3.16</graalvm.version>
         <info_cqframework_version>3.27.0</info_cqframework_version>
     </properties>
 
@@ -97,7 +97,7 @@
         <dependency>
             <groupId>org.eclipse.persistence</groupId>
             <artifactId>org.eclipse.persistence.moxy</artifactId>
-            <version>4.0.7</version>
+            <version>4.0.8</version>
         </dependency>
         <!-- Jackson FasterXML -->
         <dependency>

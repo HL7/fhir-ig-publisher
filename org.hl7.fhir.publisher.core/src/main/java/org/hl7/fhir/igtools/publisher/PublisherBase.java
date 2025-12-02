@@ -1,6 +1,7 @@
 package org.hl7.fhir.igtools.publisher;
 
 import lombok.Getter;
+import lombok.Setter;
 import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_30_50;
 import org.hl7.fhir.convertors.factory.*;
 import org.hl7.fhir.exceptions.DefinitionException;
@@ -42,19 +43,17 @@ import java.util.*;
  */
 public class PublisherBase implements ILoggingService {
 
-    final PublisherFields pf;
+  @Getter @Setter public PublisherFields pf;
+  @Getter final public PublisherSettings settings;
 
-    public PublisherFields getPublisherFields() {
-        return pf;
-    }
 
   public PublisherBase() {
-    pf = new PublisherFields();
+    settings = new PublisherSettings();
   }
 
-  public PublisherBase(PublisherFields publisherFields) {
+  public PublisherBase(PublisherSettings settings) {
     super();
-    this.pf = publisherFields;
+    this.settings = settings;
   }
 
   protected static String getCurentDirectory() {
@@ -76,10 +75,10 @@ public class PublisherBase implements ILoggingService {
 
   @Nonnull
   protected FilesystemPackageCacheManager getFilesystemPackageCacheManager() throws IOException {
-    if (pf.getPackageCacheFolder() != null) {
-      return new FilesystemPackageCacheManager.Builder().withCacheFolder(pf.getPackageCacheFolder()).build();
+    if (settings.getPackageCacheFolder() != null) {
+      return new FilesystemPackageCacheManager.Builder().withCacheFolder(settings.getPackageCacheFolder()).build();
     }
-    return pf.mode == null || pf.mode == PublisherUtils.IGBuildMode.MANUAL || pf.mode == PublisherUtils.IGBuildMode.PUBLICATION ?
+    return settings.getMode() == null || settings.getMode() == PublisherUtils.IGBuildMode.MANUAL || settings.getMode() == PublisherUtils.IGBuildMode.PUBLICATION ?
             new FilesystemPackageCacheManager.Builder().build()
             : new FilesystemPackageCacheManager.Builder().withSystemCacheFolder().build();
 
@@ -90,11 +89,11 @@ public class PublisherBase implements ILoggingService {
   }
 
   protected String getTargetOutput() {
-    return pf.targetOutput;
+    return settings.getTargetOutput();
   }
 
   protected String focusDir() {
-    String dir = pf.configFile.endsWith("ig.ini") ? pf.configFile.substring(0, pf.configFile.length()-6) : pf.configFile;
+    String dir = settings.getConfigFile().endsWith("ig.ini") ? settings.getConfigFile().substring(0, settings.getConfigFile().length()-6) : settings.getConfigFile();
     if (dir.endsWith(File.separatorChar+".")) {
       dir = dir.substring(0, dir.length()-2);
     }
@@ -112,17 +111,17 @@ public class PublisherBase implements ILoggingService {
     long totalMemory = runtime.totalMemory();
     long freeMemory = runtime.freeMemory();
     long usedMemory = totalMemory - freeMemory;
-    if (usedMemory > pf.maxMemory) {
+    if (pf != null && usedMemory > pf.maxMemory) {
       pf.maxMemory = usedMemory;
     }
 
     String s = msg;
-    if (pf.tt == null) {
+    if (pf == null || pf.tt == null) {
       System.out.println(Utilities.padRight(s, ' ', 100));
     } else { // if (tt.longerThan(4)) {
       System.out.println(Utilities.padRight(s, ' ', 100)+" ("+ pf.tt.milestone()+" / "+ pf.tt.clock()+", "+Utilities.describeSize(usedMemory)+")");
     }
-    if (pf.killFile != null && pf.killFile.exists()) {
+    if (pf != null && pf.killFile != null && pf.killFile.exists()) {
       pf.killFile.delete();
       System.out.println("Terminating Process now");
       System.exit(1);
@@ -138,11 +137,11 @@ public class PublisherBase implements ILoggingService {
 
   @Override
   public boolean isDebugLogging() {
-    return pf.debug;
+    return settings.isDebug();
   }
 
   protected boolean isTemplate() throws IOException {
-    File pack = new File(Utilities.path(pf.configFile, "package", "package.json"));
+    File pack = new File(Utilities.path(settings.getConfigFile(), "package", "package.json"));
     if (pack.exists()) {
       JsonObject json = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(pack);
       if (json.has("type") && "fhir.template".equals(json.asString("type"))) {
@@ -272,7 +271,7 @@ public class PublisherBase implements ILoggingService {
   }
 
   protected boolean isNewML() {
-    return pf.newMultiLangTemplateFormat;
+    return settings.isNewMultiLangTemplateFormat();
   }
 
   protected String checkAppendSlash(String s) {
@@ -345,22 +344,14 @@ public class PublisherBase implements ILoggingService {
     return this.pf.isChild;
   }
 
-  public boolean isMilestoneBuild() {
-    return pf.milestoneBuild;
-  }
-
-  public void setMilestoneBuild(boolean milestoneBuild) {
-    this.pf.milestoneBuild = milestoneBuild;
-  }
-
   protected String targetUrl() {
-    if (pf.mode == null)
+    if (settings.getMode() == null)
       return "file://"+ pf.outputDir;
-    switch (pf.mode) {
-    case AUTOBUILD: return pf.targetOutput == null ? "https://build.fhir.org/ig/[org]/[repo]" : pf.targetOutput;
+    switch (settings.getMode()) {
+    case AUTOBUILD: return settings.getTargetOutput() == null ? "https://build.fhir.org/ig/[org]/[repo]" : settings.getTargetOutput();
     case MANUAL: return "file://"+ pf.outputDir;
     case WEBSERVER: return "http://unknown";
-    case PUBLICATION: return pf.targetOutput;
+    case PUBLICATION: return settings.getTargetOutput();
     default: return pf.igpkp.getCanonical();
     }
   }
@@ -553,6 +544,9 @@ public class PublisherBase implements ILoggingService {
     res.add("ActorDefinition");
     res.add("SubscriptionTopic");
     res.add("Requirements");
+    for (String s : pf.customResourceNames) {
+      res.remove(s);
+    }
     return res;
   }
 
@@ -604,14 +598,22 @@ public class PublisherBase implements ILoggingService {
     return inferDefaultNarrativeLang(false);
   }
 
-  protected void addFile(FetchedFile file) {
+  protected void addFile(FetchedFile file, boolean add) {
     //  	if (fileNames.contains(file.getPath())) {
     //  		dlog("Found multiple definitions for file: " + file.getName()+ ".  Using first definition only.");
     //  	} else {
     pf.fileNames.add(file.getPath());
     if (file.getRelativePath()!=null)
       pf.relativeNames.put(file.getRelativePath(), file);
-    pf.changeList.add(file);
+    if (file.getName().contains("menu")) {
+      System.out.println("");
+    }
+    if (add) {
+      pf.fileList.add(file);
+    }
+    if (!settings.isRapidoMode() || pf.hasCheckedDependencies) {
+      pf.changeList.add(file);
+    }
     //  	}
   }
 
@@ -622,7 +624,7 @@ public class PublisherBase implements ILoggingService {
       file.setXslt(ppinfo.getXslt());
       if (ppinfo.hasRelativePath())
         file.setRelativePath(ppinfo.getRelativePath() + File.separator + file.getRelativePath());
-      addFile(file);
+      addFile(file, true);
       pf.altMap.put("pre-page/"+file.getPath(), file);
       return true;
     } else {
@@ -648,7 +650,7 @@ public class PublisherBase implements ILoggingService {
   }
 
   public String getConfigFile() {
-    return pf.configFile;
+    return settings.getConfigFile();
   }
 
   protected StructureDefinition fetchSnapshotted(String url) throws Exception {
@@ -734,7 +736,7 @@ public class PublisherBase implements ILoggingService {
             utils.generateSnapshot(base, sd, sd.getUrl(), null, sd.getName());
           }
         } catch (Exception e) {
-          if (this.pf.debug) {
+          if (this.settings.isDebug()) {
             e.printStackTrace();
           }
           throw new FHIRException("Unable to generate snapshot for "+sd.getUrl()+" in "+f.getName()+" because "+e.getMessage(), e);
@@ -932,20 +934,9 @@ public class PublisherBase implements ILoggingService {
       pf.igPack = s;
   }
 
-  public PublisherUtils.CacheOption getCacheOption() {
-    return pf.cacheOption;
-  }
-
-  public void setCacheOption(PublisherUtils.CacheOption cacheOption) {
-    this.pf.cacheOption = cacheOption;
-  }
 
   public PublisherUtils.IGBuildMode getMode() {
-    return pf.mode;
-  }
-
-  public void setMode(PublisherUtils.IGBuildMode mode) {
-    this.pf.mode = mode;
+    return settings.getMode();
   }
 
   public void setFetcher(SimpleFetcher theFetcher) {
@@ -973,7 +964,7 @@ public class PublisherBase implements ILoggingService {
   }
 
   public void setConfigFileRootPath(String theConfigFileRootPath) {
-    pf.configFileRootPath = theConfigFileRootPath;
+    settings.setConfigFile(theConfigFileRootPath);
   }
 
   public FHIRToolingClient getWebTxServer() {
@@ -982,10 +973,6 @@ public class PublisherBase implements ILoggingService {
 
   public void setWebTxServer(FHIRToolingClient webTxServer) {
     this.pf.webTxServer = webTxServer;
-  }
-
-  public void setDebug(boolean theDebug) {
-    this.pf.debug = theDebug;
   }
 
   public void setIsChild(boolean newIsChild) {
@@ -1008,16 +995,8 @@ public class PublisherBase implements ILoggingService {
     return pf.publishedIg;
   }
 
-  public void setTargetOutput(String targetOutput) {
-    this.pf.targetOutput = targetOutput;
-  }
-
   public String getTargetOutputNested() {
-    return pf.targetOutputNested;
-  }
-
-  public void setTargetOutputNested(String targetOutputNested) {
-    this.pf.targetOutputNested = targetOutputNested;
+    return settings.getTargetOutputNested();
   }
 
   protected FetchedResource getResourceForRef(FetchedFile f, String ref) {
@@ -1243,7 +1222,7 @@ public class PublisherBase implements ILoggingService {
       b.append(time);
       b.append(",");
       b.append(size);
-      if (pf.trackFragments) {
+      if (settings.isTrackFragments()) {
         b.append(",");
         b.append(used);
       }
@@ -1264,7 +1243,7 @@ public class PublisherBase implements ILoggingService {
 
   }
 
-    public class CanonicalVisitor<T> implements DataTypeVisitor.IDatatypeVisitor {
+  public class CanonicalVisitor<T> implements DataTypeVisitor.IDatatypeVisitor {
     private FetchedFile f;
     private boolean snapshotMode;
 
@@ -1283,6 +1262,7 @@ public class PublisherBase implements ILoggingService {
     public boolean visit(String path, DataType node) {
       CanonicalType ct = (CanonicalType) node;
       String url = ct.asStringValue();
+
       if (url == null) {
         return false;
       }
@@ -1380,9 +1360,6 @@ public class PublisherBase implements ILoggingService {
         pp.setChildValue("name", pn);
         pp.setChildValue("valueUri", v);
         pp.setUserData(UserDataNames.auto_added_parameter, true);
-        if (pf.context.getExpansionParameters() != null) {
-          pf.context.getExpansionParameters().addParameter(pn, new UriType(v));
-        }
       }
     }
 

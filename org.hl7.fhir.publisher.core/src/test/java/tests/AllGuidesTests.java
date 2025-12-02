@@ -65,14 +65,15 @@ public class AllGuidesTests {
     
     Publisher pub = new Publisher();
     pub.setConfigFile(p);
-    pub.getPublisherFields().setTxServer(FhirSettings.getTxFhirDevelopment());
-    pub.setCacheOption(PublisherUtils.CacheOption.CLEAR_ALL);
+    pub.getSettings().setTxServer(FhirSettings.getTxFhirDevelopment());
+    pub.settings.setCacheOption(PublisherUtils.CacheOption.CLEAR_ALL);
     pub.execute();
     
     System.out.println("===== Analysis ======================================================================");
     System.out.println("-- output in "+Utilities.path(FhirSettings.getTestIgsPath(), "actual", id+".txt")+" --");
     
-    // to make diff programs easy to run
+    // to make diff programs eas
+    // .y to run
     File actual = new File(Utilities.path(FhirSettings.getTestIgsPath(), "actual", id + ".json"));
     IOUtils.copy(new FileInputStream(Utilities.path(FhirSettings.getTestIgsPath(), id, "output", "qa.json")), new FileOutputStream(actual));
     JsonObject o = JsonParser.parseObject(actual);

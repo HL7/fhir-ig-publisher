@@ -22,6 +22,7 @@ package org.hl7.fhir.igtools.publisher;
 
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
@@ -45,6 +46,7 @@ import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.BasePackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.ToolsVersion;
+import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator;
 
 /**
  * TODO: should we call versionless references ok? not sure....
@@ -80,6 +82,7 @@ public class SpecMapManager {
   private String realm;
   private String npmVId;
   private IContextResourceLoader loader;
+  private JsonObject r5ExampleMap;
   
   private SpecMapManager() {
     
@@ -116,6 +119,7 @@ public class SpecMapManager {
     } catch (Exception e) {
       spec = new JsonObject();
     }
+    base = spec.asString("webUrl");
     paths = spec.forceObject("paths");
     pages = spec.forceObject("pages");
     targets = spec.forceArray("targets");
@@ -236,7 +240,23 @@ public class SpecMapManager {
         return null;
       }
       case Examples:
-        return str(spec, "webUrl")+"/"+rt.toLowerCase()+"-"+id.toLowerCase()+".html";
+        if ("hl7.fhir.r5.examples".equals(pi.name())) {
+          if (r5ExampleMap == null) {
+            ClassLoader classLoader = HierarchicalTableGenerator.class.getClassLoader();
+            InputStream map = classLoader.getResourceAsStream("r5-examples.json");
+            try {
+              r5ExampleMap = JsonParser.parseObject(map);
+            } catch (IOException e) {
+              throw new FHIRException(e);
+            }
+          }
+          JsonObject n = r5ExampleMap.getJsonObject(rt+"/"+id);
+          if (n != null) {
+            return Utilities.pathURL(str(spec, "webUrl"), n.str("path")+".html");
+          }
+        } else if (rt != null && url.startsWith(base)) {
+          return Utilities.pathURL(str(spec, "webUrl"), rt.toLowerCase() + "-" + id.toLowerCase() + ".html");
+        }
       case DICOM:
         try {
           final String fileName = Utilities.urlTail(url) + "json";

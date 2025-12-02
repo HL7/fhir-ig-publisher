@@ -36,19 +36,17 @@ import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.elementmodel.ParserBase;
 import org.hl7.fhir.r5.elementmodel.Property;
 import org.hl7.fhir.r5.formats.FormatUtilities;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.CodeSystem;
+import org.hl7.fhir.r5.model.*;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
-import org.hl7.fhir.r5.model.Resource;
-import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
-import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.utils.UserDataNames;
+import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.r5.utils.xver.XVerExtensionManager;
 import org.hl7.fhir.r5.utils.xver.XVerExtensionManagerFactory;
 import org.hl7.fhir.utilities.LoincLinker;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.json.model.JsonElement;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.model.JsonPrimitive;
@@ -80,6 +78,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   private List<FetchedFile> files;
   private IPublisherModule module;
   private Map<String, List<ExtensionUsage>> coreExtensionMap;
+  private ContextUtilities contextUtilities;
   
   public IGKnowledgeProvider(IWorkerContext context, String pathToSpec, String canonical, JsonObject igs, List<ValidationMessage> errors, boolean noXhtml, Template template, List<String> listedURLExemptions, String altCanonical, List<FetchedFile> files, IPublisherModule module) throws Exception {
     super();
@@ -99,6 +98,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     }
     this.xver = XVerExtensionManagerFactory.createExtensionManager(context);
     this.module = module;
+    contextUtilities = new ContextUtilities(context);
   }
   
   private void loadPaths(JsonObject igs) throws Exception {
@@ -293,6 +293,9 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       return "extension";
     }
 //    if (sd.getKind() == StructureDefinitionKind.LOGICAL)
+    if (r.getElement().getChildValue("kind").equals("resource") && r.getElement().getChildValue("derivation").equals("specialization"))
+      return "resourcedefn";
+    
     return r.getElement().getChildValue("kind") + ("true".equals(r.getElement().getChildValue("abstract")) ? ":abstract" : "");
   }
 
@@ -412,10 +415,18 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   public void findConfiguration(FetchedFile f, FetchedResource r) {
     if (template != null) {
       JsonObject cfg = null;
-      if (r.isCanonical(context)) {
-        if (r.isExample()) {
+      if (cfg == null && r.fhirType().equals("StructureDefinition")) {
+        cfg = defaultConfig.getJsonObject(r.fhirType()+":"+getSDType(r));
+      }
+      if (cfg == null)
+        cfg = template.getConfig(r.fhirType(), r.getId());        
+      if (cfg == null && r.isExample()) {
+        if (r.isCanonical(context))
           cfg = defaultConfig.getJsonObject("example:canonical");
-        }
+        if (cfg == null)
+          cfg = defaultConfig.getJsonObject("example");
+      }        
+      if (cfg == null && r.isCanonical(context)) {
         if (cfg == null) {
           cfg = defaultConfig.getJsonObject(r.fhirType()+":canonical");
         }
@@ -423,14 +434,6 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
           cfg = defaultConfig.getJsonObject("Any:canonical");
         }
       }
-      if (cfg == null && r.isExample()) {
-        cfg = defaultConfig.getJsonObject("example");
-      }        
-      if (cfg == null && r.fhirType().equals("StructureDefinition")) {
-        cfg = defaultConfig.getJsonObject(r.fhirType()+":"+getSDType(r));
-      }
-      if (cfg == null)
-        cfg = template.getConfig(r.fhirType(), r.getId());        
       r.setConfig(cfg);
     }
     if (r.getConfig() == null && resourceConfig != null) {
@@ -566,6 +569,9 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     StructureDefinition sd = context.fetchResource(StructureDefinition.class, ProfileUtilities.sdNs(name, null));
     if (sd != null && sd.hasWebPath())
         return sd.getWebPath();
+    sd = contextUtilities.findType(name);
+    if (sd != null && sd.hasWebPath())
+      return sd.getWebPath();
     brokenLinkMessage(corepath, name, false);
     return name+".html";
   }
@@ -703,7 +709,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       return xver.getReference(url); 
     }
     if (sd != null && sd.hasWebPath()) {
-      if (url.contains("|") || hasMultipleVersions(context.fetchResourcesByUrl(StructureDefinition.class, url))) {
+      if (url.contains("|") || hasMultipleVersions(context.fetchResourceVersions(StructureDefinition.class, url))) {
         return sd.getWebPath()+"|"+sd.getName()+"("+sd.getVersion()+")";        
       } else {
         return sd.getWebPath()+"|"+sd.getName();
@@ -728,8 +734,32 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
 
   @Override
   public String resolveProperty(Property property) {
-    String path = property.getDefinition().getPath();
-    return property.getStructure().getWebPath()+"#"+path;
+    ElementDefinition ed = property.getDefinition();
+    StructureDefinition sd = property.getStructure();
+    String path = ed.getPath();
+    if (ed.getBase().hasPath() && !path.equals(ed.getBase().getPath())) {
+      StructureDefinition sdt = context.fetchTypeDefinition(head(ed.getBase().getPath()));
+      if (sdt != null) {
+        sd = sdt;
+      }
+    }
+    while (sd.getDerivation() == TypeDerivationRule.CONSTRAINT) {
+      StructureDefinition sdt = context.fetchResource(StructureDefinition.class, sd.getBaseDefinition());
+      if (sdt != null) {
+        sd = sdt;
+      } else {
+        break;
+      }
+    }
+    if (sd.getSourcePackage() != null && sd.getSourcePackage().isCore() && VersionUtilities.isR5Plus(sd.getFhirVersion().toCode())) {
+      return sd.getWebPath() + "#X" + path.replace("[x]", "_x_");
+    } else {
+      return sd.getWebPath() + "#" + path.replace("[x]", "_x_");
+    }
+  }
+
+  private String head(String path) {
+    return path.contains(".") ? path.substring(0, path.indexOf(".")) : path;
   }
 
   @Override

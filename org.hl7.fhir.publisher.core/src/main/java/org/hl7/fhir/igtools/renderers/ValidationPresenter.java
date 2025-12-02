@@ -69,10 +69,7 @@ import org.hl7.fhir.r5.terminologies.client.TerminologyClientContext.Terminology
 import org.hl7.fhir.r5.terminologies.client.TerminologyClientManager;
 import org.hl7.fhir.r5.terminologies.client.TerminologyClientManager.InternalLogEvent;
 import org.hl7.fhir.r5.utils.OperationOutcomeUtilities;
-import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
-import org.hl7.fhir.utilities.FileUtilities;
-import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.VersionUtilities;
+import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.i18n.I18nConstants;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
@@ -83,6 +80,8 @@ import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.stringtemplate.v4.ST;
 
 public class ValidationPresenter implements Comparator<FetchedFile> {
+
+  private int vmid = 0;
 
   public enum LanguagePopulationPolicy {
     NONE, IG, OTHERS, ALL;
@@ -473,9 +472,25 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     Collections.sort(list, this);
     return list;
   }
-  
+
+  private boolean hasMessage(List<ValidationMessage> errors, ValidationMessage newMsg) {
+    for (ValidationMessage m : errors) {
+      if (m.preciseMatch(newMsg)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   public String generate(String title, List<ValidationMessage> allErrors, List<FetchedFile> files, String path, SuppressedMessageInformation filteredMessages, String pinned) throws IOException {
     for (FetchedFile f : files) {
+      for (FetchedResource r: f.getResources()) {
+        for (ValidationMessage v : r.getErrors()) {
+          if (!hasMessage(f.getErrors(), v)) {
+            f.getErrors().add(v);
+          }
+        }
+      }
       for (ValidationMessage vm : filterMessages(f, f.getErrors(), false, filteredMessages)) {
         if (vm.getLevel().equals(ValidationMessage.IssueSeverity.FATAL)||vm.getLevel().equals(ValidationMessage.IssueSeverity.ERROR))
           err++;
@@ -491,6 +506,8 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     for (ValidationMessage vm : linkErrors) {
       if (vm.getSource() == Source.LinkChecker) {
         link++;
+      } else if (vm.getLevel() == null) {
+        err++;
       } else if (vm.getLevel().equals(ValidationMessage.IssueSeverity.FATAL)||vm.getLevel().equals(ValidationMessage.IssueSeverity.ERROR))
         err++;
       else if (vm.getLevel().equals(ValidationMessage.IssueSeverity.WARNING))
@@ -521,7 +538,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       if (!f.getErrors().isEmpty()) {
         oo = new OperationOutcome();
         validationBundle.addEntry(new BundleEntryComponent().setResource(oo));
-        ExtensionUtilities.addStringExtension(oo, ExtensionDefinitions.EXT_OO_FILE, f.getName());
+        ExtensionUtilities.addStringExtension(oo, ExtensionDefinitions.EXT_OO_FILE, f.getStatedPath());
         for (ValidationMessage vm : filterMessages(f, f.getErrors(), false, filteredMessages)) {
           oo.getIssue().add(OperationOutcomeUtilities.convertToIssue(vm, oo));
         }
@@ -792,18 +809,23 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     b.append(genHeaderTxt(title, err, warn, info));
     b.append(genSummaryRowTxtInternal(linkErrors));
     files = sorted(files);
-    for (FetchedFile f : files) 
-      b.append(genSummaryRowTxt(f));
+    for (FetchedFile f : files) {
+      if (!f.getResources().isEmpty()) {
+        b.append(genSummaryRowTxt(f));
+      }
+    }
     b.append(genEnd());
     b.append(genStartTxtInternal());
     for (ValidationMessage vm : linkErrors)
       b.append(vm.getDisplay() + "\r\n");
     b.append(genEndTxt());
     for (FetchedFile f : files) {
-      b.append(genStartTxt(f));
-      for (ValidationMessage vm : filterMessages(f, f.getErrors(), false, filteredMessages))
-        b.append(vm.getDisplay() + "\r\n");
-      b.append(genEndTxt());
+      if (!f.getResources().isEmpty()) {
+        b.append(genStartTxt(f));
+        for (ValidationMessage vm : filterMessages(f, f.getErrors(), false, filteredMessages))
+          b.append(vm.getDisplay() + "\r\n");
+        b.append(genEndTxt());
+      }
     }    
     b.append(genFooterTxt(title));
     FileUtilities.stringToFile(b.toString(), FileUtilities.changeFileExt(path, ".txt"));
@@ -815,18 +837,23 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     b.append(genHeaderTxtForCompare(title, err, warn, info));
     b.append(genSummaryRowTxtInternal(linkErrors));
     files = sorted(files);
-    for (FetchedFile f : files) 
-      b.append(genSummaryRowTxt(f));
+    for (FetchedFile f : files) {
+      if (!f.getResources().isEmpty()) {
+        b.append(genSummaryRowTxt(f));
+      }
+    }
     b.append(genEnd());
     b.append(genStartTxtInternal());
     for (ValidationMessage vm : linkErrors)
       b.append(vm.getDisplay() + "\r\n");
     b.append(genEndTxt());
     for (FetchedFile f : files) {
-      b.append(genStartTxt(f));
-      for (ValidationMessage vm : filterMessages(f, f.getErrors(), false, filteredMessages))
-        b.append(vm.getDisplay() + "\r\n");
-      b.append(genEndTxt());
+      if (!f.getResources().isEmpty()) {
+        b.append(genStartTxt(f));
+        for (ValidationMessage vm : filterMessages(f, f.getErrors(), false, filteredMessages))
+          b.append(vm.getDisplay() + "\r\n");
+        b.append(genEndTxt());
+      }
     }    
     b.append(genFooterTxt(title));
     FileUtilities.stringToFile(b.toString(), FileUtilities.changeFileExt(path, ".compare.txt"));
@@ -840,7 +867,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     files = sorted(files);
 
     for (FetchedFile f : files) {
-      if (allIssues || hasIssues(f, filteredMessages)) {
+      if (hasIssues(f, filteredMessages) || (!f.getResources().isEmpty() || allIssues)) {
         b.append(genSummaryRow(f, filteredMessages));
       }
     }
@@ -855,7 +882,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
 
     int i = 0;
     for (FetchedFile f : files) {
-      if (allIssues || hasIssues(f, filteredMessages)) {
+      if (hasIssues(f, filteredMessages) || (!f.getResources().isEmpty() || allIssues)) {
         i++;
         b.append(genStart(f, i));
         if (countNonSignpostMessages(f, filteredMessages))
@@ -994,7 +1021,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
           passesFilter = false;
         }
       }
-      if (message.getLevel().isError()) {
+      if (message.getLevel() != null && message.getLevel().isError()) {
         if (suppressedMessages.contains(message.getDisplay(), message) || suppressedMessages.contains(message.getMessage(), message) ||
             suppressedMessages.contains(message.getHtml(), message) || suppressedMessages.contains(message.getMessageId(), message) || 
             suppressedMessages.contains(message.getInvId(), message)) {
@@ -1165,18 +1192,28 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       "   <tr style=\"background-color: $halfcolor$\">\r\n"+
       "     <td><a href=\"$xlink$\">$fpath$</a></td><td><b>$msg$</b>$comment$</td>\r\n"+
       "   </tr>\r\n";
-  
-  
-  private final String detailsTemplateTxLink = 
-      "   <tr style=\"background-color: $color$\">\r\n"+
-      "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$</a>, see <a href=\"$tx$\">log</a>) <span class=\"code-value code-hidden\" style=\"font-size: 8px; color: navy\">$mid$</span></td>\r\n"+
-      "   </tr>\r\n";
-  
-  private final String detailsTemplateTxNoLink = 
-      "   <tr style=\"background-color: $color$\">\r\n"+
-      "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$</a>) <span class=\"code-value code-hidden\" style=\"font-size: 8px; color: navy\">$mid$</span></td>\r\n"+
-      "   </tr>\r\n";
-  
+
+
+  private final String detailsTemplateTxLink =
+          "   <tr style=\"background-color: $color$\">\r\n"+
+                  "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$</a>, see <a href=\"$tx$\">log</a>) <span class=\"code-value code-hidden\" style=\"font-size: 8px; color: navy\">$mid$</span></td>\r\n"+
+                  "   </tr>\r\n";
+
+  private final String detailsTemplateTxLinkDiagnostics =
+          "   <tr style=\"background-color: $color$\">\r\n"+
+                  "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$</a>, see <a href=\"$tx$\">log</a>, or see <a href=\"#$vmid$\" onClick=\"document.getElementById('$vmid$').style.display='block'\">the servers logic</a>) <span class=\"code-value code-hidden\" style=\"font-size: 8px; color: navy\">$mid$</span><div id=\"$vmid$\" style=\"display:none\"><br/><pre>$diags$</pre></div></td>\r\n"+
+                  "   </tr>\r\n";
+
+  private final String detailsTemplateTxNoLink =
+          "   <tr style=\"background-color: $color$\">\r\n"+
+                  "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$</a>) <span class=\"code-value code-hidden\" style=\"font-size: 8px; color: navy\">$mid$</span></td>\r\n"+
+                  "   </tr>\r\n";
+
+  private final String detailsTemplateTxNoLinkDiagnostics =
+          "   <tr style=\"background-color: $color$\">\r\n"+
+                  "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$</a> - see <a href=\"#$vmid$\" onClick=\"document.getElementById('$vmid$').style.display='block'\">the servers logic</a>) <span class=\"code-value code-hidden\" style=\"font-size: 8px; color: navy\">$mid$</span><div id=\"$vmid$\" style=\"display:none\"><br/><pre>$diags$</pre></div></td>\r\n"+
+                  "   </tr>\r\n";
+
   private final String detailsTemplateWithExtraDetails = 
       "   <tr style=\"background-color: $color$\">\r\n"+
       "     <td><b><a href=\"$pathlink$\">$path$</a></b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ <span id=\"s$id$\" class=\"flip\" onclick=\"flip('$id$')\">Show Reasoning</span><div id=\"$id$\" style=\"display: none\"><p>&nbsp;</p>$msgdetails$</div> <span class=\"code-value code-hidden\" style=\"font-size: 8px; color: navy\">$mid$</span></td>\r\n"+
@@ -1622,9 +1659,9 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     t.add("link", makelink(f));
     t.add("filename", f.getName());
     t.add("path", makeLocal(f.getPath()));
-    String link = provider.getLinkFor(f.getResources().get(0), true);
+    String link = f.getResources().isEmpty() ? null : provider.getLinkFor(f.getResources().get(0), true);
     if (link==null) {
-      link = altProvider.getLinkFor(f.getResources().get(0), true);
+      link = f.getResources().isEmpty() ? null : altProvider.getLinkFor(f.getResources().get(0), true);
     }
     if (link != null) { 
       link = link.replace("{{[id]}}", f.getResources().get(0).getId());
@@ -1692,9 +1729,17 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     } else if (vm.getLocationLink() != null) {
       tid = detailsTemplateWithLink;
     } else if (vm.getTxLink() != null) {
-      tid = detailsTemplateTxLink;
+      if (vm.getDiagnostics() != null) {
+        tid = detailsTemplateTxLinkDiagnostics;
+      } else {
+        tid = detailsTemplateTxLink;
+      }
     } else if (vm.getServer() != null) {
-      tid = detailsTemplateTxNoLink;
+      if (vm.getDiagnostics() != null) {
+        tid = detailsTemplateTxNoLinkDiagnostics;
+      } else {
+        tid = detailsTemplateTxNoLink;
+      }
     } else {
       tid = detailsTemplate;
     }
@@ -1712,6 +1757,8 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     t.add("halfcolor", halfColorForLevel(vm.getLevel(), vm.isSignpost()));
     t.add("id", "l"+id);
     t.add("mid", vm.getMessageId());
+    t.add("diags", vm.getDiagnostics());
+    t.add("vmid", "vmi"+(++vmid));
     t.add("msg", (isNewRule(vm) ? "<img style=\"vertical-align: text-bottom\" src=\"new.png\" height=\"16px\" width=\"36px\" alt=\"New Rule as of "+date(vm)+": \"> " : "")+ vm.getHtml());
     if (!vm.hasSliceInfo()) {      
       t.add("msgdetails",  vm.getHtml());

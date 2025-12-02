@@ -331,7 +331,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
   }
   
   @Override
-  public List<FetchedFile> scan(String sourceDir, IWorkerContext context, boolean autoPath) throws IOException, FHIRException {
+  public List<FetchedFile> scan(String sourceDir, IWorkerContext context, boolean autoPath, List<String> exemptions) throws IOException, FHIRException {
     List<String> sources = new ArrayList<String>();
     if (sourceDir != null)
       sources.add(sourceDir);
@@ -346,7 +346,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
       File file = new File(s);
       if (file.exists()) {
         for (File f : file.listFiles()) {
-          if (!f.isDirectory()) {
+          if (!f.isDirectory() && !exemptions.contains(f.getAbsolutePath())) {
 //            System.out.println("scanning: "+f.getAbsolutePath());
             String fn = f.getCanonicalPath();
             String ext = Utilities.getFileExtension(fn);
@@ -542,14 +542,16 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
   }
   
   public void scanFolders(File dir, List<String> dirs) {
-    dirs.add(dir.getAbsolutePath());
-    File[] list = dir.listFiles();
-    if (list != null) {
-      for (File f : list) {
-        if (f.isDirectory()) {
-          scanFolders(f, dirs);
+    if (!dir.getName().equals("invariant-tests")) {
+      dirs.add(dir.getAbsolutePath());
+      File[] list = dir.listFiles();
+      if (list != null) {
+        for (File f : list) {
+          if (f.isDirectory()) {
+            scanFolders(f, dirs);
+          }
         }
-      }    
+      }
     }
   }
 

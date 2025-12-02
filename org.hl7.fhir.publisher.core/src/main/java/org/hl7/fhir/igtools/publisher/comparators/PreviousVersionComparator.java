@@ -345,12 +345,12 @@ public class PreviousVersionComparator {
   }
 
 
-  public void addOtherFiles(Set<String> otherFilesRun, String outputDir) throws IOException {
+  public void addOtherFiles(Set<String> otherFilesRun, String outputDir, List<String> exemptHtmlPatterns) throws IOException {
     for (VersionInstance vi : versionList) {
       otherFilesRun.add(Utilities.path(outputDir, "comparison-v"+vi.version));
+      exemptHtmlPatterns.add("comparison-v"+vi.version.replace(".", "\\.")+".*");
     }
   }
-
   public String checkHtml() {
     if (errMsg != null) {
       return "Unable to compare with previous version: "+errMsg;
