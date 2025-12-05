@@ -25,6 +25,7 @@ public class GitUtilitiesTests {
 
 	public static final String VALID_URL = "https://github.com/FHIR/fhir-core-examples.git";
 	public static final String USERNAME_AND_TOKEN_URL = "https://username:token@github.com/FHIR/fhir-core-examples.git";
+	public static final String SSH_URL = "git@github.com:FHIR/fhir-core-examples.git";
 	public static final String NORMAL_BRANCH = "normal-branch";
 	public static final String WORKTREE_BRANCH = "branch-a";
 
@@ -98,7 +99,8 @@ public class GitUtilitiesTests {
 	@CsvSource(value= {
 			VALID_URL+","+VALID_URL,
 			"whwehwhasdlksdjsdf,''",
-			USERNAME_AND_TOKEN_URL+","+ VALID_URL})
+			USERNAME_AND_TOKEN_URL+","+ VALID_URL,
+			SSH_URL+","+SSH_URL})
 	void testGetGitSource(String url, String expected) throws IOException, InterruptedException {
 		File gitRoot = initiateGitDirectory();
 		createOriginURL(gitRoot, url);
@@ -110,7 +112,9 @@ public class GitUtilitiesTests {
 	@CsvSource(value= {
 			VALID_URL+","+VALID_URL,
 			"whwehwhasdlksdjsdf,NULL",
-			USERNAME_AND_TOKEN_URL+","+VALID_URL}, nullValues={"NULL"})
+			USERNAME_AND_TOKEN_URL+","+VALID_URL,
+			SSH_URL+","+SSH_URL,
+			"deploy@gitlab.example.com:org/repo.git,deploy@gitlab.example.com:org/repo.git"}, nullValues={"NULL"})
 	public void testGetURLWithNoUserInfo(String url, String expected) {
 		String result = GitUtilities.getURLWithNoUserInfo(url, "test");
 		assertThat(result).isEqualTo(expected);
