@@ -540,6 +540,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
   @Override
   public Set<ResourceVersionInformation> fetchCanonicalResourceVersions(IResourceValidator validator, Object appContext, String url) {
     Set<ResourceVersionInformation> res = new HashSet<>();
+    Set<String> versions = new HashSet<>();
     for (Resource r : context.fetchResourceVersions(Resource.class, url)) {
       if (r instanceof CanonicalResource) {
         
@@ -554,14 +555,22 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
               // ?? res.add(cr.hasVersion() ? cr.getVersion() : "{{unversioned}}");                          
             }
           } else {
-            res.add(new ResourceVersionInformation(cr.hasVersion() ? cr.getVersion() : "{{unversioned}}", cr.getSourcePackage()));
+            checkAddResourceVersion(res, versions, cr);
           }
         } else {
-          res.add(new ResourceVersionInformation(cr.hasVersion() ? cr.getVersion() : "{{unversioned}}", cr.getSourcePackage()));
+          checkAddResourceVersion(res, versions, cr);
         }
       }
     }
     return res;
+  }
+
+  private static void checkAddResourceVersion(Set<ResourceVersionInformation> res, Set<String> versions, CanonicalResource cr) {
+    String version = cr.hasVersion() ? cr.getVersion() : "{{unversioned}}";
+    if (!versions.contains(version)) {
+      versions.add(version);
+      res.add(new ResourceVersionInformation(version, cr.getSourcePackage()));
+    }
   }
 
   public Map<String, String> fetchCanonicalResourceVersionMap(IResourceValidator validator, Object appContext, String url) {

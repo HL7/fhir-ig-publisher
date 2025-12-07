@@ -371,9 +371,9 @@ public class PublisherSigner {
 
     JWSHeader.Builder builder = new JWSHeader.Builder(jwk.getKeyType().toString().equals("EC") ? JWSAlgorithm.ES256 : JWSAlgorithm.RS256).type(JOSEObjectType.JOSE);
     builder.keyID(jwk.getKeyID());
-    builder.customParam("sigT", when).customParam("canon", canonMethod);
+    builder.customParam(DigitalSignatureSupport.JWT_HEADER_SIGT, when).customParam("canon", canonMethod);
     if (purpose != null) {
-      builder.customParam("srCms", makeSrCMS(purpose, purposeDesc));
+      builder.customParam(DigitalSignatureSupport.JWT_HEADER_SRCMS, makeSrCMS(purpose, purposeDesc));
     }
  // Add the certificate chain
     try {
