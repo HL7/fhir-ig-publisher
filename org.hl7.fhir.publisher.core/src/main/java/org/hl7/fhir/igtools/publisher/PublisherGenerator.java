@@ -51,6 +51,7 @@ import org.hl7.fhir.r5.renderers.spreadsheets.ConceptMapSpreadsheetGenerator;
 import org.hl7.fhir.r5.renderers.spreadsheets.StructureDefinitionSpreadsheetGenerator;
 import org.hl7.fhir.r5.renderers.spreadsheets.ValueSetSpreadsheetGenerator;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
+import org.hl7.fhir.r5.renderers.utils.Resolver;
 import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
 import org.hl7.fhir.r5.terminologies.TerminologyUtilities;
 import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
@@ -87,6 +88,7 @@ import java.io.*;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
@@ -197,6 +199,7 @@ public class PublisherGenerator extends PublisherBase {
       }
     }
   }
+
 
   public PublisherGenerator(PublisherSettings settings) {
     super(settings);
@@ -331,6 +334,12 @@ public class PublisherGenerator extends PublisherBase {
     }
     pf.otherFilesRun.add(Utilities.path(pf.tempDir, "usage-stats.json"));
 
+    Set<String> urls = new HashSet<>();
+    for (DataSetInformation t : pf.dataSets) {
+      processDataSet(urls, t);
+    }
+    saveResolvedUrls(urls);
+
     printMemUsage();
     log("Reclaiming memory...");
     cleanOutput(pf.tempDir);
@@ -390,6 +399,9 @@ public class PublisherGenerator extends PublisherBase {
         addFileToNpm(NPMPackageGenerator.Category.OTHER, "validation-oo.json", validationSummaryOO());
         for (String t : pf.testDirs) {
           addTestDir(new File(t), t);
+        }
+        for (DataSetInformation t : pf.dataSets) {
+          processDataSetContent(t);
         }
         for (String n : pf.otherDirs) {
           File f = new File(n);
@@ -676,6 +688,7 @@ public class PublisherGenerator extends PublisherBase {
 
   private void generateHtmlOutputsInner(FetchedFile f, boolean regen, DBBuilder db, String lang, RenderingContext lrc)
           throws IOException, FileNotFoundException, Exception, Error {
+    lrc = lrc.copy(true); // whatever happens in here shouldn't alter the settings on the base RenderingContext
     saveFileOutputs(f, lang);
     for (FetchedResource r : f.getResources()) {
 
@@ -1118,8 +1131,9 @@ public class PublisherGenerator extends PublisherBase {
         }
         fragment(rX.fhirType()+"-"+rX.getId()+"-html", html, f.getOutputNames(), rX, vars, null, start, "html", "Resource", lang);
       } else {
-        if (xhtml == null) {
+        if (xhtml == null || rX.isGeneratedNarrative()) {
           RenderingContext xlrc = lrc.copy(false);
+          xlrc.setRules(RenderingContext.GenerationRules.IG_PUBLISHER);
           ResourceRenderer rr = RendererFactory.factory(rX.fhirType(), xlrc);
           if (lr != null && lr instanceof DomainResource) {
 // Lloyd debug - getting here and dying
@@ -1886,7 +1900,7 @@ public class PublisherGenerator extends PublisherBase {
     }
     if (wantGen(r, "maps")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-maps", sdr.mappings(this.pf.igpkp.getDefinitionsName(r), this.pf.otherFilesRun), f.getOutputNames(), r, vars, null, start, "maps", "StructureDefinition", lang);
+         fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-maps", sdr.mappings(this.pf.igpkp.getDefinitionsName(r), this.pf.otherFilesRun), f.getOutputNames(), r, vars, null, start, "maps", "StructureDefinition", lang);
     }
     if (wantGen(r, "xref")) {
       long start = System.currentTimeMillis();
@@ -4244,6 +4258,69 @@ public class PublisherGenerator extends PublisherBase {
   }
 
 
+  private void saveResolvedUrls(Set<String> urls) throws IOException {
+    JsonObject map = new JsonObject();
+    for (String url : urls) {
+      Resolver.ResourceWithReference link = pf.resolver.resolve(pf.rc, url, null);
+      if (link != null) {
+        map.add(url, link.getWebPath());
+      } else {
+        System.out.println("Unresolved URL: "+url);
+      }
+    }
+    String j = org.hl7.fhir.utilities.json.parser.JsonParser.compose(map, false);
+    String p = Utilities.path(pf.tempDir, "url-literals.json");
+    FileUtilities.stringToFile(j, p);
+    pf.otherFilesRun.add(p);
+  }
+
+  private void processDataSet(Set<String> urls, DataSetInformation dsi) throws FileNotFoundException, IOException {
+    log("Process DataSet '"+dsi.getConfig().asString("name")+"'");
+
+    if (isNewML()) {
+      for (String l : allLangs()) {
+        ClientSideIndexBuilder ib = new ClientSideIndexBuilder(
+                pf.cu, pf.validator.getFHIRPathEngine(), pf.rc.copy(true),
+                dsi.getConfig().asString("resourceType"), dsi.getAllSearchParameters(),
+                dsi.name(), Utilities.path(pf.rootDir, dsi.getConfig().asString("source")), Utilities.path(pf.tempDir, l));
+        ib.build();
+        urls.addAll(ib.getUrls());
+        pf.otherFilesRun.add(Utilities.path(pf.tempDir, l, dsi.getConfig().asString("name")+"-index.json"));
+        pf.otherFilesRun.add(Utilities.path(pf.tempDir, l, dsi.getConfig().asString("name")+"-index.js"));
+        pf.otherFilesRun.add(Utilities.path(pf.tempDir, l, dsi.getConfig().asString("name")+"-data.json"));
+        pf.otherFilesRun.add(Utilities.path(pf.tempDir, l, dsi.getConfig().asString("name")+"-data.js"));
+      }
+    } else {
+      ClientSideIndexBuilder ib = new ClientSideIndexBuilder(
+              pf.cu, pf.validator.getFHIRPathEngine(), pf.rc.copy(true),
+              dsi.getConfig().asString("resourceType"), dsi.getSearchParameters(),
+              dsi.name(), Utilities.path(pf.rootDir, dsi.getConfig().asString("source")), pf.tempDir);
+      ib.build();
+      urls.addAll(ib.getUrls());
+      pf.otherFilesRun.add(Utilities.path(pf.tempDir, dsi.getConfig().asString("name")+"-index.json"));
+      pf.otherFilesRun.add(Utilities.path(pf.tempDir, dsi.getConfig().asString("name")+"-index.js"));
+      pf.otherFilesRun.add(Utilities.path(pf.tempDir, dsi.getConfig().asString("name")+"-data.json"));
+      pf.otherFilesRun.add(Utilities.path(pf.tempDir, dsi.getConfig().asString("name")+"-data.js"));
+    }
+  }
+
+  private void processDataSetContent(DataSetInformation t) throws FileNotFoundException, IOException {
+    String src = Utilities.path(pf.rootDir, t.getConfig().asString("source"));
+    processDataSetFolder(new File(src), src);
+  }
+
+  private void processDataSetFolder(File dir, String t) throws FileNotFoundException, IOException {
+    for (File f : dir.listFiles()) {
+      if (f.isDirectory()) {
+        processDataSetFolder(f, t);
+      } else if (!f.getName().equals(".DS_Store")) {
+        String s = FileUtilities.getRelativePath(t, dir.getAbsolutePath());
+        addFileToNpm(Utilities.noString(s) ?  "data" : Utilities.path("data", s), f.getName(), FileUtilities.fileToBytes(f));
+      }
+    }
+  }
+
+
   private String checkPlural(String word, int c) {
     return c == 1 ? word : Utilities.pluralizeMe(word);
   }
@@ -4314,8 +4391,13 @@ public class PublisherGenerator extends PublisherBase {
             String value = null;
             String reference = null;
             if (uc.getValueReference().hasReference()) {
-              reference = uc.getValueReference().getReference().contains(":") ? "" : pf.igpkp.getCanonical() + "/";
-              reference += uc.getValueReference().getReference();
+              Resolver.ResourceWithReference rr = pf.rc.getResolver().resolve(pf.rc, uc.getValueReference().getReference(), null);
+              if (rr != null) {
+                reference = rr.getWebPath();
+              } else {
+                reference = uc.getValueReference().getReference().contains(":") ? "" : pf.igpkp.getCanonical() + "/";
+                reference += uc.getValueReference().getReference();
+              }
             }
             if (uc.getValueReference().hasDisplay()) {
               if (reference != null)
@@ -5712,7 +5794,7 @@ public class PublisherGenerator extends PublisherBase {
     }
     try {
       boolean changed = false;
-      String[] keywords = {"sql", "fragment", "json", "class-diagram", "uml", "multi-map", "lang-fragment"};
+      String[] keywords = {"sql", "fragment", "json", "class-diagram", "uml", "multi-map", "lang-fragment", "dataset"};
       for (String keyword: Arrays.asList(keywords)) {
 
         while (db != null && src.contains("{% " + keyword)) {
@@ -5754,6 +5836,10 @@ public class PublisherGenerator extends PublisherBase {
 
               case "json":
                 substitute = processJson(arguments, f);
+                break;
+
+              case "dataset":
+                substitute = processDataset(arguments, f);
                 break;
 
               case "class-diagram":
@@ -5928,6 +6014,20 @@ public class PublisherGenerator extends PublisherBase {
     int i = this.pf.sqlIndex++;
     fragment("sql-"+i+"-fragment", output, f.getOutputNames(), start, "sql", "SQL", null);
     return "{% include sql-"+i+"-fragment.xhtml %}";
+  }
+
+  private String processDataset(String arguments, FetchedFile f) throws FHIRException, IOException {
+    String[] params = arguments.split(" ");
+    DataSetInformation dsi = null;
+    for (DataSetInformation t : pf.dataSets) {
+      if (t.name().equals(params[1])) {
+        dsi = t;
+      }
+    }
+    if (dsi == null) {
+      throw new Error("Unable to find dataset "+params[1]);
+    }
+    return dsi.buildFragment(params[0]);
   }
 
   private String processJson(String arguments, FetchedFile f) throws FHIRException, IOException {

@@ -215,6 +215,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       loader.setPf(pf);
       processor.setPf(pf);
       generator.setPf(pf);
+      pf.resolver = this;
       setLogger(this);
 
       pf.tt = new TimeTracker();
@@ -856,7 +857,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 
     if (path != null) {
       InputStream s = null;
-      if (sp.getNpm() != null && fp.contains("/") && sp.getLoader() != null) {
+      if (rt != null && sp.getNpm() != null && fp.contains("/") && sp.getLoader() != null) {
         s = sp.getNpm().loadExampleResource(rt, id);
       }
       if (s == null) {

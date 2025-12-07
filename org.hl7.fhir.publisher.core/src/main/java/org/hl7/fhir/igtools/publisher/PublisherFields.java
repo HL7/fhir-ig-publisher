@@ -22,6 +22,7 @@ import org.hl7.fhir.r5.model.Enumeration;
 import org.hl7.fhir.r5.renderers.DataRenderer;
 import org.hl7.fhir.r5.renderers.spreadsheets.StructureDefinitionSpreadsheetGenerator;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
+import org.hl7.fhir.r5.renderers.utils.Resolver;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator;
 import org.hl7.fhir.r5.utils.client.FHIRToolingClient;
 import org.hl7.fhir.r5.utils.formats.CSVWriter;
@@ -68,6 +69,7 @@ public class PublisherFields {
     List<String> resourceFactoryDirs = new ArrayList<String>();
     List<String> pagesDirs = new ArrayList<String>();
     List<String> testDirs = new ArrayList<String>();
+    List<DataSetInformation> dataSets = new ArrayList<DataSetInformation>();
     List<String> dataDirs = new ArrayList<String>();
     List<String> otherDirs = new ArrayList<String>();
     String tempDir;
@@ -303,4 +305,5 @@ public class PublisherFields {
     public boolean hasCheckedDependencies;
     public boolean saveExpansionParams;
     @Getter private List<String> exemptHtmlPatterns = new ArrayList<>();
+    Resolver.IReferenceResolver resolver;
 }

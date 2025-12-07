@@ -27,6 +27,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.hl7.fhir.convertors.misc.ProfileVersionAdaptor.ConversionMessage;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
@@ -87,6 +89,7 @@ public class FetchedResource {
   private boolean regenAfterValidation;
   private Map<String, AlternativeVersionResource> otherVersions;
   private boolean umlGenerated;
+  @Getter @Setter private boolean generatedNarrative; // if we generate the narrative, we'll regenerate it later
 
   public FetchedResource(String nameForErrors) {
     super();
