@@ -1257,6 +1257,7 @@ public class PublisherProcessor extends PublisherBase  {
                     }
                   }
                   if (regen) {
+                    r.setGeneratedNarrative(true);
                     org.hl7.fhir.r5.elementmodel.Element e = convertToElement(r, r.getResource());
                     e.copyUserData(r.getElement());
                     r.setElement(e);

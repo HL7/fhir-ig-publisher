@@ -372,6 +372,9 @@ public class PublisherIGLoader extends PublisherBase {
         case "path-test":
           pf.testDirs.add(Utilities.path(pf.rootDir, p.getValue()));
           break;
+        case "dataset":
+          pf.dataSets.add(loadDataset(Utilities.path(pf.rootDir, p.getValue())));
+          break;
         case "path-data":
           pf.dataDirs.add(Utilities.path(pf.rootDir, p.getValue()));
           break;
@@ -1053,7 +1056,7 @@ public class PublisherIGLoader extends PublisherBase {
 
     // set up validator;
     pf.validatorSession = new ValidatorSession();
-    IGPublisherHostServices hs = new IGPublisherHostServices(pf.igpkp, pf.fileList, pf.context, new DateTimeType(pf.getExecTime()), new StringType(pf.igpkp.specPath()));
+    IGPublisherHostServices hs = new IGPublisherHostServices(pf.igpkp, pf.fileList, pf.context, new DateTimeType(pf.getExecTime()), new DateType(pf.getExecTime()), new StringType(pf.igpkp.specPath()));
     hs.registerFunction(new GlobalObject.GlobalObjectRandomFunction());
     hs.registerFunction(new BaseTableWrapper.TableColumnFunction());
     hs.registerFunction(new BaseTableWrapper.TableDateColumnFunction());
@@ -1084,7 +1087,7 @@ public class PublisherIGLoader extends PublisherBase {
     pf.validator.getExtensionDomains().addAll(extensionDomains);
     pf.validator.setNoExperimentalContent(pf.noExperimentalContent);
     pf.validator.getExtensionDomains().add(ExtensionDefinitions.EXT_PRIVATE_BASE);
-    pf.validationFetcher = new ValidationServices(pf.context, pf.igpkp, pf.sourceIg, pf.fileList, pf.npmList, pf.bundleReferencesResolve, pf.specMaps, pf.module);
+    pf.validationFetcher = new ValidationServices(pf.context, pf.igpkp, pf.sourceIg, pf.fileList, pf.npmList, pf.bundleReferencesResolve, pf.specMaps, pf.linkSpecMaps, pf.module);
     pf.validator.setFetcher(pf.validationFetcher);
     pf.validator.setPolicyAdvisor(pf.validationFetcher);
     pf.validator.getSettings().setR5BundleRelativeReferencePolicy(r5BundleRelativeReferencePolicy);
@@ -1135,6 +1138,12 @@ public class PublisherIGLoader extends PublisherBase {
       pf.extensionTracker.setoptIn(!ini.getBooleanProperty("IG", "usage-stats-opt-out"));
 
     log("Initialization complete");
+  }
+
+  private DataSetInformation loadDataset(String t) throws IOException {
+    DataSetInformation dsi = new DataSetInformation(org.hl7.fhir.utilities.json.parser.JsonParser.parseObjectFromFile(t));
+    dsi.load(pf.rootDir);
+    return dsi;
   }
 
   public void clearTempFolder() throws Exception {

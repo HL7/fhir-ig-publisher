@@ -13,11 +13,7 @@ import org.hl7.fhir.r5.fhirpath.FHIRPathEngine;
 import org.hl7.fhir.r5.fhirpath.TypeDetails;
 import org.hl7.fhir.r5.liquid.GlobalObject;
 import org.hl7.fhir.r5.fhirpath.ExpressionNode.CollectionStatus;
-import org.hl7.fhir.r5.model.Base;
-import org.hl7.fhir.r5.model.DateTimeType;
-import org.hl7.fhir.r5.model.Resource;
-import org.hl7.fhir.r5.model.StringType;
-import org.hl7.fhir.r5.model.ValueSet;
+import org.hl7.fhir.r5.model.*;
 import org.hl7.fhir.r5.utils.validation.IResourceValidator;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.fhirpath.FHIRPathConstantEvaluationMode;
@@ -29,15 +25,17 @@ public class IGPublisherHostServices extends BaseHostServices {
   private List<FetchedFile> fileList = new ArrayList<FetchedFile>();
   private SimpleWorkerContext context;
   private DateTimeType dt;
+  private DateType dtD;
   private StringType pathToSpec;
   
   public IGPublisherHostServices(IGKnowledgeProvider igpkp, List<FetchedFile> fileList,
-      SimpleWorkerContext context, DateTimeType dt, StringType pathToSpec) {
+                                 SimpleWorkerContext context, DateTimeType dt, DateType dtD, StringType pathToSpec) {
     super(context);
     this.igpkp = igpkp;
     this.fileList = fileList;
     this.context = context;
     this.dt = dt;
+    this.dtD = dtD;
     this.pathToSpec = pathToSpec;
   }
   
@@ -45,7 +43,7 @@ public class IGPublisherHostServices extends BaseHostServices {
   public List<Base> resolveConstant(FHIRPathEngine engine, Object appContext, String name, FHIRPathConstantEvaluationMode mode) throws PathEngineException {
     if ("Globals".equals(name)) {
       List<Base> list = new ArrayList<Base>();
-      list.add(new GlobalObject(dt, pathToSpec));
+      list.add(new GlobalObject(dt, dtD, pathToSpec));
       return list;
     } else {
       return new ArrayList<>();
