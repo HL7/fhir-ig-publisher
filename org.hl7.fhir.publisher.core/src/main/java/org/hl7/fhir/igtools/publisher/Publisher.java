@@ -215,6 +215,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       loader.setPf(pf);
       processor.setPf(pf);
       generator.setPf(pf);
+      pf.resolver = this;
       setLogger(this);
 
       pf.tt = new TimeTracker();

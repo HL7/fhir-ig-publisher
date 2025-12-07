@@ -331,6 +331,12 @@ public class PublisherGenerator extends PublisherBase {
     }
     pf.otherFilesRun.add(Utilities.path(pf.tempDir, "usage-stats.json"));
 
+    Set<String> urls = new HashSet<>();
+    for (DataSetInformation t : pf.dataSets) {
+      processDataSet(urls, t);
+    }
+    saveResolvedUrls(urls);
+
     printMemUsage();
     log("Reclaiming memory...");
     cleanOutput(pf.tempDir);
@@ -390,6 +396,9 @@ public class PublisherGenerator extends PublisherBase {
         addFileToNpm(NPMPackageGenerator.Category.OTHER, "validation-oo.json", validationSummaryOO());
         for (String t : pf.testDirs) {
           addTestDir(new File(t), t);
+        }
+        for (DataSetInformation t : pf.dataSets) {
+          processDataSetContent(t);
         }
         for (String n : pf.otherDirs) {
           File f = new File(n);
@@ -4244,6 +4253,69 @@ public class PublisherGenerator extends PublisherBase {
   }
 
 
+  private void saveResolvedUrls(Set<String> urls) throws IOException {
+    JsonObject map = new JsonObject();
+    for (String url : urls) {
+      Resolver.ResourceWithReference link = pf.resolver.resolve(pf.rc, url, null);
+      if (link != null) {
+        map.add(url, link.getWebPath());
+      } else {
+        System.out.println("Unresolved URL: "+url);
+      }
+    }
+    String j = org.hl7.fhir.utilities.json.parser.JsonParser.compose(map, false);
+    String p = Utilities.path(pf.tempDir, "url-literals.json");
+    FileUtilities.stringToFile(j, p);
+    pf.otherFilesRun.add(p);
+  }
+
+  private void processDataSet(Set<String> urls, DataSetInformation dsi) throws FileNotFoundException, IOException {
+    log("Process DataSet '"+dsi.getConfig().asString("name")+"'");
+
+    if (isNewML()) {
+      for (String l : allLangs()) {
+        ClientSideIndexBuilder ib = new ClientSideIndexBuilder(
+                pf.cu, pf.validator.getFHIRPathEngine(), pf.rc.copy(true),
+                dsi.getConfig().asString("resourceType"), dsi.getAllSearchParameters(),
+                dsi.name(), Utilities.path(pf.rootDir, dsi.getConfig().asString("source")), Utilities.path(pf.tempDir, l));
+        ib.build();
+        urls.addAll(ib.getUrls());
+        pf.otherFilesRun.add(Utilities.path(pf.tempDir, l, dsi.getConfig().asString("name")+"-index.json"));
+        pf.otherFilesRun.add(Utilities.path(pf.tempDir, l, dsi.getConfig().asString("name")+"-index.js"));
+        pf.otherFilesRun.add(Utilities.path(pf.tempDir, l, dsi.getConfig().asString("name")+"-data.json"));
+        pf.otherFilesRun.add(Utilities.path(pf.tempDir, l, dsi.getConfig().asString("name")+"-data.js"));
+      }
+    } else {
+      ClientSideIndexBuilder ib = new ClientSideIndexBuilder(
+              pf.cu, pf.validator.getFHIRPathEngine(), pf.rc.copy(true),
+              dsi.getConfig().asString("resourceType"), dsi.getSearchParameters(),
+              dsi.name(), Utilities.path(pf.rootDir, dsi.getConfig().asString("source")), pf.tempDir);
+      ib.build();
+      urls.addAll(ib.getUrls());
+      pf.otherFilesRun.add(Utilities.path(pf.tempDir, dsi.getConfig().asString("name")+"-index.json"));
+      pf.otherFilesRun.add(Utilities.path(pf.tempDir, dsi.getConfig().asString("name")+"-index.js"));
+      pf.otherFilesRun.add(Utilities.path(pf.tempDir, dsi.getConfig().asString("name")+"-data.json"));
+      pf.otherFilesRun.add(Utilities.path(pf.tempDir, dsi.getConfig().asString("name")+"-data.js"));
+    }
+  }
+
+  private void processDataSetContent(DataSetInformation t) throws FileNotFoundException, IOException {
+    String src = Utilities.path(pf.rootDir, t.getConfig().asString("source"));
+    processDataSetFolder(new File(src), src);
+  }
+
+  private void processDataSetFolder(File dir, String t) throws FileNotFoundException, IOException {
+    for (File f : dir.listFiles()) {
+      if (f.isDirectory()) {
+        processDataSetFolder(f, t);
+      } else if (!f.getName().equals(".DS_Store")) {
+        String s = FileUtilities.getRelativePath(t, dir.getAbsolutePath());
+        addFileToNpm(Utilities.noString(s) ?  "data" : Utilities.path("data", s), f.getName(), FileUtilities.fileToBytes(f));
+      }
+    }
+  }
+
+
   private String checkPlural(String word, int c) {
     return c == 1 ? word : Utilities.pluralizeMe(word);
   }
@@ -5712,7 +5784,7 @@ public class PublisherGenerator extends PublisherBase {
     }
     try {
       boolean changed = false;
-      String[] keywords = {"sql", "fragment", "json", "class-diagram", "uml", "multi-map", "lang-fragment"};
+      String[] keywords = {"sql", "fragment", "json", "class-diagram", "uml", "multi-map", "lang-fragment", "dataset"};
       for (String keyword: Arrays.asList(keywords)) {
 
         while (db != null && src.contains("{% " + keyword)) {
@@ -5754,6 +5826,10 @@ public class PublisherGenerator extends PublisherBase {
 
               case "json":
                 substitute = processJson(arguments, f);
+                break;
+
+              case "dataset":
+                substitute = processDataset(arguments, f);
                 break;
 
               case "class-diagram":
@@ -5928,6 +6004,20 @@ public class PublisherGenerator extends PublisherBase {
     int i = this.pf.sqlIndex++;
     fragment("sql-"+i+"-fragment", output, f.getOutputNames(), start, "sql", "SQL", null);
     return "{% include sql-"+i+"-fragment.xhtml %}";
+  }
+
+  private String processDataset(String arguments, FetchedFile f) throws FHIRException, IOException {
+    String[] params = arguments.split(" ");
+    DataSetInformation dsi = null;
+    for (DataSetInformation t : pf.dataSets) {
+      if (t.name().equals(params[1])) {
+        dsi = t;
+      }
+    }
+    if (dsi == null) {
+      throw new Error("Unable to find dataset "+params[1]);
+    }
+    return dsi.buildFragment(params[0]);
   }
 
   private String processJson(String arguments, FetchedFile f) throws FHIRException, IOException {
