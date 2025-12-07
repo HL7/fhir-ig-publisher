@@ -37,6 +37,7 @@ import java.util.Set;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.modules.IPublisherModule;
+import org.hl7.fhir.r5.context.IContextResourceLoader;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.elementmodel.Manager;
@@ -62,6 +63,8 @@ import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureMap;
 import org.hl7.fhir.r5.model.ValueSet;
+import org.hl7.fhir.r5.renderers.utils.Resolver;
+import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
 import org.hl7.fhir.r5.terminologies.ImplicitValueSets;
 import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.r5.utils.validation.IMessagingServices;
@@ -90,11 +93,13 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
   private List<String> mappingUrls = new ArrayList<>();
   private boolean bundleReferencesResolve;
   private List<SpecMapManager> specMaps;
+  private List<PublisherUtils.LinkedSpecification> linkSpecMaps;
   private IPublisherModule module;
   private static boolean nsFailHasFailed = false; // work around for an THO 6.0.0 problem
   
   
-  public ValidationServices(IWorkerContext context, IGKnowledgeProvider ipg, ImplementationGuide ig, List<FetchedFile> files, List<NpmPackage> packages, boolean bundleReferencesResolve, List<SpecMapManager> specMaps, IPublisherModule module) {
+  public ValidationServices(IWorkerContext context, IGKnowledgeProvider ipg, ImplementationGuide ig, List<FetchedFile> files, List<NpmPackage> packages,
+                            boolean bundleReferencesResolve, List<SpecMapManager> specMaps, List<PublisherUtils.LinkedSpecification> linkSpecMaps, IPublisherModule module) {
     super();
     this.context = context;
     this.ipg = ipg;
@@ -103,6 +108,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
     this.packages = packages;
     this.bundleReferencesResolve = bundleReferencesResolve;
     this.specMaps = specMaps;
+    this.linkSpecMaps = linkSpecMaps;
     this.module = module;
     initOtherUrls();
   }
@@ -231,9 +237,56 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
       Element expr = new ObjectConverter(context).convert(context.getExpansionParameters());
       return expr;
     }
+
+    //
+    for (PublisherUtils.LinkedSpecification sp : linkSpecMaps) {
+      Element resr = getResourceFromMap(url, sp.getSpm());
+      if (resr != null) return resr;
+    }
     return null;
   }
 
+  private Element getResourceFromMap(String url, SpecMapManager sp) throws IOException {
+    String[] pl = url.split("\\/");
+    String rt = pl.length >= 2 ? pl[pl.length-2] : null;
+    String id = pl.length >= 2 ? pl[pl.length-1] : null;
+    String fp = Utilities.isAbsoluteUrl(url) ? url : sp.getBase()+"/"+ url;
+
+    if (rt != null && !context.getResourceNamesAsSet().contains(rt)) {
+      rt = null;
+      id = null;
+    }
+    String path;
+    try {
+      path = sp.getPath(fp, null, rt, id);
+    } catch (Exception e) {
+      path = null;
+    }
+
+    // hack around an error in the R5 specmap file
+    if (path != null && sp.isCore() && path.startsWith("http://terminology.hl7.org")) {
+      path = null;
+    }
+
+    if (path != null) {
+      InputStream s = null;
+      if (rt != null && sp.getNpm() != null && fp.contains("/")) {
+        s = sp.getNpm().loadExampleResource(rt, id);
+        if (s == null) {
+          s = sp.getNpm().loadResource(rt, id);
+        }
+      }
+      if (s == null) {
+        return null;
+      } else {
+        Element res = Manager.parseSingle(context, s, FhirFormat.JSON);
+        res.setWebPath(path);
+        return res;
+
+      }
+    }
+    return null;
+  }
 
   private Class getResourceType(String url) {
     if (url.contains("/ValueSet/"))
@@ -485,8 +538,8 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
   }
 
   @Override
-  public Set<String> fetchCanonicalResourceVersions(IResourceValidator validator, Object appContext, String url) {
-    Set<String> res = new HashSet<>();
+  public Set<ResourceVersionInformation> fetchCanonicalResourceVersions(IResourceValidator validator, Object appContext, String url) {
+    Set<ResourceVersionInformation> res = new HashSet<>();
     for (Resource r : context.fetchResourceVersions(Resource.class, url)) {
       if (r instanceof CanonicalResource) {
         
@@ -501,10 +554,10 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
               // ?? res.add(cr.hasVersion() ? cr.getVersion() : "{{unversioned}}");                          
             }
           } else {
-            res.add(cr.hasVersion() ? cr.getVersion() : "{{unversioned}}");            
+            res.add(new ResourceVersionInformation(cr.hasVersion() ? cr.getVersion() : "{{unversioned}}", cr.getSourcePackage()));
           }
         } else {
-          res.add(cr.hasVersion() ? cr.getVersion() : "{{unversioned}}");
+          res.add(new ResourceVersionInformation(cr.hasVersion() ? cr.getVersion() : "{{unversioned}}", cr.getSourcePackage()));
         }
       }
     }
@@ -540,7 +593,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
   public List<StructureDefinition> getImpliedProfilesForResource(IResourceValidator validator, Object appContext,
       String stackPath, ElementDefinition definition, StructureDefinition structure, Element resource, boolean valid,
       IMessagingServices msgServices, List<ValidationMessage> messages) {
-    return new BasePolicyAdvisorForFullValidation(ReferenceValidationPolicy.CHECK_VALID).getImpliedProfilesForResource(validator, appContext, stackPath, 
+    return new BasePolicyAdvisorForFullValidation(ReferenceValidationPolicy.CHECK_VALID, null).getImpliedProfilesForResource(validator, appContext, stackPath,
         definition, structure, resource, valid, msgServices, messages);
   }
 
@@ -552,6 +605,11 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
   @Override
   public ReferenceValidationPolicy getReferencePolicy() {
     return ReferenceValidationPolicy.CHECK_VALID;
+  }
+
+  @Override
+  public Set<String> getCheckReferencesTo() {
+    return Set.of();
   }
 
   @Override

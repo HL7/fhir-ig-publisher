@@ -1087,7 +1087,7 @@ public class PublisherIGLoader extends PublisherBase {
     pf.validator.getExtensionDomains().addAll(extensionDomains);
     pf.validator.setNoExperimentalContent(pf.noExperimentalContent);
     pf.validator.getExtensionDomains().add(ExtensionDefinitions.EXT_PRIVATE_BASE);
-    pf.validationFetcher = new ValidationServices(pf.context, pf.igpkp, pf.sourceIg, pf.fileList, pf.npmList, pf.bundleReferencesResolve, pf.specMaps, pf.module);
+    pf.validationFetcher = new ValidationServices(pf.context, pf.igpkp, pf.sourceIg, pf.fileList, pf.npmList, pf.bundleReferencesResolve, pf.specMaps, pf.linkSpecMaps, pf.module);
     pf.validator.setFetcher(pf.validationFetcher);
     pf.validator.setPolicyAdvisor(pf.validationFetcher);
     pf.validator.getSettings().setR5BundleRelativeReferencePolicy(r5BundleRelativeReferencePolicy);

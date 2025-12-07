@@ -58,6 +58,7 @@ public class HistoryGenerator {
       
       // framework
       XhtmlNode div = new XhtmlNode(NodeType.Element, "div");
+      div.attribute("data-fhir", "generated");
       div.hr();
       div.para().b().tx("History");
       XhtmlNode tbl = div.table("grid", false).markGenerated(!context.forValidResource());

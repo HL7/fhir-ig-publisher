@@ -51,6 +51,7 @@ import org.hl7.fhir.r5.renderers.spreadsheets.ConceptMapSpreadsheetGenerator;
 import org.hl7.fhir.r5.renderers.spreadsheets.StructureDefinitionSpreadsheetGenerator;
 import org.hl7.fhir.r5.renderers.spreadsheets.ValueSetSpreadsheetGenerator;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
+import org.hl7.fhir.r5.renderers.utils.Resolver;
 import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
 import org.hl7.fhir.r5.terminologies.TerminologyUtilities;
 import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
@@ -87,6 +88,7 @@ import java.io.*;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
@@ -197,6 +199,7 @@ public class PublisherGenerator extends PublisherBase {
       }
     }
   }
+
 
   public PublisherGenerator(PublisherSettings settings) {
     super(settings);
@@ -685,6 +688,7 @@ public class PublisherGenerator extends PublisherBase {
 
   private void generateHtmlOutputsInner(FetchedFile f, boolean regen, DBBuilder db, String lang, RenderingContext lrc)
           throws IOException, FileNotFoundException, Exception, Error {
+    lrc = lrc.copy(true); // whatever happens in here shouldn't alter the settings on the base RenderingContext
     saveFileOutputs(f, lang);
     for (FetchedResource r : f.getResources()) {
 
@@ -1127,8 +1131,9 @@ public class PublisherGenerator extends PublisherBase {
         }
         fragment(rX.fhirType()+"-"+rX.getId()+"-html", html, f.getOutputNames(), rX, vars, null, start, "html", "Resource", lang);
       } else {
-        if (xhtml == null) {
+        if (xhtml == null || rX.isGeneratedNarrative()) {
           RenderingContext xlrc = lrc.copy(false);
+          xlrc.setRules(RenderingContext.GenerationRules.IG_PUBLISHER);
           ResourceRenderer rr = RendererFactory.factory(rX.fhirType(), xlrc);
           if (lr != null && lr instanceof DomainResource) {
 // Lloyd debug - getting here and dying
@@ -1895,7 +1900,7 @@ public class PublisherGenerator extends PublisherBase {
     }
     if (wantGen(r, "maps")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-maps", sdr.mappings(this.pf.igpkp.getDefinitionsName(r), this.pf.otherFilesRun), f.getOutputNames(), r, vars, null, start, "maps", "StructureDefinition", lang);
+         fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-maps", sdr.mappings(this.pf.igpkp.getDefinitionsName(r), this.pf.otherFilesRun), f.getOutputNames(), r, vars, null, start, "maps", "StructureDefinition", lang);
     }
     if (wantGen(r, "xref")) {
       long start = System.currentTimeMillis();
@@ -4386,8 +4391,13 @@ public class PublisherGenerator extends PublisherBase {
             String value = null;
             String reference = null;
             if (uc.getValueReference().hasReference()) {
-              reference = uc.getValueReference().getReference().contains(":") ? "" : pf.igpkp.getCanonical() + "/";
-              reference += uc.getValueReference().getReference();
+              Resolver.ResourceWithReference rr = pf.rc.getResolver().resolve(pf.rc, uc.getValueReference().getReference(), null);
+              if (rr != null) {
+                reference = rr.getWebPath();
+              } else {
+                reference = uc.getValueReference().getReference().contains(":") ? "" : pf.igpkp.getCanonical() + "/";
+                reference += uc.getValueReference().getReference();
+              }
             }
             if (uc.getValueReference().hasDisplay()) {
               if (reference != null)
