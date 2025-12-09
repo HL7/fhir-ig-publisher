@@ -308,7 +308,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       File od = new File(pf.outputDir);
       FileUtils.cleanDirectory(od);
       pf.npm = new NPMPackageGenerator(Utilities.path(pf.outputDir, "package.tgz"), pf.templateInfo, pf.getExecTime().getTime(), !settings.isPublishing());
-      pf.npm.loadFiles(pf.rootDir, new File(pf.rootDir), ".git", "output", "package", "temp");
+      pf.npm.loadFiles(pf.rootDir, ".npmignore", new File(pf.rootDir), ".git", "output", "package", "temp");
       pf.npm.finish();
 
       FileUtilities.stringToFile(makeTemplateIndexPage(), Utilities.path(pf.outputDir, "index.html"));
@@ -1626,7 +1626,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     if (!CliParams.hasNamedParam(args, "-no-exit")) {
       System.exit(exitCode);
     }
-  }
+  } 
 
   private static void setLogbackConfiguration(String[] args) {
     setLogbackConfiguration(args, CliParams.DEBUG_LOG, Level.DEBUG);
