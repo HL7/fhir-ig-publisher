@@ -1,10 +1,6 @@
 package org.hl7.fhir.igtools.publisher;
 
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FilenameFilter;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -12,8 +8,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import javax.xml.bind.JAXB;
 
 import org.cqframework.cql.cql2elm.CqlCompilerException;
 import org.cqframework.cql.cql2elm.CqlTranslator;
@@ -28,13 +22,7 @@ import org.cqframework.cql.cql2elm.model.CompiledLibrary;
 import org.cqframework.cql.cql2elm.quick.FhirLibrarySourceProvider;
 import org.cqframework.cql.elm.tracking.TrackBack;
 import org.fhir.ucum.UcumService;
-import org.hl7.cql.model.IntervalType;
-import org.hl7.cql.model.ListType;
-import org.hl7.cql.model.ModelIdentifier;
-import org.hl7.cql.model.ModelInfoProvider;
-import org.hl7.cql.model.NamedType;
-import org.hl7.cql.model.NamespaceInfo;
-import org.hl7.cql.model.NamespaceManager;
+import org.hl7.cql.model.*;
 import org.hl7.elm.r1.AccessModifier;
 import org.hl7.elm.r1.Code;
 import org.hl7.elm.r1.CodeDef;
@@ -55,6 +43,7 @@ import org.hl7.elm.r1.ValueSetDef;
 import org.hl7.elm.r1.ValueSetRef;
 import org.hl7.elm.r1.VersionedIdentifier;
 import org.hl7.elm_modelinfo.r1.ModelInfo;
+import org.hl7.elm_modelinfo.r1.serializing.ModelInfoReaderFactory;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.r5.context.ILoggingService;
@@ -173,11 +162,17 @@ public class CqlSubSystem {
             Library l = reader.readLibrary(s);
             for (org.hl7.fhir.r5.model.Attachment a : l.getContent()) {
               if (a.getContentType() != null && a.getContentType().equals("application/xml")) {
-                if (modelIdentifier.getSystem() == null) {
-                  modelIdentifier.setSystem(identifier.getSystem());
-                }
+                // Do not set the URL to the package canonical, the model info may be loading from another package
+                //if (modelIdentifier.getSystem() == null) {
+                //  modelIdentifier.setSystem(identifier.getSystem());
+                //}
                 InputStream is = new ByteArrayInputStream(a.getData());
-                return JAXB.unmarshal(is, ModelInfo.class);
+                ModelInfo mi = ModelInfoReaderFactory.getReader("application/xml").read(is);
+                // Set the URL to the model url
+                if (mi != null && mi.getUrl() != null && modelIdentifier.getSystem() == null) {
+                  modelIdentifier.setSystem(mi.getUrl());
+                }
+                return mi;
               }
             }
           }
