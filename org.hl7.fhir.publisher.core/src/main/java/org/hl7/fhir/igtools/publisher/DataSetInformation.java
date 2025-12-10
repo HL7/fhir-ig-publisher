@@ -120,7 +120,7 @@ public class DataSetInformation {
             "}" +
             "  </style>\n"+
             "  <script src=\""+name()+"-data.js\"></script>\n" +
-            "  <script src=\"datasets.js\"></script>\n" +
+            "  <script src=\"assets/js/datasets.js\"></script>\n" +
             "  <script>\n" +
             "    // Initialize\n" +
             "    const id = getIdParam();\n" +
@@ -132,7 +132,7 @@ public class DataSetInformation {
     StringBuilder b = new StringBuilder();
     b.append(
             "  <script src=\""+name()+"-index.js\"></script>\n" +
-            "  <script src=\"datasets.js\"></script>\n" +
+            "  <script src=\"assets/js/datasets.js\"></script>\n" +
             "  <script>\n" +
             "  cfg = {\n" +
             "    // Search parameters: list of column names to search on\n" +
