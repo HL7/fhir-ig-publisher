@@ -75,80 +75,84 @@ public class IGReleaseVersionUpdater {
   }
 
   private void updateFiles(String fragment, File dir, int level, List<PackageListEntry> milestones) throws FileNotFoundException, IOException {
-    for (File f : dir.listFiles()) {
-      if (ignoreList != null && ignoreList.contains(f.getAbsolutePath())) {
-        continue;
-      }
-      if (ignoreListOuter != null && ignoreListOuter.contains(f.getAbsolutePath())) {
-        continue;
-      }
-      if (Utilities.existsInList(f.getName(), "modeldoc", "quick", "qa.html", "qa-hta.html", "qa-txservers.html", "qa-dep.html", "qa.min.html", "history.html", "directory.html", "qa-tx.html", "qa-ipreview.html", "us-core-comparisons", "searchform.html")) {
-        continue;
-      }
-      if (f.getName().startsWith("comparison-v")) {
-        continue;
-      }
-
-      if (f.isDirectory() && !Utilities.existsInList(f.getName(), "html")) {
-        updateFiles(fragment, f, level+1, milestones);
-      }
-      
-      if (f.getName().endsWith(".html") || f.getName().endsWith(".htm")) {
-        String src = FileUtilities.fileToString(f);
-        String srcl = src.toLowerCase();
-        if (srcl.contains("http-equiv=\"refresh\"") || srcl.contains("<html><p>not generated in this build</p></html>")) {
+    if (dir.exists()) {
+      for (File f : dir.listFiles()) {
+        if (ignoreList != null && ignoreList.contains(f.getAbsolutePath())) {
           continue;
         }
-        String o = src;
-        int b = src.indexOf(START_HTML_MARKER);
-        int l = START_HTML_MARKER.length();
-        if (b == -1) {
-          b = src.indexOf(START_HTML_MARKER_MILESTONE);
-          l = START_HTML_MARKER_MILESTONE.length();
+        if (ignoreListOuter != null && ignoreListOuter.contains(f.getAbsolutePath())) {
+          continue;
         }
-        if (b == -1) {
-          b = src.indexOf(START_HTML_MARKER_MILESTONE_WS);
-          l = START_HTML_MARKER_MILESTONE_WS.length();
+        if (Utilities.existsInList(f.getName(), "modeldoc", "quick", "qa.html", "qa-hta.html", "qa-txservers.html", "qa-dep.html", "qa.min.html", "history.html", "directory.html", "qa-tx.html", "qa-ipreview.html", "us-core-comparisons", "searchform.html")) {
+          continue;
         }
-        if (b == -1) {
-          b = src.indexOf(START_HTML_MARKER_PAST);
-          l = START_HTML_MARKER_PAST.length();
+        if (f.getName().startsWith("comparison-v")) {
+          continue;
         }
-        if (b == -1) {
-          b = src.indexOf(START_HTML_MARKER_CURRENT);
-          l = START_HTML_MARKER_CURRENT.length();
+
+        if (f.isDirectory() && !Utilities.existsInList(f.getName(), "html")) {
+          updateFiles(fragment, f, level + 1, milestones);
         }
-        int e = src.indexOf(END_HTML_MARKER);
-        if (e == -1) {
-          e = src.indexOf(END_HTML_MARKER_WS);
-        }
-        if (b == -1 || e == -1) {
-          System.out.println("no html insert in "+f.getAbsolutePath());
-        }
-        if (b > -1 && e == -1) {
-          int i = b;
-          while (src.charAt(i+1) != '\n') i++;
-          src = src.substring(0, i)+END_HTML_MARKER+src.substring(i);
-          e = src.indexOf(END_HTML_MARKER);
-        }
-        if (b > -1 && e > -1) {
-          String updatedFragment = fragment;
-          if (updatedFragment.contains("{{fn}}")) {
-            String rp = getRelativePath(f.getAbsolutePath());
-            if (!folder.equals(currentFolder) && new File(Utilities.path(currentFolder, rp)).exists()) {
-              updatedFragment = fragment.replace("{{fn}}", "/"+Utilities.pathURL(rp));
-            } else {
-              updatedFragment = fragment.replace("{{fn}}", "");
+
+        if (f.getName().endsWith(".html") || f.getName().endsWith(".htm")) {
+          String src = FileUtilities.fileToString(f);
+          String srcl = src.toLowerCase();
+          if (srcl.contains("http-equiv=\"refresh\"") || srcl.contains("<html><p>not generated in this build</p></html>")) {
+            continue;
+          }
+          String o = src;
+          int b = src.indexOf(START_HTML_MARKER);
+          int l = START_HTML_MARKER.length();
+          if (b == -1) {
+            b = src.indexOf(START_HTML_MARKER_MILESTONE);
+            l = START_HTML_MARKER_MILESTONE.length();
+          }
+          if (b == -1) {
+            b = src.indexOf(START_HTML_MARKER_MILESTONE_WS);
+            l = START_HTML_MARKER_MILESTONE_WS.length();
+          }
+          if (b == -1) {
+            b = src.indexOf(START_HTML_MARKER_PAST);
+            l = START_HTML_MARKER_PAST.length();
+          }
+          if (b == -1) {
+            b = src.indexOf(START_HTML_MARKER_CURRENT);
+            l = START_HTML_MARKER_CURRENT.length();
+          }
+          int e = src.indexOf(END_HTML_MARKER);
+          if (e == -1) {
+            e = src.indexOf(END_HTML_MARKER_WS);
+          }
+          if (b == -1 || e == -1) {
+            System.out.println("no html insert in " + f.getAbsolutePath());
+          }
+          if (b > -1 && e == -1) {
+            int i = b;
+            while (src.charAt(i + 1) != '\n') i++;
+            src = src.substring(0, i) + END_HTML_MARKER + src.substring(i);
+            e = src.indexOf(END_HTML_MARKER);
+          }
+          if (b > -1 && e > -1) {
+            String updatedFragment = fragment;
+            if (updatedFragment.contains("{{fn}}")) {
+              String rp = getRelativePath(f.getAbsolutePath());
+              if (!folder.equals(currentFolder) && new File(Utilities.path(currentFolder, rp)).exists()) {
+                updatedFragment = fragment.replace("{{fn}}", "/" + Utilities.pathURL(rp));
+              } else {
+                updatedFragment = fragment.replace("{{fn}}", "");
+              }
             }
+            src = src.substring(0, b + l) + fixForLevel(updatedFragment, level) + addPageVersions(f, milestones) + src.substring(e);
+            if (!src.equals(o)) {
+              FileUtilities.stringToFile(src, f);
+              countUpdated++;
+            }
+            countTotal++;
           }
-          src = src.substring(0, b+l) + fixForLevel(updatedFragment, level)+addPageVersions(f, milestones)+src.substring(e);
-          if (!src.equals(o)) {
-            FileUtilities.stringToFile(src, f);
-            countUpdated++;
-          }
-          countTotal++;
         }
       }
+    } else {
+      System.out.println("Unable to find directory "+dir.getAbsolutePath());
     }
   }
 

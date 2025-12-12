@@ -615,7 +615,7 @@ public class PublicationProcess {
               if (!v.cibuild() && !v.current()) {
                 String pv = v.path();
                 String vCode = pv.substring(pv.lastIndexOf("/")+1);
-                String dv = Utilities.path(destination, vCode);
+                String dv = Utilities.path(fRoot, relPath);
                 System.out.println("Update publish box for version "+v.version()+" @ "+v.path());
                 updatePublishBox(pl, v, dv, pv, destination, fRoot.getAbsolutePath(), false, null, null, null, url, jsonXmlClones);
               }

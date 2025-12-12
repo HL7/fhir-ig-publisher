@@ -212,11 +212,12 @@ public class PublisherGenerator extends PublisherBase {
 
     for (String s : pf.context.getBinaryKeysAsSet()) {
       if (needFile(s)) {
-        if (pf.makeQA)
+        if (pf.makeQA) {
           checkMakeFile(pf.context.getBinaryForKey(s), Utilities.path(pf.qaDir, s), pf.otherFilesStartup);
+        }
         checkMakeFile(pf.context.getBinaryForKey(s), Utilities.path(pf.tempDir, s), pf.otherFilesStartup);
         for (String l : allLangs()) {
-          checkMakeFile(pf.context.getBinaryForKey(s), Utilities.path(pf.tempDir, l, s), pf.otherFilesStartup);
+          checkMakeFile(fixLang(pf.context.getBinaryForKey(s), l), Utilities.path(pf.tempDir, l, s), pf.otherFilesStartup);
         }
       }
     }
@@ -537,6 +538,20 @@ public class PublisherGenerator extends PublisherBase {
       FileUtilities.copyFile(Utilities.path(pf.tempDir, "full-ig.zip"), Utilities.path(pf.outputDir, "full-ig.zip"));
       log("Final .zip built");
     }
+  }
+
+  private byte[] fixLang(byte[] b, String l) {
+    try {
+      String s = new String(b, "UTF-8");
+      if (s.startsWith("--")) {
+        s = s.replace("{{lang}}", l);
+        return s.getBytes("UTF-8");
+      } else {
+        return b;
+      }
+    } catch (Exception e) {
+      return b;
+      }
   }
 
   private void copyData() throws IOException {
