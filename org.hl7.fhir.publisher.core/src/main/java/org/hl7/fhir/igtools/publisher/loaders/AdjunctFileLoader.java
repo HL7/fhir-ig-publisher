@@ -91,12 +91,12 @@ public class AdjunctFileLoader {
           att.getAttachment().setData(a.getData());
           att.getAttachment().setContentType(a.getContentType());
           // Library - post processing needed
-          if (r.getResource() instanceof Library && "text/cql".equals(a.getContentType())) {
-            // we just injected CQL into a library 
+          if (r.getResource() instanceof Library && ("text/cql".equals(a.getContentType()) || "application/xml".equals(a.getContentType()))) {
+            // we just injected CQL or a CQL ModelInfo into a library
             try {
               performLibraryCQLProcessing(f, (Library) r.getResource(), a);
             } catch (Exception ex) {
-              f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.EXCEPTION, att.getPath(), "Error processing CQL: " +ex.getMessage(), IssueSeverity.ERROR));              
+              f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.EXCEPTION, att.getPath(), "Error processing CQL or CQL Model Info: " +ex.getMessage(), IssueSeverity.ERROR));
             }
           }
         } catch (Exception ex) {
@@ -314,7 +314,9 @@ public class AdjunctFileLoader {
     CqlSourceFileInformation info = cql.getFileInformation(attachment.getUrl());
     if (info != null) {
       f.getErrors().addAll(info.getErrors());
-      lib.addContent().setContentType("application/elm+xml").setData(info.getElm());
+      if (info.getElm() != null) {
+        lib.addContent().setContentType("application/elm+xml").setData(info.getElm());
+      }
       if (info.getJsonElm() != null) {
         lib.addContent().setContentType("application/elm+json").setData(info.getJsonElm());
       }

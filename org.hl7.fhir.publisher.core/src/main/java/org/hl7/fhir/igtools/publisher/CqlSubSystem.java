@@ -2,24 +2,17 @@ package org.hl7.fhir.igtools.publisher;
 
 import java.io.*;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.cqframework.cql.cql2elm.CqlCompilerException;
-import org.cqframework.cql.cql2elm.CqlTranslator;
-import org.cqframework.cql.cql2elm.CqlTranslatorOptions;
-import org.cqframework.cql.cql2elm.CqlTranslatorOptionsMapper;
-import org.cqframework.cql.cql2elm.DefaultLibrarySourceProvider;
-import org.cqframework.cql.cql2elm.DefaultModelInfoProvider;
-import org.cqframework.cql.cql2elm.LibraryManager;
-import org.cqframework.cql.cql2elm.LibrarySourceProvider;
-import org.cqframework.cql.cql2elm.ModelManager;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.cqframework.cql.cql2elm.*;
 import org.cqframework.cql.cql2elm.model.CompiledLibrary;
+import org.cqframework.cql.cql2elm.model.Model;
+import org.cqframework.cql.cql2elm.model.Version;
 import org.cqframework.cql.cql2elm.quick.FhirLibrarySourceProvider;
+import org.cqframework.cql.elm.requirements.fhir.DataRequirementsProcessor;
+import org.cqframework.cql.elm.requirements.fhir.utilities.SpecificationLevel;
 import org.cqframework.cql.elm.tracking.TrackBack;
 import org.fhir.ucum.UcumService;
 import org.hl7.cql.model.*;
@@ -48,6 +41,7 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.r5.context.ILoggingService;
 import org.hl7.fhir.r5.model.*;
+import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
@@ -56,13 +50,19 @@ import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 /**
  * What this system does
  *
- * Library:
+ * Library: Processes CQL source files to:
+ *     1. Compile the CQL and report any compilation issues
+ *     2. Add the base-64 encoded CQL to the Library resource
+ *     3. Add the base-64 encoded XML and/or JSON ELM to the Library resource
+ *     4. Add inferred data requirements, parameters, and dependencies to the Library resource
  *
- * Measure:
+ * Measure: Process effective data requirements for the measure if the measure is using CQL-based libraries
  *
- * PlanDefinition:
+ * PlanDefinition: Process effective data requirements for the plan definition if it is using CQL-based libraries
  *
- * ActivityDefinition:
+ * ActivityDefinition: Process effective data requirements for the activity definition if it is using CQL-based libraries
+ *
+ * Questionnaire: Process effective data requirements for the questionnaire if it is using CQL-based libraries
  *
  */
 public class CqlSubSystem {
@@ -71,6 +71,8 @@ public class CqlSubSystem {
    * information about a cql file
    */
   public class CqlSourceFileInformation {
+    private final String path;
+    private CqlTranslatorOptions options;
     private VersionedIdentifier identifier;
     private byte[] elm;
     private byte[] jsonElm;
@@ -78,6 +80,18 @@ public class CqlSubSystem {
     private List<DataRequirement> dataRequirements = new ArrayList<>();
     private List<RelatedArtifact> relatedArtifacts = new ArrayList<>();
     private List<ParameterDefinition> parameters = new ArrayList<>();
+    public CqlSourceFileInformation(String path) {
+        this.path = path;
+    }
+    public String getPath() {
+        return path;
+    }
+    public CqlTranslatorOptions getOptions() {
+        return options;
+    }
+    public void setOptions(CqlTranslatorOptions options) {
+        this.options = options;
+    }
     public VersionedIdentifier getIdentifier() {
       return identifier;
     }
@@ -172,6 +186,9 @@ public class CqlSubSystem {
                 if (mi != null && mi.getUrl() != null && modelIdentifier.getSystem() == null) {
                   modelIdentifier.setSystem(mi.getUrl());
                 }
+                // Save this loaded model and the library from which it was loaded so that we can correctly report
+                // the dependency
+                loadedModels.put(identifier, mi);
                 return mi;
               }
             }
@@ -235,6 +252,27 @@ public class CqlSubSystem {
   private Map<String, CqlSourceFileInformation> fileMap;
 
   /**
+   * Saved map of translated files by fully qualified file name.
+   * Populated as the fileMap is emptied by the adjunct file system processing.
+   * Both the fileMap and this map are searched when artifact processing needs
+   * to find the source file information for a given library.
+   */
+  private Map<String, CqlSourceFileInformation> savedFileMap;
+
+  /**
+   * Saved map of processed model info. These are model infos that are
+   * defined in the CQL directory (i.e. locally in this IG)
+   */
+  private Map<VersionedIdentifier, ModelInfo> models;
+
+
+  /**
+   * Saved map of loaded model info. These are model infos that were
+   * loaded from dependencies.
+   */
+  private Map<VersionedIdentifier, ModelInfo> loadedModels;
+
+  /**
    * The packageId for the implementation guide, used to construct a NamespaceInfo for the CQL translator
    * Libraries that don't specify a namespace will be built in this namespace
    * Libraries can specify a namespace, but must use this name to do it
@@ -275,6 +313,10 @@ public class CqlSubSystem {
     try {
       logger.logMessage("Translating CQL source");
       fileMap = new HashMap<>();
+      models = new HashMap<>();
+      loadedModels = new HashMap<>();
+      determineCqfCommonDependency();
+      determineUsingCqlDependency();
 
       // foreach folder
       for (String folder : folders) {
@@ -296,6 +338,10 @@ public class CqlSubSystem {
       throw new IllegalStateException("CQL File map is not available, execute has not been called");
     }
 
+    if (savedFileMap == null) {
+        savedFileMap = new HashMap<String, CqlSourceFileInformation>();
+    }
+
     if (!fileMap.containsKey(filename)) {
       for (Map.Entry<String, CqlSourceFileInformation> entry: fileMap.entrySet()) {
         if (filename.equalsIgnoreCase(entry.getKey())) {
@@ -305,6 +351,7 @@ public class CqlSubSystem {
       return null;
     }
 
+    savedFileMap.put(filename, fileMap.get(filename));
     return this.fileMap.remove(filename);
   }
 
@@ -329,6 +376,92 @@ public class CqlSubSystem {
     return result;
   }
 
+  public class CqlPublisherOptions {
+    /**
+     * Determines whether target model mapping should be corrected in the compiled ELM
+     * This option controls whether Using declarations in the resulting ELM retain their
+     * original URI and version, or if they get set to the targetUrl and targetVersion of the
+     * model if the modelinfo has targetUrl.
+     *
+     * For example, USCore, 7.0.0, http://hl7.org/fhir/us/core (unmapped value, correctModelUrls true)
+     * versus USCore, null, http://hl7.org/fhir (mapped to targetUrl/targetVersion)
+     *
+     * Note that this is due to the behavior of the applyTargetModelMaps function in the translator,
+     * which sets the uri of the ModelInfo to the targetUrl of if it is specified (when the ModelInfo
+     * is either Profile-Informed or Profile-Aware).
+     */
+    private boolean correctModelUrls = true;
+    public boolean getCorrectModelUrls() {
+      return correctModelUrls;
+    }
+    public void setCorrectModelUrls(boolean correctModelUrls) {
+      this.correctModelUrls = correctModelUrls;
+    }
+  }
+
+  public class CqlPublisherOptionsMapper {
+    private static ObjectMapper om = new ObjectMapper();
+
+    public static CqlPublisherOptions fromFile(String fileName) {
+      FileReader fr = null;
+
+      try {
+        fr = new FileReader(fileName);
+        return fromReader(fr);
+      } catch (IOException e) {
+        throw new RuntimeException(String.format("Errors occurred reading options: %s", e.getMessage()));
+      }
+    }
+
+    public static CqlPublisherOptions fromReader(Reader reader) {
+      try {
+        return (CqlPublisherOptions)om.readValue(reader, CqlPublisherOptions.class);
+      } catch (IOException e) {
+        throw new RuntimeException(String.format("Errors occurred reading options: %s", e.getMessage()));
+      }
+    }
+
+    public static void toFile(String fileName, CqlPublisherOptions options) {
+      FileWriter fw = null;
+
+      try {
+        fw = new FileWriter(fileName);
+        toWriter(fw, options);
+      } catch (IOException e) {
+        throw new RuntimeException(String.format("Errors occurred writing options: %s", e.getMessage()));
+      }
+    }
+
+    public static void toWriter(Writer writer, CqlPublisherOptions options) {
+      ObjectMapper om = new ObjectMapper();
+
+      try {
+        om.writeValue(writer, options);
+      } catch (IOException e) {
+        throw new RuntimeException(String.format("Errors occurred writing options: %s", e.getMessage()));
+      }
+    }
+  }
+
+  /**
+   * Reads publisher configuration file named cql-publisher-options.json from the given folder if present.
+   * @param folder
+   * @return
+   */
+  private CqlPublisherOptions getPublisherCqlOptions(String folder) {
+    String optionsFileName = folder + File.separator + "cql-publisher-options.json";
+    CqlPublisherOptions options = null;
+    File file = new File(optionsFileName);
+    if (file.exists()) {
+      options = CqlPublisherOptionsMapper.fromFile(optionsFileName);
+    }
+    else {
+      options = new CqlPublisherOptions();
+    }
+
+    return options;
+  }
+
   /**
    * Reads configuration file named cql-options.json from the given folder if present. Otherwise returns default options.
    * @param folder
@@ -343,9 +476,6 @@ public class CqlSubSystem {
     }
     else {
       options = CqlTranslatorOptions.defaultOptions();
-      if (!options.getFormats().contains(CqlTranslatorOptions.Format.XML)) {
-        options.getFormats().add(CqlTranslatorOptions.Format.XML);
-      }
     }
 
     return options;
@@ -375,10 +505,50 @@ public class CqlSubSystem {
     return cachedLibraryManager;
   }
 
+  private CqlPublisherOptions cachedPublisherOptions;
+  private CqlPublisherOptions getPublisherOptions() {
+    checkCachedManager();
+    return cachedPublisherOptions;
+  }
+
+  private boolean hasCqfCommonDependency = false;
+  public boolean getHasCqfCommonDependency() {
+    return hasCqfCommonDependency;
+  }
+
+  private void determineCqfCommonDependency() {
+    hasCqfCommonDependency = false;
+    for (NpmPackage p : packages) {
+      if (p.id().equals("fhir.cqf.common") && p.version().equals("4.0.1")) {
+        hasCqfCommonDependency = true;
+        break;
+      }
+    }
+  }
+
+  private boolean hasUsingCqlDependency = false;
+  public boolean getHasUsingCqlDependency() {
+    return hasUsingCqlDependency;
+  }
+
+  private void determineUsingCqlDependency() {
+    hasUsingCqlDependency = false;
+    for (NpmPackage p : packages) {
+      if (p.id().equals("hl7.fhir.uv.cql")) {
+        Version v = new Version(p.version());
+        if (v.getMajorVersion() >= 2) {
+          hasUsingCqlDependency = true;
+          break;
+        }
+      }
+    }
+  }
+
   private void translateFolder(String folder) {
     logger.logMessage(String.format("Translating CQL source in folder %s", folder));
 
     CqlTranslatorOptions options = getTranslatorOptions(folder);
+    CqlPublisherOptions publisherOptions = getPublisherCqlOptions(folder);
 
     // Setup
     // Construct DefaultLibrarySourceProvider
@@ -394,11 +564,17 @@ public class CqlSubSystem {
 
     loadNamespaces(libraryManager);
 
-    // foreach *.cql file
     boolean hadCqlFiles = false;
+    // foreach *-modelinfo* file (need to process all the models first so that they are available for dependency detection)
+    for (File file : new File(folder).listFiles(getModelInfoFilenameFilter())) {
+      hadCqlFiles = true;
+      processModelInfoFile(modelManager, libraryManager, file, options);
+    }
+
+    // foreach *.cql file
     for (File file : new File(folder).listFiles(getCqlFilenameFilter())) {
       hadCqlFiles = true;
-      translateFile(modelManager, libraryManager, file, options);
+      translateFile(modelManager, libraryManager, file, options, publisherOptions);
     }
 
     if (hadCqlFiles) {
@@ -406,6 +582,7 @@ public class CqlSubSystem {
         if (!hasMultipleBinaryPaths) {
           cachedOptions = options;
           cachedLibraryManager = libraryManager;
+          cachedPublisherOptions = publisherOptions;
         }
       }
       else {
@@ -413,6 +590,7 @@ public class CqlSubSystem {
           hasMultipleBinaryPaths = true;
           cachedOptions = null;
           cachedLibraryManager = null;
+          cachedPublisherOptions = null;
         }
       }
     }
@@ -470,12 +648,49 @@ public class CqlSubSystem {
     }
   }
 
-  private void translateFile(ModelManager modelManager, LibraryManager libraryManager, File file, CqlTranslatorOptions options) {
-    logger.logMessage(String.format("Translating CQL source in file %s", file.toString()));
-    CqlSourceFileInformation result = new CqlSourceFileInformation();
+  private CqlSourceFileInformation currentInfo = null;
+
+  private void addError(ValidationMessage.IssueType issueType, String message, ValidationMessage.IssueSeverity severity) {
+    currentInfo.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, issueType, currentInfo.getPath(), message, severity));
+  }
+
+  private void processModelInfoFile(ModelManager modelManager, LibraryManager libraryManager, File file, CqlTranslatorOptions options) {
+    logger.logMessage(String.format("Processing CQL ModelInfo in file %s", file.toString()));
+    CqlSourceFileInformation result = new CqlSourceFileInformation(file.getAbsolutePath());
     fileMap.put(file.getAbsoluteFile().toString(), result);
+    try {
+      ModelInfo mi = null;
+      if (file.getName().toLowerCase().endsWith(".xml")) {
+        mi = ModelInfoReaderFactory.getReader("application/xml").read(file);
+      }
+      else if (file.getName().toLowerCase().endsWith(".json")) {
+        mi = ModelInfoReaderFactory.getReader("application/json").read(file);
+      }
+      else {
+        throw new IllegalArgumentException("Could not read model info from file.");
+      }
+
+      result.setIdentifier(new VersionedIdentifier().withId(mi.getName()).withSystem(mi.getUrl()).withVersion(mi.getVersion()));
+      models.put(result.getIdentifier(), mi);
+
+      // TODO: Perform further validation of the model info...
+
+    }
+    catch (Exception e) {
+      result.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, IssueType.EXCEPTION, file.getName(), "CQL ModelInfo Processing failed with exception: "+e.getMessage(), IssueSeverity.ERROR));
+    }
+  }
+
+  private void translateFile(ModelManager modelManager, LibraryManager libraryManager, File file, CqlTranslatorOptions options, CqlPublisherOptions publisherOptions) {
+    logger.logMessage(String.format("Translating CQL source in file %s", file.toString()));
+    CqlSourceFileInformation result = new CqlSourceFileInformation(file.getAbsolutePath());
+    fileMap.put(file.getAbsoluteFile().toString(), result);
+    currentInfo = result;
 
     try {
+      if (options.getCqlCompilerOptions().getValidateUnits()) {
+        libraryManager.setUcumService(ucumService);
+      }
 
       // translate toXML
       CqlTranslator translator = CqlTranslator.fromFile(namespaceInfo, file, libraryManager);
@@ -492,10 +707,18 @@ public class CqlSubSystem {
       }
       else {
         try {
-          // convert to base64 bytes
-          // NOTE: Publication tooling requires XML content
-          result.setElm(translator.toXml().getBytes());
+          result.setOptions(options);
           result.setIdentifier(translator.toELM().getIdentifier());
+
+          // Correct target model mapping based on publisher options
+          if (publisherOptions.getCorrectModelUrls()) {
+            correctModelUrls(libraryManager, translator.toELM());
+          }
+
+          // convert to base64 bytes
+          if (options.getFormats().contains(CqlTranslatorOptions.Format.XML)) {
+            result.setElm(translator.toXml().getBytes());
+          }
           if (options.getFormats().contains(CqlTranslatorOptions.Format.JSON)) {
             result.setJsonElm(translator.toJson().getBytes());
           }
@@ -508,16 +731,13 @@ public class CqlSubSystem {
           // TODO: Report context, requires 1.5 translator (ContextDef)
           // NOTE: In STU3, only Patient context is supported
 
+          // TODO: Report direct-reference codes
+
           // Extract relatedArtifact data (models, libraries, code systems, and value sets)
           result.relatedArtifacts.addAll(extractRelatedArtifacts(translator.toELM()));
 
           // Extract parameter data and validate result types are supported types
-          List<ValidationMessage> paramMessages = new ArrayList<>();
-          result.parameters.addAll(extractParameters(translator.toELM(), paramMessages));
-          for (ValidationMessage paramMessage : paramMessages) {
-            result.getErrors().add(new ValidationMessage(paramMessage.getSource(), paramMessage.getType(), file.getName(),
-                    paramMessage.getMessage(), paramMessage.getLevel()));
-          }
+          result.parameters.addAll(extractParameters(translator.toELM()));
 
           // Extract dataRequirement data
           result.dataRequirements.addAll(extractDataRequirements(translator.toRetrieves(), translator.getTranslatedLibrary(), libraryManager));
@@ -532,6 +752,18 @@ public class CqlSubSystem {
     catch (Exception e) {
       result.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, IssueType.EXCEPTION, file.getName(), "CQL Processing failed with exception: "+e.getMessage(), IssueSeverity.ERROR));
     }
+    finally {
+        currentInfo = null;
+    }
+  }
+
+  private FilenameFilter getModelInfoFilenameFilter() {
+    return new FilenameFilter() {
+      @Override
+      public boolean accept(File path, String name) {
+        return name.toLowerCase().contains("-modelinfo");
+      }
+    };
   }
 
   private FilenameFilter getCqlFilenameFilter() {
@@ -541,6 +773,69 @@ public class CqlSubSystem {
         return name.endsWith(".cql");
       }
     };
+  }
+
+  private int getMajorVersion(String version) {
+    if (version == null || version.equals("")) {
+      return -1;
+    }
+
+    int indexOf = version.indexOf(".");
+    if (indexOf == -1) {
+      return -1;
+    }
+
+    for (int i = 0; i < indexOf; i++) {
+      if (!Character.isDigit(version.charAt(i))) {
+        return -1;
+      }
+    }
+
+    return Integer.parseUnsignedInt(version.substring(0, indexOf));
+  }
+
+  private Model getProcessedModel(LibraryManager libraryManager, String modelName) {
+    List<Model> models = new ArrayList<>();
+    for (var entry : libraryManager.getModelManager().getGlobalCache().entrySet()) {
+      if (modelName.equals(entry.getKey().getId())) {
+        models.add(entry.getValue());
+      }
+    }
+
+    if (models.size() == 0) {
+      return null;
+    }
+
+    return models.get(0);
+  }
+
+  private Model getLoadedModel(LibraryManager libraryManager, String modelName) {
+    List<Model> models = new ArrayList<>();
+    for (var entry : libraryManager.getModelManager().getGlobalCache().entrySet()) {
+      if (modelName.equals(entry.getKey().getId())) {
+        models.add(entry.getValue());
+      }
+    }
+
+    if (models.size() == 0) {
+      return null;
+    }
+
+    return models.get(0);
+  }
+
+  private void correctModelUrls(LibraryManager libraryManager, org.hl7.elm.r1.Library library) {
+    if (library.getUsings() != null && !library.getUsings().getDef().isEmpty()) {
+      for (UsingDef def : library.getUsings().getDef()) {
+        if (def.getLocalIdentifier() != null) {
+          Model m = getLoadedModel(libraryManager, def.getLocalIdentifier());
+          if (m != null) {
+            def.setUri(m.getModelInfo().getUrl());
+            def.setVersion(m.getModelInfo().getVersion());
+          }
+        }
+      }
+    }
   }
 
   private List<RelatedArtifact> extractRelatedArtifacts(org.hl7.elm.r1.Library library) {
@@ -553,10 +848,27 @@ public class CqlSubSystem {
         // System model info is an implicit dependency, do not report
         if (!def.getLocalIdentifier().equals("System")) {
           // FHIR model info included from the translator is implicit, do not report
-          if (!((def.getLocalIdentifier().equals("FHIR") || def.getLocalIdentifier().equals("USCore") || def.getLocalIdentifier().equals("QICore"))
-                  && def.getUri() != null && def.getUri().equals("http://hl7.org/fhir"))) {
-            result.add(toRelatedArtifact(def));
+          if (def.getLocalIdentifier().equals("FHIR") && "http://hl7.org/fhir".equals(def.getUri())) {
+            if (getMajorVersion(def.getVersion()) <= 4) {
+              continue;
+            }
           }
+
+          // USCore model info 6.1.0 and prior included from the translator is implicit, do not report
+          if (def.getLocalIdentifier().equals("USCore")) {
+            if (getMajorVersion(def.getVersion()) <= 6) {
+              continue;
+            }
+          }
+
+          // QICore model info 6.0.0 and prior included from the translator is implicit, do not report
+          if (def.getLocalIdentifier().equals("QICore")) {
+            if (getMajorVersion(def.getVersion()) <= 6) {
+              continue;
+            }
+          }
+
+          result.add(toRelatedArtifact(def));
         }
       }
     }
@@ -591,19 +903,19 @@ public class CqlSubSystem {
     return result;
   }
 
-  private List<ParameterDefinition> extractParameters(org.hl7.elm.r1.Library library, List<ValidationMessage> messages) {
+  private List<ParameterDefinition> extractParameters(org.hl7.elm.r1.Library library) {
     List<ParameterDefinition> result = new ArrayList<>();
 
     if (library.getParameters() != null && !library.getParameters().getDef().isEmpty()) {
       for (ParameterDef def : library.getParameters().getDef()) {
-        result.add(toParameterDefinition(def, messages));
+        result.add(toParameterDefinition(def));
       }
     }
 
     if (library.getStatements() != null && !library.getStatements().getDef().isEmpty()) {
       for (ExpressionDef def : library.getStatements().getDef()) {
         if (!(def instanceof FunctionDef) && (def.getAccessLevel() == null || def.getAccessLevel() == AccessModifier.PUBLIC)) {
-          result.add(toOutputParameterDefinition(def, messages));
+          result.add(toOutputParameterDefinition(def));
         }
       }
     }
@@ -629,11 +941,28 @@ public class CqlSubSystem {
   }
 
   private String getModelInfoReferenceUrl(String uri, String name, String version) {
+    // If the model is defined in this IG
+    for (var m : models.values()) {
+      if (name.equals(m.getName())) {
+        return String.format("%s/Library/%s-ModelInfo%s", canonicalBase, name, version != null ? ("|" + version) : "");
+      }
+    }
+
+    // If the model was loaded from a dependency, report it from that dependency
+    for (var entry : loadedModels.entrySet()) {
+      if (entry.getKey().getId().equals(name)) {
+        return String.format("%s/Library/%s-ModelInfo%s",
+            entry.getKey().getSystem(),
+            entry.getKey().getId(),
+            entry.getKey().getVersion() != null ? ("|" + entry.getKey().getVersion()) : "");
+      }
+    }
+
     if (uri != null) {
       return String.format("%s/Library/%s-ModelInfo%s", uri, name, version != null ? ("|" + version) : "");
     }
 
-    return String.format("Library/%-ModelInfo%s", name, version != null ? ("|" + version) : "");
+    return String.format("%s/Library/%s-ModelInfo%s", canonicalBase, name, version != null ? ("|" + version) : "");
   }
 
   private org.hl7.fhir.r5.model.RelatedArtifact toRelatedArtifact(IncludeDef includeDef) {
@@ -668,11 +997,11 @@ public class CqlSubSystem {
             .setResource(toReference(valueSetDef));
   }
 
-  private ParameterDefinition toParameterDefinition(ParameterDef def, List<ValidationMessage> messages) {
+  private ParameterDefinition toParameterDefinition(ParameterDef def) {
     org.hl7.cql.model.DataType parameterType = def.getResultType() instanceof ListType ? ((ListType)def.getResultType()).getElementType() : def.getResultType();
 
     AtomicBoolean isList = new AtomicBoolean(false);
-    Enumerations.FHIRTypes typeCode = Enumerations.FHIRTypes.fromCode(toFHIRParameterTypeCode(parameterType, def.getName(), isList, messages));
+    Enumerations.FHIRTypes typeCode = Enumerations.FHIRTypes.fromCode(toFHIRParameterTypeCode(parameterType, def.getName(), isList));
 
     return new ParameterDefinition()
             .setName(def.getName())
@@ -682,9 +1011,9 @@ public class CqlSubSystem {
             .setType(typeCode);
   }
 
-  private ParameterDefinition toOutputParameterDefinition(ExpressionDef def, List<ValidationMessage> messages) {
+  private ParameterDefinition toOutputParameterDefinition(ExpressionDef def) {
     AtomicBoolean isList = new AtomicBoolean(false);
-    Enumerations.FHIRTypes typeCode = Enumerations.FHIRTypes.fromCode(toFHIRResultTypeCode(def.getResultType(), def.getName(), isList, messages));
+    Enumerations.FHIRTypes typeCode = Enumerations.FHIRTypes.fromCode(toFHIRResultTypeCode(def.getResultType(), def.getName(), isList));
 
     return new ParameterDefinition()
             .setName(def.getName())
@@ -694,26 +1023,30 @@ public class CqlSubSystem {
             .setType(typeCode);
   }
 
-  private String toFHIRResultTypeCode(org.hl7.cql.model.DataType dataType, String defName, AtomicBoolean isList, List<ValidationMessage> messages) {
+  private String toFHIRResultTypeCode(org.hl7.cql.model.DataType dataType, String defName, AtomicBoolean isList) {
     AtomicBoolean isValid = new AtomicBoolean(true);
     String resultCode = toFHIRTypeCode(dataType, isValid, isList);
     if (!isValid.get()) {
       // Issue a warning that the result type is not supported
-      messages.add(new ValidationMessage(ValidationMessage.Source.Publisher, IssueType.NOTSUPPORTED, "CQL Library Packaging",
+      addError(IssueType.NOTSUPPORTED,
               String.format("Result type %s of definition %s is not supported; implementations may not be able to use the result of this expression",
-                      dataType.toLabel(), defName), IssueSeverity.WARNING));
+                      dataType.toLabel(), defName),
+              IssueSeverity.WARNING
+      );
     }
 
     return resultCode;
   }
 
-  private String toFHIRParameterTypeCode(org.hl7.cql.model.DataType dataType, String parameterName, AtomicBoolean isList, List<ValidationMessage> messages) {
+  private String toFHIRParameterTypeCode(org.hl7.cql.model.DataType dataType, String parameterName, AtomicBoolean isList) {
     AtomicBoolean isValid = new AtomicBoolean(true);
     String resultCode = toFHIRTypeCode(dataType, isValid, isList);
     if (!isValid.get()) {
       // Issue a warning that the parameter type is not supported
-      messages.add(new ValidationMessage(ValidationMessage.Source.Publisher, IssueType.NOTSUPPORTED, "CQL Library Packaging",
-              String.format("Parameter type %s of parameter %s is not supported; reported as FHIR.Any", dataType.toLabel(), parameterName), IssueSeverity.WARNING));
+      addError(IssueType.NOTSUPPORTED,
+              String.format("Parameter type %s of parameter %s is not supported; reported as FHIR.Any", dataType.toLabel(), parameterName),
+              IssueSeverity.WARNING
+      );
     }
 
     return resultCode;
@@ -787,7 +1120,7 @@ public class CqlSubSystem {
 
       if (retrieve.getCodes() instanceof ValueSetRef) {
         ValueSetRef vsr = (ValueSetRef)retrieve.getCodes();
-        cfc.setValueSet(toReference(resolveValueSetRef(vsr, library, libraryManager)));
+        cfc.setValueSet(toReference(resolveValueSetRef(vsr, new ResolutionContext(libraryManager, library))));
       }
 
       if (retrieve.getCodes() instanceof org.hl7.elm.r1.ToList) {
@@ -814,44 +1147,56 @@ public class CqlSubSystem {
                                       CompiledLibrary library, LibraryManager libraryManager) {
     if (e instanceof org.hl7.elm.r1.CodeRef) {
       CodeRef cr = (CodeRef)e;
-      cfc.addCode(toCoding(toCode(resolveCodeRef(cr, library, libraryManager)), library, libraryManager));
+      ResolutionContext context = new ResolutionContext(libraryManager, library);
+      cfc.addCode(toCoding(toCode(resolveCodeRef(cr, context)), context));
     }
 
     if (e instanceof org.hl7.elm.r1.Code) {
-      cfc.addCode(toCoding((org.hl7.elm.r1.Code)e, library, libraryManager));
+      cfc.addCode(toCoding((org.hl7.elm.r1.Code)e, new ResolutionContext(libraryManager, library)));
     }
 
     if (e instanceof org.hl7.elm.r1.ConceptRef) {
       ConceptRef cr = (ConceptRef)e;
-      org.hl7.fhir.r5.model.CodeableConcept c = toCodeableConcept(toConcept(resolveConceptRef(cr, library, libraryManager), library, libraryManager), library, libraryManager);
+      ResolutionContext context = new ResolutionContext(libraryManager, library);
+      org.hl7.fhir.r5.model.CodeableConcept c = toCodeableConcept(toConcept(resolveConceptRef(cr, context), context), context);
       for (org.hl7.fhir.r5.model.Coding code : c.getCoding()) {
         cfc.addCode(code);
       }
     }
 
     if (e instanceof org.hl7.elm.r1.Concept) {
-      org.hl7.fhir.r5.model.CodeableConcept c = toCodeableConcept((org.hl7.elm.r1.Concept)e, library, libraryManager);
+      org.hl7.fhir.r5.model.CodeableConcept c = toCodeableConcept((org.hl7.elm.r1.Concept)e, new ResolutionContext(libraryManager, library));
       for (org.hl7.fhir.r5.model.Coding code : c.getCoding()) {
         cfc.addCode(code);
       }
     }
   }
 
-  private org.hl7.fhir.r5.model.Coding toCoding(Code code, CompiledLibrary library, LibraryManager libraryManager) {
-    CodeSystemDef codeSystemDef = resolveCodeSystemRef(code.getSystem(), library, libraryManager);
+  private org.hl7.fhir.r5.model.Coding toCoding(Code code, ResolutionContext context) {
+    CodeSystemDef codeSystemDef = resolveCodeSystemRef(code.getSystem(), context);
     org.hl7.fhir.r5.model.Coding coding = new org.hl7.fhir.r5.model.Coding();
     coding.setCode(code.getCode());
     coding.setDisplay(code.getDisplay());
-    coding.setSystem(codeSystemDef.getId());
-    coding.setVersion(codeSystemDef.getVersion());
+    if (codeSystemDef != null) {
+        coding.setSystem(codeSystemDef.getId());
+        coding.setVersion(codeSystemDef.getVersion());
+    }
+    else {
+        // Message that the code system reference could not be resolved
+        addError(IssueType.PROCESSING,
+                String.format("Code system reference %s could not be resolved", code.getSystem()),
+                IssueSeverity.ERROR
+        );
+        coding.setSystem(code.getSystem().toString());
+    }
     return coding;
   }
 
-  private org.hl7.fhir.r5.model.CodeableConcept toCodeableConcept(Concept concept, CompiledLibrary library, LibraryManager libraryManager) {
+  private org.hl7.fhir.r5.model.CodeableConcept toCodeableConcept(Concept concept, ResolutionContext context) {
     org.hl7.fhir.r5.model.CodeableConcept codeableConcept = new org.hl7.fhir.r5.model.CodeableConcept();
     codeableConcept.setText(concept.getDisplay());
     for (Code code : concept.getCode()) {
-      codeableConcept.addCoding(toCoding(code, library, libraryManager));
+      codeableConcept.addCoding(toCoding(code, new ResolutionContext(context.getLibraryManager(), context.getLibrary())));
     }
     return codeableConcept;
   }
@@ -866,11 +1211,11 @@ public class CqlSubSystem {
 
   // TODO: Move to the CQL-to-ELM translator
 
-  private org.hl7.elm.r1.Concept toConcept(ConceptDef conceptDef, CompiledLibrary library, LibraryManager libraryManager) {
+  private org.hl7.elm.r1.Concept toConcept(ConceptDef conceptDef, ResolutionContext context) {
     org.hl7.elm.r1.Concept concept = new org.hl7.elm.r1.Concept();
     concept.setDisplay(conceptDef.getDisplay());
     for (org.hl7.elm.r1.CodeRef codeRef : conceptDef.getCode()) {
-      concept.getCode().add(toCode(resolveCodeRef(codeRef, library, libraryManager)));
+      concept.getCode().add(toCode(resolveCodeRef(codeRef, new ResolutionContext(context.getLibraryManager(), context.getLibrary()))));
     }
     return concept;
   }
@@ -879,44 +1224,62 @@ public class CqlSubSystem {
     return new org.hl7.elm.r1.Code().withCode(codeDef.getId()).withSystem(codeDef.getCodeSystem()).withDisplay(codeDef.getDisplay());
   }
 
-  private org.hl7.elm.r1.CodeDef resolveCodeRef(CodeRef codeRef, CompiledLibrary library, LibraryManager libraryManager) {
+  private class ResolutionContext {
+      private final LibraryManager libraryManager;
+      private CompiledLibrary library;
+      public ResolutionContext(LibraryManager libraryManager, CompiledLibrary library) {
+          this.libraryManager = libraryManager;
+          this.library = library;
+      }
+      public LibraryManager getLibraryManager() {
+          return libraryManager;
+      }
+      public CompiledLibrary getLibrary() {
+          return library;
+      }
+      public void setLibrary(CompiledLibrary library) {
+          this.library = library;
+      }
+  }
+
+  private org.hl7.elm.r1.CodeDef resolveCodeRef(CodeRef codeRef, ResolutionContext context) {
     // If the reference is to another library, resolve to that library
     if (codeRef.getLibraryName() != null) {
-      library = resolveLibrary(codeRef.getLibraryName(), library, libraryManager);
+      context.setLibrary(resolveLibrary(codeRef.getLibraryName(), context));
     }
 
-    return library.resolveCodeRef(codeRef.getName());
+    return context.getLibrary().resolveCodeRef(codeRef.getName());
   }
 
-  private org.hl7.elm.r1.ConceptDef resolveConceptRef(ConceptRef conceptRef, CompiledLibrary library, LibraryManager libraryManager) {
+  private org.hl7.elm.r1.ConceptDef resolveConceptRef(ConceptRef conceptRef, ResolutionContext context) {
     // If the reference is to another library, resolve to that library
     if (conceptRef.getLibraryName() != null) {
-      library = resolveLibrary(conceptRef.getLibraryName(), library, libraryManager);
+      context.setLibrary(resolveLibrary(conceptRef.getLibraryName(), context));
     }
 
-    return library.resolveConceptRef(conceptRef.getName());
+    return context.getLibrary().resolveConceptRef(conceptRef.getName());
   }
 
-  private CodeSystemDef resolveCodeSystemRef(CodeSystemRef codeSystemRef, CompiledLibrary library, LibraryManager libraryManager) {
+  private CodeSystemDef resolveCodeSystemRef(CodeSystemRef codeSystemRef, ResolutionContext context) {
     if (codeSystemRef.getLibraryName() != null) {
-      library = resolveLibrary(codeSystemRef.getLibraryName(), library, libraryManager);
+      context.setLibrary(resolveLibrary(codeSystemRef.getLibraryName(), context));
     }
 
-    return library.resolveCodeSystemRef(codeSystemRef.getName());
+    return context.getLibrary().resolveCodeSystemRef(codeSystemRef.getName());
   }
 
-  private ValueSetDef resolveValueSetRef(ValueSetRef valueSetRef, CompiledLibrary library, LibraryManager libraryManager) {
+  private ValueSetDef resolveValueSetRef(ValueSetRef valueSetRef, ResolutionContext context) {
     // If the reference is to another library, resolve to that library
     if (valueSetRef.getLibraryName() != null) {
-      library = resolveLibrary(valueSetRef.getLibraryName(), library, libraryManager);
+      context.setLibrary(resolveLibrary(valueSetRef.getLibraryName(), context));
     }
 
-    return library.resolveValueSetRef(valueSetRef.getName());
+    return context.getLibrary().resolveValueSetRef(valueSetRef.getName());
   }
 
-  private CompiledLibrary resolveLibrary(String localLibraryName, CompiledLibrary library, LibraryManager libraryManager) {
-    IncludeDef includeDef = library.resolveIncludeRef(localLibraryName);
-    return resolveLibrary(libraryManager, new VersionedIdentifier()
+  private CompiledLibrary resolveLibrary(String localLibraryName, ResolutionContext context) {
+    IncludeDef includeDef = context.getLibrary().resolveIncludeRef(localLibraryName);
+    return resolveLibrary(context.getLibraryManager(), new VersionedIdentifier()
             .withId(NamespaceManager.getNamePart(includeDef.getPath()))
             .withSystem(NamespaceManager.getUriPart(includeDef.getPath()))
             .withVersion(includeDef.getVersion()));
@@ -933,13 +1296,412 @@ public class CqlSubSystem {
    * @return
    */
   public boolean processArtifact(FetchedFile f, Resource resource) {
-    if (resource instanceof Measure) {
-      Measure m = (Measure) resource;
-
-      return true;
+    try {
+      if (resource instanceof Measure
+              || resource instanceof ActivityDefinition
+              || resource instanceof PlanDefinition
+              || resource instanceof Questionnaire) {
+        processEffectiveDataRequirements(f, (DomainResource)resource);
+        return true;
+      }
     }
+    catch (Exception e) {
+      f.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, IssueType.PROCESSING,
+              f.getPath(), e.getMessage(), IssueSeverity.WARNING));
+      f.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, IssueType.PROCESSING,
+              f.getPath(), "Exceptions occurred attempting to process effective data requirements",
+              IssueSeverity.WARNING));
+    }
+
     return false;
   }
 
+  private CqlSourceFileInformation getCqlInfo(String libraryId) {
+    if (fileMap != null) {
+      for (var info : fileMap.values()) {
+        if (info.identifier != null && info.identifier.getId() != null && info.identifier.getId().equals(libraryId)) {
+          return info;
+        }
+      }
+    }
 
+    if (savedFileMap != null) {
+      for (var info : savedFileMap.values()) {
+        if (info.identifier != null && info.identifier.getId() != null && info.identifier.getId().equals(libraryId)) {
+          return info;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  private CqlSourceFileInformation getLibraryInfo(FetchedFile f, DomainResource r) {
+    if (r instanceof Measure) {
+      return getLibraryInfo(f, ((Measure)r).getLibrary());
+    }
+    else if (r instanceof ActivityDefinition) {
+      return getLibraryInfo(f, ((ActivityDefinition)r).getLibrary());
+    }
+    else if (r instanceof PlanDefinition) {
+      return getLibraryInfo(f, ((PlanDefinition)r).getLibrary());
+    }
+    else if (r instanceof Questionnaire) {
+      return getLibraryInfo(f, r.getExtensionsByUrl("http://hl7.org/fhir/StructureDefinition/cqf-library").stream().map(Extension::getValueCanonicalType).toList());
+    }
+    else {
+      return null;
+    }
+  }
+
+  private CqlSourceFileInformation getLibraryInfo(FetchedFile f, List<CanonicalType> libraries) {
+    // Skip if there are no, or more than one, libraries
+    if (libraries == null || libraries.size() == 0 || libraries.size() > 1) {
+      f.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, IssueType.PROCESSING,
+          f.getPath(), "Artifact either has no library, or has multiple libraries so no effective data requirements were inferred.",
+          IssueSeverity.INFORMATION));
+      return null;
+    }
+
+    // Get the compiled measure library
+    CqlSourceFileInformation libraryInfo = null;
+    for (var canonical : libraries) {
+      libraryInfo = getCqlInfo(Utilities.tail(canonical.getCanonical()));
+      if (libraryInfo != null) {
+        break;
+      }
+    }
+
+    // If it was not successfully compiled, log a warning that measure data requirements could not be inferred
+    if (libraryInfo == null) {
+      f.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, IssueType.PROCESSING,
+          f.getPath(), "Artifact library could not be found so no data requirements were inferred.",
+          IssueSeverity.WARNING));
+    }
+
+    return libraryInfo;
+  }
+
+  private void processEffectiveDataRequirements(FetchedFile f, DomainResource r) {
+    CqlSourceFileInformation libraryInfo = getLibraryInfo(f, r);
+
+    if (libraryInfo != null) {
+      // Build the module definition library
+      DataRequirementsProcessor drp = new DataRequirementsProcessor();
+      drp.setSpecificationLevel(SpecificationLevel.QM_STU_1);
+      Library moduleDefinitionLibrary = getModuleDefinitionLibrary(f, r, drp, libraryInfo);
+      attachModuleDefinitionLibrary(r, moduleDefinitionLibrary);
+
+      // Report issues to the fetched file
+      for (var message : drp.getValidationMessages()) {
+        f.getErrors().add(message);
+      }
+    }
+  }
+
+  private void fixupFHIRReferences(FetchedFile f, Library library, CompiledLibrary compiledLibrary) {
+    // Correct references to any reported models to the models and loadedModels tables (local ig and ig dependency models)
+    for (var r : library.getRelatedArtifact()) {
+      if (r.hasResource() && r.getResource().contains("/Library/") && r.getResource().contains("-ModelInfo")) {
+        var tail = Utilities.urlTail(r.getResource());
+        var uri = Utilities.extractBaseUrl(Utilities.extractBaseUrl(r.getResource()));
+        var modelName = tail.substring(0, tail.indexOf("-"));
+        var versionIndex = tail.indexOf("|");
+        var version = versionIndex > 0 ? tail.substring(versionIndex + 1) : null;
+        r.setResource(getModelInfoReferenceUrl(uri, modelName, version));
+      }
+    }
+
+    // If the library still has a dependency on 'http://fhir.org/guides/cqf/common/Library/FHIR-ModelInfo'
+    // and to 'http://hl7.org/fhir/Library/FHIRHelpers' then the guide is using CQFCommon, but
+    // the dependency resolved to the translator-included FHIRHelpers, which doesn't resolve in the
+    // IG. So correct the dependency to 'http://fhir.org/guides/cqf/common/Library/FHIRHelpers'
+    RelatedArtifact cqfCommonModelInfo = null;
+    for (var r : library.getRelatedArtifact()) {
+      if (r.hasResource() && r.getResource().startsWith("http://fhir.org/guides/cqf/common/Library/FHIR-ModelInfo")) {
+        cqfCommonModelInfo = r;
+          break;
+      }
+    }
+
+    if (cqfCommonModelInfo != null) {
+      // Find the loaded model for FHIR
+      // If there is one, use it, otherwise, remove the reported dependency (it is the implicit one loaded in the translator)
+      VersionedIdentifier fhirModel = null;
+      for (var entry : loadedModels.entrySet()) {
+        if ("FHIR".equals(entry.getKey().getId())) {
+          fhirModel = entry.getKey();
+          break;
+        }
+      }
+
+      if (fhirModel != null && fhirModel.getSystem() != null) {
+        cqfCommonModelInfo.setResource(String.format("%s/Library/%s-ModelInfo%s",
+            fhirModel.getSystem(),
+            fhirModel.getId(),
+            fhirModel.getVersion() != null ? "|" + fhirModel.getVersion() : ""
+        ));
+
+        for (var r : library.getRelatedArtifact()) {
+          if (r.hasResource() && r.getResource().startsWith("http://hl7.org/fhir/Library/FHIRHelpers")) {
+            if (r.getResource().contains("|")) {
+              r.setResource(fhirModel.getSystem() + "/Library/FHIRHelpers|4.0.1");
+            }
+            else {
+              r.setResource(fhirModel.getSystem() + "/Library/FHIRHelpers");
+            }
+
+            f.getErrors().add(
+                new ValidationMessage(
+                    ValidationMessage.Source.Publisher,
+                    IssueType.PROCESSING,
+                    f.getPath(),
+                    "Artifact is using a package-loaded FHIR-ModelInfo, but the implicit FHIRHelpers. The dependency has been updated to use the FHIRHelpers from the same package.",
+                    IssueSeverity.INFORMATION
+                )
+            );
+          }
+        }
+      }
+      else if (hasCqfCommonDependency) {
+        // The IG declares a dependency on fhir.cqf.common#4.0.1
+        // But order of providers loaded model info from the implicit translator
+        // And then the data requirements processing assigned it to the CQF uri
+        // So switch FHIRHelpers to the cqf common as well
+        for (var r : library.getRelatedArtifact()) {
+          if (r.hasResource() && r.getResource().startsWith("http://hl7.org/fhir/Library/FHIRHelpers")) {
+            if (r.getResource().contains("|")) {
+              r.setResource("http://fhir.org/guides/cqf/common/Library/FHIRHelpers|4.0.1");
+            }
+            else {
+              r.setResource("http://fhir.org/guides/cqf/common/Library/FHIRHelpers");
+            }
+
+            f.getErrors().add(
+                new ValidationMessage(
+                    ValidationMessage.Source.Publisher,
+                    IssueType.PROCESSING,
+                    f.getPath(),
+                    "Artifact is using CQF Common package, but the implicitly loaded FHIR-ModelInfo and FHIRHelpers. The dependencies have been updated to use the libraries from the CQF Common package.",
+                    IssueSeverity.INFORMATION
+                )
+            );
+          }
+        }
+      }
+      else if (hasUsingCqlDependency) {
+        // The IG declares a dependency on hl7.fhir.uv.cql#2.0.0+
+        // But order of providers loaded model info from the implicit translator
+        // And then the data requirements processing assigned it to the CQF uri
+        // So switch the model back to the uv/cql dependency
+        if (cqfCommonModelInfo.getResource().contains("|")) {
+          cqfCommonModelInfo.setResource("http://hl7.org/fhir/uv/cql/Library/FHIR-ModelInfo|4.0.1");
+        }
+        else {
+          cqfCommonModelInfo.setResource("http://hl7.org/fhir/uv/cql/Library/FHIR-ModelInfo");
+        }
+
+        f.getErrors().add(
+            new ValidationMessage(
+                ValidationMessage.Source.Publisher,
+                IssueType.PROCESSING,
+                f.getPath(),
+                "Artifact is using Using CQL 2.0+ package, but the implicitly loaded FHIR-ModelInfo. The artifact dependencies have been updated to use the Using CQL 2.0+ dependency.",
+                IssueSeverity.INFORMATION
+            )
+        );
+      }
+      else {
+        // Remove the reported dependency (it is the implicit one loaded in the translator)
+        library.getRelatedArtifact().remove(cqfCommonModelInfo);
+
+        f.getErrors().add(
+            new ValidationMessage(
+                ValidationMessage.Source.Publisher,
+                IssueType.PROCESSING,
+                f.getPath(),
+                "Artifact is using the implicitly loaded FHIR-ModelInfo and FHIRHelpers and is not referencing Using CQL version 2 or CQF Common version 4.0.1, so the model info dependency was removed. Consider using hl7.fhir.uv.cql#2.0.0 or fhir.cqf.common#4.0.1.",
+                IssueSeverity.INFORMATION
+            )
+        );
+      }
+    }
+  }
+
+  private void attachModuleDefinitionLibrary(DomainResource r, Library moduleDefinitionLibrary) {
+    // Remove extensions from QM IG STU2 or earlier
+    r.getExtension().removeAll(r.getExtensionsByUrl(
+        "http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-directReferenceCode",
+        "http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-logicDefinition",
+        "http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-parameter",
+        "http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-dataRequirement"
+    ));
+
+    // Remove the existing effective data requirements library and extension if one is present
+    r.getContained().removeIf(res -> res.getId().equals(getDataRequirementsLibraryId(r)));
+    r.getExtension().removeAll(r.getExtensionsByUrl(
+        "http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-effectiveDataRequirements",
+        "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-effectiveDataRequirements"
+    ));
+
+    // Add the module effective data requirements library
+    if (!moduleDefinitionLibrary.hasId()) {
+      moduleDefinitionLibrary.setId("effective-data-requirements");
+    }
+    r.getContained().add(moduleDefinitionLibrary);
+    r.getExtension().add(
+        new Extension(
+            "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-effectiveDataRequirements",
+            new CanonicalType("#" + moduleDefinitionLibrary.getId())
+        )
+    );
+  }
+
+  private String getDataRequirementsLibraryId(DomainResource r) {
+    Extension edr = r.getExtensionByUrl("http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-effectiveDataRequirements");
+    if (edr == null) {
+      edr = r.getExtensionByUrl("http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-effectiveDataRequirements");
+    }
+
+    // Be as liberal as possible in how the effective data requirements reference is specified
+    String reference = null;
+    if (edr != null) {
+      if (edr.hasValueStringType()) {
+        reference = edr.getValueStringType().getValue();
+      }
+      else if (edr.hasValueCanonicalType()) {
+        reference = edr.getValueCanonicalType().getValue();
+      }
+      else if (edr.hasValueUriType()) {
+        reference =  edr.getValueUriType().getValue();
+      }
+      else if (edr.hasValueUrlType()) {
+        reference = edr.getValueUrlType().getValue();
+      }
+      else if (edr.hasValueReference()) {
+        reference = edr.getValueReference().getReference();
+      }
+    }
+
+    if (reference != null && reference.startsWith("#")) {
+      reference = reference.substring(1);
+    }
+
+    return reference;
+  }
+
+  private Library getModuleDefinitionLibrary(FetchedFile f, DomainResource r, DataRequirementsProcessor drp, CqlSourceFileInformation info) {
+    Set<String> expressions = getExpressions(r);
+
+    boolean annotationsEnabled = info.getOptions().getCqlCompilerOptions().getOptions().contains(CqlCompilerOptions.Options.EnableAnnotations);
+    if (!annotationsEnabled) {
+      drp.getValidationMessages().add(
+          new ValidationMessage(ValidationMessage.Source.Publisher, IssueType.PROCESSING,
+              info.getPath(), "Artifact library was not translated with annotations enabled, so the measure narrative will not include logic definitions.",
+              IssueSeverity.INFORMATION)
+      );
+    }
+
+    CompiledLibrary compiledLibrary = getLibraryManager().resolveLibrary(info.getIdentifier(), new ArrayList<>());
+    Library moduleDefinitionLibrary = drp.gatherDataRequirements(
+        getLibraryManager(),
+        compiledLibrary,
+        info.getOptions().getCqlCompilerOptions(),
+        expressions,
+        annotationsEnabled
+    );
+
+    fixupFHIRReferences(f, moduleDefinitionLibrary, compiledLibrary);
+
+    return moduleDefinitionLibrary;
+  }
+
+  private boolean isExpressionIdentifier(org.hl7.fhir.r5.model.Expression expression) {
+    return expression.hasLanguage() && expression.hasExpression()
+        && (expression.getLanguage().equalsIgnoreCase("text/cql.identifier")
+        || expression.getLanguage().equalsIgnoreCase("text/cql")
+        || expression.getLanguage().equalsIgnoreCase("text/cql-identifier"));
+  }
+
+  private Set<String> getExpressions(DomainResource r) {
+    if (r instanceof Measure) {
+      return getMeasureExpressions((Measure) r);
+    }
+    else if (r instanceof PlanDefinition) {
+      return getPlanDefinitionExpressions((PlanDefinition) r);
+    }
+    else if (r instanceof ActivityDefinition) {
+      return getActivityDefinitionExpressions((ActivityDefinition) r);
+    }
+    else if (r instanceof Questionnaire) {
+      return getQuestionnaireExpressions((Questionnaire) r);
+    }
+    else {
+      return new HashSet<>();
+    }
+  }
+
+  private void getPlanDefinitionActionExpressions(PlanDefinition.PlanDefinitionActionComponent action, Set<String> expressionSet) {
+    for (var condition : action.getCondition()) {
+      if (condition.hasExpression() && isExpressionIdentifier(condition.getExpression())) {
+        expressionSet.add(condition.getExpression().getExpression());
+      }
+    }
+
+    for (var dynamicValue : action.getDynamicValue()) {
+      if (dynamicValue.hasExpression() && isExpressionIdentifier(dynamicValue.getExpression())) {
+        expressionSet.add(dynamicValue.getExpression().getExpression());
+      }
+    }
+
+    for (var childAction : action.getAction()) {
+      getPlanDefinitionActionExpressions(childAction, expressionSet);
+    }
+  }
+
+  private Set<String> getPlanDefinitionExpressions(PlanDefinition planDefinition) {
+    Set<String> expressionSet = new HashSet<>();
+    planDefinition.getAction().forEach(action -> {
+      getPlanDefinitionActionExpressions(action, expressionSet);
+    });
+    return expressionSet;
+  }
+
+  private Set<String> getActivityDefinitionExpressions(ActivityDefinition activityDefinition) {
+    Set<String> expressionSet = new HashSet<>();
+    for (var dynamicValue : activityDefinition.getDynamicValue()) {
+      if (dynamicValue.hasExpression() && isExpressionIdentifier(dynamicValue.getExpression())) {
+        expressionSet.add(dynamicValue.getExpression().getExpression());
+      }
+    }
+    return expressionSet;
+  }
+
+  private Set<String> getQuestionnaireExpressions(Questionnaire questionnaire) {
+    Set<String> expressionSet = new HashSet<>();
+    // TODO: Need to determine where we will see expression references in questionnaires...
+    return expressionSet;
+  }
+
+  private Set<String> getMeasureExpressions(Measure measure) {
+    Set<String> expressionSet = new HashSet<>();
+    measure.getSupplementalData().forEach(supData -> {
+      if (supData.hasCriteria() && isExpressionIdentifier(supData.getCriteria())) {
+        expressionSet.add(supData.getCriteria().getExpression());
+      }
+    });
+    measure.getGroup().forEach(groupMember -> {
+      groupMember.getPopulation().forEach(population -> {
+        if (population.hasCriteria() && isExpressionIdentifier(population.getCriteria())) {
+          expressionSet.add(population.getCriteria().getExpression());
+        }
+      });
+      groupMember.getStratifier().forEach(stratifier -> {
+        if (stratifier.hasCriteria() && isExpressionIdentifier(stratifier.getCriteria())) {
+          expressionSet.add(stratifier.getCriteria().getExpression());
+        }
+      });
+    });
+    return expressionSet;
+  }
 }
