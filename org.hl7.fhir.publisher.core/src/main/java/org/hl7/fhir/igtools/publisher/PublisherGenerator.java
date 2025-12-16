@@ -88,7 +88,6 @@ import java.io.*;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
@@ -217,7 +216,7 @@ public class PublisherGenerator extends PublisherBase {
         }
         checkMakeFile(pf.context.getBinaryForKey(s), Utilities.path(pf.tempDir, s), pf.otherFilesStartup);
         for (String l : allLangs()) {
-          checkMakeFile(fixLang(pf.context.getBinaryForKey(s), l), Utilities.path(pf.tempDir, l, s), pf.otherFilesStartup);
+          checkMakeFile(fillLangTemplate(pf.context.getBinaryForKey(s), l), Utilities.path(pf.tempDir, l, s), pf.otherFilesStartup);
         }
       }
     }
@@ -540,7 +539,7 @@ public class PublisherGenerator extends PublisherBase {
     }
   }
 
-  private byte[] fixLang(byte[] b, String l) {
+  private byte[] fillLangTemplate(byte[] b, String l) {
     try {
       String s = new String(b, "UTF-8");
       if (s.startsWith("--")) {
