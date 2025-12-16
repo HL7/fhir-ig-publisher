@@ -48,6 +48,11 @@
         </dependency>
         <dependency>
             <groupId>info.cqframework</groupId>
+            <artifactId>elm-fhir</artifactId>
+            <version>${info_cqframework_version}</version>
+        </dependency>
+        <dependency>
+            <groupId>info.cqframework</groupId>
             <artifactId>elm-jaxb</artifactId>
             <version>${info_cqframework_version}</version>
         </dependency>
