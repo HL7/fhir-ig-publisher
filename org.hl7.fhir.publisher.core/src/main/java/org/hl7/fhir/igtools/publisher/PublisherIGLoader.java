@@ -318,6 +318,7 @@ public class PublisherIGLoader extends PublisherBase {
     Map<String, String> expParamMap = new HashMap<>();
     boolean allowExtensibleWarnings = false;
     boolean noCIBuildIssues = false;
+    boolean keepTranslationsWhenTranslating = false;
     List<String> conversionVersions = new ArrayList<>();
     List<String> liquid0 = new ArrayList<>();
     List<String> liquid1 = new ArrayList<>();
@@ -782,6 +783,9 @@ public class PublisherIGLoader extends PublisherBase {
         case "no-ig-database":
           pf.generatingDatabase = false;
           break;
+        case "language-translations-mode":
+          keepTranslationsWhenTranslating = "preserve".equals(p.getValue());
+          break;
         default:
           if (pc.startsWith("wantGen-")) {
             String code = pc.substring(8);
@@ -915,6 +919,7 @@ public class PublisherIGLoader extends PublisherBase {
       loadConversionVersion(s);
     }
     pf.langUtils = new LanguageUtils(pf.context);
+    pf.langUtils.setKeepTranslationsWhenTranslating(keepTranslationsWhenTranslating);
     pf.txLog = FileUtilities.createTempFile("fhir-ig-", ".html").getAbsolutePath();
     System.out.println("Running Terminology Log: "+ pf.txLog);
     if (settings.getMode() != PublisherUtils.IGBuildMode.WEBSERVER) {
