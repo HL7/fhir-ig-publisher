@@ -1355,10 +1355,15 @@ public class CqlSubSystem {
   }
 
   private CqlSourceFileInformation getLibraryInfo(FetchedFile f, List<CanonicalType> libraries) {
-    // Skip if there are no, or more than one, libraries
-    if (libraries == null || libraries.size() == 0 || libraries.size() > 1) {
+    // Skip if there are no libraries
+    if (libraries == null || libraries.isEmpty()) {
+      return null;
+    }
+
+    // Skip and inform that effective data requirements processing will not be performed if there are multiple libraries
+    if (libraries.size() > 1) {
       f.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, IssueType.PROCESSING,
-          f.getPath(), "Artifact either has no library, or has multiple libraries so no effective data requirements were inferred.",
+          f.getPath(), "Artifact has multiple libraries so no effective data requirements were inferred.",
           IssueSeverity.INFORMATION));
       return null;
     }
@@ -1677,9 +1682,34 @@ public class CqlSubSystem {
     return expressionSet;
   }
 
+  private void getQuestionnaireExtensionExpressions(List<Extension> extensions, Set<String> expressions) {
+    for (var extension : extensions) {
+      if (Utilities.existsInList(extension.getUrl(),
+          "http://hl7.org/fhir/StructureDefinition/cqf-expression",
+          "http://hl7.org/fhir/StructureDefinition/cqf-calculatedExpression",
+          "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-itemPopulationContext",
+          "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
+          "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-candidaiteExpression",
+          "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-contextExpression",
+          "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-answerExpression",
+          "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-enableWhenExpression"
+      )) {
+        if (isExpressionIdentifier(extension.getValueExpression())) {
+          expressions.add(extension.getValueExpression().getExpression());
+        }
+      }
+      else if ("http://hl7.org/fhir/StructureDefinition/cqf-calculatedValue".equals(extension.getUrl())) {
+        expressions.add(extension.getValueStringType().getValue());
+      }
+    }
+  }
+
   private Set<String> getQuestionnaireExpressions(Questionnaire questionnaire) {
     Set<String> expressionSet = new HashSet<>();
-    // TODO: Need to determine where we will see expression references in questionnaires...
+    getQuestionnaireExtensionExpressions(questionnaire.getExtension(), expressionSet);
+    for (var item : questionnaire.getItem()) {
+      getQuestionnaireExtensionExpressions(item.getExtension(), expressionSet);
+    }
     return expressionSet;
   }
 
