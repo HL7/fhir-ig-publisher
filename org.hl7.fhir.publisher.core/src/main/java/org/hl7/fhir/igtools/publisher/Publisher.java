@@ -170,7 +170,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   public static final long JEKYLL_TIMEOUT = 60000 * 5; // 5 minutes....
   public static final long FSH_TIMEOUT = 60000 * 5; // 5 minutes....
   public static final int PRISM_SIZE_LIMIT = 16384;
-  public static final String TOOLING_IG_CURRENT_RELEASE = "0.8.0";
+  public static final String TOOLING_IG_CURRENT_RELEASE = "0.9.0";
   public static final String PACKAGE_CACHE_FOLDER_PARAM = "-package-cache-folder";
 
   private PublisherIGLoader loader;
