@@ -1938,13 +1938,23 @@ public class PublisherProcessor extends PublisherBase  {
       f.start("translate");
       try {
         for (FetchedResource r : f.getResources()) {
-          pt.translate(f, r);
+          if (!isFromDependency(r)) {
+            pt.translate(f, r);
+          }
         }
       } finally {
         f.finish("translate");
       }
     }
     pt.finish();
+  }
+
+  private boolean isFromDependency(FetchedResource r) {
+    String url = r.getElement().getChildValue("url");
+    if (url == null) {
+      return false;
+    }
+    return !url.startsWith(pf.igpkp.getCanonical());
   }
 
 

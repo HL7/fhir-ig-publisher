@@ -613,6 +613,9 @@ public class PublisherGenerator extends PublisherBase {
 
   private void generateNativeOutputs(FetchedFile f, boolean regen, DBBuilder db) throws IOException, FHIRException, SQLException {
     for (FetchedResource r : f.getResources()) {
+      if (isFromDependency(r)) {
+        continue;
+      }
       logDebugMessage(LogCategory.PROGRESS, "Produce resources for "+r.fhirType()+"/"+r.getId());
       var json = saveNativeResourceOutputs(f, r);
       if (db != null) {
@@ -705,7 +708,9 @@ public class PublisherGenerator extends PublisherBase {
     lrc = lrc.copy(true); // whatever happens in here shouldn't alter the settings on the base RenderingContext
     saveFileOutputs(f, lang);
     for (FetchedResource r : f.getResources()) {
-
+      if (isFromDependency(r)) {
+        continue;
+      }
       logDebugMessage(LogCategory.PROGRESS, "Produce outputs for "+r.fhirType()+"/"+r.getId());
       Map<String, String> vars = makeVars(r);
       makeTemplates(f, r, vars, lang, lrc);
@@ -827,6 +832,9 @@ public class PublisherGenerator extends PublisherBase {
       // nothing
     } else {
       for (FetchedResource r : f.getResources()) {
+        if (isFromDependency(r)) {
+          continue;
+        }
         Map<String, String> vars = makeVars(r);
         if (r.getResource() != null) {
           generateResourceSpreadsheets(f, regen, r, r.getResource(), vars, "", db);
@@ -889,6 +897,14 @@ public class PublisherGenerator extends PublisherBase {
       return false;
     else
       return igr.getIsExample();
+  }
+
+  private boolean isFromDependency(FetchedResource r) {
+    String url = r.getElement().getChildValue("url");
+    if (url == null) {
+      return false;
+    }
+    return !url.startsWith(pf.igpkp.getCanonical());
   }
 
 
