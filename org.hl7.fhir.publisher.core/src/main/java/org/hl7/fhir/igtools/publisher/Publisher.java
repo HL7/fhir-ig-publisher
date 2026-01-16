@@ -1595,11 +1595,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         if (CliParams.hasNamedParam(args, "-no-errors")) {
           exitCode = self.countErrs(self.pf.errors) > 0 ? 1 : 0;
         }
-      } catch (ENoDump e) {
-        self.log("Publishing Content Failed: " + e.getMessage());
-        self.log("");
       } catch (Exception e) {
-        exitCode = 1;
         self.log("Publishing Content Failed: " + e.getMessage());
         self.log("");
         if (e.getMessage() != null && e.getMessage().contains("xsl:message")) {
