@@ -1994,7 +1994,7 @@ public class PublisherIGLoader extends PublisherBase {
       pf.publishedIg.addExtension(ExtensionDefinitions.EXT_WORKGROUP, new CodeType(pf.wgm));
     }
 
-    if (!VersionUtilities.isSemVer(pf.publishedIg.getVersion())) {
+    if (!VersionUtilities.isSemVer(pf.publishedIg.getVersion(), false)) {
       if (settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD) {
         throw new Error("The version "+ pf.publishedIg.getVersion()+" is not a valid semantic version so cannot be published in the ci-build");
       } else {

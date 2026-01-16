@@ -8,10 +8,11 @@
     <packaging>pom</packaging>
 
     <properties>
-        <core_version>6.7.10</core_version>
+        <core_version>6.7.11-SNAPSHOT</core_version>
         <maven_surefire_version>3.0.0-M5</maven_surefire_version>
         <apache_poi_version>5.4.1</apache_poi_version>
         <commons_io_version>2.17.0</commons_io_version>
+        <commons_text_version>1.15.0</commons_text_version>
         <lombok_version>1.18.38</lombok_version>
         <okhttp.version>4.11.0</okhttp.version>
         <junit_jupiter_version>5.7.1</junit_jupiter_version>
@@ -23,7 +24,7 @@
         <maven.compiler.testTarget>17</maven.compiler.testTarget>
         <logback-classic.version>1.5.20</logback-classic.version>
         <jackson_version>2.17.0</jackson_version>
-        <nedap-healthcare-archie.version>3.15.0</nedap-healthcare-archie.version>
+        <nedap-healthcare-archie.version>3.16.0</nedap-healthcare-archie.version>
     </properties>
 
     <name>HL7 FHIR IG Publisher</name>
@@ -136,6 +137,16 @@
                 <groupId>com.ibm.icu</groupId>
                 <artifactId>icu4j</artifactId>
                 <version>78.1</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.jena</groupId>
+                <artifactId>jena-shex</artifactId>
+                <version>5.6.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-text</artifactId>
+                <version>${commons_text_version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
