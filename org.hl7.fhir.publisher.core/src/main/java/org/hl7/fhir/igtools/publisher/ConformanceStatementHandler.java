@@ -246,7 +246,7 @@ class ConformanceStatementHandler {
     
     Map<String, ConformanceClause> primaryClauses = languageClauses.get(defaultLang);
     List<String> keyList = new ArrayList<>();
-    keyList.addAll(primaryClauses.keySet());
+    keyList.addAll(primaryClauses != null ? primaryClauses.keySet() : Collections.emptyList());
     Collections.sort(keyList, new NaturalOrderComparator<String>());
     for (String key: keyList) {
       Requirements.RequirementsStatementComponent newComp;
