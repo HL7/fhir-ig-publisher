@@ -500,6 +500,9 @@ public class PublisherGenerator extends PublisherBase {
         }
       }
 
+      pf.inspector.setReqFolder(pf.repoRoot);
+      pf.inspector.setDefaultLang(pf.defaultTranslationLang);
+      pf.inspector.setTranslationLangs(pf.translationLangs);
       List<ValidationMessage> linkmsgs = settings.isGenerationOff() ? new ArrayList<ValidationMessage>() : pf.inspector.check(statusMessage, statusMessages);
       int bl = 0;
       int lf = 0;
