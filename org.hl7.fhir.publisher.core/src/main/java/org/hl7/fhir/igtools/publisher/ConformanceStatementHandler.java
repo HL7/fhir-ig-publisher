@@ -364,10 +364,7 @@ class ConformanceStatementHandler {
     if (mismatch) {
       String fname = Utilities.path(reqFolder, "Requirements-fromNarrative.json");
       FileOutputStream fs = new FileOutputStream(fname);
-      if (oldReq.isEmpty()) 
-        messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, null, "A requirements resource representing all narrative-declared conformance statements has been placed in the root folder.  If desired, it can be copied into an input folder",
-            IssueSeverity.INFORMATION));
-      else
+      if (!oldReq.isEmpty())
         messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Requirements/fromNarrative", "There are differences between the requirements found in the narrative and what's found the provided Requirements resource.  A new version has been generated in the root.  It should be used to replace the one in the input folder.",
             IssueSeverity.WARNING));
         
