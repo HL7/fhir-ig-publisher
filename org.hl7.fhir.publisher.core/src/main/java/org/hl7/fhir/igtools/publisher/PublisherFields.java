@@ -246,6 +246,7 @@ public class PublisherFields {
     boolean hintAboutNonMustSupport = false;
     boolean anyExtensionsAllowed = false;
     boolean checkAggregation = false;
+    boolean strictIdentifierSystems = false;
     boolean autoLoad = false;
     boolean showReferenceMessages = false;
     boolean noExperimentalContent = false;

@@ -443,7 +443,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
           new PublicationChecker(pf.repoRoot, pf.historyPage, pf.markdownEngine, findReleaseLabelString(), pf.publishedIg, pf.relatedIGs).check(), renderGlobals(), pf.copyrightYear, pf.context, scanForR5Extensions(), pf.modifierExtensions,
           generateDraftDependencies(), pf.noNarrativeResources, pf.noValidateResources, settings.isValidationOff(), settings.isGenerationOff(), pf.dependentIgFinder, pf.context.getTxClientManager(),
           fragments, makeLangInfo(), pf.relatedIGs);
-      val.setValidationFlags(pf.hintAboutNonMustSupport, pf.anyExtensionsAllowed, pf.checkAggregation, pf.autoLoad, pf.showReferenceMessages, pf.noExperimentalContent, pf.displayWarnings);
+      val.setValidationFlags(pf.hintAboutNonMustSupport, pf.anyExtensionsAllowed, pf.checkAggregation, pf.strictIdentifierSystems, pf.autoLoad, pf.showReferenceMessages, pf.noExperimentalContent, pf.displayWarnings);
       FileUtilities.stringToFile(new IPViewRenderer(uncsList, pf.inspector.getExternalReferences(), pf.inspector.getImageRefs(), pf.inspector.getCopyrights(),
               pf.ipStmt, pf.inspector.getVisibleFragments().get("1"), pf.context).execute(), Utilities.path(pf.outputDir, "qa-ipreview.html"));
       tts.end();
