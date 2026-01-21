@@ -23,6 +23,7 @@
         <maven.compiler.testSource>17</maven.compiler.testSource>
         <maven.compiler.testTarget>17</maven.compiler.testTarget>
         <logback-classic.version>1.5.20</logback-classic.version>
+        <log4jVersion>2.25.3</log4jVersion>
         <jackson_version>2.17.0</jackson_version>
         <nedap-healthcare-archie.version>3.16.0</nedap-healthcare-archie.version>
     </properties>
@@ -147,6 +148,11 @@
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-text</artifactId>
                 <version>${commons_text_version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.logging.log4j</groupId>
+                <artifactId>log4j-api</artifactId>
+                <version>${log4jVersion}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -380,7 +386,7 @@
         <dependency>
             <groupId>net.sourceforge.plantuml</groupId>
             <artifactId>plantuml-mit</artifactId>
-            <version>1.2023.9</version>
+            <version>1.2026.1</version>
         </dependency>
 
         <dependency>
