@@ -409,10 +409,10 @@ class ConformanceStatementHandler {
       header.th().style("text-align: center;").tx(rc.formatPhrase(RenderingContext.CSTABLE_HEAD_EXPECT));
       header.th().style("text-align: center;").tx(rc.formatPhrase(RenderingContext.CSTABLE_HEAD_COND));
       if (!usedActors.isEmpty())
-        header.th().style("text-align: center;").tx(rc.formatPhrase(RenderingContext.CSTABLE_HEAD_ACTOR));
+        header.th().id("fcl-actor").style("text-align: center;").tx(rc.formatPhrase(RenderingContext.CSTABLE_HEAD_ACTOR));
       if (!usedCategories.isEmpty())
-        header.th().style("text-align: center;").tx(rc.formatPhrase(RenderingContext.CSTABLE_HEAD_CAT));
-      header.th().style("text-align: center;").tx(rc.formatPhrase(RenderingContext.CSTABLE_HEAD_RULE));
+        header.th().id("fcl-cat").style("text-align: center;").tx(rc.formatPhrase(RenderingContext.CSTABLE_HEAD_CAT));
+      header.th().id("fcl-rule").style("text-align: center;").tx(rc.formatPhrase(RenderingContext.CSTABLE_HEAD_RULE));
       
       XhtmlNode filters = thead.tr().style("background-color: WhiteSmoke;");
       filters.td().input("filterid", "text", " ", 4).attribute("title", rc.formatPhrase(RenderingContext.CSTABLE_TITLE_ID));
@@ -729,7 +729,7 @@ class ConformanceStatementHandler {
     if (clause.hasActors() || clause.hasCategories()) {
       String title = "";
       if (clause.hasActors()) {
-        title += "Actor(s): ";
+        title +=rc.formatPhrase(RenderingContext.CSTABLE_HEAD_ACTOR) + ": ";
         boolean first = true;
         for (ActorDefinition actor: clause.getActors()) {
           if (!first)
@@ -742,7 +742,7 @@ class ConformanceStatementHandler {
       if (clause.hasCategories()) {
         if (!title.isEmpty())
           title += "\n";
-        title += "Category(ies): ";
+        title += rc.formatPhrase(RenderingContext.CSTABLE_HEAD_CAT) + ": ";
         boolean first = true;
         for (Coding category: clause.getCategories()) {
           if (!first)
