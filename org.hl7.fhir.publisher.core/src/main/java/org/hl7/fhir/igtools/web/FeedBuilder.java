@@ -137,7 +137,7 @@ public class FeedBuilder {
       return kind;
     }    
     public boolean isSemVer() {
-      return VersionUtilities.isSemVer(version, true);
+      return VersionUtilities.isSemVer(version, false);
     }
     
     @Override

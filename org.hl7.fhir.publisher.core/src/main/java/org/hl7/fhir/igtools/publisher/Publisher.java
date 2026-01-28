@@ -100,6 +100,7 @@ import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 import org.hl7.fhir.utilities.http.HTTPResult;
 import org.hl7.fhir.utilities.http.ManagedWebAccess;
+import org.hl7.fhir.utilities.i18n.I18nBase;
 import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonBoolean;
 import org.hl7.fhir.utilities.json.model.JsonObject;
@@ -1222,6 +1223,9 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     }
     ManagedWebAccess.loadFromFHIRSettings();
 
+    if (CliParams.hasNamedParam(args, "-produce-translator-ids")) {
+      I18nBase.setUseMessageIdsDirectly(true);
+    }
 
     if (CliParams.hasNamedParam(args, "-gui")) {
       IGPublisherUI.main(args);
