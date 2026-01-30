@@ -84,7 +84,11 @@ public class TemplateManager {
     if (!canExecute) {
       logger.logMessage("IG template '"+templateThatCantExecute+"' is not trusted.  No scripts will be executed");
     }
-    return new Template(rootFolder, canExecute, templateThatCantExecute, templateReason, wantLog, rapidoMode);
+    return new Template(rootFolder, canExecute, templateThatCantExecute, templateReason, wantLog, rapidoMode, isDevMode(template));
+  }
+
+  private boolean isDevMode(String template) {
+    return !NpmPackage.isValidNameWithVersion(template, true);
   }
 
   private void installTemplate(String template, String rootFolder, String templateDir, List<String> scriptIds, ArrayList<String> loadedIds, int level) throws FHIRException, IOException {

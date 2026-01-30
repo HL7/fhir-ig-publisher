@@ -101,6 +101,7 @@ public class Template {
   private Map<String, String> scriptMappings = new HashMap<>();
   @Getter Map<String, TemplateFragmentTypeLoader.PrefixGroup> usedFragmentTypes;
   private boolean rapido;
+  private boolean devMode;
 
   /** unpack the template into /template 
    * 
@@ -110,13 +111,14 @@ public class Template {
    * 
    * @throws IOException - only if the path is incorrect or the disk runs out of space
    */
-  public Template(String rootDir, boolean canExecute, String templateThatCantExecute, String templateReason, boolean wantLog, boolean rapido) throws IOException {
+  public Template(String rootDir, boolean canExecute, String templateThatCantExecute, String templateReason, boolean wantLog, boolean rapido, boolean devMode) throws IOException {
     root = rootDir;
     this.canExecute = canExecute;
     this.templateThatCantExecute = templateThatCantExecute;
     this.templateReason = templateReason;
     this.wantLog = wantLog;
     this.rapido = rapido;
+    this.devMode = devMode;
 
     templateDir = Utilities.path(rootDir, "template");
 
@@ -651,5 +653,9 @@ public class Template {
     if (rapido) {
       System.out.println("Rapido Template Summary: don't produce "+noproduced+" of "+fragments+" fragments");
     }
+  }
+
+  public boolean isDevMode() {
+    return devMode;
   }
 }

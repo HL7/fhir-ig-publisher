@@ -35,6 +35,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
+import org.hl7.fhir.dstu2.model.Type;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.modules.IPublisherModule;
 import org.hl7.fhir.r5.context.IContextResourceLoader;
@@ -362,8 +363,20 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
     if (url.startsWith(ipg.getCanonical())) {
       for (FetchedFile f : files) {
         for (FetchedResource r: f.getResources()) {
-          if (Utilities.pathURL(ipg.getCanonical(), r.fhirType(), r.getId()).equals(url) && (!canonical || VersionUtilities.getCanonicalResourceNames(context.getVersion()).contains(r.fhirType()))) {
+          if (Utilities.pathURL(ipg.getCanonical(), r.fhirType(), r.getId()).equals(url) && (!canonical || isCanonicalResource(r.fhirType()))) {
             return true;
+          }
+          if (f.getLogical() != null && f.getResources().size() == 1) {
+            StructureDefinition sd = context.fetchResource(StructureDefinition.class, f.getLogical());
+            if (sd != null) {
+              String t = sd.getType();
+              if (Utilities.isAbsoluteUrl(t)) {
+                t = Utilities.urlTail(t);
+              }
+              if (Utilities.pathURL(ipg.getCanonical(), t, r.getId()).equals(url) && (!canonical || isCanonicalResource(sd.getType()))) {
+                return true;
+              }
+            }
           }
         }
       }
@@ -432,7 +445,23 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
     }
     return false;
   }
-  
+
+  private boolean isCanonicalResource(String type) {
+    if (VersionUtilities.getCanonicalResourceNames(context.getVersion()).contains(type)) {
+      return true;
+    }
+    // ok, let's look in the definition
+    StructureDefinition sdt = context.fetchResource(StructureDefinition.class, type);
+    while (sdt != null) {
+      String s = ExtensionUtilities.readStringExtension(sdt, ExtensionDefinitions.EXT_RESOURCE_IMPLEMENTS);
+      if (s != null && "http://hl7.org/fhir/StructureDefinition/CanonicalResource".equals(s)) {
+        return true;
+      }
+      sdt = context.fetchResource(StructureDefinition.class, sdt.getBaseDefinition());
+    }
+    return false;
+  }
+
 
   private boolean targetsHas(List<CanonicalType> targets, String name) {
     if (targets == null) {
