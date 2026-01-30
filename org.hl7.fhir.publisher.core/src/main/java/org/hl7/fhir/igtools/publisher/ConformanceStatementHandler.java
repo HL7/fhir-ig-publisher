@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.ConcurrentModificationException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -526,7 +527,7 @@ class ConformanceStatementHandler {
         }
         
         if (clause.hasSummary()) {
-          tr.td().tx(clause.getSummary());
+          rr.addMarkdown(tr.td(), clause.getSummary());
         } else {
           tr.td().getChildNodes().addAll(clause.getNode().getChildNodes());
         }
@@ -624,6 +625,7 @@ class ConformanceStatementHandler {
     nparents.add(x);
     if (nodeText.isEmpty() && x.getNodeType() == NodeType.Element && new HashSet<>(Arrays.asList("p", "li", "span", "td")).contains(x.getName()))
       nodeText = x.toLiteralText().replaceAll("\\s", " ");
+//try {
     for (XhtmlNode c : x.getChildNodes()) {
       if (c.getNodeType() == NodeType.Element && "span".equals(c.getName()) && c.hasClass("fhir-conformance")) {
         String spanId = c.getAttribute("id");
@@ -635,6 +637,7 @@ class ConformanceStatementHandler {
           }
           addTitle(c, clause);
           addClause(lang, clause, source.path, messages);
+          hasClauses.set(true);
         } catch (FHIRException e) {
 //          messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, source.path, context.formatMessage(I18nConstants.CONFORMANCE_STATEMENT_NOCONFWORD, lang, c.toString()), IssueSeverity.INFORMATION).setMessageId(I18nConstants.CONFORMANCE_STATEMENT_NOCONFWORD));          
           messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, source.path, e.getMessage(), IssueSeverity.INFORMATION).setMessageId(I18nConstants.CONFORMANCE_STATEMENT_NOCONFWORD));          
@@ -646,10 +649,12 @@ class ConformanceStatementHandler {
           if (spanId!=null && spanId.contains("^")) {
             // Strip latter parts of the id
             c.setAttribute("id", StringUtils.substringBefore(spanId,  "^"));
+            hasClauses.set(true);
           }
           if (clause.hasSummary()) {
             addTitle(c, clause);
             addClause(lang, clause, source.path, messages);
+            hasClauses.set(true);
           } else {
             messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, source.path, context.formatMessage(I18nConstants.CONFORMANCE_STATEMENT_NOSUMMARY, clause.getId(), lang), IssueSeverity.INFORMATION).setMessageId(I18nConstants.CONFORMANCE_STATEMENT_NOCONFWORD));          
           }
@@ -700,6 +705,9 @@ class ConformanceStatementHandler {
         } 
       }
     }
+//} catch (ConcurrentModificationException e) {
+//  e = e;
+//}
   }
 
   private static String getStringWithoutNewlines(String string) {
