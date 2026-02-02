@@ -356,4 +356,8 @@ public class IpsComparator {
     return lastUrl;
   }
 
+
+  public String getBaseFile() {
+    return "";
+  }
 }
