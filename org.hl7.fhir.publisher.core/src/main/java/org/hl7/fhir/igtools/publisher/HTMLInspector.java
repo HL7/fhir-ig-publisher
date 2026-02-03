@@ -269,6 +269,7 @@ public class HTMLInspector {
   private String version;
   private IWorkerContext context;
   private ConformanceStatementHandler csHandler;
+  private Set<String> comparisonFiles = new HashSet<>();
 
   public HTMLInspector(IWorkerContext context, String rootFolder, List<SpecMapManager> specs, List<LinkedSpecification> linkSpecs, ILoggingService log, String canonical, String packageId, String version, Map<String, List<String>> trackedFragments, List<FetchedFile> sources, IPublisherModule module, boolean isCIBuild, Map<String, PublisherBase.FragmentUseRecord> fragmentUses, List<RelatedIG> relatedIGs, boolean noCIBuildIssues, List<String> langList) throws IOException {
     this.rootFolder = rootFolder.replace("/", File.separator);
@@ -955,14 +956,17 @@ public class HTMLInspector {
       subFolder = subFolder.substring(0, subFolder.lastIndexOf(File.separator));
     }
     // full-ig.zip doesn't exist yet
+    String fixedRef = null;
     if (subFolder == null) {
       if ("full-ig.zip".equals(ref)) {
         return true;
       }
+      fixedRef = rref;
     } else {
       if ("../full-ig.zip".equals(ref)) {
         return true;
       }
+      fixedRef = rref.length() > 3 ? rref.substring(3) : rref;
     }
     if (Utilities.existsInList(ref, isSubFolder ? "../qa.html" : "qa.html",
         "http://hl7.org/fhir", "http://hl7.org", "http://www.hl7.org", "http://hl7.org/fhir/search.cfm") || 
@@ -1050,6 +1054,9 @@ public class HTMLInspector {
       }
     }
 
+    if (comparisonFiles.contains(fixedRef)) {
+      return true;
+    }
     // external terminology resources 
     if (Utilities.startsWithInList(ref, "http://cts.nlm.nih.gov/fhir")) {
       return true;
@@ -1401,5 +1408,8 @@ public class HTMLInspector {
   public void setReqFolder(String folder) {
     csHandler.setReqFolder(folder);
   }
-  
+
+  public Set<String> getComparisonFiles() {
+    return comparisonFiles;
+  }
 }

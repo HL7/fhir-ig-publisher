@@ -34,8 +34,6 @@ import org.hl7.fhir.r5.model.StringType;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionParameterComponent;
-import org.hl7.fhir.r5.model.Requirements.ConformanceExpectation;
-import org.hl7.fhir.r5.model.Requirements.RequirementsStatementComponent;
 import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionContainsComponent;
 import org.hl7.fhir.r5.renderers.ActorDefinitionRenderer;
 import org.hl7.fhir.r5.renderers.Renderer.RenderingStatus;
@@ -364,10 +362,7 @@ class ConformanceStatementHandler {
     if (mismatch) {
       String fname = Utilities.path(reqFolder, "Requirements-fromNarrative.json");
       FileOutputStream fs = new FileOutputStream(fname);
-      if (oldReq.isEmpty()) 
-        messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, null, "A requirements resource representing all narrative-declared conformance statements has been placed in the root folder.  If desired, it can be copied into an input folder",
-            IssueSeverity.INFORMATION));
-      else
+      if (!oldReq.isEmpty())
         messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Requirements/fromNarrative", "There are differences between the requirements found in the narrative and what's found the provided Requirements resource.  A new version has been generated in the root.  It should be used to replace the one in the input folder.",
             IssueSeverity.WARNING));
         
@@ -659,7 +654,7 @@ class ConformanceStatementHandler {
             messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, source.path, context.formatMessage(I18nConstants.CONFORMANCE_STATEMENT_NOSUMMARY, clause.getId(), lang), IssueSeverity.INFORMATION).setMessageId(I18nConstants.CONFORMANCE_STATEMENT_NOCONFWORD));          
           }
         } catch (FHIRException e) {
-          messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, source.path, context.formatMessage(I18nConstants.CONFORMANCE_STATEMENT_NOCONFWORD, lang, c.toString()), IssueSeverity.INFORMATION).setMessageId(I18nConstants.CONFORMANCE_STATEMENT_NOCONFWORD));          
+          messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, source.path, context.formatMessage(I18nConstants.CONFORMANCE_STATEMENT_NOCONFWORD, lang, getStringWithoutNewlines(c.toString())), IssueSeverity.INFORMATION).setMessageId(I18nConstants.CONFORMANCE_STATEMENT_NOCONFWORD));
         }
       } else if (c.getNodeType() == NodeType.Element && "table".equals(c.getName()) && c.hasClass("fhir-conformance-list")) {
         if (confHomes.containsKey(lang)) {
@@ -706,7 +701,16 @@ class ConformanceStatementHandler {
       }
     }
   }
-  
+
+  private static String getStringWithoutNewlines(String string) {
+    if (string == null) {
+      return null;
+    }
+    String noCrNl = string.replaceAll("\r\n", " ");
+    String noNl = noCrNl.replaceAll("\n", " ");
+    return noNl;
+  }
+
   private void addClause(String lang, ConformanceClause clause, String path, List<ValidationMessage> messages) {
     Map<String, ConformanceClause> clauseMap;
     if (languageClauses.containsKey(lang)) {
