@@ -4195,10 +4195,10 @@ public class PublisherGenerator extends PublisherBase {
       zip.addFileName("schematron.zip", sch, false);
     }
     if (js != null) {
-      zip.addFileName("json.schema.zip", sch, false);
+      zip.addFileName("json.schema.zip", js, false);
     }
     if (shex != null) {
-      zip.addFileName("shex.zip", sch, false);
+      zip.addFileName("shex.zip", shex, false);
     }
     zip.close();
   }
