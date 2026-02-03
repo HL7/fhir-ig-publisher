@@ -100,6 +100,7 @@ import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 import org.hl7.fhir.utilities.http.HTTPResult;
 import org.hl7.fhir.utilities.http.ManagedWebAccess;
+import org.hl7.fhir.utilities.i18n.I18nBase;
 import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonBoolean;
 import org.hl7.fhir.utilities.json.model.JsonObject;
@@ -1222,6 +1223,9 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     }
     ManagedWebAccess.loadFromFHIRSettings();
 
+    if (CliParams.hasNamedParam(args, "-produce-translator-ids")) {
+      I18nBase.setUseMessageIdsDirectly(true);
+    }
 
     if (CliParams.hasNamedParam(args, "-gui")) {
       IGPublisherUI.main(args);
@@ -1595,11 +1599,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         if (CliParams.hasNamedParam(args, "-no-errors")) {
           exitCode = self.countErrs(self.pf.errors) > 0 ? 1 : 0;
         }
-      } catch (ENoDump e) {
-        self.log("Publishing Content Failed: " + e.getMessage());
-        self.log("");
       } catch (Exception e) {
-        exitCode = 1;
         self.log("Publishing Content Failed: " + e.getMessage());
         self.log("");
         if (e.getMessage() != null && e.getMessage().contains("xsl:message")) {

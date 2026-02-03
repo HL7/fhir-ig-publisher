@@ -356,4 +356,8 @@ public class IpaComparator {
     return lastUrl;
   }
 
+
+  public String getBaseFile() {
+    return "";
+  }
 }

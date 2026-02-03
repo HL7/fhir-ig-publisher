@@ -17,7 +17,7 @@ public class VersionRedirectorGenerator {
   
   public void execute(String version, String path) throws IOException {
     executeVer(version, path);
-    if (VersionUtilities.isSemVer(version)) {
+    if (VersionUtilities.isSemVer(version, false)) {
       executeVer(VersionUtilities.getMajMin(version), path);
     }
   }

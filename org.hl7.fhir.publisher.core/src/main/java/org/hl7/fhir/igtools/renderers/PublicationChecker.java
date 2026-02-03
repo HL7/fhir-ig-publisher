@@ -203,7 +203,7 @@ public class PublicationChecker {
 
   private void checkPackage(List<String> messages, NpmPackage npm) {
     if (check(messages, !"current".equals(npm.version()), "The version of the IG is 'current' which is not valid. It should have a version X.Y.z-cibuild"+mkError())) {
-      check(messages, VersionUtilities.isSemVer(npm.version()), "Version '"+npm.version()+"' does not conform to semver rules"+mkError());
+      check(messages, VersionUtilities.isSemVer(npm.version(), false), "Version '"+npm.version()+"' does not conform to semver rules"+mkError());
     }
     check(messages, Utilities.pathURL(npm.canonical(), "history.html").equals(historyPage), "History Page '"+Utilities.escapeXml(historyPage)+"' is wrong (ig.json#paths/history) - must be '"+
        Utilities.escapeXml(Utilities.pathURL(npm.canonical(), "history.html"))+"'"+mkError());
@@ -240,6 +240,7 @@ public class PublicationChecker {
     }
     if (check(messages, pr.has("version"), "No publication request version found"+mkError())) {
       String v = pr.asString("version");
+      check(messages, VersionUtilities.isSemVer(v, false), "Publication Request is for v'"+pr.asString("version")+"' but this is not a valid SemVer version"+mkError());
       if (check(messages, npm.version().equals(v), "Publication Request is for v'"+pr.asString("version")+"' but package version is v"+npm.version()+mkError())) {
         summary.add(new StringPair("version", pr.asString("version")));        
       }

@@ -13,6 +13,7 @@ import org.hl7.fhir.convertors.factory.*;
 import org.hl7.fhir.convertors.misc.NpmPackageVersionConverter;
 import org.hl7.fhir.convertors.misc.ProfileVersionAdaptor;
 import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.igtools.publisher.comparators.PreviousVersionComparator;
 import org.hl7.fhir.igtools.renderers.*;
 import org.hl7.fhir.igtools.renderers.CodeSystemRenderer;
 import org.hl7.fhir.igtools.renderers.ExampleScenarioRenderer;
@@ -500,6 +501,22 @@ public class PublisherGenerator extends PublisherBase {
         }
       }
 
+      pf.inspector.setReqFolder(pf.repoRoot);
+      pf.inspector.setDefaultLang(pf.defaultTranslationLang);
+      pf.inspector.setTranslationLangs(pf.translationLangs);
+
+
+      if (pf.previousVersionComparator != null) {
+        for (PreviousVersionComparator.VersionInstance vi : pf.previousVersionComparator.getVersionList()) {
+          pf.inspector.getComparisonFiles().add("comparison-v"+vi.getVersion()+"/index.html");
+        }
+      }
+      if (pf.ipaComparator != null && pf.ipaComparator.hasLast()) {
+        pf.inspector.getComparisonFiles().add(pf.ipaComparator.getBaseFile());
+      }
+      if (pf.ipsComparator != null && pf.ipsComparator.hasLast()) {
+        pf.inspector.getComparisonFiles().add(pf.ipsComparator.getBaseFile());
+      }
       List<ValidationMessage> linkmsgs = settings.isGenerationOff() ? new ArrayList<ValidationMessage>() : pf.inspector.check(statusMessage, statusMessages);
       int bl = 0;
       int lf = 0;
@@ -4178,10 +4195,10 @@ public class PublisherGenerator extends PublisherBase {
       zip.addFileName("schematron.zip", sch, false);
     }
     if (js != null) {
-      zip.addFileName("json.schema.zip", sch, false);
+      zip.addFileName("json.schema.zip", js, false);
     }
     if (shex != null) {
-      zip.addFileName("shex.zip", sch, false);
+      zip.addFileName("shex.zip", shex, false);
     }
     zip.close();
   }

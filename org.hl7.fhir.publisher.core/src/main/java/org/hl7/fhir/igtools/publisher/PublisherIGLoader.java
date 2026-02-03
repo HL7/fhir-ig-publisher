@@ -813,6 +813,10 @@ public class PublisherIGLoader extends PublisherBase {
       pf.jekyllTimeout = ini.getLongProperty("IG", "jekyll-timeout") * 1000;
     }
 
+    if (pf.template.isDevMode()) {
+      FileUtilities.clearDirectory(pf.tempDir);
+    }
+
     for (String s : liquid0) {
       pf.templateProvider.load(Utilities.path(pf.rootDir, s));
     }
@@ -1994,7 +1998,7 @@ public class PublisherIGLoader extends PublisherBase {
       pf.publishedIg.addExtension(ExtensionDefinitions.EXT_WORKGROUP, new CodeType(pf.wgm));
     }
 
-    if (!VersionUtilities.isSemVer(pf.publishedIg.getVersion())) {
+    if (!VersionUtilities.isSemVer(pf.publishedIg.getVersion(), false)) {
       if (settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD) {
         throw new Error("The version "+ pf.publishedIg.getVersion()+" is not a valid semantic version so cannot be published in the ci-build");
       } else {
@@ -2596,7 +2600,6 @@ public class PublisherIGLoader extends PublisherBase {
     return null;
   }
 
-
   private RealmBusinessRules makeRealmBusinessRules() {
     if (pf.expectedJurisdiction != null && pf.expectedJurisdiction.getCode().equals("US")) {
       return new USRealmBusinessRules(pf.context, pf.version, pf.tempDir, pf.igpkp.getCanonical(), pf.igpkp, pf.rc, pf.publishedIg);
@@ -2604,7 +2607,6 @@ public class PublisherIGLoader extends PublisherBase {
       return new NullRealmBusinessRules(pf.igrealm);
     }
   }
-
 
   private PreviousVersionComparator makePreviousVersionComparator() throws IOException {
     if (isTemplate()) {
@@ -2637,7 +2639,6 @@ public class PublisherIGLoader extends PublisherBase {
     }
     return new IpsComparator(pf.context, pf.rootDir, pf.tempDir, pf.igpkp, pf.logger, pf.ipsComparisons, pf.rc);
   }
-
 
   private void checkIgDeps(ImplementationGuide vig, String ver) {
     if ("r4b".equals(ver)) {
