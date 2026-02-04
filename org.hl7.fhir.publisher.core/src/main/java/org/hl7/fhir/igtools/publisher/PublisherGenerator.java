@@ -1124,14 +1124,22 @@ public class PublisherGenerator extends PublisherBase {
           ResourceRenderer rr = RendererFactory.factory(logicalType, xlrc);
 
           if (!(rr instanceof ProfileDrivenRenderer)) {
-            // Has specialised renderer - use it.
-            ResourceWrapper rw = ResourceWrapper.forResource(xlrc.getContextUtilities(), rX.getLogicalElement());
-            XhtmlNode renderedXhtml = rr.buildNarrative(rw);
-            html = pfx + new XhtmlComposer(XhtmlComposer.HTML).compose(renderedXhtml);
-          } else {
-            // No specialised renderer - fall back to JSON/XML rendering.
+            // Has specialised renderer - try to use it.
+            try {
+              ResourceWrapper rw = ResourceWrapper.forResource(xlrc.getContextUtilities(), rX.getLogicalElement());
+              XhtmlNode renderedXhtml = rr.buildNarrative(rw);
+              if (renderedXhtml != null) {
+                html = pfx + new XhtmlComposer(XhtmlComposer.HTML).compose(renderedXhtml);
+              }
+            } catch (Exception ex) {
+              // Specialised renderer failed - fall through to JSON/XML rendering.
+            }
+          }
+
+          if (html == null) {
+            // No specialised renderer or it failed - fall back to JSON/XML rendering.
             String rXContentType = rX.getElement().getNamedChildValueSingle("contentType");
-            if (rXContentType.contains("xml")) {
+            if (rXContentType != null && rXContentType.contains("xml")) {
               org.hl7.fhir.r5.elementmodel.XmlParser xmlParser = new org.hl7.fhir.r5.elementmodel.XmlParser(this.pf.context);
               XmlXHtmlRenderer xmlXHtmlRenderer = new XmlXHtmlRenderer();
               xmlXHtmlRenderer.setPrism(true);
@@ -1144,7 +1152,7 @@ public class PublisherGenerator extends PublisherBase {
               }
               xmlParser.compose(rX.getLogicalElement(), xmlXHtmlRenderer);
               html = xmlXHtmlRenderer.toString();
-            } else if (rXContentType.contains("json")) {
+            } else if (rXContentType != null && rXContentType.contains("json")) {
               JsonXhtmlRenderer jsonXhtmlRenderer = new JsonXhtmlRenderer();
               jsonXhtmlRenderer.setPrism(true);
               org.hl7.fhir.r5.elementmodel.JsonParser jsonParser = new org.hl7.fhir.r5.elementmodel.JsonParser(this.pf.context);
