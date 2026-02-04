@@ -1117,32 +1117,46 @@ public class PublisherGenerator extends PublisherBase {
         }
         String html = null;
         if (rX.getLogicalElement() != null) {
-          String rXContentType = rX.getElement().getNamedChildValueSingle("contentType");
-          if (rXContentType.contains("xml")) {
-            org.hl7.fhir.r5.elementmodel.XmlParser xmlParser = new org.hl7.fhir.r5.elementmodel.XmlParser(this.pf.context);
-            XmlXHtmlRenderer xmlXHtmlRenderer = new XmlXHtmlRenderer();
-            xmlXHtmlRenderer.setPrism(true);
-            xmlParser.setElideElements(true);
-            xmlXHtmlRenderer.setAutoNamespaces(true);
-            xmlParser.setLinkResolver(this.pf.igpkp);
-            xmlParser.setShowDecorations(false);
-            if (suppressId(f, rX)) {
-              xmlParser.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
+          // Try to use a specialised renderer for this logical model.
+          String logicalType = fhirTypeRoot(rX.getLogicalElement().fhirType());
+          RenderingContext xlrc = lrc.copy(false);
+          xlrc.setRules(RenderingContext.GenerationRules.IG_PUBLISHER);
+          ResourceRenderer rr = RendererFactory.factory(logicalType, xlrc);
+
+          if (!(rr instanceof ProfileDrivenRenderer)) {
+            // Has specialised renderer - use it.
+            ResourceWrapper rw = ResourceWrapper.forResource(xlrc.getContextUtilities(), rX.getLogicalElement());
+            XhtmlNode renderedXhtml = rr.buildNarrative(rw);
+            html = pfx + new XhtmlComposer(XhtmlComposer.HTML).compose(renderedXhtml);
+          } else {
+            // No specialised renderer - fall back to JSON/XML rendering.
+            String rXContentType = rX.getElement().getNamedChildValueSingle("contentType");
+            if (rXContentType.contains("xml")) {
+              org.hl7.fhir.r5.elementmodel.XmlParser xmlParser = new org.hl7.fhir.r5.elementmodel.XmlParser(this.pf.context);
+              XmlXHtmlRenderer xmlXHtmlRenderer = new XmlXHtmlRenderer();
+              xmlXHtmlRenderer.setPrism(true);
+              xmlParser.setElideElements(true);
+              xmlXHtmlRenderer.setAutoNamespaces(true);
+              xmlParser.setLinkResolver(this.pf.igpkp);
+              xmlParser.setShowDecorations(false);
+              if (suppressId(f, rX)) {
+                xmlParser.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
+              }
+              xmlParser.compose(rX.getLogicalElement(), xmlXHtmlRenderer);
+              html = xmlXHtmlRenderer.toString();
+            } else if (rXContentType.contains("json")) {
+              JsonXhtmlRenderer jsonXhtmlRenderer = new JsonXhtmlRenderer();
+              jsonXhtmlRenderer.setPrism(true);
+              org.hl7.fhir.r5.elementmodel.JsonParser jsonParser = new org.hl7.fhir.r5.elementmodel.JsonParser(this.pf.context);
+              jsonParser.setLinkResolver(this.pf.igpkp);
+              jsonParser.setAllowComments(true);
+              jsonParser.setElideElements(true);
+              if (suppressId(f, rX)) {
+                jsonParser.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
+              }
+              jsonParser.compose(rX.getLogicalElement(), jsonXhtmlRenderer);
+              html = jsonXhtmlRenderer.toString();
             }
-            xmlParser.compose(rX.getLogicalElement(), xmlXHtmlRenderer);
-            html = xmlXHtmlRenderer.toString();
-          } else if (rXContentType.contains("json")) {
-            JsonXhtmlRenderer jsonXhtmlRenderer = new JsonXhtmlRenderer();
-            jsonXhtmlRenderer.setPrism(true);
-            org.hl7.fhir.r5.elementmodel.JsonParser jsonParser = new org.hl7.fhir.r5.elementmodel.JsonParser(this.pf.context);
-            jsonParser.setLinkResolver(this.pf.igpkp);
-            jsonParser.setAllowComments(true);
-            jsonParser.setElideElements(true);
-            if (suppressId(f, rX)) {
-              jsonParser.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
-            }
-            jsonParser.compose(rX.getLogicalElement(), jsonXhtmlRenderer);
-            html = jsonXhtmlRenderer.toString();
           }
         }
         if (html == null) {
@@ -6970,6 +6984,23 @@ public class PublisherGenerator extends PublisherBase {
     ExtensionUtilities.removeExtension(ig, ExtensionDefinitions.EXT_IGP_CONTAINED_RESOURCE_INFO); // - this is in contained resources somewhere, not the root of IG?
     for (ImplementationGuide.ImplementationGuideDefinitionResourceComponent r : ig.getDefinition().getResource())
       ExtensionUtilities.removeExtension(r, ExtensionDefinitions.EXT_IGP_RESOURCE_INFO);
+  }
+
+  /**
+   * Extracts the type name from a FHIR type that may be a URL.
+   *
+   * <p>For logical models, the fhirType is a URL like
+   * "https://sql-on-fhir.org/ig/StructureDefinition/ViewDefinition". This method extracts just
+   * the final segment ("ViewDefinition") for use with RendererFactory.
+   *
+   * @param fhirType The FHIR type, which may be a simple name or a URL.
+   * @return The type name (final path segment if a URL, otherwise the input unchanged).
+   */
+  private static String fhirTypeRoot(String fhirType) {
+    if (fhirType != null && fhirType.contains("/")) {
+      return fhirType.substring(fhirType.lastIndexOf("/") + 1);
+    }
+    return fhirType;
   }
 
 }
