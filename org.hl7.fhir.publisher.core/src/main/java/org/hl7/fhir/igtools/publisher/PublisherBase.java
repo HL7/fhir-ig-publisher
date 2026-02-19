@@ -771,7 +771,74 @@ public class PublisherBase implements ILoggingService {
     } else {
       DataTypeVisitor dv = new DataTypeVisitor();
       dv.visit(bc, new PublisherBase.CanonicalVisitor<CanonicalType>(f, snapshotMode));
-      return dv.isAnyTrue();
+      boolean changed = false;
+      if (bc instanceof ValueSet) {
+        changed = checkValueSetVersions(f, (ValueSet) bc);
+      }
+      return dv.isAnyTrue() || changed;
+    }
+  }
+
+  private boolean checkValueSetVersions(FetchedFile f, ValueSet vs) {
+    boolean changed = false;
+    int i = 0;
+    for (ValueSet.ConceptSetComponent inc : vs.getCompose().getInclude()) {
+      changed = checkValueSetVersions(f, inc, "ValueSet.compose.include["+i+"]") || changed;
+      i++;
+    }
+    for (ValueSet.ConceptSetComponent inc : vs.getCompose().getExclude()) {
+      changed = checkValueSetVersions(f, inc, "ValueSet.compose.exclude["+i+"]") || changed;
+    }
+    return changed;
+  }
+
+  private boolean checkValueSetVersions(FetchedFile f, ValueSet.ConceptSetComponent inc, String path) {
+    String url = inc.getSystem();
+    String version = inc.getVersion();
+    if (version != null) {
+      return false;
+    }
+    CanonicalResource tgt = (CanonicalResource) PublisherBase.this.pf.context.fetchResourceRaw(Resource.class, url);
+    if (tgt instanceof CodeSystem) {
+      CodeSystem cs = (CodeSystem) tgt;
+      if (cs.getContent() == Enumerations.CodeSystemContentMode.NOTPRESENT && cs.hasSourcePackage() && cs.getSourcePackage().isTHO()) {
+        // we ignore these definitions - their version is completely wrong for a start
+        return false;
+      }
+    }
+    if (tgt == null) {
+      return false;
+    }
+    if (!tgt.hasVersion()) {
+      return false;
+    }
+    if (PublisherBase.this.pf.pinningPolicy == PublisherUtils.PinningPolicy.FIX) {
+      PublisherBase.this.pf.pinCount++;
+      f.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.PROCESSING, path, "Pinned the version of "+url+" to "+tgt.getVersion(),
+              ValidationMessage.IssueSeverity.INFORMATION).setMessageId(PublisherMessageIds.PIN_VERSION));
+      if (PublisherBase.this.pf.pinDest != null) {
+        pinInManifest(tgt.fhirType(), url, tgt.getVersion());
+        return false;
+      } else {
+        inc.setVersion(tgt.getVersion());
+        return true;
+      }
+    } else {
+      Map<String, String> lst = PublisherBase.this.pf.validationFetcher.fetchCanonicalResourceVersionMap(null, null, url);
+      if (lst.size() < 2) {
+        return false;
+      } else {
+        PublisherBase.this.pf.pinCount++;
+        f.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.PROCESSING, path, "Pinned the version of "+url+" to "+tgt.getVersion()+" from choices of "+stringify(",", lst),
+                ValidationMessage.IssueSeverity.INFORMATION).setMessageId(PublisherMessageIds.PIN_VERSION));
+        if (PublisherBase.this.pf.pinDest != null) {
+          pinInManifest(tgt.fhirType(), url, tgt.getVersion());
+          return false;
+        } else {
+          inc.setVersion(tgt.getVersion());
+          return true;
+        }
+      }
     }
   }
 
@@ -1294,10 +1361,11 @@ public class PublisherBase implements ILoggingService {
         }
         if (PublisherBase.this.pf.pinDest != null) {
           pinInManifest(tgt.fhirType(), url, tgt.getVersion());
+          return false;
         } else {
           ct.setValue(url+"|"+tgt.getVersion());
+          return true;
         }
-        return true;
       } else {
         Map<String, String> lst = PublisherBase.this.pf.validationFetcher.fetchCanonicalResourceVersionMap(null, null, url);
         if (lst.size() < 2) {
@@ -1310,67 +1378,68 @@ public class PublisherBase implements ILoggingService {
           }
           if (PublisherBase.this.pf.pinDest != null) {
             pinInManifest(tgt.fhirType(), url, tgt.getVersion());
+            return false;
           } else {
             ct.setValue(url+"|"+tgt.getVersion());
+            return true;
           }
-          return true;
         }
       }
     }
 
-    private void pinInManifest(String type, String url, String version) {
-      FetchedResource r = fetchByResource("Parameters", PublisherBase.this.pf.pinDest);
-      if (r == null) {
-        throw new Error("Unable to find nominated pin-manifest "+ PublisherBase.this.pf.pinDest);
-      }
-      Element p = r.getElement();
-      if (!p.hasUserData(UserDataNames.EXP_REVIEWED)) {
-        new ExpansionParameterUtilities(PublisherBase.this.pf.context).reviewVersions(p);
-        p.setUserData(UserDataNames.EXP_REVIEWED, true);
-      }
-      String pn = null;
-      switch (type) {
-        case "CodeSystem":
-          pn = "system-version";
-          break;
-        case "ValueSet":
-          pn = "default-valueset-version";
-          break;
-        default:
-          pn = "default-canonical-version";
-      }
-      String v = url+"|"+version;
-      boolean add = true;
-      for (Element t : p.getChildren("parameter")) {
-        String name = t.getNamedChildValue("name");
-        String value = t.getNamedChildValue("value");
-        if (name.equals(pn) && value.startsWith(url+"|")) {
-          if (!v.equals(value)) {
-            if (t.hasUserData(UserDataNames.auto_added_parameter)) {
-              throw new FHIRException("An error occurred building the version manifest: the IGPublisher wanted to add version "+version+" but had already added version "+value.substring(version.indexOf("|")+1));
-            } else {
-              throw new FHIRException("An error occurred building the version manifest: the IGPublisher wanted to add version "+version+" but found version "+value.substring(version.indexOf("|")+1)+" already specified");
-            }
+  }
+
+  private void pinInManifest(String type, String url, String version) {
+    FetchedResource r = fetchByResource("Parameters", PublisherBase.this.pf.pinDest);
+    if (r == null) {
+      throw new Error("Unable to find nominated pin-manifest "+ PublisherBase.this.pf.pinDest);
+    }
+    Element p = r.getElement();
+    if (!p.hasUserData(UserDataNames.EXP_REVIEWED)) {
+      new ExpansionParameterUtilities(PublisherBase.this.pf.context).reviewVersions(p);
+      p.setUserData(UserDataNames.EXP_REVIEWED, true);
+    }
+    String pn = null;
+    switch (type) {
+      case "CodeSystem":
+        pn = "system-version";
+        break;
+      case "ValueSet":
+        pn = "default-valueset-version";
+        break;
+      default:
+        pn = "default-canonical-version";
+    }
+    String v = url+"|"+version;
+    boolean add = true;
+    for (Element t : p.getChildren("parameter")) {
+      String name = t.getNamedChildValue("name");
+      String value = t.getNamedChildValue("value");
+      if (name.equals(pn) && value.startsWith(url+"|")) {
+        if (!v.equals(value)) {
+          if (t.hasUserData(UserDataNames.auto_added_parameter)) {
+            throw new FHIRException("An error occurred building the version manifest: the IGPublisher wanted to add version "+version+" but had already added version "+value.substring(version.indexOf("|")+1));
+          } else {
+            throw new FHIRException("An error occurred building the version manifest: the IGPublisher wanted to add version "+version+" but found version "+value.substring(version.indexOf("|")+1)+" already specified");
           }
-          add = false;
         }
-      }
-      if (add) {
-        Element pp = p.addElement("parameter");
-        pp.setChildValue("name", pn);
-        pp.setChildValue("valueUri", v);
-        pp.setUserData(UserDataNames.auto_added_parameter, true);
+        add = false;
       }
     }
-
-    private String stringify(String string, Map<String, String> lst) {
-      CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder();
-      for (String s : Utilities.sorted(lst.keySet())) {
-        b.append(s+" ("+lst.get(s)+")");
-      }
-      return b.toString();
+    if (add) {
+      Element pp = p.addElement("parameter");
+      pp.setChildValue("name", pn);
+      pp.setChildValue("valueUri", v);
+      pp.setUserData(UserDataNames.auto_added_parameter, true);
     }
   }
 
+  private String stringify(String string, Map<String, String> lst) {
+    CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder();
+    for (String s : Utilities.sorted(lst.keySet())) {
+      b.append(s+" ("+lst.get(s)+")");
+    }
+    return b.toString();
+  }
 
 }
