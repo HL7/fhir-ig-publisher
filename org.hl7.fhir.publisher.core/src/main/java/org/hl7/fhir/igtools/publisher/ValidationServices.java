@@ -92,6 +92,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
   private List<NpmPackage> packages;
   private Set<String> otherUrls = new HashSet<>();
   private List<String> mappingUrls = new ArrayList<>();
+  private List<String> allLangs = new ArrayList<>();
   private boolean bundleReferencesResolve;
   private List<SpecMapManager> specMaps;
   private List<PublisherUtils.LinkedSpecification> linkSpecMaps;
@@ -100,7 +101,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
   
   
   public ValidationServices(IWorkerContext context, IGKnowledgeProvider ipg, ImplementationGuide ig, List<FetchedFile> files, List<NpmPackage> packages,
-                            boolean bundleReferencesResolve, List<SpecMapManager> specMaps, List<PublisherUtils.LinkedSpecification> linkSpecMaps, IPublisherModule module) {
+                            boolean bundleReferencesResolve, List<SpecMapManager> specMaps, List<PublisherUtils.LinkedSpecification> linkSpecMaps, IPublisherModule module, List<String> allLangs) {
     super();
     this.context = context;
     this.ipg = ipg;
@@ -111,6 +112,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
     this.specMaps = specMaps;
     this.linkSpecMaps = linkSpecMaps;
     this.module = module;
+    this.allLangs = allLangs;
     initOtherUrls();
   }
 
@@ -442,6 +444,34 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
       if (cs != null) {
         return true;
       }      
+    }
+    if ("url".equals(type) && !Utilities.isAbsoluteUrl(url)) {
+      // well, it might be a reference to a page in the specification, so we should check that.
+      if (matchesPage(url)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private boolean matchesPage(String url) {
+    if (url.contains("#")) {
+      url = url.substring(0, url.indexOf("#"));
+    }
+    for (FetchedFile f : files) {
+      for (FetchedResource r : f.getResources()) {
+        String p = ipg.getLinkFor(r, true);
+        if (p != null && p.equals(url)) {
+          return true;
+        }
+        if (p != null) {
+          for (String lang : allLangs) {
+            if ((lang + "/" + p).equals(url)) {
+              return true;
+            }
+          }
+        }
+      }
     }
     return false;
   }

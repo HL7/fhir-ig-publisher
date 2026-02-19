@@ -950,6 +950,9 @@ public class PublisherIGLoader extends PublisherBase {
       pf.context.getExpansionParameters().addParameter(n, expParamMap.get(n));
     }
 
+    if (!pf.sourceIg.hasUrl()) {
+      throw new FHIRException("Unable to publish an IG without a URL");
+    }
     settings.setNewMultiLangTemplateFormat(pf.template.config().asBoolean("multilanguage-format"));
     loadPubPack();
     pf.igpkp = new IGKnowledgeProvider(pf.context, checkAppendSlash(pf.specPath), determineCanonical(pf.sourceIg.getUrl(), "ImplementationGuide.url"), pf.template.config(), pf.errors, VersionUtilities.isR2Ver(pf.version), pf.template, pf.listedURLExemptions, pf.altCanonical, pf.fileList, pf.module);
@@ -1096,7 +1099,7 @@ public class PublisherIGLoader extends PublisherBase {
     pf.validator.getExtensionDomains().addAll(extensionDomains);
     pf.validator.setNoExperimentalContent(pf.noExperimentalContent);
     pf.validator.getExtensionDomains().add(ExtensionDefinitions.EXT_PRIVATE_BASE);
-    pf.validationFetcher = new ValidationServices(pf.context, pf.igpkp, pf.sourceIg, pf.fileList, pf.npmList, pf.bundleReferencesResolve, pf.specMaps, pf.linkSpecMaps, pf.module);
+    pf.validationFetcher = new ValidationServices(pf.context, pf.igpkp, pf.sourceIg, pf.fileList, pf.npmList, pf.bundleReferencesResolve, pf.specMaps, pf.linkSpecMaps, pf.module, allLangs());
     pf.validator.setFetcher(pf.validationFetcher);
     pf.validator.setPolicyAdvisor(pf.validationFetcher);
     pf.validator.getSettings().setR5BundleRelativeReferencePolicy(r5BundleRelativeReferencePolicy);
