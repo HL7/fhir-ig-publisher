@@ -318,6 +318,7 @@ public class PublisherIGLoader extends PublisherBase {
     Map<String, String> expParamMap = new HashMap<>();
     boolean allowExtensibleWarnings = false;
     boolean noCIBuildIssues = false;
+    boolean keepTranslationsWhenTranslating = false;
     List<String> conversionVersions = new ArrayList<>();
     List<String> liquid0 = new ArrayList<>();
     List<String> liquid1 = new ArrayList<>();
@@ -782,6 +783,9 @@ public class PublisherIGLoader extends PublisherBase {
         case "no-ig-database":
           pf.generatingDatabase = false;
           break;
+        case "language-translations-mode":
+          keepTranslationsWhenTranslating = "preserve".equals(p.getValue());
+          break;
         default:
           if (pc.startsWith("wantGen-")) {
             String code = pc.substring(8);
@@ -807,6 +811,10 @@ public class PublisherIGLoader extends PublisherBase {
     }
     if (ini.hasProperty("IG", "jekyll-timeout")) { //todo: consider adding this to ImplementationGuideDefinitionParameterComponent
       pf.jekyllTimeout = ini.getLongProperty("IG", "jekyll-timeout") * 1000;
+    }
+
+    if (pf.template.isDevMode()) {
+      FileUtilities.clearDirectory(pf.tempDir);
     }
 
     for (String s : liquid0) {
@@ -915,6 +923,7 @@ public class PublisherIGLoader extends PublisherBase {
       loadConversionVersion(s);
     }
     pf.langUtils = new LanguageUtils(pf.context);
+    pf.langUtils.setKeepTranslationsWhenTranslating(keepTranslationsWhenTranslating);
     pf.txLog = FileUtilities.createTempFile("fhir-ig-", ".html").getAbsolutePath();
     System.out.println("Running Terminology Log: "+ pf.txLog);
     if (settings.getMode() != PublisherUtils.IGBuildMode.WEBSERVER) {
@@ -1989,7 +1998,7 @@ public class PublisherIGLoader extends PublisherBase {
       pf.publishedIg.addExtension(ExtensionDefinitions.EXT_WORKGROUP, new CodeType(pf.wgm));
     }
 
-    if (!VersionUtilities.isSemVer(pf.publishedIg.getVersion())) {
+    if (!VersionUtilities.isSemVer(pf.publishedIg.getVersion(), false)) {
       if (settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD) {
         throw new Error("The version "+ pf.publishedIg.getVersion()+" is not a valid semantic version so cannot be published in the ci-build");
       } else {
@@ -2591,7 +2600,6 @@ public class PublisherIGLoader extends PublisherBase {
     return null;
   }
 
-
   private RealmBusinessRules makeRealmBusinessRules() {
     if (pf.expectedJurisdiction != null && pf.expectedJurisdiction.getCode().equals("US")) {
       return new USRealmBusinessRules(pf.context, pf.version, pf.tempDir, pf.igpkp.getCanonical(), pf.igpkp, pf.rc, pf.publishedIg);
@@ -2599,7 +2607,6 @@ public class PublisherIGLoader extends PublisherBase {
       return new NullRealmBusinessRules(pf.igrealm);
     }
   }
-
 
   private PreviousVersionComparator makePreviousVersionComparator() throws IOException {
     if (isTemplate()) {
@@ -2632,7 +2639,6 @@ public class PublisherIGLoader extends PublisherBase {
     }
     return new IpsComparator(pf.context, pf.rootDir, pf.tempDir, pf.igpkp, pf.logger, pf.ipsComparisons, pf.rc);
   }
-
 
   private void checkIgDeps(ImplementationGuide vig, String ver) {
     if ("r4b".equals(ver)) {

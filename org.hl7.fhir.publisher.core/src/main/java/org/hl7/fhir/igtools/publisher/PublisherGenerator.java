@@ -13,6 +13,7 @@ import org.hl7.fhir.convertors.factory.*;
 import org.hl7.fhir.convertors.misc.NpmPackageVersionConverter;
 import org.hl7.fhir.convertors.misc.ProfileVersionAdaptor;
 import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.igtools.publisher.comparators.PreviousVersionComparator;
 import org.hl7.fhir.igtools.renderers.*;
 import org.hl7.fhir.igtools.renderers.CodeSystemRenderer;
 import org.hl7.fhir.igtools.renderers.ExampleScenarioRenderer;
@@ -88,7 +89,6 @@ import java.io.*;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
@@ -212,11 +212,12 @@ public class PublisherGenerator extends PublisherBase {
 
     for (String s : pf.context.getBinaryKeysAsSet()) {
       if (needFile(s)) {
-        if (pf.makeQA)
+        if (pf.makeQA) {
           checkMakeFile(pf.context.getBinaryForKey(s), Utilities.path(pf.qaDir, s), pf.otherFilesStartup);
+        }
         checkMakeFile(pf.context.getBinaryForKey(s), Utilities.path(pf.tempDir, s), pf.otherFilesStartup);
         for (String l : allLangs()) {
-          checkMakeFile(pf.context.getBinaryForKey(s), Utilities.path(pf.tempDir, l, s), pf.otherFilesStartup);
+          checkMakeFile(fillLangTemplate(pf.context.getBinaryForKey(s), l), Utilities.path(pf.tempDir, l, s), pf.otherFilesStartup);
         }
       }
     }
@@ -500,6 +501,22 @@ public class PublisherGenerator extends PublisherBase {
         }
       }
 
+      pf.inspector.setReqFolder(pf.repoRoot);
+      pf.inspector.setDefaultLang(pf.defaultTranslationLang);
+      pf.inspector.setTranslationLangs(pf.translationLangs);
+
+
+      if (pf.previousVersionComparator != null) {
+        for (PreviousVersionComparator.VersionInstance vi : pf.previousVersionComparator.getVersionList()) {
+          pf.inspector.getComparisonFiles().add("comparison-v"+vi.getVersion()+"/index.html");
+        }
+      }
+      if (pf.ipaComparator != null && pf.ipaComparator.hasLast()) {
+        pf.inspector.getComparisonFiles().add(pf.ipaComparator.getBaseFile());
+      }
+      if (pf.ipsComparator != null && pf.ipsComparator.hasLast()) {
+        pf.inspector.getComparisonFiles().add(pf.ipsComparator.getBaseFile());
+      }
       List<ValidationMessage> linkmsgs = settings.isGenerationOff() ? new ArrayList<ValidationMessage>() : pf.inspector.check(statusMessage, statusMessages);
       int bl = 0;
       int lf = 0;
@@ -537,6 +554,20 @@ public class PublisherGenerator extends PublisherBase {
       FileUtilities.copyFile(Utilities.path(pf.tempDir, "full-ig.zip"), Utilities.path(pf.outputDir, "full-ig.zip"));
       log("Final .zip built");
     }
+  }
+
+  private byte[] fillLangTemplate(byte[] b, String l) {
+    try {
+      String s = new String(b, "UTF-8");
+      if (s.startsWith("--")) {
+        s = s.replace("{{lang}}", l);
+        return s.getBytes("UTF-8");
+      } else {
+        return b;
+      }
+    } catch (Exception e) {
+      return b;
+      }
   }
 
   private void copyData() throws IOException {
@@ -4164,10 +4195,10 @@ public class PublisherGenerator extends PublisherBase {
       zip.addFileName("schematron.zip", sch, false);
     }
     if (js != null) {
-      zip.addFileName("json.schema.zip", sch, false);
+      zip.addFileName("json.schema.zip", js, false);
     }
     if (shex != null) {
-      zip.addFileName("shex.zip", sch, false);
+      zip.addFileName("shex.zip", shex, false);
     }
     zip.close();
   }

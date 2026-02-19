@@ -233,6 +233,11 @@ public class PublicationProcess {
 
     JsonObject prSrc = JsonParser.parseObject(loadFile("Source publication request", Utilities.path(source, "publication-request.json")));
     PublicationProcessMode mode = PublicationProcessMode.fromCode(prSrc.asString("mode"));
+
+    if (!check(res,  VersionUtilities.isSemVer(prSrc.asString("version"), false), "Publication Request version '"+prSrc.asString("version")+"' is not a valid semver")) {
+      return res;
+    }
+
     String id = prSrc.asString("package-id");
     String[] p = id.split("\\.");
     
@@ -615,7 +620,7 @@ public class PublicationProcess {
               if (!v.cibuild() && !v.current()) {
                 String pv = v.path();
                 String vCode = pv.substring(pv.lastIndexOf("/")+1);
-                String dv = Utilities.path(destination, vCode);
+                String dv = Utilities.path(fRoot, relPath);
                 System.out.println("Update publish box for version "+v.version()+" @ "+v.path());
                 updatePublishBox(pl, v, dv, pv, destination, fRoot.getAbsolutePath(), false, null, null, null, url, jsonXmlClones);
               }

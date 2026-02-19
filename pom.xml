@@ -4,14 +4,15 @@
 
     <groupId>org.hl7.fhir.publisher</groupId>
     <artifactId>org.hl7.fhir.publisher</artifactId>
-    <version>2.0.29-SNAPSHOT</version>
+    <version>2.1.1-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <properties>
-        <core_version>6.7.9</core_version>
+        <core_version>6.8.0</core_version>
         <maven_surefire_version>3.0.0-M5</maven_surefire_version>
         <apache_poi_version>5.4.1</apache_poi_version>
         <commons_io_version>2.17.0</commons_io_version>
+        <commons_text_version>1.15.0</commons_text_version>
         <lombok_version>1.18.38</lombok_version>
         <okhttp.version>4.11.0</okhttp.version>
         <junit_jupiter_version>5.7.1</junit_jupiter_version>
@@ -21,9 +22,10 @@
         <maven.compiler.testRelease>17</maven.compiler.testRelease>
         <maven.compiler.testSource>17</maven.compiler.testSource>
         <maven.compiler.testTarget>17</maven.compiler.testTarget>
-        <logback-classic.version>1.5.20</logback-classic.version>
+        <logback.version>1.5.25</logback.version>
+        <log4jVersion>2.25.3</log4jVersion>
         <jackson_version>2.17.0</jackson_version>
-        <nedap-healthcare-archie.version>3.15.0</nedap-healthcare-archie.version>
+        <nedap-healthcare-archie.version>3.16.0</nedap-healthcare-archie.version>
     </properties>
 
     <name>HL7 FHIR IG Publisher</name>
@@ -137,6 +139,21 @@
                 <artifactId>icu4j</artifactId>
                 <version>78.1</version>
             </dependency>
+            <dependency>
+                <groupId>org.apache.jena</groupId>
+                <artifactId>jena-shex</artifactId>
+                <version>5.6.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-text</artifactId>
+                <version>${commons_text_version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.logging.log4j</groupId>
+                <artifactId>log4j-api</artifactId>
+                <version>${log4jVersion}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -201,7 +218,7 @@
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
-            <version>${logback-classic.version}</version>
+            <version>${logback.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
@@ -369,7 +386,7 @@
         <dependency>
             <groupId>net.sourceforge.plantuml</groupId>
             <artifactId>plantuml-mit</artifactId>
-            <version>1.2023.9</version>
+            <version>1.2026.1</version>
         </dependency>
 
         <dependency>

@@ -65,7 +65,7 @@ public class PreviousVersionComparator {
     }
   }
   
-  private class VersionInstance {
+  public class VersionInstance {
     private String version;
     private SimpleWorkerContext context;    
     private List<CanonicalResource> resources = new ArrayList<>();
@@ -79,6 +79,10 @@ public class PreviousVersionComparator {
       this.version = version;
       this.ini = ini;
       this.annotate = annotate;
+    }
+
+    public String getVersion() {
+      return version;
     }
   }
 
@@ -424,5 +428,13 @@ public class PreviousVersionComparator {
     } else {
       return lastVersion().resources;
     }
+  }
+
+  public List<VersionInstance> getVersionList() {
+    return versionList;
+  }
+
+  public String getBaseFile() {
+    return "";
   }
 }
