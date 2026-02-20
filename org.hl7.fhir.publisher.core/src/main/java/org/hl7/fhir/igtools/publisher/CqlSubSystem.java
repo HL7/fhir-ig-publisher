@@ -1371,6 +1371,11 @@ public class CqlSubSystem {
     // Get the compiled measure library
     CqlSourceFileInformation libraryInfo = null;
     for (var canonical : libraries) {
+      // Skip if the library canonical is rooted in example.org
+      if (canonical.getCanonical().startsWith("http://example.org")) {
+        return null;
+      }
+
       libraryInfo = getCqlInfo(Utilities.tail(canonical.getCanonical()));
       if (libraryInfo != null) {
         break;
