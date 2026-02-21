@@ -318,12 +318,17 @@ public class PublisherGenerator extends PublisherBase {
       db.closeUp();
     }
     FileUtilities.bytesToFile(pf.extensionTracker.generate(), Utilities.path(pf.tempDir, "usage-stats.json"));
-    try {
-      log("Sending Usage Stats to Server");
-      pf.extensionTracker.sendToServer("http://test.fhir.org/usage-stats");
-    } catch (Exception e) {
-      log("Submitting Usage Stats failed: "+e.getMessage());
-    }
+    // Send usage stats asynchronously to avoid blocking the build
+    Thread usageStatsThread = new Thread(() -> {
+      try {
+        pf.extensionTracker.sendToServer("http://test.fhir.org/usage-stats");
+      } catch (Exception e) {
+        // fire-and-forget: don't block the build for telemetry
+      }
+    }, "usage-stats-sender");
+    usageStatsThread.setDaemon(true);
+    usageStatsThread.start();
+    log("Sending Usage Stats to Server (async)");
 
     pf.realmRules.addOtherFiles(pf.otherFilesRun, pf.outputDir);
     pf.previousVersionComparator.addOtherFiles(pf.otherFilesRun, pf.outputDir, pf.getExemptHtmlPatterns());

@@ -207,14 +207,13 @@ public class PreviousVersionComparator {
             filename = id;
             CanonicalResource curr = (CanonicalResource) loadResourceFromPackage(current, id, current.fhirVersion());
             if (curr != null) {
-              curr.setWebPath(Utilities.pathURL(current.getWebLocation(), curr.fhirType()+"-"+curr.getId()+".html")); // to do - actually refactor to use the correct algorithm
+              curr.setWebPath(Utilities.pathURL(current.getWebLocation(), curr.fhirType()+"-"+curr.getId()+".html"));
               vi.resources.add(curr);
             }
           }
           NpmPackage core = pcm.loadPackage(VersionUtilities.packageForVersion(current.fhirVersion()), VersionUtilities.getCurrentVersion(current.fhirVersion()));
           vi.context = new SimpleWorkerContext.SimpleWorkerContextBuilder().withTerminologyCachePath(Utilities.path(context.getTxCache().getFolder(), vi.version)).fromPackage(core,
                   new PublisherLoader(core, SpecMapManager.fromPackage(core), core.getWebLocation(), null, false).makeLoader(), true);
-          //vi.context.initTS();
           vi.context.connectToTSServer(context.getTxClientManager().getFactory(), context.getTxClientManager().getMasterClient(), false);
           vi.context.setAllowLoadingDuplicates(true);
           vi.context.setExpansionParameters(context.getExpansionParameters());
