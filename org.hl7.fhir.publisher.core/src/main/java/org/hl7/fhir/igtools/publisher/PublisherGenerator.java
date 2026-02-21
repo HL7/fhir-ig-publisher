@@ -93,6 +93,7 @@ import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.concurrent.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -267,16 +268,14 @@ public class PublisherGenerator extends PublisherBase {
       new XmlParser().setOutputStyle(IParser.OutputStyle.NORMAL).compose(new FileOutputStream(Utilities.path(pf.tempDir, "parameters-expansion-parameters.xml")), pf.context.getExpansionParameters());
     }
 
-    logMessage("Generate HTML Outputs");
-    for (FetchedFile f : pf.changeList) {
-      f.start("generate2");
-      try {
-        generateHtmlOutputs(f, false, db, null);
-      } finally {
-        f.finish("generate2");
-      }
-    }
+    int htmlThreadCount = Integer.parseInt(System.getProperty("ig.threads",
+        String.valueOf(Math.max(1, Math.min(Runtime.getRuntime().availableProcessors(), pf.changeList.size())))));
 
+    logMessage("@@PHASE_START htmlOutputs threads=" + htmlThreadCount);
+    runHtmlOutputs(db, htmlThreadCount);
+    logMessage("@@PHASE_END htmlOutputs");
+
+    logMessage("@@PHASE_START spreadsheets");
     logMessage("Generate Spreadsheets");
     for (FetchedFile f : pf.changeList) {
       f.start("generate2");
@@ -296,6 +295,8 @@ public class PublisherGenerator extends PublisherBase {
       pf.otherFilesRun.add(Utilities.path(pf.tempDir, "all-profiles.xlsx"));
       pf.allProfilesXlsx.dump();
     }
+    logMessage("@@PHASE_END spreadsheets");
+    logMessage("@@PHASE_START summaries");
     logMessage("Generate Summaries");
 
 
@@ -314,6 +315,12 @@ public class PublisherGenerator extends PublisherBase {
     }
     pf.template.rapidoSummary();
     genBasePages();
+
+    // Interactive benchmark mode: re-run phases in a hot JVM
+    if (System.getProperty("ig.interactive") != null) {
+      runInteractiveLoop(db);
+    }
+
     if (db != null) {
       db.closeUp();
     }
@@ -2361,6 +2368,14 @@ public class PublisherGenerator extends PublisherBase {
         FileUtilities.stringToFile(pageWrap(fixedContent, name), Utilities.path(pf.qaDir, name+".html"));
       }
     }
+    // For multi-language IGs, also write a non-suffixed copy for the default language
+    // so templates that reference e.g. "cross-version-analysis.xhtml" (without -en) still work
+    if (lang != null && lang.equals(pf.defaultTranslationLang)) {
+      String unsuffixedPath = Utilities.path(pf.tempDir, "_includes", name+".xhtml");
+      if (!pf.allOutputs.contains(unsuffixedPath.toLowerCase())) {
+        FileUtilities.bytesToFile(FileUtilities.stringToBytes(wrapLiquid(fixedContent)), unsuffixedPath);
+      }
+    }
   }
 
 
@@ -3878,14 +3893,14 @@ public class PublisherGenerator extends PublisherBase {
   }
 
 
-  private void addFileToNpm(NPMPackageGenerator.Category other, String name, byte[] cnt) throws IOException {
+  private synchronized void addFileToNpm(NPMPackageGenerator.Category other, String name, byte[] cnt) throws IOException {
     pf.npm.addFile(other, name, cnt);
     for (NPMPackageGenerator vnpm : pf.vnpms.values()) {
       vnpm.addFile(other, name, cnt);
     }
   }
 
-  private void addFileToNpm(String other, String name, byte[] cnt) throws IOException {
+  private synchronized void addFileToNpm(String other, String name, byte[] cnt) throws IOException {
     pf.npm.addFile(other, name, cnt);
     for (NPMPackageGenerator vnpm : pf.vnpms.values()) {
       vnpm.addFile(other, name, cnt);
@@ -6975,6 +6990,174 @@ public class PublisherGenerator extends PublisherBase {
     ExtensionUtilities.removeExtension(ig, ExtensionDefinitions.EXT_IGP_CONTAINED_RESOURCE_INFO); // - this is in contained resources somewhere, not the root of IG?
     for (ImplementationGuide.ImplementationGuideDefinitionResourceComponent r : ig.getDefinition().getResource())
       ExtensionUtilities.removeExtension(r, ExtensionDefinitions.EXT_IGP_RESOURCE_INFO);
+  }
+
+  private void runHtmlOutputs(DBBuilder db, int threadCount) throws Exception {
+    runHtmlOutputs(db, threadCount, pf.changeList);
+  }
+
+  private void runHtmlOutputs(DBBuilder db, int threadCount, List<FetchedFile> files) throws Exception {
+    logMessage("Generate HTML Outputs (" + threadCount + " threads, " + files.size() + " files)");
+    ExecutorService pool = Executors.newFixedThreadPool(threadCount);
+    List<Future<?>> futures = new ArrayList<>();
+    for (FetchedFile f : files) {
+      futures.add(pool.submit(() -> {
+        try {
+          f.start("generate2");
+          try {
+            generateHtmlOutputs(f, false, db, null);
+          } finally {
+            f.finish("generate2");
+          }
+        } catch (Exception e) {
+          throw new RuntimeException("Error generating HTML for " + f.getName(), e);
+        }
+      }));
+    }
+    pool.shutdown();
+    for (Future<?> future : futures) {
+      try {
+        future.get();
+      } catch (ExecutionException e) {
+        if (e.getCause() instanceof RuntimeException && e.getCause().getCause() instanceof Exception) {
+          throw (Exception) e.getCause().getCause();
+        }
+        if (e.getCause() instanceof Exception) {
+          throw (Exception) e.getCause();
+        }
+        throw new RuntimeException(e.getCause());
+      }
+    }
+  }
+
+  private void runSpreadsheets(DBBuilder db) throws Exception {
+    runSpreadsheets(db, pf.changeList);
+  }
+
+  private void runSpreadsheets(DBBuilder db, List<FetchedFile> files) throws Exception {
+    for (FetchedFile f : files) {
+      f.start("generate2");
+      try {
+        generateSpreadsheets(f, false, db);
+      } finally {
+        f.finish("generate2");
+      }
+    }
+  }
+
+  /**
+   * Reset mutable state so a phase can be re-run in the same JVM.
+   * Used by interactive benchmark mode for fast iteration.
+   */
+  private void resetForPhaseRerun() {
+    pf.allOutputs.clear();
+    pf.fragmentUses.clear();
+    for (FetchedFile f : pf.changeList) {
+      f.getOutputNames().clear();
+    }
+    // Clear generated include files so fragment() regenerates them
+    try {
+      File includesDir = new File(Utilities.path(pf.tempDir, "_includes"));
+      if (includesDir.exists()) {
+        for (File f : includesDir.listFiles()) {
+          if (f.isFile()) f.delete();
+        }
+      }
+    } catch (Exception e) {
+      logMessage("Warning: could not clear _includes: " + e.getMessage());
+    }
+  }
+
+  /**
+   * Interactive REPL for re-running phases in a hot JVM.
+   * Activated by -Dig.interactive=true. Reads commands from stdin.
+   *
+   * Commands:
+   *   htmlOutputs [threads=N] [files=N] [filter=pattern]  - Re-run HTML output generation
+   *   spreadsheets                                         - Re-run spreadsheet generation
+   *   quit                                                 - Exit interactive mode
+   *
+   * Options:
+   *   threads=N       Number of threads (default: availableProcessors)
+   *   files=N         Process only the first N files (for fast iteration)
+   *   filter=pattern  Process only files whose name contains pattern
+   */
+  private void runInteractiveLoop(DBBuilder db) {
+    Scanner scanner = new Scanner(System.in);
+    logMessage("@@INTERACTIVE_READY");
+    logMessage("Interactive mode. Commands: htmlOutputs [threads=N] [files=N] [filter=pattern], spreadsheets, quit");
+    logMessage("PID: " + ProcessHandle.current().pid());
+    System.out.flush();
+
+    while (scanner.hasNextLine()) {
+      String line = scanner.nextLine().trim();
+      if (line.isEmpty()) continue;
+      if ("quit".equalsIgnoreCase(line) || "exit".equalsIgnoreCase(line)) break;
+
+      String[] parts = line.split("\\s+");
+      String phase = parts[0];
+      int threads = Runtime.getRuntime().availableProcessors();
+      int fileLimit = -1;
+      String filter = null;
+      for (String p : parts) {
+        if (p.startsWith("threads=")) {
+          threads = Integer.parseInt(p.substring(8));
+        } else if (p.startsWith("files=")) {
+          fileLimit = Integer.parseInt(p.substring(6));
+        } else if (p.startsWith("filter=")) {
+          filter = p.substring(7);
+        }
+      }
+
+      // Build the file subset to process
+      List<FetchedFile> filesToProcess = pf.changeList;
+      if (filter != null) {
+        String pat = filter;
+        filesToProcess = pf.changeList.stream()
+            .filter(f -> f.getName().contains(pat))
+            .collect(java.util.stream.Collectors.toList());
+        logMessage("Filter '" + pat + "': " + filesToProcess.size() + " of " + pf.changeList.size() + " files");
+      }
+      if (fileLimit > 0 && fileLimit < filesToProcess.size()) {
+        filesToProcess = filesToProcess.subList(0, fileLimit);
+        logMessage("Limiting to first " + fileLimit + " files");
+      }
+
+      try {
+        resetForPhaseRerun();
+        System.gc();
+        long startMem = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+        long startTime = System.currentTimeMillis();
+        logMessage("@@BENCH_START " + phase + " threads=" + threads + " files=" + filesToProcess.size());
+        System.out.flush();
+
+        switch (phase) {
+          case "htmlOutputs":
+            runHtmlOutputs(db, threads, filesToProcess);
+            break;
+          case "spreadsheets":
+            runSpreadsheets(db, filesToProcess);
+            break;
+          default:
+            logMessage("Unknown phase: " + phase);
+            logMessage("@@INTERACTIVE_READY");
+            System.out.flush();
+            continue;
+        }
+
+        long elapsed = System.currentTimeMillis() - startTime;
+        long endMem = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+        long memDelta = (endMem - startMem) / (1024 * 1024);
+        logMessage("@@BENCH_END " + phase + " elapsed=" + elapsed + "ms mem_delta=" + memDelta + "MB");
+      } catch (Exception e) {
+        logMessage("@@BENCH_ERROR " + phase + " " + e.getMessage());
+        e.printStackTrace();
+      }
+      logMessage("@@INTERACTIVE_READY");
+      System.out.flush();
+    }
+    logMessage("Exiting interactive mode");
+    System.out.flush();
   }
 
 }

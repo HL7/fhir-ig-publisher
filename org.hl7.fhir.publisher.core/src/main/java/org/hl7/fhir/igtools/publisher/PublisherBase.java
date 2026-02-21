@@ -292,10 +292,11 @@ public class PublisherBase implements ILoggingService {
   protected boolean checkMakeFile(byte[] bs, String path, Set<String> outputTracker) throws IOException {
     // logDebugMessage(LogCategory.GENERATE, "Check Generate "+path);
     String s = path.toLowerCase();
-    if (pf.allOutputs.contains(s))
+    if (!pf.allOutputs.add(s))
       throw new Error("Error generating build: the file "+path+" is being generated more than once (may differ by case)");
-    pf.allOutputs.add(s);
-    outputTracker.add(path);
+    synchronized (outputTracker) {
+      outputTracker.add(path);
+    }
     File f = new CSFile(path);
     File folder = new File(FileUtilities.getDirectoryForFile(f));
     if (!folder.exists()) {

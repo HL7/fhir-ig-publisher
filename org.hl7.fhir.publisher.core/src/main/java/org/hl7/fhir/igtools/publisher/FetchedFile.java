@@ -28,6 +28,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -37,7 +38,7 @@ import org.hl7.fhir.utilities.validation.ValidationMessage;
 public class FetchedFile {
   private static long timeZero = System.currentTimeMillis();
   private static String root;
-  private static List<String> columns = new ArrayList<>();
+  private static List<String> columns = new CopyOnWriteArrayList<>();
 
   public class ProcessingReport {
     private String activity;
@@ -239,7 +240,7 @@ public class FetchedFile {
     this.logical = logical;
   }
   
-  public void start(String activityName) {
+  public synchronized void start(String activityName) {
     if (!columns.contains(activityName)) {
       columns.add(activityName);
     }
@@ -249,7 +250,7 @@ public class FetchedFile {
     processes.add(pr);
   }
   
-  public void finish(String activityName) {
+  public synchronized void finish(String activityName) {
     for (int i = processes.size() -1; i >= 0; i--) {
       ProcessingReport pr = processes.get(i);
       if (pr.activity.equals(activityName) && pr.finish == 0) {

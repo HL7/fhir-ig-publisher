@@ -501,7 +501,7 @@ public class DBBuilder {
     time(start);
   }
 
-  public void recordExpansion(ValueSet vs, ValueSetExpansionOutcome exp) throws SQLException {
+  public synchronized void recordExpansion(ValueSet vs, ValueSetExpansionOutcome exp) throws SQLException {
     long start = System.currentTimeMillis();
     try {
       if (con == null) {
@@ -832,7 +832,7 @@ public class DBBuilder {
   }
 
 
-  public String processSQL(String sql) {
+  public synchronized String processSQL(String sql) {
     long start = System.currentTimeMillis();
     if (con == null) {
       return "<span style=\"color: maroon\">Error processing SQL: SQL is not set up properly</span>";
@@ -1023,7 +1023,7 @@ public class DBBuilder {
     }
   }
 
-  public String executeQueryToJson(String sql) throws SQLException {
+  public synchronized String executeQueryToJson(String sql) throws SQLException {
     if (con == null) {
       throw new IllegalStateException("No database connection available.");
     }
@@ -1084,7 +1084,7 @@ public class DBBuilder {
     System.out.println("DB Cumulative Time invested: "+Utilities.describeDuration(cumulativeTime));
   }
 
-  public void addToCSList(int viewType, CodeSystem cs, Set<String> oids, Set<Resource> rl) {
+  public synchronized void addToCSList(int viewType, CodeSystem cs, Set<String> oids, Set<Resource> rl) {
     try {
       lastCLKey++;
       PreparedStatement sql;
@@ -1137,7 +1137,7 @@ public class DBBuilder {
     }
   }
 
-  public void addToVSList(int viewType, ValueSet vs, Set<String> oids, Set<String> used, Set<String> sources, Set<Resource> rl) {
+  public synchronized void addToVSList(int viewType, ValueSet vs, Set<String> oids, Set<String> used, Set<String> sources, Set<Resource> rl) {
     try {
       lastVLKey++;
       PreparedStatement sql;
