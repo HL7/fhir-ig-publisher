@@ -267,6 +267,18 @@ public class DBBuilder {
 
   private long cumulativeTime;
   
+  // Deferred DB operations: collected during parallel phases, flushed after
+  private final java.util.concurrent.ConcurrentLinkedQueue<DeferredExpansion> deferredExpansions = new java.util.concurrent.ConcurrentLinkedQueue<>();
+  
+  private static class DeferredExpansion {
+    final ValueSet vs;
+    final ValueSetExpansionOutcome exp;
+    DeferredExpansion(ValueSet vs, ValueSetExpansionOutcome exp) {
+      this.vs = vs;
+      this.exp = exp;
+    }
+  }
+  
   private void time(long start) {
     cumulativeTime = cumulativeTime + (System.currentTimeMillis() - start);
   }
@@ -442,55 +454,75 @@ public class DBBuilder {
     }
 
     try {
-      PreparedStatement psql = con.prepareStatement("Insert into Properties (Key, ResourceKey, Code, Uri, Description, Type) "+
-          "values (?, ?, ?, ?, ?, ?)");
-      for (CodeSystem cs : codesystems) {
-        for (PropertyComponent p : cs.getProperty()) { 
-          psql.setInt(1, ++lastPropKey);
-          psql.setInt(2, ((Integer) cs.getUserData(UserDataNames.db_key)).intValue());
-          bindString(psql, 3, p.getCode());
-          bindString(psql, 4, p.getUri());
-          bindString(psql, 5, p.getDescription());
-          bindString(psql, 6, p.getType().toCode());  
-          psql.executeUpdate();     
-          p.setUserData(UserDataNames.db_key, lastPropKey);   
-        }
-      }
-      psql = con.prepareStatement("Insert into Concepts (Key, ResourceKey, ParentKey,  Code, Display, Definition) "+
-          "values (?, ?, ?, ?, ?, ?)");
-      for (CodeSystem cs : codesystems) {
-        addConcepts(cs, cs.getConcept(), psql, 0);
-      }
-      psql = con.prepareStatement("Insert into ConceptProperties (Key, ResourceKey, ConceptKey, PropertyKey, Code, Value) "+
-          "values (?, ?, ?, ?, ?, ?)");
-      for (CodeSystem cs : codesystems) {
-        addConceptProperties(cs, cs.getConcept(), psql);
-      }
-      psql = con.prepareStatement("Insert into Designations (Key, ResourceKey, ConceptKey, UseSystem, UseCode, Lang, Value) "+
-          "values (?, ?, ?, ?, ?, ?, ?)");
-      for (CodeSystem cs : codesystems) {
-        addConceptDesignations(cs, cs.getConcept(), psql);
-      }
+      boolean origAutoCommit = con.getAutoCommit();
+      try {
+        con.setAutoCommit(false);
 
-      psql = con.prepareStatement("Insert into ConceptMappings (Key, ResourceKey, SourceSystem, SourceVersion, SourceCode, Relationship, TargetSystem, TargetVersion, TargetCode) "+
-          "values (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-      for (ConceptMap cm : mappings) {
-        for (ConceptMapGroupComponent grp : cm.getGroup()) {
-          for (SourceElementComponent src : grp.getElement()) {
-            for (TargetElementComponent tgt : src.getTarget()) {
-              psql.setInt(1, ++lastMapKey);
-              psql.setInt(2, ((Integer) cm.getUserData(UserDataNames.db_key)).intValue());
-              bindString(psql, 3, grp.getSourceElement().baseUrl());
-              bindString(psql, 4, grp.getSourceElement().version());
-              bindString(psql, 5, src.getCode());
-              bindString(psql, 6, tgt.getRelationshipElement().primitiveValue());
-              bindString(psql, 7, grp.getTargetElement().baseUrl());
-              bindString(psql, 8, grp.getTargetElement().version());
-              bindString(psql, 9, tgt.getCode());
-              psql.executeUpdate();    
+        PreparedStatement psql = con.prepareStatement("Insert into Properties (Key, ResourceKey, Code, Uri, Description, Type) "+
+            "values (?, ?, ?, ?, ?, ?)");
+        for (CodeSystem cs : codesystems) {
+          for (PropertyComponent p : cs.getProperty()) { 
+            psql.setInt(1, ++lastPropKey);
+            psql.setInt(2, ((Integer) cs.getUserData(UserDataNames.db_key)).intValue());
+            bindString(psql, 3, p.getCode());
+            bindString(psql, 4, p.getUri());
+            bindString(psql, 5, p.getDescription());
+            bindString(psql, 6, p.getType().toCode());  
+            psql.addBatch();
+            p.setUserData(UserDataNames.db_key, lastPropKey);   
+          }
+        }
+        psql.executeBatch();
+
+        psql = con.prepareStatement("Insert into Concepts (Key, ResourceKey, ParentKey,  Code, Display, Definition) "+
+            "values (?, ?, ?, ?, ?, ?)");
+        for (CodeSystem cs : codesystems) {
+          addConcepts(cs, cs.getConcept(), psql, 0);
+        }
+        psql.executeBatch();
+
+        psql = con.prepareStatement("Insert into ConceptProperties (Key, ResourceKey, ConceptKey, PropertyKey, Code, Value) "+
+            "values (?, ?, ?, ?, ?, ?)");
+        for (CodeSystem cs : codesystems) {
+          addConceptProperties(cs, cs.getConcept(), psql);
+        }
+        psql.executeBatch();
+
+        psql = con.prepareStatement("Insert into Designations (Key, ResourceKey, ConceptKey, UseSystem, UseCode, Lang, Value) "+
+            "values (?, ?, ?, ?, ?, ?, ?)");
+        for (CodeSystem cs : codesystems) {
+          addConceptDesignations(cs, cs.getConcept(), psql);
+        }
+        psql.executeBatch();
+
+        psql = con.prepareStatement("Insert into ConceptMappings (Key, ResourceKey, SourceSystem, SourceVersion, SourceCode, Relationship, TargetSystem, TargetVersion, TargetCode) "+
+            "values (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        for (ConceptMap cm : mappings) {
+          for (ConceptMapGroupComponent grp : cm.getGroup()) {
+            for (SourceElementComponent src : grp.getElement()) {
+              for (TargetElementComponent tgt : src.getTarget()) {
+                psql.setInt(1, ++lastMapKey);
+                psql.setInt(2, ((Integer) cm.getUserData(UserDataNames.db_key)).intValue());
+                bindString(psql, 3, grp.getSourceElement().baseUrl());
+                bindString(psql, 4, grp.getSourceElement().version());
+                bindString(psql, 5, src.getCode());
+                bindString(psql, 6, tgt.getRelationshipElement().primitiveValue());
+                bindString(psql, 7, grp.getTargetElement().baseUrl());
+                bindString(psql, 8, grp.getTargetElement().version());
+                bindString(psql, 9, tgt.getCode());
+                psql.addBatch();
+              }
             }
           }
         }
+        psql.executeBatch();
+
+        con.commit();
+      } catch (SQLException e) {
+        try { con.rollback(); } catch (SQLException ignored) {}
+        throw e;
+      } finally {
+        con.setAutoCommit(origAutoCommit);
       }
     } catch (SQLException e) {
       errors.add(e.getMessage());
@@ -502,31 +534,54 @@ public class DBBuilder {
   }
 
   public synchronized void recordExpansion(ValueSet vs, ValueSetExpansionOutcome exp) throws SQLException {
-    long start = System.currentTimeMillis();
-    try {
-      if (con == null) {
-        return;
-      }
-      if (exp == null || exp.getValueset() == null) {
-        return;
-      }
-
-      PreparedStatement psql = con.prepareStatement("Insert into ValueSet_Codes (Key, ResourceKey, ValueSetUri, ValueSetVersion, System, Version, Code, Display) "+
-          "values (?, ?, ?, ?, ?, ?, ?, ?)");
-      for (ValueSetExpansionContainsComponent e : exp.getValueset().getExpansion().getContains()) {
-        addContains(vs, e, psql);
-      }
-    } catch (SQLException e) {
-      errors.add(e.getMessage());
-      if (debug) {
-        e.printStackTrace();
-      }
-    }
-    time(start);
+    // Queue for deferred execution to avoid SQLite lock contention during parallel phases
+    deferredExpansions.add(new DeferredExpansion(vs, exp));
   }
 
+  /** Flush all deferred DB operations. Call after parallel phase completes (single-threaded). */
+  public synchronized void flushDeferredOperations() throws SQLException {
+    if (con == null) {
+      // drain queue even if no connection
+      while (deferredExpansions.poll() != null) {}
+      return;
+    }
+    boolean origAutoCommit = con.getAutoCommit();
+    try {
+      con.setAutoCommit(false);
+      PreparedStatement psql = con.prepareStatement("Insert into ValueSet_Codes (Key, ResourceKey, ValueSetUri, ValueSetVersion, System, Version, Code, Display) "+
+          "values (?, ?, ?, ?, ?, ?, ?, ?)");
+      DeferredExpansion de;
+      int batchCount = 0;
+      while ((de = deferredExpansions.poll()) != null) {
+        if (de.exp == null || de.exp.getValueset() == null) {
+          continue;
+        }
+        long start = System.currentTimeMillis();
+        try {
+          for (ValueSetExpansionContainsComponent e : de.exp.getValueset().getExpansion().getContains()) {
+            batchCount = addContainsBatch(de.vs, e, psql, batchCount);
+          }
+        } catch (SQLException e) {
+          errors.add(e.getMessage());
+          if (debug) {
+            e.printStackTrace();
+          }
+        }
+        time(start);
+      }
+      if (batchCount > 0) {
+        psql.executeBatch();
+      }
+      con.commit();
+    } catch (SQLException e) {
+      try { con.rollback(); } catch (SQLException ignored) {}
+      throw e;
+    } finally {
+      con.setAutoCommit(origAutoCommit);
+    }
+  }
 
-  private void addContains(ValueSet vs, ValueSetExpansionContainsComponent e, PreparedStatement psql) throws SQLException {
+  private int addContainsBatch(ValueSet vs, ValueSetExpansionContainsComponent e, PreparedStatement psql, int batchCount) throws SQLException {
     if (vs.hasUserData(UserDataNames.db_key)) {
       psql.setInt(1, ++lastVSKey);
       psql.setInt(2, ((Integer) vs.getUserData(UserDataNames.db_key)).intValue());
@@ -536,11 +591,16 @@ public class DBBuilder {
       bindString(psql, 6, e.getVersion());
       bindString(psql, 7, e.getCode());
       bindString(psql, 8, e.getDisplay());
-      psql.executeUpdate();   
+      psql.addBatch();
+      batchCount++;
+      if (batchCount % 5000 == 0) {
+        psql.executeBatch();
+      }
       for (ValueSetExpansionContainsComponent c : e.getContains()) {
-        addContains(vs, c, psql);
+        batchCount = addContainsBatch(vs, c, psql, batchCount);
       }
     }
+    return batchCount;
   }
 
   private void addConcepts(CodeSystem cs, List<ConceptDefinitionComponent> list, PreparedStatement psql, int parent) throws SQLException {
@@ -556,7 +616,7 @@ public class DBBuilder {
       bindString(psql, 4, cd.getCode());
       bindString(psql, 5, cd.getDisplay());
       bindString(psql, 6, cd.getDefinition());
-      psql.executeUpdate();    
+      psql.addBatch();
       cd.setUserData(UserDataNames.db_key, lastConceptKey);   
       addConcepts(cs, cd.getConcept(), psql, lastConceptKey);
     }
@@ -578,7 +638,7 @@ public class DBBuilder {
         }
         bindString(psql, 5, p.getCode());
         bindString(psql, 6, p.getValue() == null ? p.getValue().primitiveValue() : null);
-        psql.executeUpdate();    
+        psql.addBatch();
         p.setUserData(UserDataNames.db_key, lastCPropKey);   
       }
       addConceptProperties(cs, cd.getConcept(), psql);
@@ -602,7 +662,7 @@ public class DBBuilder {
           }
           bindString(psql, 6, p.getLanguage());
           bindString(psql, 7, p.getValue());
-          psql.executeUpdate();    
+          psql.addBatch();
           p.setUserData(UserDataNames.db_key, lastDesgKey);   
         }
         addConceptDesignations(cs, cd.getConcept(), psql);
