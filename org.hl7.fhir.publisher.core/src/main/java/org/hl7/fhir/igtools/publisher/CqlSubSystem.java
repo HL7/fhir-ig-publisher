@@ -214,6 +214,12 @@ public class CqlSubSystem {
     public ActivityDefinition readActivityDefinition(InputStream stream) throws FHIRFormatError, IOException;
   }
 
+  public static class CanonicalUtilities {
+    public static boolean isExample(String canonical) {
+      return canonical.contains("example");
+    }
+  }
+
   /**
    * all the NPM packages this IG depends on (including base).
    * This list is in a maintained order such that you can just
@@ -1372,7 +1378,7 @@ public class CqlSubSystem {
     CqlSourceFileInformation libraryInfo = null;
     for (var canonical : libraries) {
       // Skip if the library canonical is rooted in example.org
-      if (canonical.getCanonical().startsWith("http://example.org")) {
+      if (CanonicalUtilities.isExample(canonical.getCanonical())) {
         return null;
       }
 
