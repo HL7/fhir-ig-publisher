@@ -167,10 +167,21 @@ class ConformanceStatementHandler {
         String valuesetUrl = param.getValue();
         ValueSet categoriesVs = context.fetchResource(ValueSet.class, valuesetUrl);
         ValueSetExpansionOutcome expansion = context.expandVS(categoriesVs, false, true, 100);
+        loadCategories(expansion.getValueset().getExpansion().getContains());
         for (ValueSetExpansionContainsComponent catCode: expansion.getValueset().getExpansion().getContains()) {
           categories.put(catCode.getCode(), new Coding(catCode.getSystem(), catCode.getCode(), catCode.getDisplay()));
         }
         break;
+      }
+    }
+  }
+  
+  private void loadCategories(List<ValueSetExpansionContainsComponent> contains) {
+    for (ValueSetExpansionContainsComponent cat: contains) {
+      if (!cat.getAbstract())
+        categories.put(cat.getCode(), new Coding(cat.getSystem(), cat.getCode(), cat.getDisplay()));
+      if (cat.hasContains()) {
+        loadCategories(cat.getContains());
       }
     }
   }
