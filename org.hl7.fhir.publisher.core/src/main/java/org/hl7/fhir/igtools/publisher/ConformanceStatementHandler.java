@@ -541,7 +541,7 @@ class ConformanceStatementHandler {
         }
         
         if (clause.hasSummary()) {
-          tr.td().tx(clause.getSummary());
+          tr.td().markdown(clause.getSummary(), "ConformanceStatementHandler");
         } else {
           tr.td().getChildNodes().addAll(clause.getNode().getChildNodes());
         }
