@@ -217,6 +217,8 @@ class ConformanceStatementHandler {
   }
 
   public void generateRequirementsInstance(List<ValidationMessage> messages) throws IOException {
+    if (messages.isEmpty())
+      return;
     String reqUrl = this.rootUrl + "Requirements/fromNarrative";
     Requirements req = context.fetchResource(Requirements.class, reqUrl);
     Map<String, Requirements.RequirementsStatementComponent> oldReq = new HashMap<>();
