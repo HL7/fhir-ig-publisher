@@ -70,7 +70,7 @@ public class IGPublisherHostServices extends BaseHostServices {
   }
 
   @Override
-  public Base resolveReference(FHIRPathEngine engine, Object appContext, String url, Base refContext) {
+  public Base resolveReference(FHIRPathEngine engine, Object appContext, String url, Identifier identifier, Base refContext) {
     if (Utilities.isAbsoluteUrl(url)) {
       if (url.startsWith(igpkp.getCanonical())) {
         url = url.substring(igpkp.getCanonical().length());

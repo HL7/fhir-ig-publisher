@@ -307,4 +307,5 @@ public class PublisherFields {
     public boolean saveExpansionParams;
     @Getter private List<String> exemptHtmlPatterns = new ArrayList<>();
     Resolver.IReferenceResolver resolver;
+    @Getter @Setter private boolean languagePack;
 }
