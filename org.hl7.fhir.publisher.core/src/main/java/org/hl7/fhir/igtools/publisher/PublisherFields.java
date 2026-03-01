@@ -38,7 +38,6 @@ import org.hl7.fhir.validation.profile.ProfileValidator;
 
 import java.io.File;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class PublisherFields {
 
@@ -109,12 +108,12 @@ public class PublisherFields {
     List<Resource> loaded = new ArrayList<Resource>();
     ImplementationGuide sourceIg;
     ImplementationGuide publishedIg;
-    List<ValidationMessage> errors = Collections.synchronizedList(new ArrayList<ValidationMessage>());
+    List<ValidationMessage> errors = new ArrayList<ValidationMessage>();
     Set<String> otherFilesStartup = new HashSet<String>();
-    Set<String> otherFilesRun = ConcurrentHashMap.newKeySet();
+    Set<String> otherFilesRun = new HashSet<>();
     Set<String> regenList = new HashSet<String>();
     StringBuilder filelog;
-    Set<String> allOutputs = ConcurrentHashMap.newKeySet();
+    Set<String> allOutputs = new HashSet<>();
     Set<FetchedResource> examples = new HashSet<FetchedResource>();
     Set<FetchedResource> testplans = new HashSet<FetchedResource>();
     Set<FetchedResource> testscripts = new HashSet<FetchedResource>();
@@ -266,7 +265,7 @@ public class PublisherFields {
 
     LanguageSubtagRegistry registry;
 
-    public Map<String, PublisherBase.FragmentUseRecord> fragmentUses = new ConcurrentHashMap<>();
+    public Map<String, PublisherBase.FragmentUseRecord> fragmentUses = new HashMap<>();
 
     LanguageUtils langUtils;
 
