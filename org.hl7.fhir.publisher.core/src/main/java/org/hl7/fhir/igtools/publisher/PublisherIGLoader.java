@@ -786,6 +786,8 @@ public class PublisherIGLoader extends PublisherBase {
         case "language-translations-mode":
           keepTranslationsWhenTranslating = "preserve".equals(p.getValue());
           break;
+        case "lang-pack":
+          pf.setLanguagePack("true".equals(p.getValue()));
         default:
           if (pc.startsWith("wantGen-")) {
             String code = pc.substring(8);
@@ -3368,6 +3370,10 @@ public class PublisherIGLoader extends PublisherBase {
     supplement.setPublisher(pf.sourceIg.getPublisher());
     supplement.setContact(pf.sourceIg.getContact());
     supplement.setCopyright(pf.sourceIg.getCopyright());
+
+    if (pf.isLanguagePack()) {
+      supplement.addExtension(ExtensionDefinitions.EXT_SUPPL_TYPE, new CodeType("lang-pack"));
+    }
 
     supplement.setName(res.getName());
     supplement.setTitle(res.getTitle());

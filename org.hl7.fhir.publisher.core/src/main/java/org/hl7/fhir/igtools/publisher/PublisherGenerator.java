@@ -57,6 +57,7 @@ import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
 import org.hl7.fhir.r5.terminologies.TerminologyUtilities;
 import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
 import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
+import org.hl7.fhir.r5.terminologies.utilities.TerminologyServiceErrorClass;
 import org.hl7.fhir.r5.terminologies.utilities.ValidationResult;
 import org.hl7.fhir.r5.utils.*;
 import org.hl7.fhir.r5.utils.formats.CSVWriter;
@@ -1510,8 +1511,8 @@ public class PublisherGenerator extends PublisherBase {
           }
         } else {
           if (exp.getError() != null) {
-            if (exp.getError().contains("Unable to provide support")) {
-              if (exp.getError().contains("known versions")) {
+            if (exp.getErrorClass() == TerminologyServiceErrorClass.UNKNOWN) {
+              if (exp.getError().contains("version")) {
                 fragmentErrorHtml("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", "No Expansion for this valueset (Unsupported Code System Version<!-- "+Utilities.escapeXml(exp.getAllErrors().toString())+" -->)", "Publication Tooling Error: "+Utilities.escapeXml(exp.getAllErrors().toString()), f.getOutputNames(), start, "expansion", "ValueSet", lang);
               } else {
                 fragmentErrorHtml("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", "No Expansion for this valueset (Unknown Code System<!-- "+Utilities.escapeXml(exp.getAllErrors().toString())+" -->)", "Publication Tooling Error: "+Utilities.escapeXml(exp.getAllErrors().toString()), f.getOutputNames(), start, "expansion", "ValueSet", lang);
