@@ -294,9 +294,8 @@ public class PublisherBase implements ILoggingService {
     String s = path.toLowerCase();
     if (!pf.allOutputs.add(s))
       throw new Error("Error generating build: the file "+path+" is being generated more than once (may differ by case)");
-    synchronized (outputTracker) {
-      outputTracker.add(path);
-    }
+    outputTracker.add(path);
+
     File f = new CSFile(path);
     File folder = new File(FileUtilities.getDirectoryForFile(f));
     if (!folder.exists()) {

@@ -25,9 +25,11 @@ import org.hl7.fhir.r5.extensions.ExtensionUtilities;
 import org.hl7.fhir.r5.model.ActorDefinition;
 import org.hl7.fhir.r5.model.BooleanType;
 import org.hl7.fhir.r5.model.CanonicalType;
+import org.hl7.fhir.r5.model.CodeableConcept;
 import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.Enumeration;
 import org.hl7.fhir.r5.model.Extension;
+import org.hl7.fhir.r5.model.IdType;
 import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.model.Requirements;
 import org.hl7.fhir.r5.model.StringType;
@@ -165,10 +167,21 @@ class ConformanceStatementHandler {
         String valuesetUrl = param.getValue();
         ValueSet categoriesVs = context.fetchResource(ValueSet.class, valuesetUrl);
         ValueSetExpansionOutcome expansion = context.expandVS(categoriesVs, false, true, 100);
+        loadCategories(expansion.getValueset().getExpansion().getContains());
         for (ValueSetExpansionContainsComponent catCode: expansion.getValueset().getExpansion().getContains()) {
           categories.put(catCode.getCode(), new Coding(catCode.getSystem(), catCode.getCode(), catCode.getDisplay()));
         }
         break;
+      }
+    }
+  }
+  
+  private void loadCategories(List<ValueSetExpansionContainsComponent> contains) {
+    for (ValueSetExpansionContainsComponent cat: contains) {
+      if (!cat.getAbstract())
+        categories.put(cat.getCode(), new Coding(cat.getSystem(), cat.getCode(), cat.getDisplay()));
+      if (cat.hasContains()) {
+        loadCategories(cat.getContains());
       }
     }
   }
@@ -204,6 +217,8 @@ class ConformanceStatementHandler {
   }
 
   public void generateRequirementsInstance(List<ValidationMessage> messages) throws IOException {
+    if (messages.isEmpty())
+      return;
     String reqUrl = this.rootUrl + "Requirements/fromNarrative";
     Requirements req = context.fetchResource(Requirements.class, reqUrl);
     Map<String, Requirements.RequirementsStatementComponent> oldReq = new HashMap<>();
@@ -222,13 +237,6 @@ class ConformanceStatementHandler {
             mismatch = true;
         }
       }
-      req.setActor(new ArrayList<>());
-      for (ActorDefinition actor: usedActors.values()) {
-        CanonicalType actorRef = req.addActorElement();
-        actorRef.setValue(actor.getUrl());
-        actorRef.addExtension(EXT_REQACTORKEY, new StringType(actor.getId()));
-      }
-
       
     } else {
       req = new Requirements();
@@ -239,8 +247,17 @@ class ConformanceStatementHandler {
       req.setStatus(PublicationStatus.ACTIVE);
       req.setExperimental(false);
       req.setDescription(rc.formatPhrase(RenderingContext.CSREQ_DESC));
+      mismatch = true;
     }
     
+    if (mismatch) {
+      req.setActor(new ArrayList<>());
+      for (ActorDefinition actor: usedActors.values()) {
+        CanonicalType actorRef = req.addActorElement();
+        actorRef.setValue(actor.getUrl());
+        actorRef.addExtension(EXT_REQACTORKEY, new IdType(actor.getId()));
+      }
+    }
     
     Map<String, ConformanceClause> primaryClauses = languageClauses.get(defaultLang);
     List<String> keyList = new ArrayList<>();
@@ -282,7 +299,7 @@ class ConformanceStatementHandler {
         mismatch = true;
         newComp.removeExtension(EXT_CSCAT);
         for (Coding category: clause.getCategories()) {
-          newComp.addExtension(EXT_CSCAT, category);
+          newComp.addExtension(EXT_CSCAT, new CodeableConcept().addCoding(category));
         }
       }
       
@@ -304,7 +321,7 @@ class ConformanceStatementHandler {
         mismatch = true;
         newComp.removeExtension(EXT_CSACTOR);
         for (ActorDefinition actor: clause.getActors()) {
-          newComp.addExtension(EXT_CSACTOR, new StringType(actor.getId()));
+          newComp.addExtension(EXT_CSACTOR, new IdType(actor.getId()));
         }
       }
       
@@ -387,7 +404,7 @@ class ConformanceStatementHandler {
   
   private boolean matchCategories(List<Extension> l1, List<Coding> l2) {
     for (int i = 0; i< l1.size(); i++) {
-      Coding l1Cat = l1.get(i).getValueCoding();
+      Coding l1Cat = l1.get(i).getValueCodeableConcept().getCodingFirstRep();
       if (!l1Cat.equalsDeep(l2.get(i)))
         return false;
     }
@@ -526,7 +543,7 @@ class ConformanceStatementHandler {
         }
         
         if (clause.hasSummary()) {
-          tr.td().tx(clause.getSummary());
+          tr.td().markdown(clause.getSummary(), "ConformanceStatementHandler");
         } else {
           tr.td().getChildNodes().addAll(clause.getNode().getChildNodes());
         }

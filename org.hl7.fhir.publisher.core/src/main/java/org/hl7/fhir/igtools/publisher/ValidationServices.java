@@ -98,9 +98,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
   private List<PublisherUtils.LinkedSpecification> linkSpecMaps;
   private IPublisherModule module;
   private static boolean nsFailHasFailed = false; // work around for an THO 6.0.0 problem
-  private Set<String> namingSystemUrls; // cached URL set for resolveURL lookups
-  
-  
+
   public ValidationServices(IWorkerContext context, IGKnowledgeProvider ipg, ImplementationGuide ig, List<FetchedFile> files, List<NpmPackage> packages,
                             boolean bundleReferencesResolve, List<SpecMapManager> specMaps, List<PublisherUtils.LinkedSpecification> linkSpecMaps, IPublisherModule module, List<String> allLangs) {
     super();
@@ -384,29 +382,24 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
         }
       }
     }
-    try {
-      if (namingSystemUrls == null) {
-        namingSystemUrls = new HashSet<>();
-        for (NamingSystem ns : context.fetchResourcesByType(NamingSystem.class)) {
-          for (NamingSystemUniqueIdComponent uid : ns.getUniqueId()) {
-            if (uid.hasValue()) {
-              if (uid.getType() == NamingSystemIdentifierType.URI) {
-                namingSystemUrls.add(uid.getValue());
-              } else if (uid.getType() == NamingSystemIdentifierType.OID) {
-                namingSystemUrls.add("urn:oid:" + uid.getValue());
-              }
+    Set<String> namingSystemUrls = (Set<String>) context.retrieveAnalysis(ValidationServices.class);
+    if (namingSystemUrls == null) {
+      namingSystemUrls = new HashSet<>();
+      for (NamingSystem ns : context.fetchResourcesByType(NamingSystem.class)) {
+        for (NamingSystemUniqueIdComponent uid : ns.getUniqueId()) {
+          if (uid.hasValue()) {
+            if (uid.getType() == NamingSystemIdentifierType.URI) {
+              namingSystemUrls.add(uid.getValue());
+            } else if (uid.getType() == NamingSystemIdentifierType.OID) {
+              namingSystemUrls.add("urn:oid:" + uid.getValue());
             }
           }
         }
       }
-      if (namingSystemUrls.contains(u)) {
-        return true;
-      }
-    } catch (Exception e) {
-      if (!nsFailHasFailed) {
-        e.printStackTrace();
-        nsFailHasFailed  = true;
-      }
+      context.storeAnalysis(ValidationServices.class, namingSystemUrls);
+    }
+    if (namingSystemUrls.contains(u)) {
+      return true;
     }
 
     String base = url.contains("#") ? url.substring(0, url.indexOf("#")) : url;
