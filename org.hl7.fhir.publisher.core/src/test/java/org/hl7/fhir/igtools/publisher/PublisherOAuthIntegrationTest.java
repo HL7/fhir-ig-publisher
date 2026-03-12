@@ -7,7 +7,6 @@ import org.hl7.fhir.utilities.http.HTTPRequest;
 import org.hl7.fhir.utilities.http.HTTPResult;
 import org.hl7.fhir.utilities.http.HTTPTokenManager;
 import org.hl7.fhir.utilities.http.ManagedWebAccess;
-import org.hl7.fhir.utilities.settings.ServerDetailsPOJO;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,14 +14,12 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Integration tests that prove the IG Publisher's OAuth client_credentials
  * CLI parameters work end-to-end: from CLI arg parsing through token
  * acquisition to authenticated FHIR server requests.
- *
- * These tests replicate exactly what Publisher.main() does when it receives
- * -tx-client-id, -tx-client-secret, and -tx-token-endpoint arguments.
  */
 public class PublisherOAuthIntegrationTest {
 
@@ -36,6 +33,7 @@ public class PublisherOAuthIntegrationTest {
     tokenServer.start();
     fhirServer.start();
     HTTPTokenManager.clearCache();
+    ManagedWebAccess.loadFromFHIRSettings();
     ManagedWebAccess.setAccessPolicy(ManagedWebAccess.WebAccessPolicy.DIRECT);
     ManagedWebAccess.setUserAgent("hapi-fhir-tooling-client");
   }
@@ -43,6 +41,7 @@ public class PublisherOAuthIntegrationTest {
   @AfterEach
   void tearDown() throws IOException {
     HTTPTokenManager.clearCache();
+    ManagedWebAccess.loadFromFHIRSettings();
     tokenServer.shutdown();
     fhirServer.shutdown();
   }
@@ -81,18 +80,13 @@ public class PublisherOAuthIntegrationTest {
   // -----------------------------------------------------------------------
   // Test 3: Full Publisher CLI-to-FHIR flow
   //
-  // Replicates what Publisher.main() does:
-  //   1. Parse CLI args for -tx, -tx-client-id, -tx-client-secret, -tx-token-endpoint
-  //   2. Build a ServerDetailsPOJO (same as configureOAuthFromCliParams)
-  //   3. Call ManagedWebAccess.addServerAuthDetail()
-  //   4. Make a FHIR terminology request
-  //   5. Verify the token was fetched and sent as Bearer header
+  // Calls the actual configureOAuthFromCliParams() method, then makes a
+  // FHIR request and verifies the token was fetched and sent as Bearer header.
   // -----------------------------------------------------------------------
   @Test
   public void testFullCliToFhirFlow() throws Exception {
     String txUrl = fhirServer.url("").toString();
 
-    // Simulate CLI args as the user would pass them
     String[] args = {
       "-ig", "ig.ini",
       "-tx", txUrl,
@@ -101,45 +95,27 @@ public class PublisherOAuthIntegrationTest {
       "-tx-token-endpoint", tokenServer.url("/token").toString()
     };
 
-    // Token endpoint returns a valid token
     tokenServer.enqueue(new MockResponse()
       .setBody("{\"access_token\":\"publisher-oauth-token\",\"token_type\":\"Bearer\",\"expires_in\":3600}")
       .addHeader("Content-Type", "application/json")
       .setResponseCode(200));
 
-    // FHIR server returns a ValueSet expansion (typical terminology operation)
     fhirServer.enqueue(new MockResponse()
       .setBody("{\"resourceType\":\"ValueSet\",\"expansion\":{\"total\":42}}")
       .addHeader("Content-Type", "application/fhir+json")
       .setResponseCode(200));
 
-    // --- Replicate exactly what configureOAuthFromCliParams() does ---
-    if (CliParams.hasNamedParam(args, "-tx-token-endpoint")) {
-      String cliTxUrl = CliParams.getNamedParam(args, "-tx");
-      ServerDetailsPOJO oauthServer = ServerDetailsPOJO.builder()
-        .url(cliTxUrl)
-        .type("fhir")
-        .authenticationType("client_credentials")
-        .clientId(CliParams.getNamedParam(args, "-tx-client-id"))
-        .clientSecret(CliParams.getNamedParam(args, "-tx-client-secret"))
-        .tokenEndpoint(CliParams.getNamedParam(args, "-tx-token-endpoint"))
-        .build();
-      ManagedWebAccess.addServerAuthDetail(oauthServer);
-    }
-    // --- End of configureOAuthFromCliParams replication ---
+    Publisher.configureOAuthFromCliParams(args);
 
-    // Make a FHIR request the same way the IG Publisher's terminology client would
     String expandUrl = fhirServer.url("/ValueSet/$expand").toString();
     HTTPResult result = ManagedWebAccess.httpCall(
       new HTTPRequest().withUrl(expandUrl).withMethod(HTTPRequest.HttpMethod.POST)
         .withBody("{\"resourceType\":\"Parameters\"}".getBytes())
         .withContentType("application/fhir+json"));
 
-    // Verify the FHIR response
     assertThat(result.getCode()).isEqualTo(200);
     assertThat(result.getContentAsString()).contains("ValueSet");
 
-    // Verify the token endpoint was called with correct credentials
     RecordedRequest tokenRequest = tokenServer.takeRequest();
     assertThat(tokenRequest.getMethod()).isEqualTo("POST");
     String tokenBody = tokenRequest.getBody().readUtf8();
@@ -147,17 +123,12 @@ public class PublisherOAuthIntegrationTest {
     assertThat(tokenBody).contains("client_id=publisher-client");
     assertThat(tokenBody).contains("client_secret=publisher-secret");
 
-    // Verify the FHIR request carried the Bearer token
     RecordedRequest fhirRequest = fhirServer.takeRequest();
     assertThat(fhirRequest.getHeader("Authorization")).isEqualTo("Bearer publisher-oauth-token");
   }
 
   // -----------------------------------------------------------------------
-  // Test 5: Password masking hides -tx-client-secret in log output
-  //
-  // Verifies that removePassword() masks the secret value when logging
-  // CLI parameters, preventing credentials from appearing in build logs.
-  // Since removePassword is private, we test the same logic directly.
+  // Test 4: Password masking via actual removePassword method
   // -----------------------------------------------------------------------
   @Test
   public void testPasswordMaskingForClientSecret() {
@@ -169,14 +140,12 @@ public class PublisherOAuthIntegrationTest {
       "-tx-token-endpoint", "https://auth.example.org/token"
     };
 
-    // Build the parameter string the same way Publisher.main() does
     StringBuilder s = new StringBuilder("Parameters:");
     for (int i = 0; i < args.length; i++) {
-      s.append(" ").append(maskSecrets(args, i));
+      s.append(" ").append(Publisher.removePassword(args, i));
     }
     String logOutput = s.toString();
 
-    // Secret should be masked
     assertThat(logOutput).doesNotContain("super-secret-value");
     assertThat(logOutput).contains("XXXXXX");
 
@@ -186,17 +155,166 @@ public class PublisherOAuthIntegrationTest {
     assertThat(logOutput).contains("ig.ini");
   }
 
-  /**
-   * Replicates Publisher.removePassword(String[] args, int i) logic.
-   */
-  private static String maskSecrets(String[] args, int i) {
-    if (i == 0) {
-      return args[i];
-    }
-    String prev = args[i - 1].toLowerCase();
-    if (prev.contains("password") || prev.equals("-tx-client-secret")) {
-      return "XXXXXX";
-    }
-    return args[i];
+  // -----------------------------------------------------------------------
+  // Test 5: Missing -tx-client-id throws IllegalArgumentException
+  // -----------------------------------------------------------------------
+  @Test
+  public void testMissingClientIdThrowsException() {
+    String[] args = {
+      "-ig", "ig.ini",
+      "-tx", "https://tx.example.org/fhir",
+      "-tx-client-secret", "my-secret",
+      "-tx-token-endpoint", "https://auth.example.org/token"
+    };
+
+    assertThatThrownBy(() -> Publisher.configureOAuthFromCliParams(args))
+      .isInstanceOf(IllegalArgumentException.class)
+      .hasMessageContaining("-tx-client-id");
+  }
+
+  // -----------------------------------------------------------------------
+  // Test 6: Missing -tx-client-secret throws IllegalArgumentException
+  // -----------------------------------------------------------------------
+  @Test
+  public void testMissingClientSecretThrowsException() {
+    String[] args = {
+      "-ig", "ig.ini",
+      "-tx", "https://tx.example.org/fhir",
+      "-tx-client-id", "my-client",
+      "-tx-token-endpoint", "https://auth.example.org/token"
+    };
+
+    assertThatThrownBy(() -> Publisher.configureOAuthFromCliParams(args))
+      .isInstanceOf(IllegalArgumentException.class)
+      .hasMessageContaining("-tx-client-secret");
+  }
+
+  // -----------------------------------------------------------------------
+  // Test 7: Flag value that looks like another flag throws exception
+  // -----------------------------------------------------------------------
+  @Test
+  public void testFlagAsValueThrowsException() {
+    String[] args = {
+      "-ig", "ig.ini",
+      "-tx", "https://tx.example.org/fhir",
+      "-tx-client-id", "-tx-client-secret",
+      "-tx-client-secret", "my-secret",
+      "-tx-token-endpoint", "https://auth.example.org/token"
+    };
+
+    assertThatThrownBy(() -> Publisher.configureOAuthFromCliParams(args))
+      .isInstanceOf(IllegalArgumentException.class)
+      .hasMessageContaining("looks like a flag name");
+  }
+
+  // -----------------------------------------------------------------------
+  // Test 8: No OAuth args means configureOAuthFromCliParams is a no-op
+  // -----------------------------------------------------------------------
+  @Test
+  public void testNoOAuthArgsIsNoOp() {
+    String[] args = {"-ig", "ig.ini", "-tx", "https://tx.example.org/fhir"};
+
+    Publisher.configureOAuthFromCliParams(args);
+  }
+
+  // -----------------------------------------------------------------------
+  // Test 9: -tx-token-endpoint as last arg with no value throws exception
+  // -----------------------------------------------------------------------
+  @Test
+  public void testTokenEndpointWithNoValueThrowsException() {
+    String[] args = {
+      "-ig", "ig.ini",
+      "-tx", "https://tx.example.org/fhir",
+      "-tx-client-id", "my-client",
+      "-tx-client-secret", "my-secret",
+      "-tx-token-endpoint"
+    };
+
+    assertThatThrownBy(() -> Publisher.configureOAuthFromCliParams(args))
+      .isInstanceOf(IllegalArgumentException.class)
+      .hasMessageContaining("-tx-token-endpoint");
+  }
+
+  // -----------------------------------------------------------------------
+  // Test 10: OAuth without -tx falls back to default TX server
+  // -----------------------------------------------------------------------
+  @Test
+  public void testOAuthWithoutExplicitTxUsesDefault() {
+    String[] args = {
+      "-ig", "ig.ini",
+      "-tx-client-id", "my-client",
+      "-tx-client-secret", "my-secret",
+      "-tx-token-endpoint", "https://auth.example.org/token"
+    };
+
+    // Should not throw -- falls back to FhirSettings.getTxFhirProduction()
+    Publisher.configureOAuthFromCliParams(args);
+  }
+
+  // -----------------------------------------------------------------------
+  // Test 11: -devtx flag is used for TX URL when -tx is absent
+  // -----------------------------------------------------------------------
+  @Test
+  public void testDevTxFallback() {
+    String[] args = {
+      "-ig", "ig.ini",
+      "-devtx",
+      "-tx-client-id", "my-client",
+      "-tx-client-secret", "my-secret",
+      "-tx-token-endpoint", "https://auth.example.org/token"
+    };
+
+    // Should not throw -- falls back to FhirSettings.getTxFhirDevelopment()
+    Publisher.configureOAuthFromCliParams(args);
+  }
+
+  // -----------------------------------------------------------------------
+  // Test 12: Whitespace-only client-id is rejected
+  // -----------------------------------------------------------------------
+  @Test
+  public void testWhitespaceOnlyClientIdThrowsException() {
+    String[] args = {
+      "-tx-client-id", "  ",
+      "-tx-client-secret", "my-secret",
+      "-tx-token-endpoint", "https://auth.example.org/token"
+    };
+
+    assertThatThrownBy(() -> Publisher.configureOAuthFromCliParams(args))
+      .isInstanceOf(IllegalArgumentException.class)
+      .hasMessageContaining("-tx-client-id");
+  }
+
+  // -----------------------------------------------------------------------
+  // Test 13: Malformed token endpoint URL is rejected
+  // -----------------------------------------------------------------------
+  @Test
+  public void testMalformedTokenEndpointThrowsException() {
+    String[] args = {
+      "-tx", "https://tx.example.org/fhir",
+      "-tx-client-id", "my-client",
+      "-tx-client-secret", "my-secret",
+      "-tx-token-endpoint", "not-a-url"
+    };
+
+    assertThatThrownBy(() -> Publisher.configureOAuthFromCliParams(args))
+      .isInstanceOf(IllegalArgumentException.class)
+      .hasMessageContaining("-tx-token-endpoint");
+  }
+
+  // -----------------------------------------------------------------------
+  // Test 14: FTP token endpoint URL is rejected
+  // -----------------------------------------------------------------------
+  @Test
+  public void testNonHttpTokenEndpointThrowsException() {
+    String[] args = {
+      "-tx", "https://tx.example.org/fhir",
+      "-tx-client-id", "my-client",
+      "-tx-client-secret", "my-secret",
+      "-tx-token-endpoint", "ftp://auth.example.org/token"
+    };
+
+    assertThatThrownBy(() -> Publisher.configureOAuthFromCliParams(args))
+      .isInstanceOf(IllegalArgumentException.class)
+      .hasMessageContaining("HTTP(S) URL");
   }
 }
