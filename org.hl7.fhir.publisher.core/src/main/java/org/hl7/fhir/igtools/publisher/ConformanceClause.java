@@ -126,6 +126,7 @@ class ConformanceClause {
           }
         }
       }
+      handler.processConditional(conditional);
     }
     
     private void fixRefs(XhtmlNode node, String fileName) {
