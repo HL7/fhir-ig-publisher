@@ -1723,11 +1723,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 
       String txUrl = CliParams.getNamedParam(args, "-tx");
       if (txUrl == null) {
-        if (CliParams.hasNamedParam(args, "-devtx")) {
-          txUrl = FhirSettings.getTxFhirDevelopment();
-        } else {
-          txUrl = FhirSettings.getTxFhirProduction();
-        }
+        txUrl = FhirSettings.getTxFhirProduction();
       }
       // Normalize URL scheme to match how ManagedWebAccess will make requests
       txUrl = ManagedWebAccess.makeSecureRef(txUrl);

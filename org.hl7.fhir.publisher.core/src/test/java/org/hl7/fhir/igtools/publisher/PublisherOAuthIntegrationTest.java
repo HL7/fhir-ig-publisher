@@ -252,24 +252,7 @@ public class PublisherOAuthIntegrationTest {
   }
 
   // -----------------------------------------------------------------------
-  // Test 11: -devtx flag is used for TX URL when -tx is absent
-  // -----------------------------------------------------------------------
-  @Test
-  public void testDevTxFallback() {
-    String[] args = {
-      "-ig", "ig.ini",
-      "-devtx",
-      "-tx-client-id", "my-client",
-      "-tx-client-secret", "my-secret",
-      "-tx-token-endpoint", "https://auth.example.org/token"
-    };
-
-    // Should not throw -- falls back to FhirSettings.getTxFhirDevelopment()
-    Publisher.configureOAuthFromCliParams(args);
-  }
-
-  // -----------------------------------------------------------------------
-  // Test 12: Whitespace-only client-id is rejected
+  // Test 11: Whitespace-only client-id is rejected
   // -----------------------------------------------------------------------
   @Test
   public void testWhitespaceOnlyClientIdThrowsException() {
