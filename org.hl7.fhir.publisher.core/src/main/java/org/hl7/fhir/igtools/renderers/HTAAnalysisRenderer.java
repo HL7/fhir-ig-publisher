@@ -395,7 +395,7 @@ public class HTAAnalysisRenderer {
   }
 
   private String name(String url) {
-    CodeSystem cs = context.fetchCodeSystem(url);
+    CodeSystem cs = context.fetchCodeSystem(url, IWorkerContext.VersionResolutionRules.defaultRule());
     if (cs != null) {
       return cs.present();
     }

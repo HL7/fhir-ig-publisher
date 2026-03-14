@@ -27,6 +27,7 @@ import org.hl7.fhir.igtools.publisher.modules.xver.SourcedElementDefinition.Elem
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
+import org.hl7.fhir.r5.extensions.ExtensionUtilities;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.model.CanonicalResource;
@@ -715,7 +716,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
 
   private void copyBinding(IWorkerContext defns, ElementDefinition edv, ElementDefinitionBindingComponent binding) {
     if (!binding.isEmpty() && (binding.getStrength() == BindingStrength.EXTENSIBLE || binding.getStrength() == BindingStrength.REQUIRED)) {
-      ValueSet vs = defns.fetchResource(ValueSet.class, binding.getValueSet());
+      ValueSet vs = defns.fetchResource(ValueSet.class, binding.getValueSet(), ExtensionUtilities.getVersionResolutionRules(binding.getValueSetElement()));
       if (vs == null) {
         edv.getBinding().setStrength(binding.getStrength());
         edv.getBinding().setDescription(binding.getDescription());
@@ -737,7 +738,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     }
     for (ConceptSetComponent inc : vs.getCompose().getInclude()) {
       for (CanonicalType ct : inc.getValueSet()) {
-        ValueSet ivs = defns.fetchResource(ValueSet.class, ct.asStringValue());
+        ValueSet ivs = defns.fetchResource(ValueSet.class, ct.asStringValue(), ExtensionUtilities.getVersionResolutionRules(ct));
         if (ivs != null) {
           ct.setValue(importValueSet(defns, ivs));
         }
@@ -2583,7 +2584,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   private VSPair isCoded(ElementWithType et, String version) {
     IWorkerContext vd = et.getDef();
     if (et.getEd().getBinding().getStrength() == BindingStrength.REQUIRED || et.getEd().getBinding().getStrength() == BindingStrength.EXTENSIBLE) {
-      ValueSet vs = vd.fetchResource(ValueSet.class, et.getEd().getBinding().getValueSet());
+      ValueSet vs = vd.fetchResource(ValueSet.class, et.getEd().getBinding().getValueSet(), ExtensionUtilities.getVersionResolutionRules(et.getEd().getBinding().getValueSetElement()));
       if (vs != null && vs.getCompose().getInclude().size() == 1) {
         ValueSetExpansionOutcome vse = vd.expandVS(vs, logStarted, false);
         if (vse.getValueset() != null) {
@@ -2603,7 +2604,8 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     String v = VersionUtilities.getNameForVersion(pair.getVer()).toLowerCase();
     IWorkerContext vd = versions.get(v);
     if (pair.getEd().getBinding().getStrength() == BindingStrength.REQUIRED || pair.getEd().getBinding().getStrength() == BindingStrength.EXTENSIBLE) {
-      ValueSet vs = vd.fetchResource(ValueSet.class, pair.getEd().getBinding().getValueSet());
+      ValueSet vs = vd.fetchResource(ValueSet.class, pair.getEd().getBinding().getValueSet(),
+              ExtensionUtilities.getVersionResolutionRules(pair.getEd().getBinding().getValueSetElement()));
       if (vs != null) {
         ValueSetExpansionOutcome vse = vd.expandVS(vs, logStarted, false);
         if (vse.getValueset() != null) {
@@ -3103,7 +3105,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
         StructureDefinition sd = vd.fetchTypeDefinition(name);
         if (sd != null) {
           ElementDefinition ed = sd.getDifferential().getElementByPath(ep);
-          return processVS(vd, ed.getBinding().getValueSet());
+          return processVS(vd, ed.getBinding().getValueSetElement());
         }
       } else if (uri.endsWith("/ValueSet/resource-types")) {
         return listResources(vd.fetchResourcesByType(StructureDefinition.class), VersionUtilities.getMajMin(vd.getVersion()));
@@ -3138,8 +3140,8 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     return list;
   }
 
-  private List<Coding> processVS(IWorkerContext vd, String url) {
-    ValueSet vs = vd.fetchResource(ValueSet.class, url);
+  private List<Coding> processVS(IWorkerContext vd, UriType url) {
+    ValueSet vs = vd.fetchResource(ValueSet.class, url.primitiveValue(), ExtensionUtilities.getVersionResolutionRules(url));
     if (vs != null && vs.hasCompose() && !vs.getCompose().hasExclude()) {
       List<Coding> list = new ArrayList<>();
       for (ConceptSetComponent inc : vs.getCompose().getInclude()) {
@@ -3153,7 +3155,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
             list.add(new Coding().setSystem(system).setCode(cc.getCode()).setDisplay(cc.getDisplay()+" ("+vn+")"));
           }
         } else {
-          CodeSystem cs = vd.fetchResource(CodeSystem.class, inc.getSystem());
+          CodeSystem cs = vd.fetchResource(CodeSystem.class, inc.getSystem(), ExtensionUtilities.getVersionResolutionRules(inc));
           if (cs == null) {
             return null;
           } else {

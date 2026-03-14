@@ -35,6 +35,7 @@ import org.hl7.fhir.r5.comparison.VersionComparisonAnnotation;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
+import org.hl7.fhir.r5.extensions.ExtensionUtilities;
 import org.hl7.fhir.r5.model.*;
 import org.hl7.fhir.r5.model.Enumerations.CodeSystemContentMode;
 import org.hl7.fhir.r5.model.NamingSystem.NamingSystemUniqueIdComponent;
@@ -77,7 +78,7 @@ public class CodeSystemRenderer extends CanonicalRenderer {
     }
     if (hasSummaryRow(rows, "cs.vs")) {
       if (cs.hasValueSet()) {
-        ValueSet vs = context.findTxResource(ValueSet.class, cs.getValueSet());
+        ValueSet vs = context.findTxResource(ValueSet.class, cs.getValueSet(), ExtensionUtilities.getVersionResolutionRules(cs.getValueSetElement()));
         if (vs == null) {
           b.append(" <tr><td>" + (gen.formatPhrase(RenderingContext.GENERAL_VALUESET)) + ":</td><td>" + cs.getValueSet() + " (" + (" " + gen.formatPhrase(RenderingContext.CODE_SYS_THE_VALUE_SET)) + ")</td></tr>\r\n");
         } else {
@@ -98,14 +99,14 @@ public class CodeSystemRenderer extends CanonicalRenderer {
       case FRAGMENT:
         return (gen.formatPhrase(RenderingContext.CODE_SYS_FRAGMENT));
       case SUPPLEMENT:
-        return (gen.formatPhrase(RenderingContext.CODE_SYS_SUPPLEMENT) + " ") + refCS(cs.getSupplements());
+        return (gen.formatPhrase(RenderingContext.CODE_SYS_SUPPLEMENT) + " ") + refCS(cs.getSupplementsElement());
       default:
         return "?? illegal content status value " + (content == null ? "(null)" : content.toCode());
     }
   }
 
-  private String refCS(String supplements) {
-    CodeSystem tgt = context.fetchCodeSystem(supplements);
+  private String refCS(UriType supplements) {
+    CodeSystem tgt = context.fetchCodeSystem(supplements.primitiveValue(), ExtensionUtilities.getVersionResolutionRules(supplements));
     if (tgt != null) {
       return "<a href=\"" + tgt.getWebPath() + "\"><code>" + supplements + "</code></a>";
     } else {
@@ -184,7 +185,7 @@ public class CodeSystemRenderer extends CanonicalRenderer {
 
     Set<String> processed = new HashSet<String>();
     for (String url : vsurls) {
-      ValueSet vc = context.findTxResource(ValueSet.class, url);
+      ValueSet vc = context.findTxResource(ValueSet.class, url, IWorkerContext.VersionResolutionRules.defaultRule());
       if (cs.getContent() != CodeSystemContentMode.SUPPLEMENT) {
         for (ConceptSetComponent ed : vc.getCompose().getInclude()) {
           first = addLink(b, first, vc, ed, processed);

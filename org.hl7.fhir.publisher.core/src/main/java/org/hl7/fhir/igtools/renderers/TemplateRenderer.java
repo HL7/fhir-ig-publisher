@@ -1,5 +1,6 @@
 package org.hl7.fhir.igtools.renderers;
 
+import org.hl7.fhir.r5.extensions.ExtensionUtilities;
 import org.hl7.fhir.r5.formats.IParser;
 import org.hl7.fhir.r5.formats.XmlParser;
 import org.hl7.fhir.r5.model.*;
@@ -52,7 +53,7 @@ public class TemplateRenderer {
       return specPath("terminologies.html#unbound");
     if (bs.getValueSet() == null)
       return specPath("terminologies.html#unbound");
-    ValueSet vs = context.getContext().findTxResource(ValueSet.class, bs.getValueSet());
+    ValueSet vs = context.getContext().findTxResource(ValueSet.class, bs.getValueSet(), ExtensionUtilities.getVersionResolutionRules(bs.getValueSetElement()));
     if (vs == null) {
       return bs.getValueSet();
     } else {
@@ -140,7 +141,7 @@ public class TemplateRenderer {
       if ("DomainResource".equals(t.getType())) {
         return true;
       }
-      t = context.getContext().fetchResource(StructureDefinition.class, t.getBaseDefinition());
+      t = context.getContext().fetchResource(StructureDefinition.class, t.getBaseDefinition(), ExtensionUtilities.getVersionResolutionRules(t.getBaseDefinitionElement()));
     }
     return false;
   }
@@ -412,7 +413,7 @@ public class TemplateRenderer {
         boolean firstp = true;
         List<StructureDefinition> ap = new ArrayList<>();
         for (CanonicalType p : t.getTargetProfile()) {
-          StructureDefinition sdt = context.getContext().fetchResource(StructureDefinition.class, p.primitiveValue());
+          StructureDefinition sdt = context.getContext().fetchResource(StructureDefinition.class, p.primitiveValue(), ExtensionUtilities.getVersionResolutionRules(p));
           if (sdt != null) {
             ap.add(sdt);
           }
@@ -630,7 +631,7 @@ public class TemplateRenderer {
         boolean first = true;
         for (CanonicalType p : type.getTargetProfile()) {
           if (first) first = false; else b.append("|");
-          StructureDefinition sdt = context.getContext().fetchResource(StructureDefinition.class, p.primitiveValue());
+          StructureDefinition sdt = context.getContext().fetchResource(StructureDefinition.class, p.primitiveValue(), ExtensionUtilities.getVersionResolutionRules(p));
           if (sdt != null) {
             b.append("<a href=\"" + sdt.getWebPath() + "\">" + sdt.getType() + "</a>");
           }
@@ -735,7 +736,7 @@ public class TemplateRenderer {
       boolean firstp = true;
       List<StructureDefinition> ap = new ArrayList<>();
       for (CanonicalType p : t.getTargetProfile()) {
-        StructureDefinition sdt = context.getContext().fetchResource(StructureDefinition.class, p.primitiveValue());
+        StructureDefinition sdt = context.getContext().fetchResource(StructureDefinition.class, p.primitiveValue(), ExtensionUtilities.getVersionResolutionRules(p));
         if (sdt != null) {
           ap.add(sdt);
         }
@@ -921,7 +922,7 @@ public class TemplateRenderer {
       boolean firstp = true;
       List<StructureDefinition> ap = new ArrayList<>();
       for (CanonicalType p : t.getTargetProfile()) {
-        StructureDefinition sd = context.getContext().fetchResource(StructureDefinition.class, p.primitiveValue());
+        StructureDefinition sd = context.getContext().fetchResource(StructureDefinition.class, p.primitiveValue(), ExtensionUtilities.getVersionResolutionRules(p));
         if (sd != null) {
           ap.add(sd);
         }

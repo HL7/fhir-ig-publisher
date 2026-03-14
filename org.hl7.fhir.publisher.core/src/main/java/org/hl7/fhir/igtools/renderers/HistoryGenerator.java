@@ -11,6 +11,7 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
 import org.hl7.fhir.igtools.publisher.ProvenanceDetails;
 import org.hl7.fhir.igtools.publisher.ProvenanceDetails.ProvenanceDetailsTarget;
+import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.model.Bundle;
 import org.hl7.fhir.r5.model.Bundle.BundleEntryComponent;
@@ -71,7 +72,7 @@ public class HistoryGenerator {
       tr.td().b().tx("Date");
       tr.td().b().tx("Action");
       for (Coding c : actorTypes) {
-        CodeSystem cs = context.getWorker().fetchCodeSystem(c.getSystem());
+        CodeSystem cs = context.getWorker().fetchCodeSystem(c.getSystem(), IWorkerContext.VersionResolutionRules.defaultRule());
         XhtmlNode td = tr.td().b(); 
         if (cs != null && cs.hasWebPath()) {
           ConceptDefinitionComponent cd = CodeSystemUtilities.getCode(cs, c.getCode());
@@ -101,7 +102,7 @@ public class HistoryGenerator {
         
 
         XhtmlNode td = tr.td(); 
-        CodeSystem cs = context.getWorker().fetchCodeSystem(pd.getAction().getSystem());
+        CodeSystem cs = context.getWorker().fetchCodeSystem(pd.getAction().getSystem(), IWorkerContext.VersionResolutionRules.defaultRule());
         if (cs != null && cs.hasWebPath()) {
           ConceptDefinitionComponent cd = CodeSystemUtilities.getCode(cs, pd.getAction().getCode());
           td.ah(cs.getWebPath()+"#"+cs.getId()+"-"+pd.getAction().getCode()).tx(cd != null ? cd.getDisplay() : pd.getAction().getCode());

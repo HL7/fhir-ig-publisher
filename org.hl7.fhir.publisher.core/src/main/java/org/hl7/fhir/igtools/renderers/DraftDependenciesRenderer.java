@@ -9,6 +9,7 @@ import java.util.Set;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
+import org.hl7.fhir.r5.extensions.ExtensionUtilities;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
 import org.hl7.fhir.r5.model.Resource;
@@ -63,17 +64,18 @@ public class DraftDependenciesRenderer implements IElementVisitor {
       scanReferences(resource, child);
     }
     if (element.fhirType().equals("Coding")) {
-      checkReference(resource, element.getNamedChildValue("system"));
+      checkReference(resource, element.getNamedChild("system"));
     } else if (element.fhirType().equals("Extension")) {
-      checkReference(resource, element.getNamedChildValue("url"));
+      checkReference(resource, element.getNamedChild("url"));
     } else if (element.fhirType().equals("Reference")) {
-      checkReference(resource, element.getNamedChildValue("reference"));
+      checkReference(resource, element.getNamedChild("reference"));
     } else if (element.fhirType().equals("canonical")) {
-      checkReference(resource, element.primitiveValue());
+      checkReference(resource, element);
     } 
   }
 
-  private void checkReference(FetchedResource resource, String url) {
+  private void checkReference(FetchedResource resource, Element urlE) {
+    String url = urlE.primitiveValue();
     if (url == null) {
       return;
     }
@@ -81,7 +83,28 @@ public class DraftDependenciesRenderer implements IElementVisitor {
       url = url.substring(0, url.indexOf("#"));
     }
     if (Utilities.isAbsoluteUrl(url)) {
-      CanonicalResource tgt = (CanonicalResource) context.fetchResource(Resource.class, url);
+      CanonicalResource tgt = (CanonicalResource) context.fetchResource(Resource.class, url, ExtensionUtilities.getVersionResolutionRules(urlE));
+      if (tgt != null && tgt.hasSourcePackage() && !thisPackage.equals(tgt.getSourcePackage().getVID())) {
+        if (tgt.getStatus() == PublicationStatus.DRAFT || tgt.getExperimental()) {
+          DraftReference dr = new DraftReference(resource, url, tgt);
+          if (!alreadyExists(dr)) {
+            draftRefs.add(dr);
+          }
+        }
+      }
+    }
+  }
+
+  private void checkReference(FetchedResource resource, org.hl7.fhir.r5.model.Element urlE) {
+    String url = urlE.primitiveValue();
+    if (url == null) {
+      return;
+    }
+    if (url.contains("#")) {
+      url = url.substring(0, url.indexOf("#"));
+    }
+    if (Utilities.isAbsoluteUrl(url)) {
+      CanonicalResource tgt = (CanonicalResource) context.fetchResource(Resource.class, url, ExtensionUtilities.getVersionResolutionRules(urlE));
       if (tgt != null && tgt.hasSourcePackage() && !thisPackage.equals(tgt.getSourcePackage().getVID())) {
         if (tgt.getStatus() == PublicationStatus.DRAFT || tgt.getExperimental()) {
           DraftReference dr = new DraftReference(resource, url, tgt);
@@ -112,7 +135,7 @@ public class DraftDependenciesRenderer implements IElementVisitor {
   @Override
   public ElementVisitorInstruction visit(Object context, org.hl7.fhir.r5.model.Element element) {
     if (element.isPrimitive()) {
-      checkReference((FetchedResource) context, element.primitiveValue());
+      checkReference((FetchedResource) context, element);
     }
     return ElementVisitorInstruction.VISIT_CHILDREN;
   }

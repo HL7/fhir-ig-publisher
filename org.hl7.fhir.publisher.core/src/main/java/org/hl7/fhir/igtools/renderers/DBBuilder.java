@@ -975,7 +975,7 @@ public class DBBuilder {
           if (!Utilities.noString(s)) {
             switch (col.getType()) {
             case Auto: 
-              Resource r = context.fetchResource(Resource.class, s);
+              Resource r = context.fetchResource(Resource.class, s, IWorkerContext.VersionResolutionRules.defaultRule());
               if (r != null && r instanceof CanonicalResource && r.hasWebPath()) {
                 String d = ((CanonicalResource) r).present();
                 if (Utilities.noString(d)) {
@@ -991,7 +991,7 @@ public class DBBuilder {
               }
               break;
             case Canonical:
-              r = context.fetchResource(Resource.class, s);
+              r = context.fetchResource(Resource.class, s, IWorkerContext.VersionResolutionRules.defaultRule());
               if (r != null && r instanceof CanonicalResource && r.hasWebPath()) {
                 String d = ((CanonicalResource) r).present();
                 if (Utilities.noString(d)) {
@@ -1035,7 +1035,7 @@ public class DBBuilder {
               td.tx(s);
               break;
             case Resource:
-              r = context.fetchResource(Resource.class, s);
+              r = context.fetchResource(Resource.class, s, IWorkerContext.VersionResolutionRules.defaultRule());
               if (r != null && r instanceof CanonicalResource && r.hasWebPath()) {
                 String d = ((CanonicalResource) r).present();
                 if (Utilities.noString(d)) {

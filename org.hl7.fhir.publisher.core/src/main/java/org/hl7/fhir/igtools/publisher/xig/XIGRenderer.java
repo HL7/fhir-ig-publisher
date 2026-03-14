@@ -13,15 +13,12 @@ import org.hl7.fhir.r5.conformance.profile.ProfileKnowledgeProvider;
 import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
 import org.hl7.fhir.r5.formats.JsonParser;
-import org.hl7.fhir.r5.model.CanonicalResource;
+import org.hl7.fhir.r5.model.*;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
 import org.hl7.fhir.r5.model.Enumerations.CapabilityStatementKind;
 import org.hl7.fhir.r5.model.Enumerations.CodeSystemContentMode;
 import org.hl7.fhir.r5.model.NamingSystem.NamingSystemType;
-import org.hl7.fhir.r5.model.Resource;
-import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
-import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.renderers.RendererFactory;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
@@ -364,12 +361,12 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
 
   @Override
   public BindingResolution resolveBinding(StructureDefinition def, ElementDefinitionBindingComponent binding, String path) throws FHIRException {
-    return resolveBinding(def, binding.getValueSet(), path);
+    return resolveBinding(def, binding.getValueSet(), path, binding.getValueSetElement());
   }
 
 
   @Override
-  public BindingResolution resolveBinding(StructureDefinition def, String url, String path) throws FHIRException {
+  public BindingResolution resolveBinding(StructureDefinition def, String url, String path, Element ctxt) throws FHIRException {
     ValueSet vs = info.getCtxt().fetchResource(ValueSet.class, url);
     if (vs != null) {
       return new BindingResolution(vs.present(), vs.getUserData("filebase")+".html");
