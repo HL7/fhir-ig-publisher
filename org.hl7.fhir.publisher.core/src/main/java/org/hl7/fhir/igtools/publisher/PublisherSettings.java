@@ -37,4 +37,5 @@ public class PublisherSettings {
     @Getter @Setter private boolean milestoneBuild;
     @Getter private final List<String> noNarratives = new ArrayList<String>();
     @Getter private final List<String> noValidate = new ArrayList<String>();
+    @Getter @Setter String jekyllCommand = "jekyll";
 }
