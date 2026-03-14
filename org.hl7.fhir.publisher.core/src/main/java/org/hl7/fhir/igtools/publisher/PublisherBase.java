@@ -764,14 +764,20 @@ public class PublisherBase implements ILoggingService {
   }
 
   protected boolean checkCanonicalsForVersions(FetchedFile f, CanonicalResource bc, boolean snapshotMode) {
+    boolean changed = false;
+    DataTypeVisitor dv = new DataTypeVisitor();
+    dv.visit(bc, new PublisherBase.CanonicalVisitorLatest<CanonicalType>(f, snapshotMode));
+    if (bc instanceof ValueSet) {
+      changed = checkValueSetVersionsLatest(f, (ValueSet) bc);
+    }
+    changed = dv.isAnyTrue() || changed;
+
     if (this.pf.pinningPolicy == PublisherUtils.PinningPolicy.NO_ACTION) {
-      return false;
+      return changed;
 //    } else if ("ImplementationGuide".equals(bc.fhirType())) {
 //      return false;
     } else {
-      DataTypeVisitor dv = new DataTypeVisitor();
       dv.visit(bc, new PublisherBase.CanonicalVisitor<CanonicalType>(f, snapshotMode));
-      boolean changed = false;
       if (bc instanceof ValueSet) {
         changed = checkValueSetVersions(f, (ValueSet) bc);
       }
@@ -840,6 +846,33 @@ public class PublisherBase implements ILoggingService {
         }
       }
     }
+  }
+
+  private boolean checkValueSetVersionsLatest(FetchedFile f, ValueSet vs) {
+    boolean changed = false;
+    int i = 0;
+    for (ValueSet.ConceptSetComponent inc : vs.getCompose().getInclude()) {
+      changed = checkValueSetVersions(f, inc, "ValueSet.compose.include["+i+"]") || changed;
+      i++;
+    }
+    for (ValueSet.ConceptSetComponent inc : vs.getCompose().getExclude()) {
+      changed = checkValueSetVersionsLatest(f, inc, "ValueSet.compose.exclude["+i+"]") || changed;
+    }
+    return changed;
+  }
+
+  private boolean checkValueSetVersionsLatest(FetchedFile f, ValueSet.ConceptSetComponent inc, String path) {
+    String url = inc.getSystem();
+    String version = inc.getVersion();
+    if (version == null) {
+      return false;
+    }
+    if (version.equals("*")) {
+      inc.setVersion(null);
+      inc.addExtension(ExtensionDefinitions.CANONICAL_RESOLUTION_METHOD, new CodeType("latest"));
+      return true;
+    }
+    return false;
   }
 
   protected void generateSnapshots() throws Exception {
@@ -946,16 +979,6 @@ public class PublisherBase implements ILoggingService {
       }
     }
     return false;
-  }
-
-  public void setJekyllCommand(String theJekyllCommand) {
-    if (!Utilities.noString(theJekyllCommand)) {
-      this.pf.jekyllCommand = theJekyllCommand;
-    }
-  }
-
-  public String getJekyllCommand() {
-    return this.pf.jekyllCommand;
   }
 
   protected boolean forHL7orFHIR() {
@@ -1258,7 +1281,7 @@ public class PublisherBase implements ILoggingService {
       ImplementationGuide ig = (ImplementationGuide) res;
       ig.getFhirVersion().clear();
       ig.getFhirVersion().add(new Enumeration<>(new Enumerations.FHIRVersionEnumFactory(), pf.version));
-      ig.setPackageId(pf.publishedIg.getPackageId()+"."+v);
+      ig.setPackageId(pf.packageId()+"."+v);
     }
     if (res instanceof StructureDefinition) {
       StructureDefinition sd = (StructureDefinition) res;
@@ -1336,6 +1359,9 @@ public class PublisherBase implements ILoggingService {
       if (url.contains("|")) {
         return false;
       }
+      if (ct.hasExtension(ExtensionDefinitions.CANONICAL_RESOLUTION_METHOD)) {
+        return false;
+      }
       CanonicalResource tgt = (CanonicalResource) PublisherBase.this.pf.context.fetchResourceRaw(Resource.class, url);
       if (tgt instanceof CodeSystem) {
         CodeSystem cs = (CodeSystem) tgt;
@@ -1385,6 +1411,43 @@ public class PublisherBase implements ILoggingService {
           }
         }
       }
+    }
+
+  }
+
+  public class CanonicalVisitorLatest<T> implements DataTypeVisitor.IDatatypeVisitor {
+    private FetchedFile f;
+    private boolean snapshotMode;
+
+    public CanonicalVisitorLatest(FetchedFile f, boolean snapshotMode) {
+      super();
+      this.f = f;
+      this.snapshotMode = snapshotMode;
+    }
+
+    @Override
+    public Class classT() {
+      return CanonicalType.class;
+    }
+
+    @Override
+    public boolean visit(String path, DataType node) {
+      CanonicalType ct = (CanonicalType) node;
+      String url = ct.asStringValue();
+
+      if (url == null) {
+        return false;
+      }
+      if (ct.hasExtension(ExtensionDefinitions.CANONICAL_RESOLUTION_METHOD)) {
+        return false;
+      }
+      if (url.endsWith("|*")) {
+        ct.setValue(url.substring(0, url.length()-2));
+        ct.addExtension(ExtensionDefinitions.CANONICAL_RESOLUTION_METHOD, new CodeType("latest"));
+        return true;
+      }
+      return false;
+
     }
 
   }
