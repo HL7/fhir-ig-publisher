@@ -343,7 +343,7 @@ public class PublisherProcessor extends PublisherBase  {
         }
       }
       if (inc.hasSystem()) {
-        CodeSystem cs = pf.context.fetchResource(CodeSystem.class, inc.getSystem(), inc.getVersion());
+        CodeSystem cs = pf.context.fetchResource(CodeSystem.class, inc.getSystem(),  ExtensionUtilities.getVersionResolutionRules(inc), inc.getVersion());
         if (cs != null) {
           checkForCoreDependenciesCS(npm, tctxt, cs, tnpm);
         }
@@ -640,7 +640,7 @@ public class PublisherProcessor extends PublisherBase  {
           ig = assignments.getJsonObject(pf.oidRoot).asString("id");
         }
         for (JsonProperty p : assignments.getProperties()) {
-          if (p.getValue().isJsonObject() && pf.sourceIg.getPackageId().equals(p.getValue().asJsonObject().asString("id"))) {
+          if (p.getValue().isJsonObject() && pf.packageId().equals(p.getValue().asJsonObject().asString("id"))) {
             oid = p.getName();
           }
         }
@@ -648,7 +648,7 @@ public class PublisherProcessor extends PublisherBase  {
           pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE, "ImplementationGuide", "The assigned auto-oid-root value '"+ pf.oidRoot +"' is not registered in https://github.com/FHIR/ig-registry/blob/master/oid-assignments.json so isn't known to be valid", ValidationMessage.IssueSeverity.WARNING));
         } else if (oid != null && !oid.equals(pf.oidRoot)) {
           throw new FHIRException("The assigned auto-oid-root value '"+ pf.oidRoot +"' does not match the value of '"+ pf.oidRoot +"' registered in https://github.com/FHIR/ig-registry/blob/master/oid-assignments.json so cannot proceed");
-        } else if (ig != null && !ig.equals(pf.sourceIg.getPackageId())) {
+        } else if (ig != null && !ig.equals(pf.packageId())) {
           throw new FHIRException("The assigned auto-oid-root value '"+ pf.oidRoot +"' is already registered to the IG '"+ig+"' in https://github.com/FHIR/ig-registry/blob/master/oid-assignments.json so cannot proceed");
         }
       } catch (Exception e) {
@@ -1223,7 +1223,7 @@ public class PublisherProcessor extends PublisherBase  {
                 r.getElement().removeChild("text");
               } else {
                 List<Locale> langs = translationLocales();
-                logDebugMessage(LogCategory.PROGRESS, "narrative for "+f.getName()+" : "+r.getId());
+                logDebugMessage(LogCategory.PROGRESS, "generate narrative for "+f.getLoadPath()+" : "+r.getId());
                 if (r.getResource() != null && r.getResource() instanceof DomainResource && isConvertableResource(r.getResource().fhirType())) {
                   boolean regen = false;
                   boolean first = true;
@@ -1444,7 +1444,7 @@ public class PublisherProcessor extends PublisherBase  {
       }
     }
     TimeTracker.Session tts = pf.tt.start("realm-rules");
-    if (!pf.realmRules.isExempt(pf.publishedIg.getPackageId())) {
+    if (!pf.realmRules.isExempt(pf.packageId())) {
       log("Check realm rules");
       pf.realmRules.startChecks(pf.publishedIg);
       for (FetchedFile f : pf.changeList) {

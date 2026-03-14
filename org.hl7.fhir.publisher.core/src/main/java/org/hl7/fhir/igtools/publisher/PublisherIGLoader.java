@@ -269,7 +269,7 @@ public class PublisherIGLoader extends PublisherBase {
     } catch (Exception e) {
       throw new Exception("Error Parsing File "+ pf.igName +": "+e.getMessage(), e);
     }
-    pf.template = pf.templateManager.loadTemplate(templateName, pf.rootDir, pf.sourceIg.getPackageId(), settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD, pf.logOptions.contains("template"), settings.isRapidoMode());
+    pf.template = pf.templateManager.loadTemplate(templateName, pf.rootDir, pf.packageId(), settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD, pf.logOptions.contains("template"), settings.isRapidoMode());
     if (pf.template.hasExtraTemplates()) {
       processExtraTemplates(pf.template.getExtraTemplates());
     }
@@ -965,7 +965,7 @@ public class PublisherIGLoader extends PublisherBase {
     pf.fetcher.setContext(pf.context);
     pf.template.loadSummaryRows(pf.igpkp.summaryRows());
 
-    if (VersionUtilities.isR4Plus(pf.version) && !dependsOnExtensions(pf.sourceIg.getDependsOn()) && !pf.sourceIg.getPackageId().contains("hl7.fhir.uv.extensions")) {
+    if (VersionUtilities.isR4Plus(pf.version) && !dependsOnExtensions(pf.sourceIg.getDependsOn()) && !pf.packageId().contains("hl7.fhir.uv.extensions")) {
       ImplementationGuide.ImplementationGuideDependsOnComponent dep = new ImplementationGuide.ImplementationGuideDependsOnComponent();
       dep.setUserData(UserDataNames.pub_no_load_deps, "true");
       dep.setId("hl7ext");
@@ -975,7 +975,7 @@ public class PublisherIGLoader extends PublisherBase {
       dep.addExtension(ExtensionDefinitions.EXT_IGDEP_COMMENT, new MarkdownType("Automatically added as a dependency - all IGs depend on the HL7 Extension Pack"));
       pf.sourceIg.getDependsOn().add(0, dep);
     }
-    if (!dependsOnUTG(pf.sourceIg.getDependsOn()) && !pf.sourceIg.getPackageId().contains("hl7.terminology")) {
+    if (!dependsOnUTG(pf.sourceIg.getDependsOn()) && !pf.packageId().contains("hl7.terminology")) {
       ImplementationGuide.ImplementationGuideDependsOnComponent dep = new ImplementationGuide.ImplementationGuideDependsOnComponent();
       dep.setUserData(UserDataNames.pub_no_load_deps, "true");
       dep.setId("hl7tx");
@@ -985,7 +985,7 @@ public class PublisherIGLoader extends PublisherBase {
       dep.addExtension(ExtensionDefinitions.EXT_IGDEP_COMMENT, new MarkdownType("Automatically added as a dependency - all IGs depend on HL7 Terminology"));
       pf.sourceIg.getDependsOn().add(0, dep);
     }
-    if (!"hl7.fhir.uv.tools".equals(pf.sourceIg.getPackageId()) && !dependsOnTooling(pf.sourceIg.getDependsOn())) {
+    if (!pf.packageId().contains("hl7.fhir.uv.tools") && !dependsOnTooling(pf.sourceIg.getDependsOn())) {
       String toolingPackageName = getToolingPackageName();
       String toolingPackageId = toolingPackageName +"#"+TOOLING_IG_CURRENT_RELEASE;
       boolean toolsExists = false;
@@ -1001,7 +1001,7 @@ public class PublisherIGLoader extends PublisherBase {
       }
     }
 
-    pf.inspector = new HTMLInspector(pf.context, pf.outputDir, pf.specMaps, pf.linkSpecMaps, this, pf.igpkp.getCanonical(), pf.sourceIg.getPackageId(), pf.sourceIg.getVersion(),
+    pf.inspector = new HTMLInspector(pf.context, pf.outputDir, pf.specMaps, pf.linkSpecMaps, this, pf.igpkp.getCanonical(), pf.packageId(), pf.sourceIg.getVersion(),
             pf.trackedFragments, pf.fileList, pf.module, settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD || settings.getMode() == PublisherUtils.IGBuildMode.WEBSERVER, settings.isTrackFragments() ? pf.fragmentUses : null, pf.relatedIGs, noCIBuildIssues, allLangs());
     pf.inspector.getManual().add("full-ig.zip");
     if (pf.historyPage != null) {
@@ -1030,12 +1030,12 @@ public class PublisherIGLoader extends PublisherBase {
       loadIg(dep, i, !dep.hasUserData(UserDataNames.pub_no_load_deps), false);
       i++;
     }
-    if (!"hl7.fhir.uv.tools".equals(pf.sourceIg.getPackageId()) && !dependsOnTooling(pf.sourceIg.getDependsOn())) {
+    if (!pf.packageId().contains("hl7.fhir.uv.tools") && !dependsOnTooling(pf.sourceIg.getDependsOn())) {
       loadIg("igtools", getToolingPackageName(), TOOLING_IG_CURRENT_RELEASE, "http://hl7.org/fhir/tools/ImplementationGuide/hl7.fhir.uv.tools", i, false, true);
     }
     for (Extension ig : pf.sourceIg.getDefinition().getExtensionsByUrl(ExtensionConstants.EXT_IGINTERNAL_DEPENDENCY)) {
       String pid = ig.getValue().primitiveValue();
-      if (!pid.startsWith("hl7.fhir.uv.tools") && pid.contains("#")) {
+      if (!pid.contains("hl7.fhir.uv.tools") && pid.contains("#")) {
         loadIg("igtools", pid.substring(0, pid.indexOf("#")), pid.substring(pid.indexOf("#")+1), null, i, true, true);
       }
     }
@@ -1121,7 +1121,7 @@ public class PublisherIGLoader extends PublisherBase {
 
     if (pf.sourceIg.hasLicense())
       pf.license = pf.sourceIg.getLicense().toCode();
-    pf.npmName = pf.sourceIg.getPackageId();
+    pf.npmName = pf.packageId();
     if (Utilities.noString(pf.npmName)) {
       throw new Error("No packageId provided in the implementation guide resource - cannot build this IG");
     }
@@ -1966,7 +1966,7 @@ public class PublisherIGLoader extends PublisherBase {
     igr.setId(pf.sourceIg.getId()).setTitle(pf.publishedIg.getName());
     Locale locale = inferDefaultNarrativeLang(true);
     pf.context.setLocale(locale);
-    pf.dependentIgFinder = new DependentIGFinder(pf.sourceIg.getPackageId());
+    pf.dependentIgFinder = new DependentIGFinder(pf.packageId());
 
     for (ImplementationGuide.ImplementationGuideDependsOnComponent dep : pf.publishedIg.getDependsOn()) {
       if (dep.hasPackageId() && dep.getPackageId().contains("@npm:")) {
@@ -2026,10 +2026,10 @@ public class PublisherIGLoader extends PublisherBase {
     } else if (!id.equals(pf.publishedIg.getId()))
       pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE, "ImplementationGuide.id", "The Implementation Guide Resource id should be "+id, ValidationMessage.IssueSeverity.WARNING));
 
-    pf.packageInfo = new PackageInformation(pf.publishedIg.getPackageId(), pf.publishedIg.getVersion(), pf.context.getVersion(), new Date(), pf.publishedIg.getName(), pf.igpkp.getCanonical(), settings.getTargetOutput());
+    pf.packageInfo = new PackageInformation(pf.packageId(), pf.publishedIg.getVersion(), pf.context.getVersion(), new Date(), pf.publishedIg.getName(), pf.igpkp.getCanonical(), settings.getTargetOutput());
 
     // Cql Compile
-    pf.cql = new CqlSubSystem(pf.npmList, pf.binaryPaths, new CqlResourceLoader(pf.version), this, pf.context.getUcumService(), pf.publishedIg.getPackageId(), pf.igpkp.getCanonical());
+    pf.cql = new CqlSubSystem(pf.npmList, pf.binaryPaths, new CqlResourceLoader(pf.version), this, pf.context.getUcumService(), pf.packageId(), pf.igpkp.getCanonical());
     if (pf.binaryPaths.size() > 0) {
       pf.cql.execute();
     }
@@ -2257,17 +2257,17 @@ public class PublisherIGLoader extends PublisherBase {
       if (!dep.hasPackageId())
         throw new FHIRException("Unknown package id for "+dep.getUri());
     }
-    pf.npm = new NPMPackageGenerator(pf.publishedIg.getPackageId(), Utilities.path(pf.outputDir, "package.tgz"), pf.igpkp.getCanonical(), targetUrl(), PackageGenerator.PackageType.IG, pf.publishedIg, pf.getExecTime().getTime(), relatedIgMap(), !settings.isPublishing());
+    pf.npm = new NPMPackageGenerator(pf.packageId(), Utilities.path(pf.outputDir, "package.tgz"), pf.igpkp.getCanonical(), targetUrl(), PackageGenerator.PackageType.IG, pf.publishedIg, pf.getExecTime().getTime(), relatedIgMap(), !settings.isPublishing());
     for (String v : pf.generateVersions) {
       ImplementationGuide vig = pf.publishedIg.copy();
       checkIgDeps(vig, v);
-      pf.vnpms.put(v, new NPMPackageGenerator(pf.publishedIg.getPackageId()+"."+v, Utilities.path(pf.outputDir, pf.publishedIg.getPackageId()+"."+v+".tgz"),
+      pf.vnpms.put(v, new NPMPackageGenerator(pf.packageId()+"."+v, Utilities.path(pf.outputDir, pf.basePackageId()+"."+v+".tgz"),
               pf.igpkp.getCanonical(), targetUrl(), PackageGenerator.PackageType.IG,  vig, pf.getExecTime().getTime(), relatedIgMap(), !settings.isPublishing(), VersionUtilities.versionFromCode(v)));
     }
     if (isNewML()) {
       for (String l : allLangs()) {
         ImplementationGuide vig = (ImplementationGuide) pf.langUtils.copyToLanguage(pf.publishedIg, l, true, pf.defaultTranslationLang, igf.getErrors());
-        pf.lnpms.put(l, new NPMPackageGenerator(pf.publishedIg.getPackageId()+"."+l, Utilities.path(pf.outputDir, pf.publishedIg.getPackageId()+"."+l+".tgz"),
+        pf.lnpms.put(l, new NPMPackageGenerator(pf.packageId()+"."+l, Utilities.path(pf.outputDir, pf.basePackageId()+"."+l+".tgz"),
                 pf.igpkp.getCanonical(), targetUrl(), PackageGenerator.PackageType.IG, vig, pf.getExecTime().getTime(), relatedIgMap(), !settings.isPublishing(), pf.context.getVersion()));
       }
     }
