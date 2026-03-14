@@ -171,7 +171,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   public static final long JEKYLL_TIMEOUT = 60000 * 5; // 5 minutes....
   public static final long FSH_TIMEOUT = 60000 * 5; // 5 minutes....
   public static final int PRISM_SIZE_LIMIT = 16384;
-  public static final String TOOLING_IG_CURRENT_RELEASE = "0.9.0";
+  public static final String TOOLING_IG_CURRENT_RELEASE = "1.1.0";
   public static final String PACKAGE_CACHE_FOLDER_PARAM = "-package-cache-folder";
 
   private PublisherIGLoader loader;
@@ -440,7 +440,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       deleteDuplicateMessages();
       ValidationPresenter val = new ValidationPresenter(pf.version, workingVersion(), pf.igpkp, pf.childPublisher == null? null : pf.childPublisher.getIgpkp(), pf.rootDir, pf.npmName, pf.childPublisher == null? null : pf.childPublisher.pf.npmName,
           IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), pf.realmRules, pf.previousVersionComparator, pf.ipaComparator, pf.ipsComparator,
-          new DependencyRenderer(pf.pcm, pf.outputDir, pf.npmName, pf.templateManager, pf.dependencyList, pf.context, pf.markdownEngine, pf.rc, pf.specMaps).render(pf.publishedIg, true, false, false), new HTAAnalysisRenderer(pf.context, pf.outputDir, pf.markdownEngine).render(pf.publishedIg.getPackageId(), pf.fileList, pf.publishedIg.present()),
+          new DependencyRenderer(pf.pcm, pf.outputDir, pf.npmName, pf.templateManager, pf.dependencyList, pf.context, pf.markdownEngine, pf.rc, pf.specMaps).render(pf.publishedIg, true, false, false), new HTAAnalysisRenderer(pf.context, pf.outputDir, pf.markdownEngine).render(pf.packageId(), pf.fileList, pf.publishedIg.present()),
           new PublicationChecker(pf.repoRoot, pf.historyPage, pf.markdownEngine, findReleaseLabelString(), pf.publishedIg, pf.relatedIGs).check(), renderGlobals(), pf.copyrightYear, pf.context, scanForR5Extensions(), pf.modifierExtensions,
           generateDraftDependencies(), pf.noNarrativeResources, pf.noValidateResources, settings.isValidationOff(), settings.isGenerationOff(), pf.dependentIgFinder, pf.context.getTxClientManager(),
           fragments, makeLangInfo(), pf.relatedIGs);
@@ -680,7 +680,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         }
       }
       if (pf.publishedIg != null && pf.publishedIg.hasPackageId()) {
-        j.add("package-id", pf.publishedIg.getPackageId());
+        j.add("package-id", pf.packageId());
         j.add("ig-ver", pf.publishedIg.getVersion());
       }
       j.add("date", new SimpleDateFormat("EEE, dd MMM, yyyy HH:mm:ss Z", new Locale("en", "US")).format(pf.getExecTime().getTime()));
@@ -1545,7 +1545,9 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         }
         self.setConfigFile(getAbsoluteConfigFilePath(self.getConfigFile()));
       }
-      self.setJekyllCommand(CliParams.getNamedParam(args, "-jekyll"));
+      if (CliParams.hasNamedParam(args, "-jekyll")) {
+        self.settings.setJekyllCommand(CliParams.getNamedParam(args, "-jekyll"));
+      }
       self.setIgPack(CliParams.getNamedParam(args, "-spec"));
       String proxy = CliParams.getNamedParam(args, "-proxy");
       if (!Utilities.noString(proxy)) {
