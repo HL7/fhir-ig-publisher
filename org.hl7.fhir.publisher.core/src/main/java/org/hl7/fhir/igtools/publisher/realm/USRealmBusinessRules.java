@@ -19,6 +19,7 @@ import org.hl7.fhir.r5.comparison.ComparisonRenderer;
 import org.hl7.fhir.r5.comparison.ComparisonSession;
 import org.hl7.fhir.r5.conformance.profile.ProfileKnowledgeProvider;
 import org.hl7.fhir.r5.context.IWorkerContext;
+import org.hl7.fhir.r5.extensions.ExtensionUtilities;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.model.PackageInformation;
@@ -123,7 +124,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
     if (Utilities.existsInList(sd.getType(), types)) {
       StructureDefinition t = sd;
       while (t != null && !existsInSDList(usCoreProfiles, t.getUrl())) {
-        t = context.fetchResource(StructureDefinition.class, t.getBaseDefinition());
+        t = context.fetchResource(StructureDefinition.class, t.getBaseDefinition(), ExtensionUtilities.getVersionResolutionRules(t.getBaseDefinitionElement()));
       }
       if (t == null) {
         problems.add(sd);
@@ -152,7 +153,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
       if (Utilities.existsInList(sd.getType(), types)) {
         StructureDefinition t = sd;
         while (t != null && !existsInSDList(usPHProfiles, t.getUrl())) {
-          t = context.fetchResource(StructureDefinition.class, t.getBaseDefinition());
+          t = context.fetchResource(StructureDefinition.class, t.getBaseDefinition(), ExtensionUtilities.getVersionResolutionRules(t.getBaseDefinitionElement()));
         }
         if (t == null) {
           problems.add(sd);

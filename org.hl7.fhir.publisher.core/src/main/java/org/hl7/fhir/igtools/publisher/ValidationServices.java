@@ -123,7 +123,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
       url = url.substring(0, url.indexOf("/_history"));
     }
     String turl = (!Utilities.isAbsoluteUrl(url)) ? Utilities.pathURL(ipg.getCanonical(), url) : url;
-    Resource res = context.fetchResource(getResourceType(turl), turl);
+    Resource res = context.fetchResource(getResourceType(turl), turl, IWorkerContext.VersionResolutionRules.defaultRule());
     if (res != null) {
       Element e = (Element)res.getUserData(UserDataNames.pub_element);
       if (e!=null)
@@ -327,7 +327,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
   }
 
   @Override
-  public boolean resolveURL(IResourceValidator validator, Object appContext, String path, String url, String type, boolean canonical, List<CanonicalType> targets) throws IOException {
+  public boolean resolveURL(IResourceValidator validator, Object appContext, String path, String url, IWorkerContext.VersionResolutionRules rules, String type, boolean canonical, List<CanonicalType> targets) throws IOException {
     String u = url;
     String v = null;
     if (url.contains("|")) {
@@ -368,7 +368,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
             return true;
           }
           if (f.getLogical() != null && f.getResources().size() == 1) {
-            StructureDefinition sd = context.fetchResource(StructureDefinition.class, f.getLogical());
+            StructureDefinition sd = context.fetchResource(StructureDefinition.class, f.getLogical(), IWorkerContext.VersionResolutionRules.defaultRule());
             if (sd != null) {
               String t = sd.getType();
               if (Utilities.isAbsoluteUrl(t)) {
@@ -424,7 +424,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
       return true;
     }
     try {
-      Resource res = context.fetchResourceWithException(Resource.class, url);
+      Resource res = context.fetchResourceWithException(Resource.class, url, rules);
       if (res != null) {
         return true;
       }
@@ -432,20 +432,20 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
     }
     if (canonical) {
       if (targetsHas(targets, "CodeSystem")) {
-        CodeSystem cs = context.findTxResource(CodeSystem.class, url);
+        CodeSystem cs = context.findTxResource(CodeSystem.class, url, rules);
         if (cs != null) {
           return true;
         }
       }
       //if (targetsHas(targets, "ValueSet")) { - can't do this test because of implicit value sets etc
-      ValueSet vs = context.findTxResource(ValueSet.class, url);
+      ValueSet vs = context.findTxResource(ValueSet.class, url, rules);
       if (vs != null) {
         return true;
       }
       
     }
     if (Utilities.existsInList(path, "ValueSet.compose.include.system", "ValueSet.compose.exclude.system")) {
-      CodeSystem cs = context.findTxResource(CodeSystem.class, url);
+      CodeSystem cs = context.findTxResource(CodeSystem.class, url, rules);
       if (cs != null) {
         return true;
       }      
@@ -486,13 +486,13 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
       return true;
     }
     // ok, let's look in the definition
-    StructureDefinition sdt = context.fetchResource(StructureDefinition.class, type);
+    StructureDefinition sdt = context.fetchResource(StructureDefinition.class, type, IWorkerContext.VersionResolutionRules.defaultRule());
     while (sdt != null) {
       String s = ExtensionUtilities.readStringExtension(sdt, ExtensionDefinitions.EXT_RESOURCE_IMPLEMENTS);
       if (s != null && "http://hl7.org/fhir/StructureDefinition/CanonicalResource".equals(s)) {
         return true;
       }
-      sdt = context.fetchResource(StructureDefinition.class, sdt.getBaseDefinition());
+      sdt = context.fetchResource(StructureDefinition.class, sdt.getBaseDefinition(), IWorkerContext.VersionResolutionRules.defaultRule());
     }
     return false;
   }

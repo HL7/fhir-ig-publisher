@@ -558,7 +558,7 @@ public class DependencyRenderer {
     if (!globalPackages.contains(key)) {
       globalPackages.add(key);
       for (ImplementationGuideGlobalComponent g : ig.getGlobal()) {
-        StructureDefinition sd = context.fetchResource(StructureDefinition.class, g.getProfile());
+        StructureDefinition sd = context.fetchResource(StructureDefinition.class, g.getProfile(), ExtensionUtilities.getVersionResolutionRules(g.getProfileElement()));
         globals.add(new GlobalProfile(npm, ig, g.getType(), g.getProfile(), sd));
       }    
     }
@@ -635,7 +635,7 @@ public class DependencyRenderer {
   }
 
   private Row addBaseRow(HierarchicalTableGenerator gen, TableModel model, ImplementationGuide ig, boolean QA, boolean hasDesc) {
-    String id = ig.getPackageId();
+    String id = ig.getFullPackageId();
     String ver = ig.getVersion();
     String fver = ig.getFhirVersion().get(0).asStringValue();
     this.fhirVersion = fver;

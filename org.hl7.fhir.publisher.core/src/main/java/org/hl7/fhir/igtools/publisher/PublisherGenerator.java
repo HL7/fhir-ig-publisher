@@ -29,6 +29,7 @@ import org.hl7.fhir.r5.conformance.ConstraintJavaGenerator;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.context.ExpansionOptions;
+import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.elementmodel.Manager;
 import org.hl7.fhir.r5.elementmodel.ObjectConverter;
@@ -73,6 +74,7 @@ import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.model.JsonProperty;
 import org.hl7.fhir.utilities.json.model.JsonString;
+import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.ToolsVersion;
 import org.hl7.fhir.utilities.settings.FhirSettings;
 import org.hl7.fhir.utilities.turtle.Turtle;
@@ -81,6 +83,7 @@ import org.hl7.fhir.utilities.validation.ValidationOptions;
 import org.hl7.fhir.utilities.xhtml.*;
 import org.hl7.fhir.utilities.xml.XMLUtil;
 import org.hl7.fhir.utilities.xml.XmlEscaper;
+import org.hl7.fhir.validation.special.PackageReGenerator;
 import org.w3c.dom.Document;
 import org.xml.sax.InputSource;
 
@@ -262,6 +265,15 @@ public class PublisherGenerator extends PublisherBase {
     }
 
     generateViewDefinitions(db);
+    if (!pf.changeList.isEmpty()) {
+      if (isNewML()) {
+        for (String l : allLangs()) {
+          generateSummaryOutputsBefore(db, l, pf.rcLangs.get(l));
+        }
+      } else {
+        generateSummaryOutputsBefore(db, null, pf.rc);
+      }
+    }
     templateBeforeGenerate();
     if (pf.saveExpansionParams) {
       new JsonParser().setOutputStyle(IParser.OutputStyle.NORMAL).compose(new FileOutputStream(Utilities.path(pf.tempDir, "parameters-expansion-parameters.json")), pf.context.getExpansionParameters());
@@ -308,10 +320,10 @@ public class PublisherGenerator extends PublisherBase {
     if (!pf.changeList.isEmpty()) {
       if (isNewML()) {
         for (String l : allLangs()) {
-          generateSummaryOutputs(db, l, pf.rcLangs.get(l));
+          generateSummaryOutputsAfter(l, pf.rcLangs.get(l));
         }
       } else {
-        generateSummaryOutputs(db, null, pf.rc);
+        generateSummaryOutputsAfter(null, pf.rc);
       }
     }
     pf.template.rapidoSummary();
@@ -366,7 +378,7 @@ public class PublisherGenerator extends PublisherBase {
       log("Processing nested IG: " + pf.nestedIgConfig);
       pf.childPublisher = new Publisher();
       pf.childPublisher.setConfigFile(Utilities.path(FileUtilities.getDirectoryForFile(this.getConfigFile()), pf.nestedIgConfig));
-      pf.childPublisher.setJekyllCommand(this.getJekyllCommand());
+      pf.childPublisher.settings.setJekyllCommand(this.settings.getJekyllCommand());
       pf.childPublisher.settings.setTxServer(this.settings.getTxServer());
       pf.childPublisher.settings.setDebug(this.settings.isDebug());
       pf.childPublisher.settings.setCacheOption(this.settings.getCacheOption());
@@ -436,18 +448,19 @@ public class PublisherGenerator extends PublisherBase {
             pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.EXCEPTION, "package.tgz", "Error converting pacakge to R4B: "+e.getMessage(), ValidationMessage.IssueSeverity.ERROR));
           }
         }
+        genCombinedPackage();
 
         if (settings.getMode() == null || settings.getMode() == PublisherUtils.IGBuildMode.MANUAL) {
           if (settings.isCacheVersion()) {
-            pf.pcm.addPackageToCache(pf.publishedIg.getPackageId(), pf.publishedIg.getVersion(), new FileInputStream(pf.npm.filename()), "[output]");
+            pf.pcm.addPackageToCache(pf.packageId(), pf.publishedIg.getVersion(), new FileInputStream(pf.npm.filename()), "[output]");
           } else {
-            pf.pcm.addPackageToCache(pf.publishedIg.getPackageId(), "dev", new FileInputStream(pf.npm.filename()), "[output]");
+            pf.pcm.addPackageToCache(pf.packageId(), "dev", new FileInputStream(pf.npm.filename()), "[output]");
             if (pf.branchName != null) {
-              pf.pcm.addPackageToCache(pf.publishedIg.getPackageId(), "dev$"+ pf.branchName, new FileInputStream(pf.npm.filename()), "[output]");
+              pf.pcm.addPackageToCache(pf.packageId(), "dev$"+ pf.branchName, new FileInputStream(pf.npm.filename()), "[output]");
             }
           }
         } else if (settings.getMode() == PublisherUtils.IGBuildMode.PUBLICATION) {
-          pf.pcm.addPackageToCache(pf.publishedIg.getPackageId(), pf.publishedIg.getVersion(), new FileInputStream(pf.npm.filename()), "[output]");
+          pf.pcm.addPackageToCache(pf.packageId(), pf.publishedIg.getVersion(), new FileInputStream(pf.npm.filename()), "[output]");
         }
         JsonArray json = new JsonArray();
         for (String s : pf.generateVersions) {
@@ -556,6 +569,25 @@ public class PublisherGenerator extends PublisherBase {
       FileUtilities.copyFile(Utilities.path(pf.tempDir, "full-ig.zip"), Utilities.path(pf.outputDir, "full-ig.zip"));
       log("Final .zip built");
     }
+  }
+
+  private void genCombinedPackage() throws IOException {
+    log("Generating combined package");
+    PackageReGenerator gen = new PackageReGenerator();
+    gen.setIncludeConformsTo(true);
+    gen.setExpansionParameters(pf.context.getExpansionParameters());
+    gen.setScope(PackageReGenerator.ExpansionPackageGeneratorScope.ALL_IGS);
+    gen.setOutputType(PackageReGenerator.ExpansionPackageGeneratorOutputType.TGZ);
+    gen.setHierarchical(false);
+    gen.setJson(true);
+    gen.setContext(pf.context);
+    gen.setNpmId(pf.packageId());
+    gen.setOutput(Utilities.path(pf.outputDir, "package-combined.tgz"));
+    gen.setModes(Set.of("api", "tx", "cnt", "expansions", "pin"));
+    gen.setVerbose(false);
+
+    NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(Utilities.path(pf.outputDir, "package.tgz")));
+    gen.generateCombinedPackage(npm);
   }
 
   private byte[] fillLangTemplate(byte[] b, String l) {
@@ -999,7 +1031,7 @@ public class PublisherGenerator extends PublisherBase {
     }
     if (wantGen(r, "ip-statements") && res != null) {
       long start = System.currentTimeMillis();
-      fragment(res.fhirType()+"-"+r.getId()+"-ip-statements", new IPStatementsRenderer(this.pf.context, this.pf.markdownEngine, this.pf.sourceIg.getPackageId(), lrc).genIpStatements(r, example, lang), f.getOutputNames(), start, "ip-statements", "Resource", lang);
+      fragment(res.fhirType()+"-"+r.getId()+"-ip-statements", new IPStatementsRenderer(this.pf.context, this.pf.markdownEngine, this.pf.packageId(), lrc).genIpStatements(r, example, lang), f.getOutputNames(), start, "ip-statements", "Resource", lang);
     }
     if (wantGen(r, "validate")) {
       long start = System.currentTimeMillis();
@@ -1251,11 +1283,11 @@ public class PublisherGenerator extends PublisherBase {
       b.append("<p data-fhir=\"generated\"><b>Validation Links:</b></p><ul><li><a href=\"https://confluence.hl7.org/display/FHIR/Using+the+FHIR+Validator\">Validate using FHIR Validator</a> (Java): <code id=\"vl-"+r.fhirType()+"-"+r.getId()+"\">$cmd$</code></li></ul>\r\n");
       b.append("<script type=\"text/javascript\">\r\n");
       b.append("  var x = window.location.href;\r\n");
-      b.append("  document.getElementById(\"vl-"+r.fhirType()+"-"+r.getId()+"\").innerHTML = \"java -jar [path]/org.hl7.fhir.validator.jar -ig "+ this.pf.publishedIg.getPackageId()+"#"+version+" \"+x.substr(0, x.lastIndexOf(\".\")).replace(\"file:///\", \"\") + \".json\";\r\n");
+      b.append("  document.getElementById(\"vl-"+r.fhirType()+"-"+r.getId()+"\").innerHTML = \"java -jar [path]/org.hl7.fhir.validator.jar -ig "+ this.pf.packageId()+"#"+version+" \"+x.substr(0, x.lastIndexOf(\".\")).replace(\"file:///\", \"\") + \".json\";\r\n");
       b.append("</script>\r\n");
     } else if (r.getResource() instanceof StructureDefinition) {
       b.append("<p data-fhir=\"generated\">Validate this resource:</b></p><ul><li><a href=\"https://confluence.hl7.org/display/FHIR/Using+the+FHIR+Validator\">Validate using FHIR Validator</a> (Java): <code>"+
-              "java -jar [path]/org.hl7.fhir.validator.jar -ig "+ this.pf.publishedIg.getPackageId()+"#"+version+" -profile "+((StructureDefinition) r.getResource()).getUrl()+" [resource-to-validate]"+
+              "java -jar [path]/org.hl7.fhir.validator.jar -ig "+ this.pf.packageId()+"#"+version+" -profile "+((StructureDefinition) r.getResource()).getUrl()+" [resource-to-validate]"+
               "</code></li></ul>\r\n");
     } else {
     }
@@ -1714,7 +1746,7 @@ public class PublisherGenerator extends PublisherBase {
       fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-json-schema", "yet to be done: json schema as html", null, f.getOutputNames(), start, "json-schema", "StructureDefinition", lang);
     }
 
-    StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(this.pf.context, this.pf.sourceIg.getPackageId(), checkAppendSlash(this.pf.specPath), sd, Utilities.path(this.pf.tempDir), this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, this.pf.fileList, lrc, this.pf.allInvariants, this.pf.sdMapCache, this.pf.specPath, this.pf.versionToAnnotate, this.pf.relatedIGs);
+    StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(this.pf.context, this.pf.packageId(), checkAppendSlash(this.pf.specPath), sd, Utilities.path(this.pf.tempDir), this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, this.pf.fileList, lrc, this.pf.allInvariants, this.pf.sdMapCache, this.pf.specPath, this.pf.versionToAnnotate, this.pf.relatedIGs);
     sdr.setNoXigLink(this.pf.noXigLink);
 
     if (wantGen(r, "summary")) {
@@ -2652,12 +2684,7 @@ public class PublisherGenerator extends PublisherBase {
     return new SimpleDateFormat("dd/MM/yyyy", new Locale("en", "US")).format(pf.getExecTime().getTime());
   }
 
-  private void generateSummaryOutputs(DBBuilder db, String lang, RenderingContext rc) throws Exception {
-    log("Generating Summary Outputs"+(lang == null?"": " ("+lang+")"));
-    generateResourceReferences(lang);
-
-    generateCanonicalSummary(lang);
-
+  private void generateSummaryOutputsBefore(DBBuilder db, String lang, RenderingContext rc) throws Exception {
     CrossViewRenderer cvr = new CrossViewRenderer(pf.igpkp.getCanonical(), pf.altCanonical, pf.context, pf.igpkp.specPath(), rc.copy(false));
     for (FetchedFile f : pf.fileList) {
       for (FetchedResource r : f.getResources()) {
@@ -2666,60 +2693,8 @@ public class PublisherGenerator extends PublisherBase {
         }
       }
     }
-    MappingSummaryRenderer msr = new MappingSummaryRenderer(pf.context, rc);
-    msr.addCanonical(pf.igpkp.getCanonical());
-    if (pf.altCanonical != null) {
-      msr.addCanonical(pf.altCanonical);
-    }
-    msr.analyse();
-    Set<String> types = new HashSet<>();
-    for (StructureDefinition sd : pf.context.fetchResourcesByType(StructureDefinition.class)) {
-      if (sd.getUrl().equals("http://hl7.org/fhir/StructureDefinition/Base") || (sd.getDerivation() == StructureDefinition.TypeDerivationRule.SPECIALIZATION && sd.getKind() != StructureDefinition.StructureDefinitionKind.LOGICAL && !types.contains(sd.getType()))) {
-        types.add(sd.getType());
-        long start = System.currentTimeMillis();
-        String src = msr.render(sd);
-        fragment("maps-"+sd.getTypeTail(), src, pf.otherFilesRun, start, "maps", "Cross", lang);
-      }
-    }
+
     long start = System.currentTimeMillis();
-    fragment("summary-observations", cvr.getObservationSummary(), pf.otherFilesRun, start, "summary-observations", "Cross", lang);
-    String path = Utilities.path(pf.tempDir, "observations-summary.xlsx");
-    ObservationSummarySpreadsheetGenerator vsg = new ObservationSummarySpreadsheetGenerator(pf.context);
-    pf.otherFilesRun.add(path);
-    vsg.generate(cvr.getObservations());
-    vsg.finish(new FileOutputStream(path));
-    DeprecationRenderer dpr = new DeprecationRenderer(pf.context, checkAppendSlash(pf.specPath), pf.igpkp, pf.specMaps, pageTargets(), pf.markdownEngine, pf.packge, rc.copy(false));
-    fragment("deprecated-list", dpr.deprecationSummary(pf.fileList, pf.previousVersionComparator), pf.otherFilesRun, start, "deprecated-list", "Cross", lang);
-    fragment("new-extensions", dpr.listNewResources(pf.fileList, pf.previousVersionComparator, "StructureDefinition.extension"), pf.otherFilesRun, start, "new-extensions", "Cross", lang);
-    fragment("deleted-extensions", dpr.listDeletedResources(pf.fileList, pf.previousVersionComparator, "StructureDefinition.extension"), pf.otherFilesRun, start, "deleted-extensions", "Cross", lang);
-
-    JsonObject data = new JsonObject();
-    JsonArray ecl = new JsonArray();
-    //    data.add("extension-contexts-populated", ecl); causes a bug in jekyll see https://github.com/jekyll/jekyll/issues/9289
-
-    start = System.currentTimeMillis();
-    fragment("summary-extensions", cvr.getExtensionSummary(), pf.otherFilesRun, start, "summary-extensions", "Cross", lang);
-    start = System.currentTimeMillis();
-    fragment("extension-list", cvr.buildExtensionTable(), pf.otherFilesRun, start, "extension-list", "Cross", lang);
-    Set<String> econtexts = pf.cu.getTypeNameSet();
-    for (String s : cvr.getExtensionContexts()) {
-      ecl.add(s);
-      econtexts.add(s);
-    }
-    for (String s : econtexts) {
-      start = System.currentTimeMillis();
-      fragment("extension-list-"+s, cvr.buildExtensionTable(s), pf.otherFilesRun, start, "extension-list-", "Cross", lang);
-    }
-    for (String s : pf.context.getResourceNames()) {
-      start = System.currentTimeMillis();
-      fragment("extension-search-list-"+s, cvr.buildExtensionSearchTable(s), pf.otherFilesRun, start, "extension-search-list", "Cross", lang);
-    }
-    for (String s : cvr.getExtensionIds()) {
-      start = System.currentTimeMillis();
-      fragment("extension-search-"+s, cvr.buildSearchTableForExtension(s), pf.otherFilesRun, start, "extension-search", "Cross", lang);
-    }
-
-    start = System.currentTimeMillis();
     List<ValueSet> vslist = cvr.buildDefinedValueSetList(pf.fileList);
     fragment("valueset-list", cvr.renderVSList(pf.versionToAnnotate, vslist, cvr.needVersionReferences(vslist, pf.publishedIg.getVersion()), false), pf.otherFilesRun, start, "valueset-list",  "Cross", lang);
     saveVSList("valueset-list", vslist, db, 1);
@@ -2749,37 +2724,125 @@ public class PublisherGenerator extends PublisherBase {
     fragment("codesystem-ref-all-list", cvr.renderCSList(pf.versionToAnnotate, cslist, cvr.needVersionReferences(vslist, pf.publishedIg.getVersion()), true), pf.otherFilesRun, start, "codesystem-ref-all-list", "Cross", lang);
     saveCSList("codesystem-ref-all-list", cslist, db, 3);
 
-    fragment("obligation-summary", cvr.renderObligationSummary(), pf.otherFilesRun, System.currentTimeMillis(), "obligation-summary", "Cross", lang);
+    fragment("obligation-summary", cvr.renderObligationSummary(), pf.otherFilesRun, start, "obligation-summary", "Cross", lang);
+
+    start = System.currentTimeMillis();
+    fragment("summary-observations", cvr.getObservationSummary(), pf.otherFilesRun, start, "summary-observations", "Cross", lang);
+    String path = Utilities.path(pf.tempDir, "observations-summary.xlsx");
+    ObservationSummarySpreadsheetGenerator vsg = new ObservationSummarySpreadsheetGenerator(pf.context);
+    pf.otherFilesRun.add(path);
+    vsg.generate(cvr.getObservations());
+    vsg.finish(new FileOutputStream(path));
+    start = System.currentTimeMillis();
+    fragment("summary-extensions", cvr.getExtensionSummary(), pf.otherFilesRun, start, "summary-extensions", "Cross", lang);
+    start = System.currentTimeMillis();
+    fragment("extension-list", cvr.buildExtensionTable(), pf.otherFilesRun, start, "extension-list", "Cross", lang);
+
+  }
+
+  private void generateSummaryOutputsAfter(String lang, RenderingContext rc) throws Exception {
+    log("Generating Summary Outputs"+(lang == null?"": " ("+lang+")"));
+    generateResourceReferences(lang);
+
+    generateCanonicalSummary(lang);
+
+    MappingSummaryRenderer msr = new MappingSummaryRenderer(pf.context, rc);
+    msr.addCanonical(pf.igpkp.getCanonical());
+    if (pf.altCanonical != null) {
+      msr.addCanonical(pf.altCanonical);
+    }
+    msr.analyse();
+    Set<String> types = new HashSet<>();
+    for (StructureDefinition sd : pf.context.fetchResourcesByType(StructureDefinition.class)) {
+      if (sd.getUrl().equals("http://hl7.org/fhir/StructureDefinition/Base") || (sd.getDerivation() == StructureDefinition.TypeDerivationRule.SPECIALIZATION && sd.getKind() != StructureDefinition.StructureDefinitionKind.LOGICAL && !types.contains(sd.getType()))) {
+        types.add(sd.getType());
+        long start = System.currentTimeMillis();
+        String src = msr.render(sd);
+        fragment("maps-"+sd.getTypeTail(), src, pf.otherFilesRun, start, "maps", "Cross", lang);
+      }
+    }
+    DeprecationRenderer dpr = new DeprecationRenderer(pf.context, checkAppendSlash(pf.specPath), pf.igpkp, pf.specMaps, pageTargets(), pf.markdownEngine, pf.packge, rc.copy(false));
+    long start = System.currentTimeMillis();
+    fragment("deprecated-list", dpr.deprecationSummary(pf.fileList, pf.previousVersionComparator), pf.otherFilesRun, start, "deprecated-list", "Cross", lang);
+    start = System.currentTimeMillis();
+    fragment("new-extensions", dpr.listNewResources(pf.fileList, pf.previousVersionComparator, "StructureDefinition.extension"), pf.otherFilesRun, start, "new-extensions", "Cross", lang);
+    start = System.currentTimeMillis();
+    fragment("deleted-extensions", dpr.listDeletedResources(pf.fileList, pf.previousVersionComparator, "StructureDefinition.extension"), pf.otherFilesRun, start, "deleted-extensions", "Cross", lang);
+
+    CrossViewRenderer cvr = new CrossViewRenderer(pf.igpkp.getCanonical(), pf.altCanonical, pf.context, pf.igpkp.specPath(), rc.copy(false));
+    for (FetchedFile f : pf.fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
+          cvr.seeResource((CanonicalResource) r.getResource());
+        }
+      }
+    }
+    JsonObject data = new JsonObject();
+    JsonArray ecl = new JsonArray();
+    //    data.add("extension-contexts-populated", ecl); causes a bug in jekyll see https://github.com/jekyll/jekyll/issues/9289
+
+    Set<String> econtexts = pf.cu.getTypeNameSet();
+    for (String s : cvr.getExtensionContexts()) {
+      ecl.add(s);
+      econtexts.add(s);
+    }
+    for (String s : econtexts) {
+      start = System.currentTimeMillis();
+      fragment("extension-list-"+s, cvr.buildExtensionTable(s), pf.otherFilesRun, start, "extension-list-", "Cross", lang);
+    }
+    for (String s : pf.context.getResourceNames()) {
+      start = System.currentTimeMillis();
+      fragment("extension-search-list-"+s, cvr.buildExtensionSearchTable(s), pf.otherFilesRun, start, "extension-search-list", "Cross", lang);
+    }
+    for (String s : cvr.getExtensionIds()) {
+      start = System.currentTimeMillis();
+      fragment("extension-search-"+s, cvr.buildSearchTableForExtension(s), pf.otherFilesRun, start, "extension-search", "Cross", lang);
+    }
 
     for (String v : pf.generateVersions) {
       for (String n : pf.context.getResourceNames()) {
+        start = System.currentTimeMillis();
         fragment("version-"+v+"-summary-"+n, generateVersionSummary(v, n), pf.otherFilesRun, start, "version-"+v+"-summary-"+n, "Cross", lang);
       }
     }
     start = System.currentTimeMillis();
-    pf.ipStmt = new IPStatementsRenderer(pf.context, pf.markdownEngine, pf.sourceIg.getPackageId(), rc).genIpStatements(pf.fileList, lang);
+    pf.ipStmt = new IPStatementsRenderer(pf.context, pf.markdownEngine, pf.packageId(), rc).genIpStatements(pf.fileList, lang);
     trackedFragment("1", "ip-statements", pf.ipStmt, pf.otherFilesRun, start, "ip-statements", "Cross", lang);
+    start = System.currentTimeMillis();
     if (VersionUtilities.isR4Ver(pf.version) || VersionUtilities.isR4BVer(pf.version)) {
-      trackedFragment("2", "cross-version-analysis", pf.r4tor4b.generate(pf.npmName, false), pf.otherFilesRun, System.currentTimeMillis(), "cross-version-analysis", "Cross", lang);
-      trackedFragment("2", "cross-version-analysis-inline", pf.r4tor4b.generate(pf.npmName, true), pf.otherFilesRun, System.currentTimeMillis(), "cross-version-analysis-inline", "Cross", lang);
+      start = System.currentTimeMillis();
+      trackedFragment("2", "cross-version-analysis", pf.r4tor4b.generate(pf.npmName, false), pf.otherFilesRun, start, "cross-version-analysis", "Cross", lang);
+      start = System.currentTimeMillis();
+      trackedFragment("2", "cross-version-analysis-inline", pf.r4tor4b.generate(pf.npmName, true), pf.otherFilesRun, start, "cross-version-analysis-inline", "Cross", lang);
     } else {
-      fragment("cross-version-analysis", pf.r4tor4b.generate(pf.npmName, false), pf.otherFilesRun, System.currentTimeMillis(), "cross-version-analysis", "Cross", lang);
-      fragment("cross-version-analysis-inline", pf.r4tor4b.generate(pf.npmName, true), pf.otherFilesRun, System.currentTimeMillis(), "cross-version-analysis-inline", "Cross", lang);
+      start = System.currentTimeMillis();
+      fragment("cross-version-analysis", pf.r4tor4b.generate(pf.npmName, false), pf.otherFilesRun, start, "cross-version-analysis", "Cross", lang);
+      start = System.currentTimeMillis();
+      fragment("cross-version-analysis-inline", pf.r4tor4b.generate(pf.npmName, true), pf.otherFilesRun, start, "cross-version-analysis-inline", "Cross", lang);
     }
     DependencyRenderer depr = new DependencyRenderer(pf.pcm, pf.tempDir, pf.npmName, pf.templateManager, makeDependencies(), pf.context, pf.markdownEngine, rc, pf.specMaps);
-    trackedFragment("3", "dependency-table", depr.render(pf.publishedIg, false, true, true), pf.otherFilesRun, System.currentTimeMillis(), "dependency-table", "Cross", lang);
-    trackedFragment("3", "dependency-table-short", depr.render(pf.publishedIg, false, false, false), pf.otherFilesRun, System.currentTimeMillis(), "dependency-table-short", "Cross", lang);
-    trackedFragment("3", "dependency-table-nontech", depr.renderNonTech(pf.publishedIg), pf.otherFilesRun, System.currentTimeMillis(), "dependency-table-nontech", "Cross", lang);
-    trackedFragment("4", "globals-table", depr.renderGlobals(), pf.otherFilesRun, System.currentTimeMillis(), "globals-table", "Cross", lang);
+    start = System.currentTimeMillis();
+    trackedFragment("3", "dependency-table", depr.render(pf.publishedIg, false, true, true), pf.otherFilesRun, start, "dependency-table", "Cross", lang);
+    start = System.currentTimeMillis();
+    trackedFragment("3", "dependency-table-short", depr.render(pf.publishedIg, false, false, false), pf.otherFilesRun, start, "dependency-table-short", "Cross", lang);
+    start = System.currentTimeMillis();
+    trackedFragment("3", "dependency-table-nontech", depr.renderNonTech(pf.publishedIg), pf.otherFilesRun, start, "dependency-table-nontech", "Cross", lang);
+    start = System.currentTimeMillis();
+    trackedFragment("4", "globals-table", depr.renderGlobals(), pf.otherFilesRun, start, "globals-table", "Cross", lang);
+    start = System.currentTimeMillis();
     String expr = renderExpansionParameters();
     if (Utilities.noString(expr)) {
-      fragment("expansion-params", expr, pf.otherFilesRun, System.currentTimeMillis(), "expansion-params", "Cross", lang);
+      start = System.currentTimeMillis();
+      fragment("expansion-params", expr, pf.otherFilesRun, start, "expansion-params", "Cross", lang);
     } else {
-      trackedFragment("5", "expansion-params", expr, pf.otherFilesRun, System.currentTimeMillis(), "expansion-params", "Cross", lang);
+      start = System.currentTimeMillis();
+      trackedFragment("5", "expansion-params", expr, pf.otherFilesRun, start, "expansion-params", "Cross", lang);
     }
 
-    fragment("related-igs-list", relatedIgsList(), pf.otherFilesRun, System.currentTimeMillis(), "related-igs-list", "Cross", lang);
-    fragment("related-igs-table", relatedIgsTable(), pf.otherFilesRun, System.currentTimeMillis(), "related-igs-table", "Cross", lang);
+    start = System.currentTimeMillis();
+    fragment("related-igs-list", relatedIgsList(), pf.otherFilesRun, start, "related-igs-list", "Cross", lang);
+    start = System.currentTimeMillis();
+    fragment("related-igs-table", relatedIgsTable(), pf.otherFilesRun, start, "related-igs-table", "Cross", lang);
 
     // now, list the profiles - all the profiles
     int i = 0;
@@ -2963,7 +3026,7 @@ public class PublisherGenerator extends PublisherBase {
         if (r.fhirType().equals("CodeSystem")) {
           item.add("content", ((CodeSystem) r.getResource()).getContent().toCode());
         }
-        path = null;
+        String path = null;
         if (r.getPath() != null) {
           path = r.getPath();
         } else if (r.getResource() != null) {
@@ -3807,14 +3870,14 @@ public class PublisherGenerator extends PublisherBase {
     exec.setWatchdog(watchdog);
 
     try {
-      log("Run jekyll: "+ pf.jekyllCommand +" build --destination \""+ pf.outputDir +"\" (in folder "+ pf.tempDir +")");
+      log("Run jekyll: "+ settings.jekyllCommand +" build --destination \""+ pf.outputDir +"\" (in folder "+ pf.tempDir +")");
       if (SystemUtils.IS_OS_WINDOWS) {
         log("Due to a known issue, Jekyll errors are lost between Java and Ruby in windows systems.");
         log("If the build process hangs at this point, you have to go to a");
         log("command prompt, and then run these two commands:");
         log("");
         log("cd "+ pf.tempDir);
-        log(pf.jekyllCommand +" build --destination \""+ pf.outputDir +"\"");
+        log(settings.jekyllCommand +" build --destination \""+ pf.outputDir +"\"");
         log("");
         log("and then investigate why Jekyll has failed");
       }
@@ -3825,13 +3888,13 @@ public class PublisherGenerator extends PublisherBase {
         final String enclosedOutputDir = "\"" + pf.outputDir + "\"";
         final CommandLine commandLine = new CommandLine("cmd")
                 .addArgument( "/C")
-                .addArgument(pf.jekyllCommand)
+                .addArgument(settings.jekyllCommand)
                 .addArgument("build")
                 .addArgument("--destination")
                 .addArgument(enclosedOutputDir);
         exec.execute(commandLine);
       } else if (FhirSettings.hasRubyPath()) {
-        ProcessBuilder processBuilder = new ProcessBuilder(new String("bash -c "+ pf.jekyllCommand));
+        ProcessBuilder processBuilder = new ProcessBuilder(new String("bash -c "+ settings.jekyllCommand));
         Map<String, String> env = processBuilder.environment();
         Map<String, String> vars = new HashMap<>();
         vars.putAll(env);
@@ -3840,11 +3903,11 @@ public class PublisherGenerator extends PublisherBase {
         if (FhirSettings.getGemPath() != null) {
           vars.put("GEM_PATH", FhirSettings.getGemPath());
         }
-        CommandLine commandLine = new CommandLine("bash").addArgument("-c").addArgument(pf.jekyllCommand +" build --destination "+ pf.outputDir, false);
+        CommandLine commandLine = new CommandLine("bash").addArgument("-c").addArgument(settings.jekyllCommand +" build --destination "+ pf.outputDir, false);
         exec.execute(commandLine, vars);
       } else {
         final String enclosedOutputDir = "\"" + pf.outputDir + "\"";
-        final CommandLine commandLine = new CommandLine(pf.jekyllCommand)
+        final CommandLine commandLine = new CommandLine(settings.jekyllCommand)
                 .addArgument("build")
                 .addArgument("--destination")
                 .addArgument(enclosedOutputDir);
@@ -5277,6 +5340,7 @@ public class PublisherGenerator extends PublisherBase {
       gen.finish();
       this.pf.otherFilesRun.add(Utilities.path(this.pf.tempDir, id+".tgz"));
     }
+
   }
 
 
@@ -6220,7 +6284,7 @@ public class PublisherGenerator extends PublisherBase {
   }
 
   private void generatePackageVersion(String filename, String ver) throws IOException {
-    NpmPackageVersionConverter self = new NpmPackageVersionConverter(filename, Utilities.path(FileUtilities.getDirectoryForFile(filename), pf.publishedIg.getPackageId()+"."+ver+".tgz"), ver, pf.publishedIg.getPackageId()+"."+ver, pf.context);
+    NpmPackageVersionConverter self = new NpmPackageVersionConverter(filename, Utilities.path(FileUtilities.getDirectoryForFile(filename), pf.packageId()+"."+ver+".tgz"), ver, pf.packageId()+"."+ver, pf.context);
     self.execute();
     for (String s : self.getErrors()) {
       pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.EXCEPTION, "ImplementationGuide", "Error creating "+ver+" package: "+s, ValidationMessage.IssueSeverity.ERROR));

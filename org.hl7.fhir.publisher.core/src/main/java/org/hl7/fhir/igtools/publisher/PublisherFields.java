@@ -17,12 +17,15 @@ import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.context.ILoggingService;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.elementmodel.LanguageUtils;
+import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
+import org.hl7.fhir.r5.extensions.ExtensionUtilities;
 import org.hl7.fhir.r5.model.*;
 import org.hl7.fhir.r5.model.Enumeration;
 import org.hl7.fhir.r5.renderers.DataRenderer;
 import org.hl7.fhir.r5.renderers.spreadsheets.StructureDefinitionSpreadsheetGenerator;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.renderers.utils.Resolver;
+import org.hl7.fhir.r5.tools.ExtensionConstants;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator;
 import org.hl7.fhir.r5.utils.client.FHIRToolingClient;
 import org.hl7.fhir.r5.utils.formats.CSVWriter;
@@ -123,7 +126,6 @@ public class PublisherFields {
     List<String> logOptions = new ArrayList<String>();
     List<String> listedURLExemptions = new ArrayList<String>();
     String altCanonical;
-    String jekyllCommand = "jekyll";
     boolean makeQA = true;
     boolean bundleReferencesResolve = true;
     CqlSubSystem cql;
@@ -307,4 +309,15 @@ public class PublisherFields {
     @Getter private List<String> exemptHtmlPatterns = new ArrayList<>();
     Resolver.IReferenceResolver resolver;
     @Getter @Setter private boolean languagePack;
+
+    public String packageId() {
+        var ig = publishedIg == null ? sourceIg : publishedIg;
+        String prefix = ig.hasExtension(ExtensionConstants.EXT_PACKAGE_SCOPE) ? "@"+ ExtensionUtilities.readStringExtension(ig, ExtensionConstants.EXT_PACKAGE_SCOPE) +"/" : "";
+        return prefix + ig.getPackageId();
+    }
+    
+    public String basePackageId() {
+        var ig = publishedIg == null ? sourceIg : publishedIg;
+        return ig.getPackageId();
+    }
 }

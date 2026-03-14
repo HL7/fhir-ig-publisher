@@ -13,6 +13,7 @@ import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
+import org.hl7.fhir.r5.extensions.ExtensionUtilities;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.OperationDefinition;
@@ -73,7 +74,7 @@ public class IPStatementsRenderer {
       if (su == null) {
         su = new SystemUsage();
         su.system = url;
-        su.cs = ctxt.fetchCodeSystem(url);
+        su.cs = ctxt.fetchCodeSystem(url, IWorkerContext.VersionResolutionRules.defaultRule());
         systems.put(url, su);
       }
       if (!su.uses.contains(source)) {
@@ -271,7 +272,7 @@ public class IPStatementsRenderer {
   
   private void listAllCodeSystemsQ(FetchedResource source, QuestionnaireItemComponent i) {
     if (i.hasAnswerValueSet()) {
-      ValueSet vs = ctxt.fetchResource(ValueSet.class, i.getAnswerValueSet());
+      ValueSet vs = ctxt.fetchResource(ValueSet.class, i.getAnswerValueSet(), ExtensionUtilities.getVersionResolutionRules(i.getAnswerValueSetElement()));
       if (vs != null) {
         listAllCodeSystemsVS(source, vs);
       }
@@ -306,7 +307,7 @@ public class IPStatementsRenderer {
   private void listAllCodeSystemsOD(FetchedResource source, OperationDefinition opd) {
     for (OperationDefinitionParameterComponent p : opd.getParameter()) {
       if (p.getBinding().hasValueSet()) {
-        ValueSet vs = ctxt.fetchResource(ValueSet.class, p.getBinding().getValueSet());
+        ValueSet vs = ctxt.fetchResource(ValueSet.class, p.getBinding().getValueSet(), ExtensionUtilities.getVersionResolutionRules(p.getBinding().getValueSetElement()));
         if (vs != null) {
           listAllCodeSystemsVS(source, vs);
         }
@@ -317,7 +318,7 @@ public class IPStatementsRenderer {
   private void listAllCodeSystemsSD(FetchedResource source, StructureDefinition sd) {
     for (ElementDefinition ed : sd.getDifferential().getElement()) {
       if (ed.getBinding().hasValueSet()) {
-        ValueSet vs = ctxt.fetchResource(ValueSet.class, ed.getBinding().getValueSet());
+        ValueSet vs = ctxt.fetchResource(ValueSet.class, ed.getBinding().getValueSet(), ExtensionUtilities.getVersionResolutionRules(ed.getBinding().getValueSetElement()));
         if (vs != null) {
           listAllCodeSystemsVS(source, vs);
         }

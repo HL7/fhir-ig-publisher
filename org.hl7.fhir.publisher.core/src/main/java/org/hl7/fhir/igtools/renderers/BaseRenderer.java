@@ -14,12 +14,8 @@ import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
 import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.CodeSystem;
+import org.hl7.fhir.r5.model.*;
 import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
-import org.hl7.fhir.r5.model.PrimitiveType;
-import org.hl7.fhir.r5.model.Resource;
-import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.renderers.IMarkdownProcessor;
 import org.hl7.fhir.r5.renderers.RendererFactory;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
@@ -104,7 +100,7 @@ public class BaseRenderer implements IMarkdownProcessor {
       
 
       if (url == null) {
-        Resource r = context.fetchResource(Resource.class, parts[0]);
+        Resource r = context.fetchResource(Resource.class, parts[0], IWorkerContext.VersionResolutionRules.defaultRule());
         if (r == null && Utilities.isAbsoluteUrl(parts[0])) {
           ResourceWithReference rr = gen.getResolver().resolve(gen, parts[0], null);
           if (rr != null) {
@@ -140,7 +136,7 @@ public class BaseRenderer implements IMarkdownProcessor {
       } 
       if (Utilities.noString(url)) {
         String[] paths = parts[0].split("\\.");
-        StructureDefinition p = new ProfileUtilities(context, null, null).getProfile(null, paths[0]);
+        StructureDefinition p = new ProfileUtilities(context, null, null).getProfile(null, new UriType(paths[0]));
         if (p != null) {
           if (p.getWebPath() == null)
             url = paths[0].toLowerCase();
@@ -193,7 +189,7 @@ public class BaseRenderer implements IMarkdownProcessor {
       if (url != null)
         return new StringPair(Utilities.pathURL(map.getBase(), url), null);
     }      
-    CanonicalResource cr = (CanonicalResource) context.fetchResource(Resource.class, linkText);
+    CanonicalResource cr = (CanonicalResource) context.fetchResource(Resource.class, linkText, IWorkerContext.VersionResolutionRules.defaultRule());
     if (cr != null && cr.hasWebPath()) {
       return new StringPair(cr.getWebPath(), cr.present());
     }
@@ -212,7 +208,7 @@ public class BaseRenderer implements IMarkdownProcessor {
 
   protected String renderCommitteeLink(CanonicalResource cr) {
     String code = ExtensionUtilities.readStringExtension(cr, ExtensionDefinitions.EXT_WORKGROUP);
-    CodeSystem cs = context.fetchCodeSystem("http://terminology.hl7.org/CodeSystem/hl7-work-group");
+    CodeSystem cs = context.fetchCodeSystem("http://terminology.hl7.org/CodeSystem/hl7-work-group", IWorkerContext.VersionResolutionRules.defaultRule());
     if (cs == null || !cs.hasWebPath())
       return code;
     else {

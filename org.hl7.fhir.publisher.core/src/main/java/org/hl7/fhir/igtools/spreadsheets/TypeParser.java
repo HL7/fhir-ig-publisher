@@ -200,7 +200,7 @@ public class TypeParser {
           list.add(tc);
         }
       } else if (Utilities.noString(t.getName()) && t.getProfile() != null) {
-        StructureDefinition sd = context.fetchResource(StructureDefinition.class, t.getProfile());
+        StructureDefinition sd = context.fetchResource(StructureDefinition.class, t.getProfile(), IWorkerContext.VersionResolutionRules.defaultRule());
         TypeRefComponent tc = getTypeComponent(list, sd != null ? sd.getType() : t.getName());
         if (t.getVersioning() != null)
           tc.setVersioning(t.getVersioning());

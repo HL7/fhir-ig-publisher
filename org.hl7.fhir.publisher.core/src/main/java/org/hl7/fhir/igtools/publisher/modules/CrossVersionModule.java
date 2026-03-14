@@ -33,26 +33,16 @@ import org.hl7.fhir.r5.extensions.ExtensionUtilities;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.formats.XmlParser;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.CanonicalType;
-import org.hl7.fhir.r5.model.ConceptMap;
-import org.hl7.fhir.r5.model.ElementDefinition;
+import org.hl7.fhir.r5.model.*;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
 import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
-import org.hl7.fhir.r5.model.Extension;
-import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.model.ImplementationGuide.GuidePageGeneration;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionPageComponent;
-import org.hl7.fhir.r5.model.Resource;
-import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionContextComponent;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
-import org.hl7.fhir.r5.model.StructureMap;
 import org.hl7.fhir.r5.model.StructureMap.StructureMapModelMode;
 import org.hl7.fhir.r5.model.StructureMap.StructureMapStructureComponent;
-import org.hl7.fhir.r5.model.UrlType;
-import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.renderers.ConceptMapRenderer;
 import org.hl7.fhir.r5.renderers.ConceptMapRenderer.RenderMultiRowSortPolicy;
 import org.hl7.fhir.r5.renderers.Renderer.RenderingStatus;
@@ -775,7 +765,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
   }
 
   @Override
-  public BindingResolution resolveBinding(StructureDefinition def, String url, String path) throws FHIRException {
+  public BindingResolution resolveBinding(StructureDefinition def, String url, String path, Element ctxt) throws FHIRException {
     return new BindingResolution("todo", "todo");
   }
 
@@ -821,35 +811,35 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
       if (engine.getVdr2().getResourceNamesAsSet().contains(tail) || engine.getVdr2().fetchTypeDefinition(tail) != null) {
         return true;
       }
-      return engine.getVdr2().fetchResource(Resource.class, ref.replace("/1.0/", "/")) != null;
+      return engine.getVdr2().fetchResource(Resource.class, ref.replace("/1.0/", "/"), IWorkerContext.VersionResolutionRules.defaultRule()) != null;
     }
     if (ref.startsWith("http://hl7.org/fhir/3.0/")) {
       String tail = ref.replace("http://hl7.org/fhir/3.0/", "");
       if (engine.getVdr3().getResourceNamesAsSet().contains(tail) || engine.getVdr3().fetchTypeDefinition(tail) != null) {
         return true;
       }
-      return engine.getVdr3().fetchResource(Resource.class, ref.replace("/3.0/", "/")) != null;
+      return engine.getVdr3().fetchResource(Resource.class, ref.replace("/3.0/", "/"), IWorkerContext.VersionResolutionRules.defaultRule()) != null;
     }
     if (ref.startsWith("http://hl7.org/fhir/4.0/")) {
       String tail = ref.replace("http://hl7.org/fhir/4.0/", "");
       if (engine.getVdr4().getResourceNamesAsSet().contains(tail) || engine.getVdr4().fetchTypeDefinition(tail) != null) {
         return true;
       }
-      return engine.getVdr4().fetchResource(Resource.class, ref.replace("/4.0/", "/")) != null;
+      return engine.getVdr4().fetchResource(Resource.class, ref.replace("/4.0/", "/"), IWorkerContext.VersionResolutionRules.defaultRule()) != null;
     }
     if (ref.startsWith("http://hl7.org/fhir/4.3/")) {
       String tail = ref.replace("http://hl7.org/fhir/4.3/", "");
       if (engine.getVdr4b().getResourceNamesAsSet().contains(tail) || engine.getVdr4b().fetchTypeDefinition(tail) != null) {
         return true;
       }
-      return engine.getVdr4b().fetchResource(Resource.class, ref.replace("/4.3/", "/")) != null;
+      return engine.getVdr4b().fetchResource(Resource.class, ref.replace("/4.3/", "/"), IWorkerContext.VersionResolutionRules.defaultRule()) != null;
     }
     if (ref.startsWith("http://hl7.org/fhir/5.0/")) {
       String tail = ref.replace("http://hl7.org/fhir/5.0/", "");
       if (engine.getVdr5().getResourceNamesAsSet().contains(tail) || engine.getVdr5().fetchTypeDefinition(tail) != null) {
         return true;
       }
-      return engine.getVdr5().fetchResource(Resource.class, ref.replace("/5.0/", "/")) != null;
+      return engine.getVdr5().fetchResource(Resource.class, ref.replace("/5.0/", "/"), IWorkerContext.VersionResolutionRules.defaultRule()) != null;
     }
     return false;
   }
@@ -863,7 +853,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
       if (sd != null) {
         return sd;
       }
-      return (CanonicalResource) engine.getVdr2().fetchResource(Resource.class, ref.replace("/1.0/", "/"));
+      return (CanonicalResource) engine.getVdr2().fetchResource(Resource.class, ref.replace("/1.0/", "/"), IWorkerContext.VersionResolutionRules.defaultRule());
     }
     if (ref.startsWith("http://hl7.org/fhir/3.0/")) {
       String tail = ref.replace("http://hl7.org/fhir/3.0/", "");
@@ -871,7 +861,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
       if (sd != null) {
         return sd;
       }
-      return (CanonicalResource) engine.getVdr3().fetchResource(Resource.class, ref.replace("/3.0/", "/"));
+      return (CanonicalResource) engine.getVdr3().fetchResource(Resource.class, ref.replace("/3.0/", "/"), IWorkerContext.VersionResolutionRules.defaultRule());
     }
     if (ref.startsWith("http://hl7.org/fhir/4.0/")) {
       String tail = ref.replace("http://hl7.org/fhir/4.0/", "");
@@ -879,7 +869,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
       if (sd != null) {
         return sd;
       }
-      return (CanonicalResource) engine.getVdr4().fetchResource(Resource.class, ref.replace("/4.0/", "/"));
+      return (CanonicalResource) engine.getVdr4().fetchResource(Resource.class, ref.replace("/4.0/", "/"), IWorkerContext.VersionResolutionRules.defaultRule());
     }
     if (ref.startsWith("http://hl7.org/fhir/4.3/")) {
       String tail = ref.replace("http://hl7.org/fhir/4.3/", "");
@@ -887,7 +877,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
       if (sd != null) {
         return sd;
       }
-      return (CanonicalResource) engine.getVdr4b().fetchResource(Resource.class, ref.replace("/4.3/", "/"));
+      return (CanonicalResource) engine.getVdr4b().fetchResource(Resource.class, ref.replace("/4.3/", "/"), IWorkerContext.VersionResolutionRules.defaultRule());
     }
     if (ref.startsWith("http://hl7.org/fhir/5.0/")) {
       String tail = ref.replace("http://hl7.org/fhir/5.0/", "");
@@ -895,7 +885,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
       if (sd != null) {
         return sd;
       }
-      return (CanonicalResource) engine.getVdr5().fetchResource(Resource.class, ref.replace("/5.0/", "/"));
+      return (CanonicalResource) engine.getVdr5().fetchResource(Resource.class, ref.replace("/5.0/", "/"), IWorkerContext.VersionResolutionRules.defaultRule());
     }
     return null;
   }

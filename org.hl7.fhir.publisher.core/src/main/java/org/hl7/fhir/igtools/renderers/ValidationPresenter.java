@@ -243,7 +243,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
           String url = s.contains(" ") ? s.substring(0, s.indexOf(" ")) : s;
           s = s.contains(" ") ? s.substring(s.indexOf(" ")) : "";
           String specName = getSpecName(url);
-          StructureDefinition sd = context.fetchResource(StructureDefinition.class, url);
+          StructureDefinition sd = context.fetchResource(StructureDefinition.class, url, IWorkerContext.VersionResolutionRules.defaultRule());
           String l = null;
           if (sd != null) {
             l = specName+"<a href=\""+sd.getWebPath()+"\">"+sd.present()+"</a>"+s;
@@ -689,7 +689,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
           tr.td().tx(us.getExpands());
           tr.td().tx(us.getValidates());
           XhtmlNode td = tr.td();
-          CodeSystem cs = context.fetchResource(CodeSystem.class, s);
+          CodeSystem cs = context.fetchResource(CodeSystem.class, s, IWorkerContext.VersionResolutionRules.defaultRule());
           if (cs != null) {
             if (cs.hasWebPath()) {
               td.ah(cs.getWebPath()).tx(cs.present());
@@ -705,7 +705,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       for (String s : nl) { 
         TerminologyClientContextUseCount us = uc.get(s);
         if (us.getReadVS() > 0) {
-          ValueSet vs = context.fetchResource(ValueSet.class, s);
+          ValueSet vs = context.fetchResource(ValueSet.class, s, IWorkerContext.VersionResolutionRules.defaultRule());
           if (vs != null && vs.hasWebPath()) {
             ul.li().ah(vs.getWebPath()).tx(s);
           } else {
@@ -1107,7 +1107,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       " <tr><td>Publication Code:</td><td>$igcode$<span style=\"color: maroon; font-weight: bold\"> $igcodeerror$</span>. PackageId = $packageId$, Canonical = $canonical$</td></tr>\r\n"+
       " <tr><td>Realm Check for $realm$:</td><td><span style=\"color: maroon; font-weight: bold\">$igrealmerror$</span>$realmCheck$</td></tr>\r\n"+
       " <tr><td>Language Info:</td><td>$langInfo$</td></tr>\r\n"+
-      " <tr><td>Publication Request:</td><td>$pubReqCheck$</td></tr>\r\n"+
+      " <tr><td><a href=\"https://confluence.hl7.org/spaces/FHIR/pages/144970227/IG+Publication+Request+Documentation\">Publication Request</a>:</td><td>$pubReqCheck$</td></tr>\r\n"+
       " <tr><td>Supressed Messages:</td><td>$suppressedmsgssummary$</td></tr>\r\n"+
       " <tr><td>Dependency Checks:</td><td>$dependencyCheck$</td></tr>\r\n"+
       " <tr><td>Related IGs:</td><td>$relatedIgs$</td></tr>\r\n"+

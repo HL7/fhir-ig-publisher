@@ -42,10 +42,10 @@ public class ExpansionParameterUtilities {
     }
     String url = value.substring(0, value.indexOf("|"));
     if ("default-valueset-version".equals(name)) {
-      ValueSet vs = context.findTxResource(ValueSet.class, url);
+      ValueSet vs = context.findTxResource(ValueSet.class, url, IWorkerContext.VersionResolutionRules.defaultRule());
       return vs == null ? null : vs.getVersionedUrl();
     } else if ("system-version".equals(name)) {      
-      CodeSystem cs = context.findTxResource(CodeSystem.class, url);
+      CodeSystem cs = context.findTxResource(CodeSystem.class, url, IWorkerContext.VersionResolutionRules.defaultRule());
       if (cs != null && !(cs.getContent() == CodeSystemContentMode.NOTPRESENT && cs.hasSourcePackage() && cs.getSourcePackage().isTHO())) {
         return cs.getVersionedUrl();
       }

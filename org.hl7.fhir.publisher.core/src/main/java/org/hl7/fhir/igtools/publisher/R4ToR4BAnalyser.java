@@ -224,9 +224,9 @@ public class R4ToR4BAnalyser {
   }
 
   private void checkTypeDerivation(StructureDefinition src, String usage, String ref) {
-    StructureDefinition sd = context.fetchResource(StructureDefinition.class, ref);
+    StructureDefinition sd = context.fetchResource(StructureDefinition.class, ref, IWorkerContext.VersionResolutionRules.defaultRule());
     while (sd != null && sd.getDerivation() == TypeDerivationRule.SPECIALIZATION) {
-      sd = context.fetchResource(StructureDefinition.class, sd.getBaseDefinition());      
+      sd = context.fetchResource(StructureDefinition.class, sd.getBaseDefinition(), IWorkerContext.VersionResolutionRules.defaultRule());
     }
     if (sd != null) {
       String type = sd.getType();

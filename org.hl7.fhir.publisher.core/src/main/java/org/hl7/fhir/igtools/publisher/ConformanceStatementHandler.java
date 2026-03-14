@@ -167,7 +167,7 @@ class ConformanceStatementHandler {
     for (ImplementationGuideDefinitionParameterComponent param: thisIg.getDefinition().getParameter()) {
       if (param.getCode().getSystem().equals("http://hl7.org/fhir/tools/CodeSystem/ig-parameters") && param.getCode().getCode().equals("requirements-category-vs")) {
         String valuesetUrl = param.getValue();
-        ValueSet categoriesVs = context.fetchResource(ValueSet.class, valuesetUrl);
+        ValueSet categoriesVs = context.fetchResource(ValueSet.class, valuesetUrl, IWorkerContext.VersionResolutionRules.defaultRule());
         ValueSetExpansionOutcome expansion = context.expandVS(categoriesVs, false, true, 100);
         loadCategories(expansion.getValueset().getExpansion().getContains());
         for (ValueSetExpansionContainsComponent catCode: expansion.getValueset().getExpansion().getContains()) {
@@ -222,7 +222,7 @@ class ConformanceStatementHandler {
     if (messages.isEmpty())
       return;
     String reqUrl = this.rootUrl + "Requirements/fromNarrative";
-    Requirements req = context.fetchResource(Requirements.class, reqUrl);
+    Requirements req = context.fetchResource(Requirements.class, reqUrl, IWorkerContext.VersionResolutionRules.defaultRule());
     Map<String, Requirements.RequirementsStatementComponent> oldReq = new HashMap<>();
     boolean mismatch = false;
     if (req != null) {

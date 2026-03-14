@@ -35,6 +35,7 @@ import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.elementmodel.ParserBase;
 import org.hl7.fhir.r5.elementmodel.Property;
+import org.hl7.fhir.r5.extensions.ExtensionUtilities;
 import org.hl7.fhir.r5.formats.FormatUtilities;
 import org.hl7.fhir.r5.model.*;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
@@ -566,7 +567,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   public String getLinkFor(String corepath, String name) {
     if (noXhtml && name.equals("xhtml"))
       return null;
-    StructureDefinition sd = context.fetchResource(StructureDefinition.class, ProfileUtilities.sdNs(name, null));
+    StructureDefinition sd = context.fetchResource(StructureDefinition.class, ProfileUtilities.sdNs(name, null), IWorkerContext.VersionResolutionRules.defaultRule());
     if (sd != null && sd.hasWebPath())
         return sd.getWebPath();
     sd = contextUtilities.findType(name);
@@ -584,11 +585,11 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       br.display = "(unbound)";
       return br;
     } else {
-      return resolveBinding(profile, binding.getValueSet(), path);
+      return resolveBinding(profile, binding.getValueSet(), path, binding.getValueSetElement());
     }
   }
   
-  public BindingResolution resolveBinding(StructureDefinition profile, String ref, String path) {
+  public BindingResolution resolveBinding(StructureDefinition profile, String ref, String path, org.hl7.fhir.r5.model.Element ctxt) {
     BindingResolution br = new BindingResolution();
     if (ref.startsWith("http://hl7.org/fhir/ValueSet/v3-")) {
       br.url = specPath("v3/"+ref.substring(32)+"/vs.html");
@@ -596,7 +597,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       br.uri = ref;
       br.external = false;
     } else if (ref.startsWith("ValueSet/")) {
-      ValueSet vs = context.findTxResource(ValueSet.class, makeCanonical(ref));
+      ValueSet vs = context.findTxResource(ValueSet.class, makeCanonical(ref), ExtensionUtilities.getVersionResolutionRules(ctxt));
       if (vs == null) {
         br.url = ref;  
         if (ref.equals("http://tools.ietf.org/html/bcp47"))
@@ -622,7 +623,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       }
     } else { 
       if (ref.startsWith("http://hl7.org/fhir/ValueSet/")) {
-        ValueSet vs = context.findTxResource(ValueSet.class, ref);
+        ValueSet vs = context.findTxResource(ValueSet.class, ref, ExtensionUtilities.getVersionResolutionRules(ctxt));
         if (vs != null) { 
           br.url = vs.getWebPath();
           br.display = vs.getName(); 
@@ -659,7 +660,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
           br.display = "LOINC "+code;
         }
       } else {
-        ValueSet vs = context.findTxResource(ValueSet.class, ref);
+        ValueSet vs = context.findTxResource(ValueSet.class, ref, ExtensionUtilities.getVersionResolutionRules(ctxt));
         if (vs != null) {
           if (ref.contains("|")) {
             // for now, we don't do anything different. This is a todo - what can we do? 
@@ -702,7 +703,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
 
   @Override
   public String getLinkForProfile(StructureDefinition profile, String url) {
-    StructureDefinition sd = context.fetchResource(StructureDefinition.class, url);
+    StructureDefinition sd = context.fetchResource(StructureDefinition.class, url, IWorkerContext.VersionResolutionRules.defaultRule());
     if (noXhtml && sd != null && sd.getType().equals("xhtml"))
       return null;
     if (xver.matchingUrl(url)) {
@@ -744,7 +745,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       }
     }
     while (sd.getDerivation() == TypeDerivationRule.CONSTRAINT) {
-      StructureDefinition sdt = context.fetchResource(StructureDefinition.class, sd.getBaseDefinition());
+      StructureDefinition sdt = context.fetchResource(StructureDefinition.class, sd.getBaseDefinition(), ExtensionUtilities.getVersionResolutionRules(sd.getBaseDefinitionElement()));
       if (sdt != null) {
         sd = sdt;
       } else {
@@ -848,7 +849,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     if (ref == null) {
       return null;
     }
-    Resource res = context.fetchResource(Resource.class, ref);
+    Resource res = context.fetchResource(Resource.class, ref, IWorkerContext.VersionResolutionRules.defaultRule());
     if (res != null && res.hasWebPath()) {
       return res.getWebPath();
     }

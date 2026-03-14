@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.hl7.fhir.r5.context.IWorkerContext;
+import org.hl7.fhir.r5.extensions.ExtensionUtilities;
 import org.hl7.fhir.r5.model.ActivityDefinition;
 import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.CapabilityStatement;
@@ -129,94 +130,94 @@ public class DependencyAnalyser {
 
   private void analyseCS(CodeSystem cs) {
     if (cs.hasSupplements()) {
-      dep(cs, "supplements", context.fetchResource(CodeSystem.class, cs.getSupplements()));
+      dep(cs, "supplements", context.fetchResource(CodeSystem.class, cs.getSupplements(), ExtensionUtilities.getVersionResolutionRules(cs.getSupplementsElement())));
     }
   }
 
   private void analyseVS(ValueSet vs) {
     for (ConceptSetComponent inc : vs.getCompose().getInclude()) {
       if (inc.hasSystem()) {
-        dep(vs, "includes from", context.fetchResource(CodeSystem.class, inc.getSystem()));
+        dep(vs, "includes from", context.fetchResource(CodeSystem.class, inc.getSystem(), ExtensionUtilities.getVersionResolutionRules(inc)));
       }
       for (CanonicalType imp : inc.getValueSet()) {
-        dep(vs, "imports", context.fetchResource(ValueSet.class, imp.asStringValue()));
+        dep(vs, "imports", context.fetchResource(ValueSet.class, imp.asStringValue(), ExtensionUtilities.getVersionResolutionRules(imp)));
       }
     }
     for (ConceptSetComponent exc : vs.getCompose().getExclude()) {
       if (exc.hasSystem()) {
-        dep(vs, "excludes from", context.fetchResource(CodeSystem.class, exc.getSystem()));
+        dep(vs, "excludes from", context.fetchResource(CodeSystem.class, exc.getSystem(), ExtensionUtilities.getVersionResolutionRules(exc)));
       }
       for (CanonicalType imp : exc.getValueSet()) {
-        dep(vs, "unimports", context.fetchResource(ValueSet.class, imp.asStringValue()));
+        dep(vs, "unimports", context.fetchResource(ValueSet.class, imp.asStringValue(), ExtensionUtilities.getVersionResolutionRules(imp)));
       }
     }
     for (ValueSetExpansionContainsComponent cc : vs.getExpansion().getContains()) {
       if (cc.hasSystem()) {
-        dep(vs, "contains", context.fetchResource(CodeSystem.class, cc.getSystem()));
+        dep(vs, "contains", context.fetchResource(CodeSystem.class, cc.getSystem(), ExtensionUtilities.getVersionResolutionRules(cc.getSystemElement())));
       }
     }
   }
 
   private void analyseCM(ConceptMap cm) {
     if (cm.hasSourceScope()) {
-      dep(cm, "has scope", context.fetchResource(ValueSet.class, cm.getSourceScope().primitiveValue()));
+      dep(cm, "has scope", context.fetchResource(ValueSet.class, cm.getSourceScope().primitiveValue(), ExtensionUtilities.getVersionResolutionRules(cm.getSourceScope())));
     }
     if (cm.hasTargetScope()) {
-      dep(cm, "has target", context.fetchResource(ValueSet.class, cm.getTargetScope().primitiveValue()));
+      dep(cm, "has target", context.fetchResource(ValueSet.class, cm.getTargetScope().primitiveValue(), ExtensionUtilities.getVersionResolutionRules(cm.getTargetScope())));
     }
     for (ConceptMapGroupComponent g : cm.getGroup()) {
       if (g.hasSource()) {
-        dep(cm, "has scope", context.fetchResource(CodeSystem.class, g.getSource()));
+        dep(cm, "has scope", context.fetchResource(CodeSystem.class, g.getSource(), ExtensionUtilities.getVersionResolutionRules(g.getSourceElement())));
       }
       if (g.hasTarget()) {
-        dep(cm, "has target", context.fetchResource(CodeSystem.class, g.getTarget()));
+        dep(cm, "has target", context.fetchResource(CodeSystem.class, g.getTarget(), ExtensionUtilities.getVersionResolutionRules(g.getTargetElement())));
       }
     }
   }
 
   private void analyseCPS(CapabilityStatement cs) {
     for (CanonicalType imp : cs.getInstantiates()) {
-      dep(cs, "instantiates", context.fetchResource(CapabilityStatement.class, imp.getValue()));
+      dep(cs, "instantiates", context.fetchResource(CapabilityStatement.class, imp.getValue(), ExtensionUtilities.getVersionResolutionRules(imp)));
     }
     for (CanonicalType imp : cs.getImports()) {
-      dep(cs, "imports", context.fetchResource(CapabilityStatement.class, imp.getValue()));
+      dep(cs, "imports", context.fetchResource(CapabilityStatement.class, imp.getValue(), ExtensionUtilities.getVersionResolutionRules(imp)));
     }
     for (CapabilityStatementRestComponent rest : cs.getRest()) {
       for (CapabilityStatementRestResourceComponent r : rest.getResource()) {
-        dep(cs, "uses profile", context.fetchResource(StructureDefinition.class, r.getProfile()));
+        dep(cs, "uses profile", context.fetchResource(StructureDefinition.class, r.getProfile(), ExtensionUtilities.getVersionResolutionRules(r.getProfileElement())));
         for (CanonicalType sp : r.getSupportedProfile()) {          
-          dep(cs, "uses profile", context.fetchResource(StructureDefinition.class, sp.asStringValue()));
+          dep(cs, "uses profile", context.fetchResource(StructureDefinition.class, sp.asStringValue(), ExtensionUtilities.getVersionResolutionRules(sp)));
         }
         for (CapabilityStatementRestResourceSearchParamComponent cp : r.getSearchParam()) {
-          dep(cs, "uses", context.fetchResource(SearchParameter.class, cp.getDefinition()));          
+          dep(cs, "uses", context.fetchResource(SearchParameter.class, cp.getDefinition(), ExtensionUtilities.getVersionResolutionRules(cp.getDefinitionElement())));
         }
         for (CapabilityStatementRestResourceOperationComponent cp : r.getOperation()) {
-          dep(cs, "uses", context.fetchResource(OperationDefinition.class, cp.getDefinition()));          
+          dep(cs, "uses", context.fetchResource(OperationDefinition.class, cp.getDefinition(), ExtensionUtilities.getVersionResolutionRules(cp.getDefinitionElement())));
         }
       }
       for (CapabilityStatementRestResourceSearchParamComponent cp : rest.getSearchParam()) {
-        dep(cs, "uses", context.fetchResource(SearchParameter.class, cp.getDefinition()));          
+        dep(cs, "uses", context.fetchResource(SearchParameter.class, cp.getDefinition(), ExtensionUtilities.getVersionResolutionRules(cp.getDefinitionElement())));
       }
       for (CapabilityStatementRestResourceOperationComponent cp : rest.getOperation()) {
-        dep(cs, "uses", context.fetchResource(OperationDefinition.class, cp.getDefinition()));          
+        dep(cs, "uses", context.fetchResource(OperationDefinition.class, cp.getDefinition(), ExtensionUtilities.getVersionResolutionRules(cp.getDefinitionElement())));
       }
     }
   }
 
   private void analyseSD(StructureDefinition sd) {
     if (sd.hasBaseDefinition()) {
-      dep(sd, "derives from", context.fetchResource(StructureDefinition.class, sd.getBaseDefinition()));
+      dep(sd, "derives from", context.fetchResource(StructureDefinition.class, sd.getBaseDefinition(), ExtensionUtilities.getVersionResolutionRules(sd.getBaseDefinitionElement())));
     } 
     for (ElementDefinition ed : sd.getDifferential().getElement()) {
       if (ed.getBinding().hasValueSet()) {
-        dep(sd, "binds to", context.fetchResource(ValueSet.class, ed.getBinding().getValueSet()));
+        dep(sd, "binds to", context.fetchResource(ValueSet.class, ed.getBinding().getValueSet(), ExtensionUtilities.getVersionResolutionRules(ed.getBinding().getValueSetElement())));
       }
       for (TypeRefComponent tr : ed.getType()) {
         for (CanonicalType p : tr.getProfile()) {
-          dep(sd, "uses", context.fetchResource(Resource.class, p.asStringValue()));
+          dep(sd, "uses", context.fetchResource(Resource.class, p.asStringValue(), ExtensionUtilities.getVersionResolutionRules(p)));
         }
         for (CanonicalType p : tr.getTargetProfile()) {
-          dep(sd, "refers to", context.fetchResource(Resource.class, p.asStringValue()));
+          dep(sd, "refers to", context.fetchResource(Resource.class, p.asStringValue(), ExtensionUtilities.getVersionResolutionRules(p)));
         }
       }
     }
@@ -224,16 +225,16 @@ public class DependencyAnalyser {
 
   private void analyseIG(ImplementationGuide ig) {
     for (ImplementationGuideGlobalComponent g : ig.getGlobal()) {
-      dep(ig, "makes global", context.fetchResource(StructureDefinition.class, g.getProfile()));
+      dep(ig, "makes global", context.fetchResource(StructureDefinition.class, g.getProfile(), ExtensionUtilities.getVersionResolutionRules(g.getProfileElement())));
     } 
   }
 
   private void analyseSP(SearchParameter sp) {
     if (sp.hasDerivedFrom()) {
-      dep(sp, "derives from", context.fetchResource(SearchParameter.class, sp.getDerivedFrom()));
+      dep(sp, "derives from", context.fetchResource(SearchParameter.class, sp.getDerivedFrom(), ExtensionUtilities.getVersionResolutionRules(sp.getDerivedFromElement())));
     } 
     for (SearchParameterComponentComponent c : sp.getComponent()) {
-      dep(sp, "derives from", context.fetchResource(SearchParameter.class, c.getDefinition()));
+      dep(sp, "derives from", context.fetchResource(SearchParameter.class, c.getDefinition(), ExtensionUtilities.getVersionResolutionRules(c.getDefinitionElement())));
     }
   }
 
@@ -242,20 +243,20 @@ public class DependencyAnalyser {
 
   private void analyseOPD(OperationDefinition opd) {
     if (opd.hasBase()) {
-      dep(opd, "derives from", context.fetchResource(OperationDefinition.class, opd.getBase()));
+      dep(opd, "derives from", context.fetchResource(OperationDefinition.class, opd.getBase(), ExtensionUtilities.getVersionResolutionRules(opd.getBaseElement())));
     } 
     if (opd.hasInputProfile()) {
-      dep(opd, "uses", context.fetchResource(StructureDefinition.class, opd.getInputProfile()));
+      dep(opd, "uses", context.fetchResource(StructureDefinition.class, opd.getInputProfile(), ExtensionUtilities.getVersionResolutionRules(opd.getInputProfileElement())));
     } 
     if (opd.hasOutputProfile()) {
-      dep(opd, "uses", context.fetchResource(StructureDefinition.class, opd.getOutputProfile()));
+      dep(opd, "uses", context.fetchResource(StructureDefinition.class, opd.getOutputProfile(), ExtensionUtilities.getVersionResolutionRules(opd.getOutputProfileElement())));
     } 
     for (OperationDefinitionParameterComponent c : opd.getParameter()) {
       if (c.getBinding().hasValueSet()) {
-        dep(opd, "binds to", context.fetchResource(ValueSet.class, c.getBinding().getValueSet()));        
+        dep(opd, "binds to", context.fetchResource(ValueSet.class, c.getBinding().getValueSet(), ExtensionUtilities.getVersionResolutionRules(c.getBinding().getValueSetElement())));
       }
       for (CanonicalType ct : c.getTargetProfile()) {
-        dep(opd, "refers to", context.fetchResource(StructureDefinition.class, ct.getValue()));
+        dep(opd, "refers to", context.fetchResource(StructureDefinition.class, ct.getValue(), ExtensionUtilities.getVersionResolutionRules(ct)));
       }
     }
   }
@@ -266,10 +267,10 @@ public class DependencyAnalyser {
 
   private void analyseSM(StructureMap sm) {
     for (StructureMapStructureComponent ref : sm.getStructure()) {
-      dep(sm, "refers to", context.fetchResource(StructureDefinition.class, ref.getUrl()));
+      dep(sm, "refers to", context.fetchResource(StructureDefinition.class, ref.getUrl(), ExtensionUtilities.getVersionResolutionRules(ref.getUrlElement())));
     }
     for (CanonicalType ct : sm.getImport()) {
-      dep(sm, "imports", context.fetchResource(StructureMap.class, ct.getValue()));
+      dep(sm, "imports", context.fetchResource(StructureMap.class, ct.getValue(), ExtensionUtilities.getVersionResolutionRules(ct)));
     }
   }
 
@@ -307,7 +308,7 @@ public class DependencyAnalyser {
 
   private void analyseQ(Questionnaire q) {
     for (CanonicalType ct : q.getDerivedFrom()) {
-      dep(q, "derives from", context.fetchResource(Questionnaire.class, ct.getValue()));
+      dep(q, "derives from", context.fetchResource(Questionnaire.class, ct.getValue(), ExtensionUtilities.getVersionResolutionRules(ct)));
     } 
     for (QuestionnaireItemComponent item : q.getItem()) {
       analyseQItem(q, item);
@@ -316,7 +317,7 @@ public class DependencyAnalyser {
 
   private void analyseQItem(Questionnaire q, QuestionnaireItemComponent item) {
     if (item.hasAnswerValueSet()) {
-      dep(q, "binds to", context.fetchResource(ValueSet.class, item.getAnswerValueSet()));
+      dep(q, "binds to", context.fetchResource(ValueSet.class, item.getAnswerValueSet(), ExtensionUtilities.getVersionResolutionRules(item.getAnswerValueSetElement())));
     }    
     for (QuestionnaireItemComponent i : item.getItem()) {
       analyseQItem(q, i);

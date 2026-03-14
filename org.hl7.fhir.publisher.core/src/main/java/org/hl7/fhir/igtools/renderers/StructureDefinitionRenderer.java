@@ -199,12 +199,12 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
                 tryAdd(ext, summariseExtension(t.getProfile(), true));
               } else {
                 for (CanonicalType ct : t.getProfile()) {
-                  tryAdd(refs, describeProfile(ct.getValue()));
+                  tryAdd(refs, describeProfile(ct));
                 }
               }
             }
             for (CanonicalType ct : t.getTargetProfile()) {
-              tryAdd(refs, describeProfile(ct.getValue()));
+              tryAdd(refs, describeProfile(ct));
             }
           }
 
@@ -372,7 +372,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (profiles.size() != 1)
       throw new Exception(gen.formatPhrase(RenderingI18nContext.SDR_MULTIPLE_PROFILES)+" (#1)"); 
     String url = profiles.get(0).getValue();
-    StructureDefinition ed = context.fetchResource(StructureDefinition.class, url);
+    StructureDefinition ed = context.fetchResource(StructureDefinition.class, url, ExtensionUtilities.getVersionResolutionRules(profiles.get(0)));
     if (ed == null)
       return "<li>" + gen.formatPhrase(RenderingI18nContext.SD_SUMMARY_MISSING_EXTENSION, url) + "</li>";
     if (ed.getWebPath() == null)
@@ -381,11 +381,12 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       return "<li><a href=\"" + Utilities.escapeXml(ed.getWebPath()) + "\">" + url + "</a>" + (modifier ? " (<b>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_MODIF)) + "</b>) " : "") + "</li>\r\n";
   }
 
-  private String describeProfile(String url) throws Exception {
+  private String describeProfile(CanonicalType ct) throws Exception {
+    String url = ct.primitiveValue();
     if (url.startsWith("http://hl7.org/fhir/StructureDefinition/") && (igp.isDatatype(url.substring(40)) || igp.isResource(url.substring(40)) || "Resource".equals(url.substring(40))))
       return null;
 
-    StructureDefinition ed = context.fetchResource(StructureDefinition.class, url);
+    StructureDefinition ed = context.fetchResource(StructureDefinition.class, url, ExtensionUtilities.getVersionResolutionRules(ct));
     if (ed == null)
       return "<li>" + gen.formatPhrase(RenderingI18nContext.SD_SUMMARY_MISSING_PROFILE, url) + "</li>";
     return "<li><a href=\"" + Utilities.escapeXml(ed.getWebPath()) + "\">" + ed.present() + " <span style=\"font-size: 8px\">(" + url + ")</span></a></li>\r\n";
@@ -442,7 +443,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       return "" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_LOINC)) + " " + coding.getCode() + (!coding.hasDisplay() ? "" : "(\"" + gen.getTranslated(coding.getDisplayElement()) + "\")");
     if ("http://unitsofmeasure.org/".equals(coding.getSystem()))
       return " (" + (gen.formatPhrase(RenderingI18nContext.GENERAL_UCUM)) + ": " + coding.getCode() + ")";
-    CodeSystem cs = context.fetchCodeSystem(coding.getSystem());
+    CodeSystem cs = context.fetchCodeSystem(coding.getSystem(), IWorkerContext.VersionResolutionRules.defaultRule());
     if (cs == null)
       return "<span title=\"" + coding.getSystem() + "\">" + coding.getCode() + "</a>" + (!coding.hasDisplay() ? "" : "(\"" + gen.getTranslated(coding.getDisplayElement()) + "\")");
     else
@@ -699,7 +700,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       urls.retainAll(SIGNIFICANT_EXTENSIONS);
       boolean bindingChanged = false;
       String basePath = child.getBase().getPath();
-      StructureDefinition baseType = context.fetchResource(StructureDefinition.class, "http://hl7.org/fhir/StructureDefinition/" + basePath.substring(0, basePath.indexOf(".")));
+      StructureDefinition baseType = context.fetchResource(StructureDefinition.class,
+              "http://hl7.org/fhir/StructureDefinition/" + basePath.substring(0, basePath.indexOf(".")), IWorkerContext.VersionResolutionRules.defaultRule());
       ElementDefinition baseElement = null;
       for (ElementDefinition e: baseType.getSnapshot().getElement()) {
         if (e.getPath().equals(basePath)) {
@@ -928,10 +930,12 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
     boolean inherited = ed.hasUserData(UserDataNames.SNAPSHOT_DERIVATION_POINTER);
     String uri = null;
+    IWorkerContext.VersionResolutionRules resolutionMethod = null;
     if (tx.getValueSet() != null) {
       uri = tx.getValueSet().trim();
+      resolutionMethod = ExtensionUtilities.getVersionResolutionRules(tx.getValueSetElement());
     }
-    ValueSet vs = context.findTxResource(ValueSet.class, canonicalise(uri));
+    ValueSet vs = context.findTxResource(ValueSet.class, canonicalise(uri), ExtensionUtilities.getVersionResolutionRules(tx.getValueSetElement()));
     if (vs == null) {
       String name = getSpecialValueSetName(uri);
       if (name != null) {
@@ -947,7 +951,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           td.ah(prefix + br.url).style("opacity: "+opacityStr(inherited)).tx(br.display);
           td.button("btn-copy", gen.formatPhrase(RenderingI18nContext.SDR_CLICK_COPY)).setAttribute("data-clipboard-text", tx.getValueSet());
         }
-        showVersion(tr.td(), uri, null);
+        showVersion(tr.td(), uri, resolutionMethod,null);
         tr.td().tx("Unknown");
       }
     } else {
@@ -961,7 +965,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       if (vs.hasUserData(UserDataNames.render_external_link)) {
         td.img("external.png", ".");
       }
-      showVersion(tr.td(), uri, vs);
+      showVersion(tr.td(), uri, resolutionMethod, vs);
 
       String src = null;
       String link = null;
@@ -1070,12 +1074,12 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
   }
 
-  private void showVersion(XhtmlNode td, String uri, ValueSet vs) {
+  private void showVersion(XhtmlNode td, String uri, IWorkerContext.VersionResolutionRules resolutionMethod, ValueSet vs) {
     String statedVersion = uri != null && uri.contains("|") ? uri.substring(uri.indexOf("|")+1) : null;
     String actualVersion = vs == null ? null : vs.getVersion();
     boolean fromPackages = vs == null ? false : vs.hasSourcePackage();
     boolean fromThisPackage = vs == null ? false : !Utilities.isAbsoluteUrlLinkable(vs.getWebPath());
-    ResourceRenderer.renderVersionReference(gen, vs, statedVersion, actualVersion, fromPackages, td, fromThisPackage, gen.formatPhrase(RenderingContext.GENERAL_VALUESET), RenderingI18nContext.VS_VERSION_NOTHING_TEXT);
+    ResourceRenderer.renderVersionReference(gen, vs, statedVersion, resolutionMethod, actualVersion, fromPackages, td, fromThisPackage, gen.formatPhrase(RenderingContext.GENERAL_VALUESET), RenderingI18nContext.VS_VERSION_NOTHING_TEXT);
   }
 
   private String opacityStr(boolean inherited) {
@@ -1500,7 +1504,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     b.append("</div>\r\n");
     if (sd.getDerivation() == TypeDerivationRule.CONSTRAINT) {
       b.append("<p class=\"profile-derivation\">\r\n");
-      StructureDefinition sdb = context.fetchResource(StructureDefinition.class, sd.getBaseDefinition());
+      StructureDefinition sdb = context.fetchResource(StructureDefinition.class, sd.getBaseDefinition(), ExtensionUtilities.getVersionResolutionRules(sd.getBaseDefinitionElement()));
       if (sdb != null)
         b.append(gen.formatPhrase(RenderingI18nContext.STRUC_DEF_PROFILE_BUILDS) + " <a href=\"" + Utilities.escapeXml(sdb.getWebPath()) + "\">" + gen.getTranslated(sdb.getNameElement()) + "</a>.");
       else
@@ -1864,7 +1868,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       b.append("{");
       b.append("<span style=\"color: darkgreen\"><a href=\"" + Utilities.escapeXml(suffix(getSrcFile(type.getWorkingCode()), type.getWorkingCode())) + "\">" + type.getWorkingCode() + "</a></span>");
       if (type.hasProfile()) {
-        StructureDefinition tsd = context.fetchResource(StructureDefinition.class, type.getProfile().get(0).getValue());
+        StructureDefinition tsd = context.fetchResource(StructureDefinition.class, type.getProfile().get(0).getValue(),
+                ExtensionUtilities.getVersionResolutionRules(type.getProfile().get(0)));
         if (tsd != null)
           b.append(" (as <span style=\"color: darkgreen\"><a href=\"" + Utilities.escapeXml(tsd.getWebPath()) + "#" + tsd.getType() + "\">" + tsd.getName() + "</a></span>)");
         else
@@ -1902,7 +1907,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     // 4. doco
     if (!elem.hasFixed()) {
       if (elem.hasBinding() && elem.getBinding().hasValueSet()) {
-        ValueSet vs = context.findTxResource(ValueSet.class, elem.getBinding().getValueSet());
+        ValueSet vs = context.findTxResource(ValueSet.class, elem.getBinding().getValueSet(), ExtensionUtilities.getVersionResolutionRules(elem.getBinding().getValueSetElement()));
         if (vs != null) {
           b.append(" <span style=\"color: navy; opacity: 0.8\"><a href=\"" + corePath + vs.getUserData(UserDataNames.render_filename) + ".html\" style=\"color: navy\">" + Utilities.escapeXml(elem.getShort()) + "</a></span>");
         } else {
@@ -2068,7 +2073,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       List<CanonicalType> profiles = slice.getTypeFirstRep().getProfile();
       // Won't have a profile if this slice is part of a complex extension
       String url = profiles.isEmpty() ? null : profiles.get(0).getValue();
-      StructureDefinition sdExt = url == null ? null : context.fetchResource(StructureDefinition.class, url);
+      StructureDefinition sdExt = url == null ? null : context.fetchResource(StructureDefinition.class, url, ExtensionUtilities.getVersionResolutionRules(profiles.get(0)));
       b.append(indentS + "  ");
       b.append("{ // <span style=\"color: navy; opacity: 0.8\">");
       writeCardinality(unbounded, b, slice);
@@ -2130,12 +2135,12 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
   private boolean hasType(String code) {
-    StructureDefinition sd = context.fetchResource(StructureDefinition.class, ProfileUtilities.sdNs(code, null));
+    StructureDefinition sd = context.fetchResource(StructureDefinition.class, ProfileUtilities.sdNs(code, null), IWorkerContext.VersionResolutionRules.defaultRule());
     return sd != null && (sd.getKind() == StructureDefinitionKind.PRIMITIVETYPE || sd.getKind() == StructureDefinitionKind.COMPLEXTYPE);
   }
 
   private String getSrcFile(String code) {
-    StructureDefinition sd = context.fetchResource(StructureDefinition.class, ProfileUtilities.sdNs(code, null));
+    StructureDefinition sd = context.fetchResource(StructureDefinition.class, ProfileUtilities.sdNs(code, null), IWorkerContext.VersionResolutionRules.defaultRule());
     if (sd == null)
       return "?sd-src?";
     else {
@@ -2670,7 +2675,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   public String crumbTrail() {
     CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder(" -&lt; ");
     b.append(sd.getName());
-    StructureDefinition t = context.fetchResource(StructureDefinition.class, sd.getBaseDefinition());
+    StructureDefinition t = context.fetchResource(StructureDefinition.class, sd.getBaseDefinition(), ExtensionUtilities.getVersionResolutionRules(sd.getBaseDefinitionElement()));
     while (t != null) {
       PackageInformation srcInfo = t.getSourcePackage();
       String s = "";
@@ -2679,7 +2684,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       }
       s = s + "<a href=\""+t.getWebPath()+"\">"+t.getName()+"</a>";
       b.append(s);
-      t = t.getDerivation() == TypeDerivationRule.SPECIALIZATION ? null : context.fetchResource(StructureDefinition.class, t.getBaseDefinition());
+      t = t.getDerivation() == TypeDerivationRule.SPECIALIZATION ? null : context.fetchResource(StructureDefinition.class, t.getBaseDefinition(), ExtensionUtilities.getVersionResolutionRules(t.getBaseDefinitionElement()));
     }
     return b.toString();
   }
@@ -2762,7 +2767,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     row.getCells().add(gc);
     if (element.types().size() == 1) {
       PEType t = element.types().get(0);
-      StructureDefinition sd = context.fetchResource(StructureDefinition.class, t.getUrl());
+      StructureDefinition sd = context.fetchResource(StructureDefinition.class, t.getUrl(), IWorkerContext.VersionResolutionRules.defaultRule());
       if (sd != null) {
         gc.addPiece(gen.new Piece(sd.getWebPath(), t.getName(), t.getType()));        
       } else {
@@ -2811,7 +2816,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         // type
         gc = gen.new Cell();
         trow.getCells().add(gc);
-        StructureDefinition sd = context.fetchResource(StructureDefinition.class, t.getUrl());
+        StructureDefinition sd = context.fetchResource(StructureDefinition.class, t.getUrl(), IWorkerContext.VersionResolutionRules.defaultRule());
         if (sd != null) {
           gc.addPiece(gen.new Piece(sd.getWebPath(), t.getName(), t.getType()));        
         } else {
@@ -2911,7 +2916,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         case EXTENSION:
           li.tx(gen.formatPhrase(RenderingI18nContext.SDR_EXT_EXT)); 
           li.tx(": ");
-          t = context.fetchResource(StructureDefinition.class, c.getExpression());
+          t = context.fetchResource(StructureDefinition.class, c.getExpression(), ExtensionUtilities.getVersionResolutionRules(c.getExpressionElement()));
           if (t != null && t.hasWebPath()) {
             li.ah(t.getWebPath()).tx(t.present());
           } else {
@@ -3092,7 +3097,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
       if (sd.hasExtension(ExtensionDefinitions.EXT_TYPE_OPERATION)) {
         for (Extension ext : sd.getExtensionsByUrl(ExtensionDefinitions.EXT_TYPE_OPERATION)) {
-          OperationDefinition od = context.fetchResource(OperationDefinition.class, ext.getValue().primitiveValue(), null, sd);
+          OperationDefinition od = context.fetchResource(OperationDefinition.class, ext.getValue().primitiveValue(),
+                  ExtensionUtilities.getVersionResolutionRules(ext.getValue()), null, sd);
           if (od != null) {
             tr = tbl.tr();
             tr.style("padding: 0px; background-color: white");

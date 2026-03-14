@@ -22,32 +22,16 @@ import org.hl7.fhir.r5.extensions.ExtensionUtilities;
 import org.hl7.fhir.r5.fhirpath.ExpressionNode;
 import org.hl7.fhir.r5.fhirpath.ExpressionNode.Kind;
 import org.hl7.fhir.r5.fhirpath.FHIRPathEngine;
-import org.hl7.fhir.r5.model.ActorDefinition;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.CanonicalType;
-import org.hl7.fhir.r5.model.CodeSystem;
+import org.hl7.fhir.r5.model.*;
 import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
-import org.hl7.fhir.r5.model.CodeableConcept;
-import org.hl7.fhir.r5.model.Coding;
-import org.hl7.fhir.r5.model.ConceptMap;
 import org.hl7.fhir.r5.model.ConceptMap.ConceptMapGroupComponent;
-import org.hl7.fhir.r5.model.DataType;
-import org.hl7.fhir.r5.model.DomainResource;
-import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingAdditionalComponent;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
 import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
-import org.hl7.fhir.r5.model.Extension;
-import org.hl7.fhir.r5.model.OperationDefinition;
 import org.hl7.fhir.r5.model.OperationDefinition.OperationDefinitionParameterComponent;
-import org.hl7.fhir.r5.model.Questionnaire;
 import org.hl7.fhir.r5.model.Questionnaire.QuestionnaireItemComponent;
-import org.hl7.fhir.r5.model.Resource;
-import org.hl7.fhir.r5.model.SearchParameter;
-import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.ExtensionContextType;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionContextComponent;
-import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.renderers.DataRenderer;
 import org.hl7.fhir.r5.renderers.Renderer;
@@ -678,7 +662,7 @@ public class CrossViewRenderer extends Renderer {
       boolean first = true;
       if (binding != null) {
         b.append("<a href=\"" + Utilities.pathURL(corePath, "terminologies.html#" + binding.getStrength().toCode()) + "\">" + binding.getStrength().toCode() + "</a> VS ");
-        ValueSet vs = worker.findTxResource(ValueSet.class, binding.getValueSet());
+        ValueSet vs = worker.findTxResource(ValueSet.class, binding.getValueSet(), ExtensionUtilities.getVersionResolutionRules(binding.getValueSetElement()));
         if (vs == null) {
           b.append(Utilities.escapeXml(binding.getValueSet()));
         } else if (vs.hasWebPath()) {
@@ -694,7 +678,7 @@ public class CrossViewRenderer extends Renderer {
           if (sys.equals(t.getSystem()))
             sys = null;
           if (sys == null) {
-            CodeSystem cs = worker.fetchCodeSystem(t.getSystem());
+            CodeSystem cs = worker.fetchCodeSystem(t.getSystem(), IWorkerContext.VersionResolutionRules.defaultRule());
             if (cs != null)
               sys = cs.getTitle();
           }
@@ -704,7 +688,7 @@ public class CrossViewRenderer extends Renderer {
             //          if (Utilities.existsInList(t.getSystem(), "http://loinc.org"))
             //            b.append("<span title=\""+t.getSystem()+(sys == null ? "" : " ("+sys+")")+": "+ vr.getDisplay()+"\">"+t.getCode()+" "+vr.getDisplay()+"</span>");           
             //          else {
-            CodeSystem cs = worker.fetchCodeSystem(t.getSystem());
+            CodeSystem cs = worker.fetchCodeSystem(t.getSystem(), IWorkerContext.VersionResolutionRules.defaultRule());
             if (cs != null && cs.hasWebPath()) {
               b.append("<a href=\"" + cs.getWebPath() + "#" + cs.getId() + "-" + t.getCode() + "\" title=\"" + t.getSystem() + (sys == null ? "" : " (" + sys + ")") + ": " + vr.getDisplay() + "\">" + t.getCode() + "</a>");
             } else {
@@ -859,10 +843,10 @@ public class CrossViewRenderer extends Renderer {
       List<String> ancestors = new ArrayList<>();
       StructureDefinition t = worker.fetchTypeDefinition(type);
       if (t != null) {
-        t = worker.fetchResource(StructureDefinition.class, t.getBaseDefinition());
+        t = worker.fetchResource(StructureDefinition.class, t.getBaseDefinition(), ExtensionUtilities.getVersionResolutionRules(t.getBaseDefinitionElement()));
         while (t != null) {
           ancestors.add(t.getType());
-          t = worker.fetchResource(StructureDefinition.class, t.getBaseDefinition());
+          t = worker.fetchResource(StructureDefinition.class, t.getBaseDefinition(), ExtensionUtilities.getVersionResolutionRules(t.getBaseDefinitionElement()));
         }
       }
 
@@ -1077,7 +1061,7 @@ public class CrossViewRenderer extends Renderer {
       } else if (ec.getType() == ExtensionContextType.FHIRPATH) {
         td.tx(Utilities.escapeXml(ec.getExpression()));
       } else if (ec.getType() == ExtensionContextType.EXTENSION) {
-        StructureDefinition extension = worker.fetchResource(StructureDefinition.class, ec.getExpression());
+        StructureDefinition extension = worker.fetchResource(StructureDefinition.class, ec.getExpression(), ExtensionUtilities.getVersionResolutionRules(ec.getExpressionElement()));
         if (extension == null)
           td.tx(Utilities.escapeXml(ec.getExpression()));
         else {
@@ -1369,7 +1353,7 @@ public class CrossViewRenderer extends Renderer {
 
   private void resolveVS(List<ValueSet> list, String url, Resource source) {
     if (url != null) {
-      ValueSet vs = context.getContext().findTxResource(ValueSet.class, url);
+      ValueSet vs = context.getContext().findTxResource(ValueSet.class, url, IWorkerContext.VersionResolutionRules.defaultRule());
       if (vs != null) {
         if (!vs.hasUserData(UserDataNames.pub_xref_used)) {
           vs.setUserData(UserDataNames.pub_xref_used, new HashSet<>());
@@ -1531,7 +1515,7 @@ public class CrossViewRenderer extends Renderer {
   }
 
   private String describeSource(String uri) {
-    CodeSystem cs = worker.fetchCodeSystem(uri);
+    CodeSystem cs = worker.fetchCodeSystem(uri, IWorkerContext.VersionResolutionRules.defaultRule());
     if (cs != null) {
       if (!Utilities.isAbsoluteUrl(cs.getWebPath())) {
         return "Internal";
@@ -1613,17 +1597,17 @@ public class CrossViewRenderer extends Renderer {
   private void findCodeSystems(List<CodeSystem> list, OperationDefinition opd, boolean all) {
     for (OperationDefinitionParameterComponent p : opd.getParameter()) {
       if (p.hasBinding()) {
-        resolveCSFromVS(list, p.getBinding().getValueSet(), all, opd);
+        resolveCSFromVS(list, p.getBinding().getValueSetElement(), all, opd);
       }
     }
   }
 
   private void findCodeSystems(List<CodeSystem> list, ConceptMap cm, boolean all) {
-    resolveCSFromVS(list, cm.getSourceScope(), all, cm);
-    resolveCSFromVS(list, cm.getTargetScope(), all, cm);
+    resolveCSFromVS(list, cm.getSourceScopeUriType(), all, cm);
+    resolveCSFromVS(list, cm.getTargetScopeUriType(), all, cm);
     for (ConceptMapGroupComponent grp : cm.getGroup()) {
-      resolveCS(list, grp.getSource(), cm);
-      resolveCS(list, grp.getTarget(), cm);
+      resolveCS(list, grp.getSourceElement(), cm);
+      resolveCS(list, grp.getTargetElement(), cm);
     }
   }
 
@@ -1634,7 +1618,7 @@ public class CrossViewRenderer extends Renderer {
   }
 
   private void findCodeSystems(List<CodeSystem> list, QuestionnaireItemComponent item, boolean all, Resource source) {
-    resolveCSFromVS(list, item.getAnswerValueSet(), all, source);
+    resolveCSFromVS(list, item.getAnswerValueSetElement(), all, source);
     for (QuestionnaireItemComponent c : item.getItem()) {
       findCodeSystems(list, c, all, source);
     }
@@ -1654,42 +1638,37 @@ public class CrossViewRenderer extends Renderer {
 
   private void findCodeSystems(List<CodeSystem> list, ElementDefinition ed, boolean all, Resource source) {
     if (ed.hasBinding()) {
-      resolveCSFromVS(list, ed.getBinding().getValueSet(), all, source);
+      resolveCSFromVS(list, ed.getBinding().getValueSetElement(), all, source);
       for (ElementDefinitionBindingAdditionalComponent ab : ed.getBinding().getAdditional()) {
-        resolveCSFromVS(list, ab.getValueSet(), all, source);
+        resolveCSFromVS(list, ab.getValueSetElement(), all, source);
       }
     }
   }
 
   private void findCodeSystems(List<CodeSystem> list, ValueSet vs, boolean all, Resource source) {
     for (ConceptSetComponent inc : vs.getCompose().getInclude()) {
-      resolveCS(list, inc.getSystem(), vs);
+      resolveCS(list, inc.getSystemElement(), vs);
     }
     if (all) {
       for (ConceptSetComponent inc : vs.getCompose().getInclude()) {
-        resolveCS(list, inc.getSystem(), vs);
+        resolveCS(list, inc.getSystemElement(), vs);
       }
     }
   }
 
-  private void resolveCSFromVS(List<CodeSystem> list, String valueSet, boolean all, Resource resource) {
+  private void resolveCSFromVS(List<CodeSystem> list, UriType valueSet, boolean all, Resource resource) {
     if (valueSet != null) {
-      ValueSet vs = context.getContext().findTxResource(ValueSet.class, valueSet);
+      ValueSet vs = context.getContext().findTxResource(ValueSet.class, valueSet.primitiveValue(), ExtensionUtilities.getVersionResolutionRules(valueSet));
       if (vs != null) {
         findCodeSystems(list, vs, all, resource);
       }
     }
   }
 
-  private void resolveCSFromVS(List<CodeSystem> list, DataType ref, boolean all, Resource resource) {
-    if (ref != null && ref.isPrimitive()) {
-      resolveCSFromVS(list, ref.primitiveValue(), all, resource);
-    }
-  }
 
-  private void resolveCS(List<CodeSystem> list, String url, Resource source) {
+  private void resolveCS(List<CodeSystem> list, UriType url, Resource source) {
     if (url != null) {
-      CodeSystem cs = context.getContext().fetchResource(CodeSystem.class, url);
+      CodeSystem cs = context.getContext().fetchResource(CodeSystem.class, url.primitiveValue(), ExtensionUtilities.getVersionResolutionRules(url));
       if (cs != null) {
         if (!cs.hasUserData(UserDataNames.pub_xref_used)) {
           cs.setUserData(UserDataNames.pub_xref_used, new HashSet<>());
@@ -1802,7 +1781,7 @@ public class CrossViewRenderer extends Renderer {
 
 
   public String renderObligationSummary() throws IOException {
-    CodeSystem cs = context.getContext().fetchCodeSystem("http://hl7.org/fhir/CodeSystem/obligation");
+    CodeSystem cs = context.getContext().fetchCodeSystem("http://hl7.org/fhir/CodeSystem/obligation", IWorkerContext.VersionResolutionRules.defaultRule());
     ObligationsAnalysis oa = ObligationsAnalysis.build(allProfiles);
     XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
     XhtmlNode tbl = x.table("grid");
@@ -1875,7 +1854,7 @@ public class CrossViewRenderer extends Renderer {
     if (a == null) {
       tr.th().colspan(ai.colspan()).style(HARD_BORDER).tx("All Actors");
     } else {
-      ActorDefinition ad = context.getContext().fetchResource(ActorDefinition.class, a);
+      ActorDefinition ad = context.getContext().fetchResource(ActorDefinition.class, a, IWorkerContext.VersionResolutionRules.defaultRule());
       if (ad == null) {
         tr.th().colspan(ai.colspan()).style(HARD_BORDER).span(null, a).code().tx(tail(a));
       } else {
