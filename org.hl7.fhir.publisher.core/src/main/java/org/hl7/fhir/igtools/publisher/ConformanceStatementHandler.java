@@ -74,6 +74,8 @@ class ConformanceStatementHandler {
   private HTMLInspector inspector;
   private Map<String, ActorDefinition> usedActors = new HashMap<>();
   private Map<String, Coding> usedCategories = new HashMap<>();
+  private boolean hasConditionalTrue = false;
+  private boolean hasConditionalFalse = false;
   private List<String> foundExpectations = new ArrayList<>();
   private String termShallNot;
   private String termShall;
@@ -416,6 +418,9 @@ class ConformanceStatementHandler {
     HomeInfo info = confHomes.get(lang);
     XhtmlNode confHome = info.node;
     if (confHome != null) {
+      if (!confHome.hasClass("grid")) {
+        confHome.clss("grid");
+      }
       XhtmlNode thead = confHome.addTag("thead");
       XhtmlNode tbody = confHome.addTag("tbody");
       XhtmlNode header = thead.tr().style("background-color: WhiteSmoke;");
@@ -424,11 +429,13 @@ class ConformanceStatementHandler {
 
       header.th().style("text-align: center;").tx(rc.formatPhrase(RenderingContext.CSTABLE_HEAD_ID));
       header.th().style("text-align: center;").tx(rc.formatPhrase(RenderingContext.CSTABLE_HEAD_EXPECT));
-      header.th().style("text-align: center;").tx(rc.formatPhrase(RenderingContext.CSTABLE_HEAD_COND));
+      if (hasConditionalTrue && hasConditionalFalse) {
+        header.th().style("text-align: center;").tx(rc.formatPhrase(RenderingContext.CSTABLE_HEAD_COND));
+      }
       if (!usedActors.isEmpty())
-        header.th().style("text-align: center;").tx(rc.formatPhrase(RenderingContext.CSTABLE_HEAD_ACTOR));
+        header.th().style("text-align: center;").tx(rc.formatPhrasePlural(usedActors.size(), RenderingContext.CSTABLE_HEAD_ACTOR, ""));
       if (!usedCategories.isEmpty())
-        header.th().style("text-align: center;").tx(rc.formatPhrase(RenderingContext.CSTABLE_HEAD_CAT));
+        header.th().style("text-align: center;").tx(rc.formatPhrasePlural(usedCategories.size(), RenderingContext.CSTABLE_HEAD_CAT, ""));
       header.th().style("text-align: center;").tx(rc.formatPhrase(RenderingContext.CSTABLE_HEAD_RULE));
       
       XhtmlNode filters = thead.tr().style("background-color: WhiteSmoke;");
@@ -441,13 +448,15 @@ class ConformanceStatementHandler {
           expectFilter.br();
         expectFilter.input("expect" + count++,  "checkbox",  null, 0).nbsp().tx(translateExpectationEnglish(expect));
       }
-      XhtmlNode conditionFilter = filters.td();
-      conditionFilter.attribute("title", rc.formatPhrase(RenderingContext.CSTABLE_TITLE_COND));
-      conditionFilter.input("conditionFilter", "radio",  null, 0).attribute("id", "conditionYes").attribute("value", "true").nbsp().tx(rc.formatPhrase(RenderingContext.CSTABLE_COND_YES));
-      conditionFilter.br();
-      conditionFilter.input("conditionFilter", "radio",  null, 0).attribute("id", "conditionNo").attribute("value", "false").nbsp().tx(rc.formatPhrase(RenderingContext.CSTABLE_COND_NO));
-      conditionFilter.br();
-      conditionFilter.input("conditionFilter", "radio",  null, 0).nbsp().attribute("id", "conditionAny").attribute("value", "").attribute("checked", "true").tx(rc.formatPhrase(RenderingContext.CSTABLE_COND_ANY));
+      if (hasConditionalTrue && hasConditionalFalse) {
+        XhtmlNode conditionFilter = filters.td();
+        conditionFilter.attribute("title", rc.formatPhrase(RenderingContext.CSTABLE_TITLE_COND));
+        conditionFilter.input("conditionFilter", "radio",  null, 0).attribute("id", "conditionYes").attribute("value", "true").nbsp().tx(rc.formatPhrase(RenderingContext.CSTABLE_COND_YES));
+        conditionFilter.br();
+        conditionFilter.input("conditionFilter", "radio",  null, 0).attribute("id", "conditionNo").attribute("value", "false").nbsp().tx(rc.formatPhrase(RenderingContext.CSTABLE_COND_NO));
+        conditionFilter.br();
+        conditionFilter.input("conditionFilter", "radio",  null, 0).nbsp().attribute("id", "conditionAny").attribute("value", "").attribute("checked", "true").tx(rc.formatPhrase(RenderingContext.CSTABLE_COND_ANY));
+      }
       if (!usedActors.isEmpty()) {
         XhtmlNode actorFilter = filters.td();
         actorFilter.attribute("title", rc.formatPhrase(RenderingContext.CSTABLE_TITLE_ACTOR));
@@ -517,7 +526,9 @@ class ConformanceStatementHandler {
             expectNode.br();
           expectNode.tx(translateExpectationEnglish(expectation));
         }
-        tr.td().style("text-align: center;").tx(clause.isConditional() ? "X" : " ");
+        if (hasConditionalTrue && hasConditionalFalse) {
+          tr.td().style("text-align: center;").tx(clause.isConditional() ? "X" : " ");
+        }
         if (!usedActors.isEmpty()) {
           XhtmlNode actors = tr.td();
           boolean firstActor = true;
@@ -958,6 +969,13 @@ class ConformanceStatementHandler {
   public void categoryUsed(Coding category) {
     if (!usedCategories.containsKey(category.getCode()))
       usedCategories.put(category.getCode(), category);
+  }
+  
+  public void processConditional(boolean conditional) {
+    if (conditional)
+      hasConditionalTrue = true;
+    else
+      hasConditionalFalse = true;
   }
 
   public void extractExpectations(List<String> expectations, String text) {
