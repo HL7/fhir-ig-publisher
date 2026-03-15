@@ -335,7 +335,7 @@ public class PublisherGenerator extends PublisherBase {
     FileUtilities.bytesToFile(pf.extensionTracker.generate(), Utilities.path(pf.tempDir, "usage-stats.json"));
     try {
       log("Sending Usage Stats to Server");
-      pf.extensionTracker.sendToServer("http://test.fhir.org/usage-stats");
+      pf.extensionTracker.sendToServer("http://tx-dev.fhir.org/ext-tracker");
     } catch (Exception e) {
       log("Submitting Usage Stats failed: "+e.getMessage());
     }
@@ -573,21 +573,25 @@ public class PublisherGenerator extends PublisherBase {
 
   private void genCombinedPackage() throws IOException {
     log("Generating combined package");
-    PackageReGenerator gen = new PackageReGenerator();
-    gen.setIncludeConformsTo(true);
-    gen.setExpansionParameters(pf.context.getExpansionParameters());
-    gen.setScope(PackageReGenerator.ExpansionPackageGeneratorScope.ALL_IGS);
-    gen.setOutputType(PackageReGenerator.ExpansionPackageGeneratorOutputType.TGZ);
-    gen.setHierarchical(false);
-    gen.setJson(true);
-    gen.setContext(pf.context);
-    gen.setNpmId(pf.packageId());
-    gen.setOutput(Utilities.path(pf.outputDir, "package-combined.tgz"));
-    gen.setModes(Set.of("api", "tx", "cnt", "expansions", "pin"));
-    gen.setVerbose(false);
+    try {
+      PackageReGenerator gen = new PackageReGenerator();
+      gen.setIncludeConformsTo(true);
+      gen.setExpansionParameters(pf.context.getExpansionParameters());
+      gen.setScope(PackageReGenerator.ExpansionPackageGeneratorScope.ALL_IGS);
+      gen.setOutputType(PackageReGenerator.ExpansionPackageGeneratorOutputType.TGZ);
+      gen.setHierarchical(false);
+      gen.setJson(true);
+      gen.setContext(pf.context);
+      gen.setNpmId(pf.packageId());
+      gen.setOutput(Utilities.path(pf.outputDir, "package-combined.tgz"));
+      gen.setModes(Set.of("api", "tx", "cnt", "expansions", "pin"));
+      gen.setVerbose(false);
 
-    NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(Utilities.path(pf.outputDir, "package.tgz")));
-    gen.generateCombinedPackage(npm);
+      NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(Utilities.path(pf.outputDir, "package.tgz")));
+      gen.generateCombinedPackage(npm);
+    } catch (Exception e) {
+      log("Error generating combined package: "+e.getMessage());
+    }
   }
 
   private byte[] fillLangTemplate(byte[] b, String l) {

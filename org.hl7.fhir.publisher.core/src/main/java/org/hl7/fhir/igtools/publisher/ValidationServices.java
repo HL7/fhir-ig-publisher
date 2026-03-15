@@ -67,6 +67,7 @@ import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.renderers.utils.Resolver;
 import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
 import org.hl7.fhir.r5.terminologies.ImplicitValueSets;
+import org.hl7.fhir.r5.terminologies.NamingSystemUtilities;
 import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.r5.utils.validation.IMessagingServices;
 import org.hl7.fhir.r5.utils.validation.IResourceValidator;
@@ -382,23 +383,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
         }
       }
     }
-    Set<String> namingSystemUrls = (Set<String>) context.retrieveAnalysis(ValidationServices.class);
-    if (namingSystemUrls == null) {
-      namingSystemUrls = new HashSet<>();
-      for (NamingSystem ns : context.fetchResourcesByType(NamingSystem.class)) {
-        for (NamingSystemUniqueIdComponent uid : ns.getUniqueId()) {
-          if (uid.hasValue()) {
-            if (uid.getType() == NamingSystemIdentifierType.URI) {
-              namingSystemUrls.add(uid.getValue());
-            } else if (uid.getType() == NamingSystemIdentifierType.OID) {
-              namingSystemUrls.add("urn:oid:" + uid.getValue());
-            }
-          }
-        }
-      }
-      context.storeAnalysis(ValidationServices.class, namingSystemUrls);
-    }
-    if (namingSystemUrls.contains(u)) {
+    if (NamingSystemUtilities.hasNamingSystem(context, u)) {
       return true;
     }
 
