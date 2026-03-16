@@ -650,10 +650,10 @@ public class PublisherIGLoader extends PublisherBase {
           pf.tabbedSnapshots = p.getValue().equals("true");
           break;
         case "r4-exclusion":
-          pf.r4tor4b.markExempt(p.getValue(), true);
+          pf.r4Exclusions.add(p.getValue());
           break;
         case "r4b-exclusion":
-          pf.r4tor4b.markExempt(p.getValue(), false);
+          pf.r4bExclusions.add(p.getValue());
           break;
         case "display-warnings":
           pf.displayWarnings = "true".equals(p.getValue());
@@ -2308,6 +2308,12 @@ public class PublisherIGLoader extends PublisherBase {
     pf.r4tor4b = new R4ToR4BAnalyser(pf.rc, isNewML());
     if (pf.context != null) {
       pf.r4tor4b.setContext(pf.context);
+    }
+    for (String s : pf.r4Exclusions) {
+      pf.r4tor4b.markExempt(s, true);
+    }
+    for (String s : pf.r4bExclusions) {
+      pf.r4tor4b.markExempt(s, false);
     }
     pf.realmRules = makeRealmBusinessRules();
     pf.previousVersionComparator = makePreviousVersionComparator();
