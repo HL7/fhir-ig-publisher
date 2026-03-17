@@ -69,12 +69,20 @@ public class GitUtilities {
 	 * <p/>
 	 * This will also send log info to console that reports user information removal, as well as a malformed URL
 	 * resulting in a null return.
+	 * <p/>
+	 * SSH-style Git URLs (e.g., git@github.com:org/repo.git) are supported and returned as-is since they
+	 * don't contain embedded credentials.
 	 *
 	 * @param url The URL
 	 * @param urlSource A string representing the source of the URL to be output (CLI param, git remote, etc.)
 	 * @return A valid URL that does not contain user information or null if the url param was malformed.
 	 */
 	protected static String getURLWithNoUserInfo(final String url, final String urlSource) {
+		// Handle SSH-style Git URLs (e.g., git@github.com:org/repo.git)
+		// These don't contain embedded passwords (they use SSH keys) so are safe to return as-is
+		if (url != null && url.matches("^[a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+:.*$")) {
+			return url;
+		}
 		try {
 			URL newUrl = new URL(url);
             if (newUrl.getUserInfo() != null) {
