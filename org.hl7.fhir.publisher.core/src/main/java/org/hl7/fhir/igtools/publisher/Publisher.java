@@ -109,6 +109,7 @@ import org.hl7.fhir.utilities.json.model.JsonString;
 import org.hl7.fhir.utilities.npm.*;
 import org.hl7.fhir.utilities.npm.NpmPackage.PackageResourceInformation;
 import org.hl7.fhir.utilities.settings.FhirSettings;
+import org.hl7.fhir.utilities.settings.ServerDetailsPOJO;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
@@ -1222,6 +1223,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       FhirSettings.setExplicitFilePath(CliParams.getNamedParam(args, FHIR_SETTINGS_PARAM));
     }
     ManagedWebAccess.loadFromFHIRSettings();
+    configureOAuthFromCliParams(args);
 
     if (CliParams.hasNamedParam(args, "-produce-translator-ids")) {
       I18nBase.setUseMessageIdsDirectly(true);
@@ -1670,17 +1672,74 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     }
   }
 
-  private static String removePassword(String[] args, int i) {
-    if (i == 0 || !args[i-1].toLowerCase().contains("password")) {
+  static String removePassword(String[] args, int i) {
+    if (i == 0) {
       return args[i];
-    } else {
+    }
+    String prev = args[i-1].toLowerCase();
+    if (prev.contains("password") || prev.contains("secret")) {
       return "XXXXXX";
     }
+    return args[i];
   }
 
-  private static String removePassword(String string) {
-    // TODO Auto-generated method stub
-    return null;
+  static void configureOAuthFromCliParams(String[] args) {
+    if (CliParams.hasNamedParam(args, "-tx-token-endpoint")) {
+      String clientId = CliParams.getNamedParam(args, "-tx-client-id");
+      String clientSecret = CliParams.getNamedParam(args, "-tx-client-secret");
+      String tokenEndpoint = CliParams.getNamedParam(args, "-tx-token-endpoint");
+
+      if (tokenEndpoint == null || tokenEndpoint.isBlank()) {
+        throw new IllegalArgumentException(
+          "-tx-token-endpoint was specified but has no value. " +
+          "Provide the OAuth token endpoint URL after -tx-token-endpoint.");
+      }
+      if (clientId == null || clientId.isBlank()) {
+        throw new IllegalArgumentException(
+          "-tx-token-endpoint was specified but -tx-client-id is missing. " +
+          "All three OAuth parameters (-tx-client-id, -tx-client-secret, -tx-token-endpoint) must be provided together.");
+      }
+      if (clientSecret == null || clientSecret.isBlank()) {
+        throw new IllegalArgumentException(
+          "-tx-token-endpoint was specified but -tx-client-secret is missing. " +
+          "All three OAuth parameters (-tx-client-id, -tx-client-secret, -tx-token-endpoint) must be provided together.");
+      }
+      if (clientId.startsWith("-") || clientSecret.startsWith("-") || tokenEndpoint.startsWith("-")) {
+        throw new IllegalArgumentException(
+          "OAuth parameter value looks like a flag name. Check that each of " +
+          "-tx-client-id, -tx-client-secret, and -tx-token-endpoint has a value after it.");
+      }
+      try {
+        java.net.URI uri = java.net.URI.create(tokenEndpoint);
+        if (uri.getScheme() == null || !uri.getScheme().startsWith("http")) {
+          throw new IllegalArgumentException(
+            "-tx-token-endpoint must be an HTTP(S) URL, got: " + tokenEndpoint);
+        }
+      } catch (IllegalArgumentException e) {
+        if (e.getMessage().startsWith("-tx-token-endpoint must be")) {
+          throw e;
+        }
+        throw new IllegalArgumentException(
+          "-tx-token-endpoint is not a valid URL: " + tokenEndpoint, e);
+      }
+
+      String txUrl = CliParams.getNamedParam(args, "-tx");
+      if (txUrl == null) {
+        txUrl = FhirSettings.getTxFhirProduction();
+      }
+      // Normalize URL scheme to match how ManagedWebAccess will make requests
+      txUrl = ManagedWebAccess.makeSecureRef(txUrl);
+
+      ServerDetailsPOJO oauthServer = ServerDetailsPOJO.builder()
+        .url(txUrl)
+        .type("fhir")
+        .authenticationType("client_credentials")
+        .clientId(clientId)
+        .clientSecret(clientSecret)
+        .tokenEndpoint(tokenEndpoint)
+        .build();
+      ManagedWebAccess.addServerAuthDetail(oauthServer);
+    }
   }
 
   public static void setTxServerValue(String[] args, Publisher self) {
