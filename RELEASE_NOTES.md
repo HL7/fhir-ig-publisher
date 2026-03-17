@@ -6,6 +6,7 @@
 * Terminology: Fix bugs in expansion and validation when valueset includes two different versions of the same code system
 * Terminology: Expansion bugs: imported valueSet excludes ignored + expansion.total inconsistent
 * Snapshot Generator: Fix bug where binding.valueSet extensions are lost in snapshots
+* Snapshot Generator: Fix error setting content reference wrong in deeply nested snapshots
 * Validator: Fix bugs chasing package versioned references when no version supplied
 * Validator: Fix snapshot generation for nested slices with contentReference (h/t glichtner)
 * Validator: Fix bug parsing with multiple profiles for a type
@@ -17,5 +18,6 @@
 * Renderer: Fix rendering bug where naming system resolution was a little random
 * Renderer: fix duplicate ids in questionnaire pages in igs
 * Version Comparison: Fix problem where comparing profiles gets into an infinite loop
+* QA: Add validation context
 
 

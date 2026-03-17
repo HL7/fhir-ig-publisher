@@ -55,15 +55,9 @@ import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
 import org.hl7.fhir.r5.extensions.ExtensionUtilities;
 import org.hl7.fhir.r5.fhirpath.FHIRPathEngine;
 import org.hl7.fhir.r5.formats.XmlParser;
-import org.hl7.fhir.r5.model.Bundle;
+import org.hl7.fhir.r5.model.*;
 import org.hl7.fhir.r5.model.Bundle.BundleEntryComponent;
-import org.hl7.fhir.r5.model.CodeSystem;
-import org.hl7.fhir.r5.model.Constants;
-import org.hl7.fhir.r5.model.OperationOutcome;
-import org.hl7.fhir.r5.model.PackageInformation;
 import org.hl7.fhir.r5.model.Parameters.ParametersParameterComponent;
-import org.hl7.fhir.r5.model.StructureDefinition;
-import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.terminologies.client.TerminologyClientContext;
 import org.hl7.fhir.r5.terminologies.client.TerminologyClientContext.TerminologyClientContextUseCount;
 import org.hl7.fhir.r5.terminologies.client.TerminologyClientManager;
@@ -875,7 +869,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     b.append(genStartInternal());
     int id = 0;
     for (ValidationMessage vm : linkErrors) {
-      b.append(genDetails(vm, id));
+      b.append(genDetails(vm, id, false));
       id++;
     }
     b.append(genEnd());
@@ -890,7 +884,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
         else
           b.append(startTemplateNoErrors);
         for (ValidationMessage vm : filterMessages(f, f.getErrors(), false, filteredMessages)) {
-          b.append(genDetails(vm, id));
+          b.append(genDetails(vm, id, true));
           id++;
         }
         b.append(genEnd());
@@ -1175,7 +1169,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   
   private final String startTemplateErrors = 
       "   <tr>\r\n"+
-      "     <td><b>Path</b></td><td><b>Severity</b></td><td><b>Message</b></td>\r\n"+
+      "     <td><b>Path</b></td><td><b>Severity</b></td><td><b>Message</b></td><td><b>Validating</b></td>\r\n"+
       "   </tr>\r\n";
 
   private final String startTemplateNoErrors = 
@@ -1185,43 +1179,43 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
 
   private final String detailsTemplate = 
       "   <tr style=\"background-color: $color$\">\r\n"+
-      "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ <span class=\"code-value code-hidden\" style=\"font-size: 8px; color: navy\">$mid$</span></td>\r\n"+
+      "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ <span class=\"code-value code-hidden\" style=\"font-size: 8px; color: navy\">$mid$</span></td>$ctxt$\r\n"+
       "   </tr>\r\n";
   
   private final String groupDetailsTemplate = 
       "   <tr style=\"background-color: $halfcolor$\">\r\n"+
-      "     <td><a href=\"$xlink$\">$fpath$</a></td><td><b>$msg$</b>$comment$</td>\r\n"+
+      "     <td><a href=\"$xlink$\">$fpath$</a></td><td><b>$msg$</b>$comment$</td>$ctxt$\r\n"+
       "   </tr>\r\n";
 
 
   private final String detailsTemplateTxLink =
           "   <tr style=\"background-color: $color$\">\r\n"+
-                  "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$</a>, see <a href=\"$tx$\">log</a>) <span class=\"code-value code-hidden\" style=\"font-size: 8px; color: navy\">$mid$</span></td>\r\n"+
+                  "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$</a>, see <a href=\"$tx$\">log</a>) <span class=\"code-value code-hidden\" style=\"font-size: 8px; color: navy\">$mid$</span></td>$ctxt$\r\n"+
                   "   </tr>\r\n";
 
   private final String detailsTemplateTxLinkDiagnostics =
           "   <tr style=\"background-color: $color$\">\r\n"+
-                  "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$</a>, see <a href=\"$tx$\">log</a>, or see <a href=\"#$vmid$\" onClick=\"document.getElementById('$vmid$').style.display='block'\">the servers logic</a>) <span class=\"code-value code-hidden\" style=\"font-size: 8px; color: navy\">$mid$</span><div id=\"$vmid$\" style=\"display:none\"><br/><pre>$diags$</pre></div></td>\r\n"+
+                  "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$</a>, see <a href=\"$tx$\">log</a>, or see <a href=\"#$vmid$\" onClick=\"document.getElementById('$vmid$').style.display='block'\">the servers logic</a>) <span class=\"code-value code-hidden\" style=\"font-size: 8px; color: navy\">$mid$</span><div id=\"$vmid$\" style=\"display:none\"><br/><pre>$diags$</pre></div></td>$ctxt$\r\n"+
                   "   </tr>\r\n";
 
   private final String detailsTemplateTxNoLink =
           "   <tr style=\"background-color: $color$\">\r\n"+
-                  "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$</a>) <span class=\"code-value code-hidden\" style=\"font-size: 8px; color: navy\">$mid$</span></td>\r\n"+
+                  "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$</a>) <span class=\"code-value code-hidden\" style=\"font-size: 8px; color: navy\">$mid$</span></td>$ctxt$\r\n"+
                   "   </tr>\r\n";
 
   private final String detailsTemplateTxNoLinkDiagnostics =
           "   <tr style=\"background-color: $color$\">\r\n"+
-                  "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$</a> - see <a href=\"#$vmid$\" onClick=\"document.getElementById('$vmid$').style.display='block'\">the servers logic</a>) <span class=\"code-value code-hidden\" style=\"font-size: 8px; color: navy\">$mid$</span><div id=\"$vmid$\" style=\"display:none\"><br/><pre>$diags$</pre></div></td>\r\n"+
+                  "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$</a> - see <a href=\"#$vmid$\" onClick=\"document.getElementById('$vmid$').style.display='block'\">the servers logic</a>) <span class=\"code-value code-hidden\" style=\"font-size: 8px; color: navy\">$mid$</span><div id=\"$vmid$\" style=\"display:none\"><br/><pre>$diags$</pre></div></td>$ctxt$\r\n"+
                   "   </tr>\r\n";
 
   private final String detailsTemplateWithExtraDetails = 
       "   <tr style=\"background-color: $color$\">\r\n"+
-      "     <td><b><a href=\"$pathlink$\">$path$</a></b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ <span id=\"s$id$\" class=\"flip\" onclick=\"flip('$id$')\">Show Reasoning</span><div id=\"$id$\" style=\"display: none\"><p>&nbsp;</p>$msgdetails$</div> <span class=\"code-value code-hidden\" style=\"font-size: 8px; color: navy\">$mid$</span></td>\r\n"+
+      "     <td><b><a href=\"$pathlink$\">$path$</a></b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ <span id=\"s$id$\" class=\"flip\" onclick=\"flip('$id$')\">Show Reasoning</span><div id=\"$id$\" style=\"display: none\"><p>&nbsp;</p>$msgdetails$</div> <span class=\"code-value code-hidden\" style=\"font-size: 8px; color: navy\">$mid$</span></td>$ctxt$\r\n"+
       "   </tr>\r\n";
       
   private final String detailsTemplateWithLink = 
       "   <tr style=\"background-color: $color$\">\r\n"+
-      "     <td><b><a href=\"$pathlink$\">$path$</a></b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ <span class=\"code-value code-hidden\" style=\"font-size: 8px; color: navy\">$mid$</span></td>\r\n"+
+      "     <td><b><a href=\"$pathlink$\">$path$</a></b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ <span class=\"code-value code-hidden\" style=\"font-size: 8px; color: navy\">$mid$</span></td>$ctxt$\r\n"+
       "   </tr>\r\n";
   
   private final String footerTemplate = 
@@ -1722,7 +1716,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     return t.render();
   }
   
-  private String genDetails(ValidationMessage vm, int id) {
+  private String genDetails(ValidationMessage vm, int id, boolean showContext) {
     String tid = null;
     if (vm.isSlicingHint() || vm.hasSliceInfo()) {
       tid = detailsTemplateWithExtraDetails;
@@ -1771,7 +1765,25 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     t.add("comment", vm.getComment() == null ? "" : "<br/><br/><span style=\"display: block; border: 1px grey solid; border-radius: 5px; background-color: #eeeeee; padding: 3px; margin: 3px \"><i><b>Editor's Comment</b>: "+Utilities.escapeXml(vm.getComment())+"</i></span>");
     t.add("tx", "qa-tx.html#l"+vm.getTxLink());
     t.add("txsrvr", getServer(vm.getServer()));
+    if (showContext) {
+      t.add("ctxt", presentContext(vm.getValidationContext()));
+    }
     return t.render();
+  }
+
+  private String presentContext(String validationContext) {
+    if (validationContext == null) {
+      return "<td>--</td>";
+    }
+    CanonicalResource res = (CanonicalResource) context.fetchResource(Resource.class, validationContext);
+    if (res == null) {
+      return Utilities.escapeXml(validationContext);
+    }
+    if (validationContext.startsWith("http://hl7.org/fhir/StructureDefinition/")) {
+      return "<td><a href=\""+res.getWebPath()+"\">"+Utilities.escapeXml(res.present())+"</a></td>";
+    } else {
+      return "<td><a href=\""+res.getWebPath()+"\">"+Utilities.escapeXml(res.present())+"</a></td>";
+    }
   }
 
   private Object genSliceInfo(List<ValidationMessage> sliceInfo) {
@@ -1868,6 +1880,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     t.add("msg", vm.getHtml());
     t.add("msgdetails", vm.isSlicingHint() ? vm.getSliceHtml() : vm.getHtml());
     t.add("comment", "");
+    t.add("ctxt", presentContext(vm.getValidationContext()));
     return t.render();
   }
   
