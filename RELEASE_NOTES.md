@@ -1,4 +1,4 @@
-* Loader: This release of the IGPublisher supports scoped packages (see [security advisory note](todo))
+* Loader: This release of the IGPublisher supports scoped packages (see [security advisory note](https://www.fhir.org/guides/security-notices/2026-03-npm-dependencies.html))
 * Loader: add new trusted template for WHO
 * Loader: jekyll command as a CLI parameter
 * Loader: Support version '|*' when pinning
