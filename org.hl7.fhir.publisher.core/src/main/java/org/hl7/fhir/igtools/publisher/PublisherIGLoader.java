@@ -1549,8 +1549,9 @@ public class PublisherIGLoader extends PublisherBase {
       logMessage("Dependency '"+idForDep(dep)+"' has no id, so can't be referred to in markdown in the IG");
       name = "u"+UUIDUtilities.makeUuidLC().replace("-", "");
     }
-    if (!isValidIGToken(name))
-      throw new Exception("IG Name must be a valid token ("+name+")");
+    if (!isValidIGToken(name)) {
+      throw new Exception("Dependency '" + idForDep(dep) + "' has an invalid token: " + name);
+    }
     String canonical = determineCanonical(dep.getUri(), "ImplementationGuide.dependency["+index+"].url");
     String packageId = dep.getPackageId();
     if (Utilities.noString(packageId))
@@ -1642,7 +1643,7 @@ public class PublisherIGLoader extends PublisherBase {
       return false;
     boolean result = Utilities.isAlphabetic(tail.charAt(0));
     for (int i = 1; i < tail.length(); i++) {
-      result = result && (Utilities.isAlphabetic(tail.charAt(i)) || Utilities.isDigit(tail.charAt(i)) || (tail.charAt(i) == '_'));
+      result = result && (Utilities.isAlphabetic(tail.charAt(i)) || Utilities.isDigit(tail.charAt(i)) || (tail.charAt(i) == '_') || (tail.charAt(i) == '-'));
     }
     return result;
   }
