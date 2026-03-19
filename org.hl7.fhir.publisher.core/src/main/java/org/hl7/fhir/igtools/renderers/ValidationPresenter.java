@@ -1767,6 +1767,8 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     t.add("txsrvr", getServer(vm.getServer()));
     if (showContext) {
       t.add("ctxt", presentContext(vm.getValidationContext()));
+    } else {
+      t.add("ctxt", "");
     }
     return t.render();
   }
