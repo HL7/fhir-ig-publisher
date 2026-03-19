@@ -329,6 +329,7 @@ public class DBBuilder {
     }
 
     try {
+      String webPath = r.getResource() == null ? r.getElement().getWebPath() : r.getResource().getWebPath();
       if (r.getResource() == null || !(r.getResource() instanceof CanonicalResource)) {
         PreparedStatement psql = con.prepareStatement("Insert into Resources (key, type, custom, id, web, url, version, status, date, name, title, description, json) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         psql.setInt(1, ++lastResKey);
@@ -355,6 +356,7 @@ public class DBBuilder {
         bindString(psql, 2,  r.fhirType());
         psql.setInt(3, r.getElement().getProperty().getStructure().hasUserData(UserDataNames.loader_custom_resource) ? 1 : 0);
         bindString(psql, 4,  r.getId());
+
         bindString(psql, 5,  cr.getWebPath());
         bindString(psql, 6,  cr.getUrl());
         bindString(psql, 7,  cr.getVersion());
