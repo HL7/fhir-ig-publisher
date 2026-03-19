@@ -246,6 +246,20 @@ public class PublisherGenerator extends PublisherBase {
     for (String rg : pf.regenList) {
       regenerate(rg);
     }
+    for (FetchedFile f : pf.changeList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.getResource() != null) {
+          if (!r.getResource().hasWebPath()) {
+            r.getResource().setWebPath(pf.igpkp.getLinkFor(r, true));
+          }
+        }
+        if (r.getElement() != null) {
+          if (!r.getElement().hasWebPath()) {
+            r.getElement().setWebPath(pf.igpkp.getLinkFor(r, true));
+          }
+        }
+      }
+    }
 
     updateImplementationGuide();
     generateDataFile(db);
@@ -335,7 +349,7 @@ public class PublisherGenerator extends PublisherBase {
     FileUtilities.bytesToFile(pf.extensionTracker.generate(), Utilities.path(pf.tempDir, "usage-stats.json"));
     try {
       log("Sending Usage Stats to Server");
-      pf.extensionTracker.sendToServer("http://tx-dev.fhir.org/ext-tracker");
+      pf.extensionTracker.sendToServer("http://tx.fhir.org/ext-tracker");
     } catch (Exception e) {
       log("Submitting Usage Stats failed: "+e.getMessage());
     }
@@ -1655,14 +1669,37 @@ public class PublisherGenerator extends PublisherBase {
         if (!Utilities.existsInList(pp.getName(), "x-system-cache-id", "defaultDisplayLanguage")) {
           tr = tbl.tr();
           tr.td().tx(pp.getName());
-          if (Utilities.existsInList(pp.getName(), "exclude-system", "system-version", "check-system-version", "force-system-version", "default-valueset-version", "check-valueset-version", "force-valueset-version")) {
+          if (Utilities.existsInList(pp.getName(), "exclude-system", "system-version", "check-system-version", "force-system-version")) {
             String canonical = pp.getValue().primitiveValue();
-            if (canonical.contains("|")) {
-              String system = canonical.substring(0, canonical.indexOf("|"));
+            CodeSystem cs = resourceRenderer.getContext().getContext().findTxResource(CodeSystem.class, canonical);
+            if (cs != null) {
+              if (cs.hasWebPath()) {
+                tr.td().ah(cs.getWebPath()).tx(cs.present() + " v" + cs.getVersion());
+              } else {
+                tr.td().tx(cs.present() + " v" + cs.getVersion()+" ("+canonical+")");
+              }
+            } else if (canonical.contains("|")) {
+              String url = canonical.substring(0, canonical.indexOf("|"));
               String version = canonical.substring(canonical.indexOf("|")+1);
-              tr.td().tx(resourceRenderer.displayCodeSource(system, version));
+              tr.td().tx(resourceRenderer.displayCodeSource(url, version));
             } else {
-              resourceRenderer.renderDataType(new Renderer.RenderingStatus(), tr.td(), ResourceWrapper.forType(pf.rc.getContextUtilities(), pp.getValue()));
+              tr.td().tx(resourceRenderer.displayCodeSource(canonical, null));
+            }
+          } else if (Utilities.existsInList(pp.getName(), "default-valueset-version", "check-valueset-version", "force-valueset-version")) {
+            String canonical = pp.getValue().primitiveValue();
+            ValueSet vs = resourceRenderer.getContext().getContext().findTxResource(ValueSet.class, canonical);
+            if (vs != null) {
+              if (vs.hasWebPath()) {
+                tr.td().ah(vs.getWebPath()).tx(vs.present() + " v" + vs.getVersion());
+              } else {
+                tr.td().tx(vs.present() + " v" + vs.getVersion()+" ("+canonical+")");
+              }
+            } else if (canonical.contains("|")) {
+              String url = canonical.substring(0, canonical.indexOf("|"));
+              String version = canonical.substring(canonical.indexOf("|")+1);
+              tr.td().tx(url+" v"+version);
+            } else {
+              tr.td().tx(canonical);
             }
           } else {
             resourceRenderer.renderDataType(new Renderer.RenderingStatus(), tr.td(), ResourceWrapper.forType(pf.rc.getContextUtilities(), pp.getValue()));
