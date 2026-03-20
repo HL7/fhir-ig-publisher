@@ -75,7 +75,7 @@ public class DraftDependenciesRenderer implements IElementVisitor {
   }
 
   private void checkReference(FetchedResource resource, Element urlE) {
-    String url = urlE.primitiveValue();
+    String url = urlE != null ? urlE.primitiveValue() : null;
     if (url == null) {
       return;
     }
