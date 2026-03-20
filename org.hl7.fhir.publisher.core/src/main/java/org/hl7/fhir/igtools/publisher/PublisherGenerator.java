@@ -2173,7 +2173,7 @@ public class PublisherGenerator extends PublisherBase {
   }
 
   private void generateOutputsQuestionnaire(FetchedFile f, FetchedResource r, Questionnaire q, Map<String,String> vars, String prefixForContainer, RenderingContext lrc, String lang) throws Exception {
-    QuestionnaireRenderer qr = new QuestionnaireRenderer(this.pf.context, checkAppendSlash(this.pf.specPath), q, Utilities.path(this.pf.tempDir), this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, lrc.copy(false).setDefinitionsTarget(this.pf.igpkp.getDefinitionsName(r)), this.pf.versionToAnnotate, this.pf.relatedIGs);
+    QuestionnaireRenderer qr = new QuestionnaireRenderer(this.pf.context, checkAppendSlash(this.pf.specPath), q, Utilities.path(this.pf.tempDir), this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, lrc.copy(false).setDefinitionsTarget(this.pf.igpkp.getDefinitionsName(r)).setPackageInformation(this.pf.packageInfo), this.pf.versionToAnnotate, this.pf.relatedIGs);
     if (wantGen(r, "summary")) {
       long start = System.currentTimeMillis();
       fragment("Questionnaire-"+prefixForContainer+q.getId()+"-summary", qr.summaryTable(r, wantGen(r, "xml"), wantGen(r, "json"), wantGen(r, "ttl"), this.pf.igpkp.summaryRows()), f.getOutputNames(), r, vars, null, start, "summary", "Questionnaire", lang);
@@ -2192,6 +2192,7 @@ public class PublisherGenerator extends PublisherBase {
     }
     if (wantGen(r, "links")) {
       long start = System.currentTimeMillis();
+
       fragment("Questionnaire-"+prefixForContainer+q.getId()+"-links", qr.render(RenderingContext.QuestionnaireRendererMode.LINKS), f.getOutputNames(), r, vars, null, start, "links", "Questionnaire", lang);
     }
     if (wantGen(r, "logic")) {
@@ -2217,7 +2218,7 @@ public class PublisherGenerator extends PublisherBase {
         for (FetchedResource r : f.getResources()) {
           if (r.fhirType().equals("QuestionnaireResponse")) {
             String qurl = r.getElement().getChildValue("questionnaire");
-            if (!Utilities.noString(qurl)) {
+            if (!Utilities.noString(qurl) && qurl.equals(q.getUrl())) {
               if (b.length() == 0) {
                 b.append("<ul>\r\n");
               }
@@ -2278,8 +2279,15 @@ public class PublisherGenerator extends PublisherBase {
     }
     for (ImplementationGuide.ImplementationGuideDefinitionResourceComponent res : this.pf.publishedIg.getDefinition().getResource()) {
       FetchedResource tr = (FetchedResource) res.getUserData(UserDataNames.pub_loaded_resource);
-      if (tr == r) {
+      if (tr != null && tr == r) {
         return res.getDescription();
+      } else {
+        String relativeUrl = res.getReference().getReference();
+        String type = StringUtils.substringBefore(relativeUrl, "/");
+        String id = StringUtils.substringAfter(relativeUrl, "/");
+        if (r.fhirType().equals(type) && r.getId().equals(id)) {
+          return res.getDescription();
+        }
       }
     }
     return "(no description)";
@@ -6981,6 +6989,10 @@ public class PublisherGenerator extends PublisherBase {
             case "Curaçao":
               code = "Curagao";
               break;
+            case "Kosovo":
+              pf.countryCodeFor2Letter.put(c.getCode(), "XKX");
+              pf.shortCountryCode.put("XKX", c.getCode());
+              code = null;
             case "Korea, Democratic People''s Republic of":
               code = "Korea, Democratic People's Republic of";
               break;
@@ -6999,12 +7011,20 @@ public class PublisherGenerator extends PublisherBase {
             case "Virgin Islands,":
               code = pf.countryCodeForName.get("Virgin Islands, U.S.");
               break;
+            case "User-assigned":
+            case "Unknown":
+            case "International Waters":
+            case "Unknown or Invalid Territory":
+              code = null; // There won't be mappings for these
+              break;
             default:
               log("Unable to find 3-character code having same country code as ISO 2-char code " + c.getCode() + " - " + c.getDisplay());
           }
         }
-        pf.countryCodeFor2Letter.put(c.getCode(), code);
-        pf.shortCountryCode.put(code, c.getCode());
+        if (code != null) {
+          pf.countryCodeFor2Letter.put(c.getCode(), code);
+          pf.shortCountryCode.put(code, c.getCode());
+        }
       }
     }
     for (ValueSet.ValueSetExpansionContainsComponent c: numExpand.getValueset().getExpansion().getContains()) {
