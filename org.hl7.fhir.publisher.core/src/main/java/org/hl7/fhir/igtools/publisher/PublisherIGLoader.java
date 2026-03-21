@@ -680,6 +680,9 @@ public class PublisherIGLoader extends PublisherBase {
           pf.hasTranslations = true;
           pf.translationSources.add(p.getValue());
           break;
+        case "infer-resource-conformance":
+          pf.inferResourceConformance = true;
+          break;
         case "validation-duration-report-cutoff":
           pf.validationLogTime = Utilities.parseInt(p.getValue(), 0) * 1000;
           break;
@@ -2289,6 +2292,7 @@ public class PublisherIGLoader extends PublisherBase {
     pf.rc.setDateTimeFormatString(pf.fmtDateTime);
     pf.rc.setChangeVersion(pf.versionToAnnotate);
     pf.rc.setShowSummaryTable(false);
+    pf.rc.setInferResourceConformance(pf.inferResourceConformance);
     for (FetchedFile f : pf.fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.getResource() instanceof CanonicalResource) {
