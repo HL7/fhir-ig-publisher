@@ -1002,7 +1002,9 @@ public class PublisherIGLoader extends PublisherBase {
     }
 
     pf.inspector = new HTMLInspector(pf.context, pf.outputDir, pf.specMaps, pf.linkSpecMaps, this, pf.igpkp.getCanonical(), pf.packageId(), pf.sourceIg.getVersion(),
-            pf.trackedFragments, pf.fileList, pf.module, settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD || settings.getMode() == PublisherUtils.IGBuildMode.WEBSERVER, settings.isTrackFragments() ? pf.fragmentUses : null, pf.relatedIGs, noCIBuildIssues, allLangs());
+            pf.trackedFragments, pf.fileList, pf.module,
+            settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD || settings.getMode() == PublisherUtils.IGBuildMode.WEBSERVER, settings.isTrackFragments() ? pf.fragmentUses : null,
+            pf.relatedIGs, noCIBuildIssues, allLangs());
     pf.inspector.getManual().add("full-ig.zip");
     if (pf.historyPage != null) {
       pf.inspector.getManual().add(pf.historyPage);
@@ -1960,6 +1962,7 @@ public class PublisherIGLoader extends PublisherBase {
 
     log("Load Content");
     pf.publishedIg = pf.sourceIg.copy();
+    pf.inspector.setIg(pf.publishedIg);
     FetchedResource igr = igf.addResource("$IG");
     //      loadAsElementModel(igf, igr, null);
     igr.setResource(pf.publishedIg);
