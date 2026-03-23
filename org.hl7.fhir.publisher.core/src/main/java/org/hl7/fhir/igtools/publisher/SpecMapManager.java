@@ -45,6 +45,7 @@ import org.hl7.fhir.utilities.json.model.JsonProperty;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.BasePackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.hl7.fhir.utilities.npm.PackageHacker;
 import org.hl7.fhir.utilities.npm.ToolsVersion;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator;
 
@@ -119,7 +120,7 @@ public class SpecMapManager {
     } catch (Exception e) {
       spec = new JsonObject();
     }
-    base = spec.asString("webUrl");
+    base = PackageHacker.fixPackageUrl(spec.asString("webUrl"));
     paths = spec.forceObject("paths");
     pages = spec.forceObject("pages");
     targets = spec.forceArray("targets");
@@ -358,7 +359,7 @@ public class SpecMapManager {
   }
 
   public void setBase(String base) {
-    this.base = base;
+    this.base = PackageHacker.fixPackageUrl(base);
   }
 
   public String getBase2() {
@@ -366,7 +367,7 @@ public class SpecMapManager {
   }
 
   public void setBase2(String base2) {
-    this.base2 = base2;
+    this.base2 = PackageHacker.fixPackageUrl(base2);
   }
 
   public void target(String tgt) {

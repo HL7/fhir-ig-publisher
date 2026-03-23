@@ -53,6 +53,7 @@ import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
 import org.hl7.fhir.r5.formats.JsonCreator;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CodeType;
+import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
@@ -270,8 +271,11 @@ public class HTMLInspector {
   private IWorkerContext context;
   private ConformanceStatementHandler csHandler;
   private Set<String> comparisonFiles = new HashSet<>();
+  @Getter @Setter private ImplementationGuide ig;
 
-  public HTMLInspector(IWorkerContext context, String rootFolder, List<SpecMapManager> specs, List<LinkedSpecification> linkSpecs, ILoggingService log, String canonical, String packageId, String version, Map<String, List<String>> trackedFragments, List<FetchedFile> sources, IPublisherModule module, boolean isCIBuild, Map<String, PublisherBase.FragmentUseRecord> fragmentUses, List<RelatedIG> relatedIGs, boolean noCIBuildIssues, List<String> langList) throws IOException {
+  public HTMLInspector(IWorkerContext context, String rootFolder, List<SpecMapManager> specs, List<LinkedSpecification> linkSpecs, ILoggingService log,
+                       String canonical, String packageId, String version, Map<String, List<String>> trackedFragments, List<FetchedFile> sources, IPublisherModule module, boolean isCIBuild,
+                       Map<String, PublisherBase.FragmentUseRecord> fragmentUses, List<RelatedIG> relatedIGs, boolean noCIBuildIssues, List<String> langList) throws IOException {
     this.rootFolder = rootFolder.replace("/", File.separator);
     this.specs = specs;
     this.linkSpecs = linkSpecs;
@@ -297,7 +301,7 @@ public class HTMLInspector {
   }
  
   public List<ValidationMessage> check(String statusMessageDef, Map<String, String> statusMessagesLang) throws IOException {
-    csHandler.setup();
+    csHandler.setup(this.ig);
     this.statusMessageDef = statusMessageDef;
     this.statusMessagesLang = statusMessagesLang;
     iteration ++;

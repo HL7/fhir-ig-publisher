@@ -159,12 +159,10 @@ class ConformanceStatementHandler {
    * Sets up information in the HTMLInspector that can't be done at the time the inspector is initialized
    * (because all IGs, including the 'current' IG aren't loaded at the time this class first comes into being).
    */
-  public void setup() {
-    List<ImplementationGuide> l = context.fetchResourcesByType(ImplementationGuide.class);
-    thisIg = l.get(l.size() - 1);
-    rootUrl = StringUtils.substringBefore(thisIg.getUrl(), "ImplementationGuide");
+  public void setup(ImplementationGuide ig) {
+    rootUrl = StringUtils.substringBefore(ig.getUrl(), "ImplementationGuide");
     categories = new HashMap<String, Coding>();
-    for (ImplementationGuideDefinitionParameterComponent param: thisIg.getDefinition().getParameter()) {
+    for (ImplementationGuideDefinitionParameterComponent param: ig.getDefinition().getParameter()) {
       if (param.getCode().getSystem().equals("http://hl7.org/fhir/tools/CodeSystem/ig-parameters") && param.getCode().getCode().equals("requirements-category-vs")) {
         String valuesetUrl = param.getValue();
         ValueSet categoriesVs = context.fetchResource(ValueSet.class, valuesetUrl, IWorkerContext.VersionResolutionRules.defaultRule());
