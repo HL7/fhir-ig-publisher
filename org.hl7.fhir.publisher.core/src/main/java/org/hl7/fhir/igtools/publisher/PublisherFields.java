@@ -53,6 +53,7 @@ public class PublisherFields {
     boolean isChild;
     boolean appendTrailingSlashInDataFile;
     boolean newIg = false;
+    boolean inferResourceConformance = false;
     Map<String, String> countryCodeForName = null;
     Map<String, String> countryNameForCode = null;
     Map<String, String> countryCodeForNumeric = null;
