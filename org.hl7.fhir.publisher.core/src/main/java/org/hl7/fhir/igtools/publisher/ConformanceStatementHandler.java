@@ -431,10 +431,10 @@ class ConformanceStatementHandler {
         header.th().style("text-align: center;").tx(rc.formatPhrase(RenderingContext.CSTABLE_HEAD_COND));
       }
       if (!usedActors.isEmpty())
-        header.th().style("text-align: center;").tx(rc.formatPhrasePlural(usedActors.size(), RenderingContext.CSTABLE_HEAD_ACTOR, ""));
+        header.th().id("fcl-actor").style("text-align: center;").tx(rc.formatPhrasePlural(usedActors.size(), RenderingContext.CSTABLE_HEAD_ACTOR, ""));
       if (!usedCategories.isEmpty())
-        header.th().style("text-align: center;").tx(rc.formatPhrasePlural(usedCategories.size(), RenderingContext.CSTABLE_HEAD_CAT, ""));
-      header.th().style("text-align: center;").tx(rc.formatPhrase(RenderingContext.CSTABLE_HEAD_RULE));
+        header.th().id("fcl-cat").style("text-align: center;").tx(rc.formatPhrasePlural(usedCategories.size(), RenderingContext.CSTABLE_HEAD_CAT, ""));
+      header.th().id("fcl-rule").style("text-align: center;").tx(rc.formatPhrase(RenderingContext.CSTABLE_HEAD_RULE));
       
       XhtmlNode filters = thead.tr().style("background-color: WhiteSmoke;");
       filters.td().input("filterid", "text", " ", 4).attribute("title", rc.formatPhrase(RenderingContext.CSTABLE_TITLE_ID));
@@ -661,6 +661,7 @@ class ConformanceStatementHandler {
           }
           addTitle(c, clause);
           addClause(lang, clause, source.path, messages);
+          hasClauses.set(true);
         } catch (FHIRException e) {
 //          messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, source.path, context.formatMessage(I18nConstants.CONFORMANCE_STATEMENT_NOCONFWORD, lang, c.toString()), IssueSeverity.INFORMATION).setMessageId(I18nConstants.CONFORMANCE_STATEMENT_NOCONFWORD));          
           messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, source.path, e.getMessage(), IssueSeverity.INFORMATION).setMessageId(I18nConstants.CONFORMANCE_STATEMENT_NOCONFWORD));          
@@ -672,10 +673,12 @@ class ConformanceStatementHandler {
           if (spanId!=null && spanId.contains("^")) {
             // Strip latter parts of the id
             c.setAttribute("id", StringUtils.substringBefore(spanId,  "^"));
+            hasClauses.set(true);
           }
           if (clause.hasSummary()) {
             addTitle(c, clause);
             addClause(lang, clause, source.path, messages);
+            hasClauses.set(true);
           } else {
             messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, source.path, context.formatMessage(I18nConstants.CONFORMANCE_STATEMENT_NOSUMMARY, clause.getId(), lang), IssueSeverity.INFORMATION).setMessageId(I18nConstants.CONFORMANCE_STATEMENT_NOCONFWORD));          
           }
@@ -755,7 +758,7 @@ class ConformanceStatementHandler {
     if (clause.hasActors() || clause.hasCategories()) {
       String title = "";
       if (clause.hasActors()) {
-        title += "Actor(s): ";
+        title += rc.formatPhrasePlural(clause.getActors().size(), RenderingContext.CSTABLE_HEAD_ACTOR, ": ");
         boolean first = true;
         for (ActorDefinition actor: clause.getActors()) {
           if (!first)
@@ -768,7 +771,7 @@ class ConformanceStatementHandler {
       if (clause.hasCategories()) {
         if (!title.isEmpty())
           title += "\n";
-        title += "Category(ies): ";
+        title += rc.formatPhrasePlural(clause.getCategories().size(), RenderingContext.CSTABLE_HEAD_CAT, ":");
         boolean first = true;
         for (Coding category: clause.getCategories()) {
           if (!first)
