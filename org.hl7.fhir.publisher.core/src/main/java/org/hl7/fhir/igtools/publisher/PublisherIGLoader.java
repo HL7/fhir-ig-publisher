@@ -1092,6 +1092,7 @@ public class PublisherIGLoader extends PublisherBase {
     pf.validator.setCrumbTrails(true);
     pf.validator.setWantCheckSnapshotUnchanged(true);
     pf.validator.setForPublication(true);
+    pf.validator.setEnforceAggregationOutsideBundles(false);
     pf.validator.getSettings().setDisplayWarningMode(pf.displayWarnings);
     pf.cu = new ContextUtilities(pf.context, pf.suppressedMappings);
 
