@@ -228,6 +228,8 @@ public class PublisherFields {
     List<StructureDefinition> modifierExtensions = new ArrayList<StructureDefinition>();
     Object branchName;
     R4ToR4BAnalyser r4tor4b;
+    List<String> r4Exclusions = new ArrayList<>();
+    List<String> r4bExclusions = new ArrayList<>();
     List<DependencyAnalyser.ArtifactDependency> dependencyList;
     Map<String, List<String>> trackedFragments = new HashMap<String, List<String>>();
     PackageInformation packageInfo;
