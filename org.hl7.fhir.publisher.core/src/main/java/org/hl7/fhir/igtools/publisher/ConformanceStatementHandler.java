@@ -557,19 +557,16 @@ class ConformanceStatementHandler {
           tr.td().getChildNodes().addAll(clause.getNode().getChildNodes());
         }
         XhtmlNode focus = clause.getNode();
+        XhtmlNode anchor = new XhtmlNode(NodeType.Element, "a").attribute("name", "ci-c-"+id);
+        anchor.tx(" ");
+        focus.addChildNode(0, anchor);
+        XhtmlNode tag = new XhtmlNode(NodeType.Element, "a");
+        tag.attribute("href", Paths.get(info.source.filename).getFileName().toString() + "#ci-c-" + id);
+        tag.supr("§" + id);
         if (clause.div) {
-          focus = clause.getNode().firstNamedDescendent("p");
-          if (focus == null) {
-            focus = clause.getNode();
-          }
-        }
-        focus.an("ci-c-" + id).tx(" ");
-        XhtmlNode f = focus.ah(Paths.get(info.source.filename).getFileName().toString() + "#ci-c-" + id);
-        if (clause.isDiv()) {
-          f.img("conformance.png", "conf").attribute("width", "20").attribute("class", "self-link").attribute("height", "20");
-          f.tx("§" + id);
+          focus.addChildNode(0, tag);  // For Divs, we want the tag at the start of the clause
         } else {
-          f.supr("§" + id);
+          focus.add(tag); // For paragraphs, line items, etc. we want the tag at the end of the clause
         }
       }
       for (LoadedFile lf : sources) {
@@ -826,7 +823,6 @@ class ConformanceStatementHandler {
         if (!cnt.trim().isBlank())
           div.start.para(cnt);
         x.getChildNodes().clear();
-        x.para("!");
         hasClauses.set(true);
       }
     } else if (x.allText() != null && "!§§".equals(x.allText())) {
