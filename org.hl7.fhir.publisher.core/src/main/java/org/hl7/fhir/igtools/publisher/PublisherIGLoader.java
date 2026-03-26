@@ -821,12 +821,16 @@ public class PublisherIGLoader extends PublisherBase {
     if (pf.template.isDevMode()) {
       FileUtilities.clearDirectory(pf.tempDir);
     } else {
-      for (File ff : new File(pf.tempDir).listFiles()) {
-        if (ff.getName().startsWith("comparison-") && ff.isDirectory()) {
-          FileUtilities.clearDirectory(ff.getAbsolutePath());
-          ff.delete();
+      File fTempDir = new File(pf.tempDir);
+      if (fTempDir.exists()) {
+        {
+          for (File ff : fTempDir.listFiles()) {
+            if (ff.getName().startsWith("comparison-") && ff.isDirectory()) {
+              FileUtilities.clearDirectory(ff.getAbsolutePath());
+              ff.delete();
+            }
+          }
         }
-      }
     }
 
     for (String s : liquid0) {
