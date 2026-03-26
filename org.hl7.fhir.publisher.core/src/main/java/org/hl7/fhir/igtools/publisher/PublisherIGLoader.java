@@ -831,6 +831,7 @@ public class PublisherIGLoader extends PublisherBase {
             }
           }
         }
+      }
     }
 
     for (String s : liquid0) {
