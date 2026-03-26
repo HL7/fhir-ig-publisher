@@ -244,7 +244,7 @@ public class AdjunctFileLoader {
   }
 
   private String checkReplaceable(Attachment att) {
-    if (att.hasData() || att.hasUrl() || att.hasContentType() || att.hasSize() || att.hasTitle()) {
+    if (att.hasData() || att.hasUrl() || att.hasContentType() || att.hasSize()) {
       return null;
     }
     if (!att.hasId()) {
