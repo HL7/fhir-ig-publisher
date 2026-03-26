@@ -1198,7 +1198,8 @@ public class PublisherGenerator extends PublisherBase {
           }
         }
         if (html == null) {
-          BinaryRenderer br = new BinaryRenderer(this.pf.tempDir, this.pf.template.getScriptMappings());
+          String tpath = lang == null ? this.pf.tempDir : Utilities.path(this.pf.tempDir, lang);
+          BinaryRenderer br = new BinaryRenderer(tpath, this.pf.template.getScriptMappings());
           if (lr instanceof Binary) {
             html = pfx + br.display((Binary) lr);
           } else if (le.fhirType().equals("Binary")) {
