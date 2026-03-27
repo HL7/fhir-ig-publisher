@@ -157,11 +157,14 @@ public class PublicationProcess {
   }
 
   private static String removePassword(String[] args, int i) {
-    if (i == 0 || !args[i-1].toLowerCase().contains("password")) {
+    if (i == 0) {
       return args[i];
-    } else {
+    }
+    String prev = args[i-1].toLowerCase();
+    if (prev.contains("password") || prev.contains("secret")) {
       return "XXXXXX";
     }
+    return args[i];
   }
 
 
