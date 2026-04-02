@@ -4249,6 +4249,7 @@ public class PublisherIGLoader extends PublisherBase {
         }
       }
     } else if (r.fhirType().equals("Bundle")) {
+      boolean altered = false;
       Bundle b = (Bundle) r.getResource();
       if (b == null) {
         try {
@@ -4262,6 +4263,7 @@ public class PublisherIGLoader extends PublisherBase {
         for (Bundle.BundleEntryComponent be : b.getEntry()) {
           if (be.hasResource() && be.getResource().fhirType().equals(type)) {
             CanonicalResource mr = (CanonicalResource) be.getResource();
+            altered = checkCanonicalsForVersions(f, mr, false) || altered;
             if (mr.hasUrl()) {
               if (!mr.hasWebPath()) {
                 this.pf.igpkp.checkForPath(f,  r,  mr, true);
@@ -4272,6 +4274,9 @@ public class PublisherIGLoader extends PublisherBase {
 
           }
         }
+      }
+      if (altered) {
+        r.setElement(convertToElement(r, b));
       }
     }
   }
