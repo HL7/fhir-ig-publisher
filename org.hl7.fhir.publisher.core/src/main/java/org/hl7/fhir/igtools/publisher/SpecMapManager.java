@@ -206,9 +206,6 @@ public class SpecMapManager {
     if (path != null) {
       return path;
     }
-    if (def != null) {
-      return def;
-    }
     if (special != null) {
       switch (special) {
       case FACADE:
@@ -272,6 +269,9 @@ public class SpecMapManager {
           return null;
         }
       }
+    }
+    if (def != null) {
+      return def;
     }
     if (url.matches(Constants.URI_REGEX)) {
       int cc = 0;
