@@ -1118,7 +1118,7 @@ public class PublisherGenerator extends PublisherBase {
         String html = null;
         if (rX.getLogicalElement() != null) {
           // Try to use a specialised renderer for this logical model.
-          String logicalType = fhirTypeRoot(rX.getLogicalElement().fhirType());
+          String logicalType = rX.getLogicalElement().fhirTypeRoot();
           RenderingContext xlrc = lrc.copy(false);
           xlrc.setRules(RenderingContext.GenerationRules.IG_PUBLISHER);
           ResourceRenderer rr = RendererFactory.factory(logicalType, xlrc);
@@ -6994,21 +6994,5 @@ public class PublisherGenerator extends PublisherBase {
       ExtensionUtilities.removeExtension(r, ExtensionDefinitions.EXT_IGP_RESOURCE_INFO);
   }
 
-  /**
-   * Extracts the type name from a FHIR type that may be a URL.
-   *
-   * <p>For logical models, the fhirType is a URL like
-   * "https://sql-on-fhir.org/ig/StructureDefinition/ViewDefinition". This method extracts just
-   * the final segment ("ViewDefinition") for use with RendererFactory.
-   *
-   * @param fhirType The FHIR type, which may be a simple name or a URL.
-   * @return The type name (final path segment if a URL, otherwise the input unchanged).
-   */
-  private static String fhirTypeRoot(String fhirType) {
-    if (fhirType != null && fhirType.contains("/")) {
-      return fhirType.substring(fhirType.lastIndexOf("/") + 1);
-    }
-    return fhirType;
-  }
 
 }
