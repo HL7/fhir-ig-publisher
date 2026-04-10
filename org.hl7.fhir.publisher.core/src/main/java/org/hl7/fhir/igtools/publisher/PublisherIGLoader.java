@@ -149,9 +149,9 @@ public class PublisherIGLoader extends PublisherBase {
     if (ini != null) {
       pf.newIg = true;
       initializeFromIg(ini);
-    } else if (isTemplate())
+    } else if (isTemplate()) {
       initializeTemplate();
-    else if (pf.rootDir == null) {
+    } else if (pf.rootDir == null) {
       throw new Error("The IG Publisher was unable to find an ig.ini, and hasn't been configured correctly - needs to know what directory to execute on");
     } else {
       throw new Error("Old style JSON configuration is no longer supported. If you see this, then ig.ini wasn't found in '"+ pf.rootDir +"'");
@@ -1796,7 +1796,10 @@ public class PublisherIGLoader extends PublisherBase {
       igm.setName(pi.title());
       igm.setBase(pi.canonical());
       igm.setBase2(PackageHacker.fixPackageUrl(pi.url()));
-      pf.linkSpecMaps.add(new PublisherUtils.LinkedSpecification(igm, pi));
+      PublisherUtils.LinkedSpecification lspec = new PublisherUtils.LinkedSpecification(igm, pi);
+      pf.linkSpecMaps.add(lspec);
+      // load any logical types out of the package
+      lspec.setIndex(org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(pi.load("package", ".index.json")));
     }
   }
 
