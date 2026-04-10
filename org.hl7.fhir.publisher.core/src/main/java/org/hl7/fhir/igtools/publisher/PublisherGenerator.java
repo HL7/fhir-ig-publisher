@@ -2807,7 +2807,8 @@ public class PublisherGenerator extends PublisherBase {
     msr.analyse();
     Set<String> types = new HashSet<>();
     for (StructureDefinition sd : pf.context.fetchResourcesByType(StructureDefinition.class)) {
-      if (sd.getUrl().equals("http://hl7.org/fhir/StructureDefinition/Base") || (sd.getDerivation() == StructureDefinition.TypeDerivationRule.SPECIALIZATION && sd.getKind() != StructureDefinition.StructureDefinitionKind.LOGICAL && !types.contains(sd.getType()))) {
+      if (!sd.getUrl().startsWith("http://hl7.org/fhir/StructureDefinition/") && sd.getDerivation() == StructureDefinition.TypeDerivationRule.SPECIALIZATION
+              && sd.getKind() != StructureDefinition.StructureDefinitionKind.LOGICAL && !types.contains(sd.getType())) {
         types.add(sd.getType());
         long start = System.currentTimeMillis();
         String src = msr.render(sd);
@@ -6122,7 +6123,7 @@ public class PublisherGenerator extends PublisherBase {
     }
   }
 
-  private String processRefTag(DBBuilder db, String src, FetchedFile f) {
+  private String processRefTag(DBBuilder db, String src, FetchedFile f) throws IOException {
     if (Utilities.existsInList(src, "$ver")) {
       switch (src) {
         case "$ver": return this.pf.businessVersion;
@@ -6159,6 +6160,35 @@ public class PublisherGenerator extends PublisherBase {
     for (RelatedIG rig : this.pf.relatedIGs) {
       if (rig.getId().equals(src) && rig.getWebLocation() != null) {
         return "<a href=\""+rig.getWebLocation()+"\">"+Utilities.escapeXml(rig.getTitle())+"</a>";
+      }
+    }
+    for (PublisherUtils.LinkedSpecification lspec : pf.linkSpecMaps) {
+      JsonObject item = null;
+      for (JsonObject t : lspec.getIndex().getJsonObjects("files")) {
+        if (src.equals(t.asString("id")) || src.equals(t.asString("url")) || src.equals(t.asString("type"))) {
+          item = t;
+          break;
+        }
+        if ("specialization".equals(t.asString("derivation")) && t.has("type") && t.asString("type").endsWith("StructureDefinition/"+src)) {
+          item = t;
+          break;
+        }
+      }
+      if (item != null) {
+        JsonObject json = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(lspec.getNpm().load("package", item.asString("filename")));
+        String page = null;
+        if (json.has("extension")) {
+          for (JsonObject ext : json.getJsonObjects("extension")) {
+            if ("http://hl7.org/fhir/tools/StructureDefinition/web-source".equals(ext.asString("url"))) {
+              page = ext.asString("valueUrl");
+              break;
+            }
+          }
+        }
+        if (page == null) {
+          page = lspec.getSpm().getPath(json.asString("url"), null, json.asString("resoureType"), json.asString("id"));
+        }
+        return "<a href=\""+page+"\">"+Utilities.escapeXml(json.has("title") ? json.asString("title") : json.asString("name"));
       }
     }
     // use [[~[ so we don't get stuck in a loop
