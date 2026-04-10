@@ -234,3 +234,13 @@ org.hl7.fhir.publisher.core/.checkstyle
 shell-scripts/go-publish-fhir.txt
 
 *.command
+
+.run/JUnit Convertors.run.xml
+
+.run/JUnit R5.run.xml
+
+.run/JUnit Utilities.run.xml
+
+.run/JUnit Validation.run.xml
+
+.run/
