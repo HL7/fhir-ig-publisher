@@ -218,7 +218,7 @@ public class PackageReleaser {
     r4 = org.hl7.fhir.r4.context.SimpleWorkerContext.fromPackage(pcm.loadPackage("hl7.fhir.r4.core", "4.0.1"));
     System.out.println("Load hl7.fhir.r3.core");
     r3 = org.hl7.fhir.dstu3.support.context.SimpleWorkerContext.fromPackage(pcm.loadPackage("hl7.fhir.r3.core", "3.0.2"));
-    System.out.println("Scanning "+source+" and comaparing to "+dest);
+    System.out.println("Scanning "+source+" and comparing to "+dest);
 
     SimpleDateFormat df = new SimpleDateFormat(RSS_DATE, new Locale("en", "US"));
     checkDest(dest);
@@ -595,7 +595,7 @@ public class PackageReleaser {
     List<VersionDecision> res = new ArrayList<PackageReleaser.VersionDecision>();
     for (String s : oldList.keySet()) {
       if (!newList.containsKey(s)) {
-        throw new Exception("Existing template "+s+" not found in release set ("+newList.keySet()+")");
+        throw new Exception("Existing package "+s+" not found in release set ("+newList.keySet()+")");
       }
       VersionDecision vd = new VersionDecision();
       res.add(vd);
@@ -729,7 +729,7 @@ public class PackageReleaser {
 
   private void scanForCurrentVersions(Map<String, String> res, File folder) throws IOException {
     for (File f : folder.listFiles()) {
-      if (f.isDirectory() && !f.getName().contains(".r2")) {
+      if (f.isDirectory() && !f.getName().contains(".r2") && !f.getName().contains("vsac")  && !f.getName().contains("xver") ) {
         scanForCurrentVersions(res, f);
       } else if (f.getName().equals("package-list.json")) {
         PackageList pl = PackageList.fromFile(f);

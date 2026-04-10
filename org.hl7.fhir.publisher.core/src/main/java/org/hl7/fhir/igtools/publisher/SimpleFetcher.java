@@ -52,6 +52,7 @@ import org.hl7.fhir.r5.model.UriType;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
+import org.hl7.fhir.utilities.regex.RegexConstants;
 
 public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
 
@@ -232,7 +233,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
               type.equals("CapabilityStatement"))) 
           )
         throw new Exception("Bad Resource Identity - should have the format [Type]/[id] where Type is a valid resource type: " + s);
-      if (!id.matches(FormatUtilities.ID_REGEX))
+      if (!id.matches(RegexConstants.ID_REGEX))
         throw new Exception("Bad Source Reference '"+s+"' - should have the format [Type]/[id] where id is a valid FHIR id type");
       String fn = pkp.getSourceFor(type+"/"+id);
       List<String> dirs = new ArrayList<>();

@@ -1,5 +1,7 @@
 package org.hl7.fhir.igtools.publisher;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.apache.commons.lang3.NotImplementedException;
 import org.hl7.fhir.convertors.factory.*;
 import org.hl7.fhir.exceptions.FHIRException;
@@ -10,11 +12,14 @@ import org.hl7.fhir.r5.model.Base;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
 
 public class PublisherUtils {
   public enum UMLGenerationMode {
@@ -53,6 +58,8 @@ public class PublisherUtils {
   public static class LinkedSpecification {
     private SpecMapManager spm;
     private NpmPackage npm;
+    @Getter @Setter private JsonObject index;
+
     public LinkedSpecification(SpecMapManager spm, NpmPackage npm) {
       super();
       this.spm = spm;
