@@ -117,7 +117,7 @@ public class IGReleaseUpdater {
     }
   }
 
-  public void check(Map<String, IndexMaintainer> indexes, boolean throwError, boolean updateStatements, String templateSrc) throws IOException  {
+  public void check(Map<String, IndexMaintainer> indexes, boolean throwError, boolean updateStatements, String templateSrc, String description) throws IOException  {
     List<String> errs = new ArrayList<>(); 
     try {
       String f = Utilities.path(folder, "package-list.json");
@@ -145,7 +145,7 @@ public class IGReleaseUpdater {
           }
         }
         boolean save = false;
-        ImplementationGuideEntry rc = reg == null ? null : reg.seeIg(json.asString("package-id"), canonical, json.asString("title"), json.asString("category"));
+        ImplementationGuideEntry rc = reg == null ? null : reg.seeIg(json.asString("package-id"), canonical, json.asString("title"), json.asString("category"), description, json.asString("country"), json.asString("authority"));
         if (!json.has("category")) {
           if (Utilities.noString(rc.getCategory())) {
             errs.add(f+" has no category value");            
@@ -203,10 +203,10 @@ public class IGReleaseUpdater {
               }
               if (reg != null) {
                 if (o.asString("status").equals("release") || o.asString("status").equals("trial-use") || o.asString("status").equals("update")) {
-                  reg.seeRelease(rc, o.asString("status").equals("update") ? "STU Update" : o.asString("sequence"), o.asString("version"), o.asString("fhirversion", "fhir-version"), o.asString("path"));
+                  reg.seeEdition(rc, o.asString("status").equals("update") ? "STU Update" : o.asString("sequence"), o.asString("version"), o.asString("fhirversion", "fhir-version"), o.asString("path"));
                   hasRelease = true;
                 } else if (!hasRelease && VersionUtilities.packageForVersion(o.asString("fhirversion", "fhir-version")) != null)
-                  reg.seeCandidate(rc, o.asString("sequence")+" "+Utilities.titleize(o.asString("status")), o.asString("version"), o.asString("fhirversion", "fhir-version"), o.asString("path"));
+                  reg.seeEdition(rc, o.asString("sequence")+" "+Utilities.titleize(o.asString("status")), o.asString("version"), o.asString("fhirversion", "fhir-version"), o.asString("path"));
               }
             }
           }
@@ -526,7 +526,7 @@ public class IGReleaseUpdater {
 
 
   public static void main(String[] args) throws Exception {
-    new IGReleaseUpdater(args[0], args[1], args[2], null, ServerType.ASP2, null, null, true, args[3]).check(null, false, true, args[4]);
+    new IGReleaseUpdater(args[0], args[1], args[2], null, ServerType.ASP2, null, null, true, args[3]).check(null, false, true, args[4], null);
   }
   
 }

@@ -37,6 +37,7 @@ import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.CanonicalResourceCom
 import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.ChangeAnalysisState;
 import org.hl7.fhir.r5.comparison.VersionComparisonAnnotation;
 import org.hl7.fhir.r5.context.IWorkerContext;
+import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.DataRequirement;
 import org.hl7.fhir.r5.model.DataRequirement.DataRequirementCodeFilterComponent;
@@ -96,6 +97,9 @@ public class ValueSetRenderer extends CanonicalRenderer {
       vsc.setExpansion(null); // we don't want to render an expansion by mistake
       RendererFactory.factory(vsc, gen).renderOrError(ResourceWrapper.forResource(gen, vsc));
       return "<h3>"+gen.formatPhrase(RenderingContext.VSR_LOGICAL)+"</h3>\r\n" + new XhtmlComposer(XhtmlComposer.HTML).compose(vsc.getText().getDiv());
+    } else if (vs.hasExtension(ExtensionDefinitions.EXT_VALUESET_RULES_TEXT)) {
+      String md = processMarkdown("ValueSet.extension", vs.getExtensionString(ExtensionDefinitions.EXT_VALUESET_RULES_TEXT));
+      return "<h3>"+gen.formatPhrase(RenderingContext.VSR_LOGICAL)+"</h3>\r\n" +md;
     } else {
       return "<h3>"+gen.formatPhrase(RenderingContext.VSR_LOGICAL)+"</h3>\r\n<p>"+gen.formatPhrase(RenderingI18nContext.VSR_NO_DEF)+"</p>\r\n";
       

@@ -110,7 +110,7 @@ public class IGWebSiteMaintainer {
       }
     }
     for (String s : igs) {
-      new IGReleaseUpdater(s, url, folder, reg, serverType, igs, sft, filter == null || filter.equalsIgnoreCase(s), historyRepo).check(indexes, true, updateStatements, templateSrc);
+      new IGReleaseUpdater(s, url, folder, reg, serverType, igs, sft, filter == null || filter.equalsIgnoreCase(s), historyRepo).check(indexes, true, updateStatements, templateSrc, "??");
     }
     for (IndexMaintainer index : indexes.values()) {
       index.buildJson();

@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import lombok.Getter;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonArray;
@@ -38,33 +39,19 @@ import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
 public class IGRegistryMaintainer {
 
   public class PublicationEntry {
-    private String name;
-    private String version;
-    private String fhirVersion;
-    private String path;
+    @Getter private String name;
+    @Getter private String version;
+    @Getter private String fhirVersion;
+    @Getter private String path;
+    @Getter private String packageId;
     
-    public PublicationEntry(String name, String version, String fhirVersion, String path) {
+    public PublicationEntry(String name, String version, String fhirVersion, String path, String packageId) {
       super();
       this.name = name;
       this.version = version;
       this.fhirVersion = fhirVersion;
       this.path = removeTrailingSlash(path);
-    }
-    
-    public String getName() {
-      return name;
-    }
-    
-    public String getVersion() {
-      return version;
-    }
-    
-    public String getFhirVersion() {
-      return fhirVersion;
-    }
-    
-    public String getPath() {
-      return path;
+      this.packageId = packageId;
     }
   }
   
@@ -75,8 +62,7 @@ public class IGRegistryMaintainer {
     private String cibuild;
     private boolean withdrawn;
     private String withDrawalDate;
-    private List<PublicationEntry> releases = new ArrayList<>();
-    private List<PublicationEntry> candidates = new ArrayList<>();
+    private List<PublicationEntry> editions = new ArrayList<>();
     private List<String> products = new ArrayList<>();
     private JsonObject entry;
     
@@ -105,12 +91,8 @@ public class IGRegistryMaintainer {
       return title;
     }
 
-    public List<PublicationEntry> getReleases() {
-      return releases;
-    }
-
-    public List<PublicationEntry> getCandidates() {
-      return candidates;
+    public List<PublicationEntry> getEditions() {
+      return editions;
     }
 
     public String getCategory() {
@@ -119,6 +101,26 @@ public class IGRegistryMaintainer {
 
     public List<String> getProducts() {
       return products;
+    }
+
+    public void markWithdrawn(String withdrawalReason) {
+      entry.add("withdrawnReason", withdrawalReason);
+    }
+
+    public void markReplacedBy(String replacedBy) {
+      entry.add("replacedBy", replacedBy);
+    }
+
+    public String description() {
+      return entry.asString("description");
+    }
+
+    public String country() {
+      return entry.asString("country");
+    }
+
+    public String authority() {
+      return entry.asString("authority");
     }
   }
 
@@ -137,7 +139,32 @@ public class IGRegistryMaintainer {
     return p.endsWith("/") ? p.substring(0,  p.length()-1) : p;
   }
 
-  public ImplementationGuideEntry seeIg(String packageId, String canonical, String title, String category) {
+
+  public ImplementationGuideEntry findIg(String packageId) {
+    for (ImplementationGuideEntry ig : igs) {
+      if (ig.getPackageId().equals(packageId)) {
+        return ig;
+      }
+    }
+    JsonObject i = json.getJsonArray("guides").findByStringProp("npm-name", packageId);
+    if (i != null) {
+      ImplementationGuideEntry ig = new ImplementationGuideEntry(packageId, i.asString("canonical"), i.asString("name"));
+      ig.entry = json.getJsonArray("guides").findByStringProp("npm-name", ig.packageId);
+      igs.add(ig);
+      for (String s : ig.entry.forceArray("product").asStrings()) {
+        if (!ig.products.contains(s)) {
+          ig.products.add(s);
+        }
+      }
+      for (JsonObject ed : ig.entry.forceArray("editions").asJsonObjects()) {
+        ig.editions.add(new PublicationEntry(ed.asString("name"), ed.asString("ig-version"), ed.asString("fhir-version"), ed.asString("url"), ed.asString("package")));
+      }
+      return ig;
+    }
+    return null;
+  }
+
+  public ImplementationGuideEntry seeIg(String packageId, String canonical, String title, String category, String description, String country, String authority) {
     ImplementationGuideEntry ig = new ImplementationGuideEntry(packageId, canonical, title);
     igs.add(ig);
     ig.getProducts().add("fhir");
@@ -148,9 +175,9 @@ public class IGRegistryMaintainer {
       ig.entry.add("name", ig.title);
       ig.entry.add("category", Utilities.noString(category) ? "??" : category);
       ig.entry.add("npm-name", ig.packageId);
-      ig.entry.add("description", "??");
-      ig.entry.add("authority", getAuthority(ig.canonical));
-      ig.entry.add("country", getCountry(ig.canonical));
+      ig.entry.add("description", description);
+      ig.entry.add("authority", authority == null ? getAuthority(ig.canonical) : authority);
+      ig.entry.add("country", country == null ? getCountry(ig.canonical) : country);
       ig.entry.add("history", getHistoryPage(ig.canonical));
       ig.entry.forceArray("product").add("fhir");
       JsonArray a = new JsonArray();
@@ -178,18 +205,13 @@ public class IGRegistryMaintainer {
   }
 
   public void withdraw(ImplementationGuideEntry ig, String name, String version, String fhirVersion, String path) {
-    ig.releases.clear();
+    ig.editions.clear();
     ig.withdrawn = true;
   }
   
-  public void seeRelease(ImplementationGuideEntry ig, String name, String version, String fhirVersion, String path) {
-    PublicationEntry p = new PublicationEntry(name, version, fhirVersion, path);
-    ig.releases.add(p);
-  }
-
-  public void seeCandidate(ImplementationGuideEntry ig, String name, String version, String fhirVersion, String path) {
-    PublicationEntry p = new PublicationEntry(name, version, fhirVersion, path);
-    ig.candidates.add(p);
+  public void seeEdition(ImplementationGuideEntry ig, String name, String version, String fhirVersion, String path) {
+    PublicationEntry p = new PublicationEntry(name, version, fhirVersion, path, ig.getPackageId());
+    ig.editions.add(p);
   }
 
   public void finish() throws FileNotFoundException, IOException {
@@ -224,29 +246,22 @@ public class IGRegistryMaintainer {
         
         JsonArray a = new JsonArray();
         ig.entry.add("editions", a);
-        if (!ig.getCandidates().isEmpty()) {
-          PublicationEntry p = ig.getCandidates().get(0);
-          a.add(makeEdition(p, ig.packageId));
-        }
-        for (PublicationEntry p : ig.getReleases()) {
-          a.add(makeEdition(p, ig.packageId));
+        if (!ig.getEditions().isEmpty()) {
+          PublicationEntry p = ig.getEditions().get(0);
+          a.add(makeEdition(p));
         }
       }
       JsonParser.compose(json, new FileOutputStream(path), true);
     }
     for (ImplementationGuideEntry ig : igs) {
       System.out.println(ig.packageId+" ("+ig.canonical+"): "+ig.title+" @ "+ig.cibuild);
-      for (PublicationEntry p : ig.getReleases()) {
-        System.out.println("  release: "+p.name+" "+p.version+"/"+p.fhirVersion+" @ "+p.path);
+      for (PublicationEntry p : ig.getEditions()) {
+        System.out.println("  edition: "+p.name+" "+p.version+"/"+p.fhirVersion+" @ "+p.path);
       }
-      if (!ig.getCandidates().isEmpty()) {
-        PublicationEntry p = ig.getCandidates().get(0);
-        System.out.println("  candidate: "+p.name+" "+p.version+"/"+p.fhirVersion+" @ "+p.path);
-      }
-    }    
+    }
   }
   
-  private JsonObject makeEdition(PublicationEntry p, String packageId) {
+  private JsonObject makeEdition(PublicationEntry p) {
     JsonObject e = new JsonObject();
     if (!e.has("name") || !e.get("name").asString().equals(p.getName())) {
       e.remove("name");
@@ -256,9 +271,9 @@ public class IGRegistryMaintainer {
       e.remove("ig-version");
       e.add("ig-version", p.getVersion());
     }
-    if (!e.has("package") || !e.get("package").asString().equals(packageId+"#"+p.getVersion())) {
+    if (!e.has("package") || !e.get("package").asString().equals(p.getPackageId()+"#"+p.getVersion())) {
       e.remove("package");
-      e.add("package", packageId+"#"+p.getVersion());
+      e.add("package", p.getPackageId()+"#"+p.getVersion());
     }
     if (p.getFhirVersion() != null) {
       if (!e.has("fhir-version") || e.getJsonArray("fhir-version").size() != 1 || !e.getJsonArray("fhir-version").get(0).asString().equals(p.getName())) {

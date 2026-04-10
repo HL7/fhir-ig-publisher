@@ -144,6 +144,9 @@ public class WebSourceProvider {
     }    
   }
 
+  public void deleteExistingFile(String name) throws IOException {
+    new File(Utilities.path(source, name)).delete();
+  }
   public void finish(String existingFilesBase, List<String> existingFiles) throws IOException {
     System.out.println("Applying changes to website source at "+source);
     if (existingFiles != null) {
@@ -153,10 +156,6 @@ public class WebSourceProvider {
     }
     FileUtilities.copyDirectory(destination, source, null);
     System.out.println("  ... done");
-  }
-
-  private String deleteFileName() throws IOException {
-    return Utilities.path("[tmp]", "files-to-delete.txt");
   }
 
   public String instructions(int fc) throws IOException {

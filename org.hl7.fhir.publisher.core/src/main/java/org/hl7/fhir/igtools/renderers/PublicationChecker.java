@@ -68,10 +68,16 @@ public class PublicationChecker {
     if (summary.size() > 0) {
       bs.append("<table class=\"grid\">\r\n");
       for (StringPair p : summary) {
-        if ("descmd".equals(p.getName())) {
-          bs.append(" <tr><td>"+Utilities.escapeXml(p.getName())+"</d><td>"+p.getValue()+"</td></tr>\r\n");
+        String name = p.getName();
+        String style = "";
+        if (name.startsWith("!")) {
+          name = name.substring(1);
+          style = " style=\"background-color: #ffe6cc;\"";
+        }
+        if ("descmd".equals(name)) {
+          bs.append(" <tr"+style+"><td>"+Utilities.escapeXml(name)+"</d><td>"+p.getValue()+"</td></tr>\r\n");
         } else {
-          bs.append(" <tr><td>"+Utilities.escapeXml(p.getName())+"</d><td>"+Utilities.escapeXml(p.getValue())+"</td></tr>\r\n");
+          bs.append(" <tr"+style+"><td>"+Utilities.escapeXml(name)+"</d><td>"+Utilities.escapeXml(p.getValue())+"</td></tr>\r\n");
         }
       }      
       bs.append("</table>\r\n");
@@ -162,9 +168,14 @@ public class PublicationChecker {
       } catch (Exception e) {
         check(messages, false, "Error reading package: "+e.getMessage()+mkError());
       }
+      JsonObject pr = null;
+      File prFile = new File(Utilities.path(folder, "publication-request.json"));
+      if (prFile.exists()) {
+        pr = JsonParser.parseObject(prFile);
+      }
       if (npm != null) {
-        checkPackage(messages, npm);  
-        String dst = determineDestination(npm);
+        checkPackage(messages, npm);
+        String dst = pr != null && pr.has("movedFrom") ? pr.asString("movedFrom").replace("https:", "http:") : determineDestination(npm);
         PackageList pl = null;
         try {
           pl = readPackageList(dst);
@@ -175,7 +186,7 @@ public class PublicationChecker {
             check(messages, false, "Error fetching package-list from "+dst+": "+e.getMessage()+mkError());
           }
         }
-        checkExistingPublication(messages, npm, pl);
+        checkExistingPublication(messages, npm, pl, pr);
         if (check(messages, exists("publication-request.json"), "No publication request found"+mkInfo())) {
           return checkPublicationRequest(messages, npm, pl, summary);
         } 
@@ -209,11 +220,19 @@ public class PublicationChecker {
        Utilities.escapeXml(Utilities.pathURL(npm.canonical(), "history.html"))+"'"+mkError());
   }
 
-  private void checkExistingPublication(List<String> messages, NpmPackage npm, PackageList pl) {
+  private void checkExistingPublication(List<String> messages, NpmPackage npm, PackageList pl, JsonObject pr) {
     if (pl != null) {
-      check(messages, npm.name().equals(pl.pid()), "Package ID mismatch. This package is "+npm.name()+" but the website has "+pl.pid()+mkError());
-      check(messages, npm.canonical().equals(pl.canonical()), "Package canonical mismatch. This package canonical is "+npm.canonical()+" but the website has "+pl.canonical()+mkError());
-      check(messages, !hasVersion(pl, npm.version()), "Version "+npm.version()+" has already been published"+mkWarning());
+      if (pr.has("movedFrom")) {
+        check(messages, !npm.name().equals(pl.pid()), "Package ID matches, which is wrong. This package is " + npm.name() + " and the website is also " + pl.pid()+", but it must change" + mkError());
+        check(messages, !npm.canonical().equals(pl.canonical()), "Package canonical matches, which is wrong. This package canonical is " + npm.canonical() + " and the website has " + pl.canonical()+", but it must change" + mkError());
+        check(messages, !hasVersion(pl, npm.version()), "Version " + npm.version() + " has already been published" + mkWarning());
+        check(messages, pl.getNowPublishedAs() == null, "Package " + npm.name() + " has been superceded by " + pl.getNowPublishedAs() + " and no further publications are possible" + mkError());
+      } else {
+        check(messages, npm.name().equals(pl.pid()), "Package ID mismatch. This package is " + npm.name() + " but the website has " + pl.pid() + mkError());
+        check(messages, npm.canonical().equals(pl.canonical()), "Package canonical mismatch. This package canonical is " + npm.canonical() + " but the website has " + pl.canonical() + mkError());
+        check(messages, !hasVersion(pl, npm.version()), "Version " + npm.version() + " has already been published" + mkWarning());
+        check(messages, pl.getNowPublishedAs() == null, "Package " + npm.name() + " has been superceded by " + pl.getNowPublishedAs() + " and no further publications are possible" + mkError());
+      }
     } else {
       check(messages, npm.version().startsWith("0.1") || npm.version().contains("-"), "This IG has never been published, so the version should start with '0.' or include a patch version e.g. '-ballot'"+mkWarning());
     }  
@@ -254,10 +273,19 @@ public class PublicationChecker {
         check(messages, cv == null || VersionUtilities.isThisOrLater(cv, v, VersionUtilities.VersionPrecision.MINOR), "Proposed version v"+v+" is older than already published version v"+cv+mkError());
       }
     }
-    if (check(messages, pr.has("path"), "No publication request path found"+mkError())) {
-      if (check(messages, pr.asString("path").startsWith(npm.canonical()) && !pr.asString("path").equals(npm.canonical()), "Proposed path for this publication does not start with the canonical URL ("+pr.asString("path")+" vs "+npm.canonical() +")"+mkError())) {
-        summary.add(new StringPair("path", pr.asString("path")));                        
+    boolean pathok = false;
+    if ("withdrawal".equals(pr.asString("mode"))) {
+      check(messages, !pr.has("path"), "No publication request path allowed for withdrawals"+mkError());
+      pathok = true;
+    } else {
+      if (check(messages, pr.has("path"), "No publication request path found" + mkError())) {
+        if (check(messages, pr.asString("path").startsWith(npm.canonical()) && !pr.asString("path").equals(npm.canonical()), "Proposed path for this publication does not start with the canonical URL (" + pr.asString("path") + " vs " + npm.canonical() + ")" + mkError())) {
+          pathok = true;
+          summary.add(new StringPair("path", pr.asString("path")));
+        }
       }
+    }
+    if (pathok) {
       boolean exists = false;
       if (pl != null) {
         for (PackageListEntry v : pl.versions()) {
@@ -282,18 +310,18 @@ public class PublicationChecker {
           }
         }
       } else if (pr.has("version")) {
-        check(messages,  
-            pr.asString("path").equals(Utilities.pathURL(npm.canonical(), pr.asString("version"))) ||
+        check(messages,
+                pr.asString("path") == null || pr.asString("path").equals(Utilities.pathURL(npm.canonical(), pr.asString("version"))) ||
             pr.asString("path").startsWith(Utilities.pathURL(npm.canonical(), pr.asString("version"))+"-") ||
             pr.asString("path").startsWith(Utilities.pathURL(npm.canonical(), pr.asString("sequence"))+"-"),
             "Proposed path for this publication should usually be the canonical with the version or sequence appended and then some kind of label (typically '-snapshot')"+mkWarning());
       }
     }
     PublicationProcessMode mode = null;
-    if (check(messages, Utilities.existsInList(pr.asString("mode"), "working", "milestone", "technical-correction"), "The release must have a mode of working, milestone or technical-correction"+mkError())) {
+    if (check(messages, Utilities.existsInList(pr.asString("mode"), "working", "milestone", "technical-correction", "withdrawal"), "The release must have a mode of working, milestone, technical-correction or withdrawal"+mkError())) {
       mode = PublicationProcessMode.fromCode(pr.asString("mode"));
-      summary.add(new StringPair("Pub-Mode", mode.toCode()));        
-      if (mode != PublicationProcessMode.WORKING) {
+      summary.add(new StringPair((mode == PublicationProcessMode.WITHDRAWAL ? "!": "")+"Pub-Mode", mode.toCode()));
+      if (mode != PublicationProcessMode.WORKING && mode != PublicationProcessMode.WITHDRAWAL) {
         check(messages, !npm.version().contains("-"), "This release is labelled as a "+mode.toCode()+", so should not have a patch version ("+npm.version() +")"+mkWarning()); 
       } else {
         check(messages, npm.version().contains("-"), "This release is not labelled as a milestone or technical correction, so should have a patch version ("+npm.version() +")"+(isHL7(npm) ? mkError() : mkWarning()));
@@ -301,7 +329,7 @@ public class PublicationChecker {
     }
     
     if (check(messages, pr.has("status"), "No publication request status found"+mkError())) {
-      if (check(messages, isValidStatus(pr.asString("status")), "Proposed status for this publication is not valid (valid values: release|trial-use|update|preview|ballot|draft|normative+trial-use|normative|informative)"+mkError())) {
+      if (check(messages, isValidStatus(pr.asString("status")), "Proposed status for this publication is not valid (valid values: release|trial-use|update|preview|ballot|draft|normative+trial-use|normative|informative|withdrawn)"+mkError())) {
         summary.add(new StringPair("status", pr.asString("status")));                        
       }
     }
@@ -319,7 +347,7 @@ public class PublicationChecker {
           PackageListEntry lv = getLastVersionForSequence(pl, seq); 
           check(messages, mode != PublicationProcessMode.WORKING || lv.current() || Utilities.existsInList(lv.status(), "ballot", "draft"),
               "This release is labelled as a working release in the sequence '"+seq+"'. This is an unexpected workflow - check that the sequence really is correct."+mkWarning());
-        } else if (check(messages, mode != PublicationProcessMode.TECHNICAL_CORRECTION, "Technical Corrections must happen in the scope of the current sequence ('"+seq+"', not '"+pr.asString("sequence")+"'."+mkWarning())) {
+        } else if (check(messages, mode != PublicationProcessMode.TECHNICAL_CORRECTION && mode != PublicationProcessMode.WITHDRAWAL, "Technical Corrections and withdrawals must happen in the scope of the current sequence ('"+seq+"', not '"+pr.asString("sequence")+"'."+mkWarning())) {
           PackageListEntry ls = getLastVersionForSequence(pl, pr.asString("sequence"));
           check(messages, ls == null || !ls.current(), "The sequence '"+seq+"' has already been closed with a current publication, and a new sequence '"+seq+"' started - is going back to '"+pr.asString("sequence")+"' really what's intended?"+mkWarning());
         }        
@@ -337,8 +365,13 @@ public class PublicationChecker {
       }
     }
 
+    if (mode == PublicationProcessMode.WITHDRAWAL) {
+      check(messages, pr.has("registry-reason"), "For withdrawals, a short succint reason for withdrawal must be provided in 'registry-reason'"+mkError());
+    }
     if (check(messages, pr.has("desc") || pr.has("descmd") , "No publication request description found"+mkError())) {
-      check(messages, pr.has("desc"), "No publication request desc found (it is recommended to provide a shorter desc as well as descmd"+mkWarning());
+      check(messages, pr.has("desc"), "No publication request desc found (it is recommended to provide a shorter desc as well as descmd)"+mkWarning());
+      check(messages, mode != PublicationProcessMode.WITHDRAWAL || pr.has("descmd"), "No publication request descmd found (needed for a withdrawal)"+mkWarning());
+
       if (pr.has("desc")) {
         summary.add(new StringPair("desc", pr.asString("desc")));                        
       }
@@ -369,8 +402,11 @@ public class PublicationChecker {
         summary.add(new StringPair("category", pr.asString("category")));                                
       }
       if (check(messages, pr.has("title"), "No publication request title found (needed for first publication)"+mkError())) {
-        summary.add(new StringPair("title", pr.asString("title")));                                
+        summary.add(new StringPair("title", pr.asString("title")));
       }
+      check(messages, pr.has("registry-description"), "No publication description (`registry-description`) found (needed for first publication)"+mkError());
+      check(messages, pr.has("registry-country"), "No publication country (`registry-country`) found (needed for first publication)"+mkError());
+      check(messages, pr.has("registry-authority"), "No publication authority (`registry-authority`) found (needed for first publication)"+mkError());
       if (check(messages, pr.has("introduction"), "No publication request introduction found (needed for first publication)"+mkError())) {
         summary.add(new StringPair("introduction", pr.asString("introduction")));                                
       }
@@ -385,6 +421,28 @@ public class PublicationChecker {
     }
     check(messages, !pr.has("date"), "Cannot specify a date of publication in the request"+mkError());
     check(messages, !pr.has("canonical"), "Cannot specify a canonical in the request"+mkError());
+
+    if (pr.has("previouslyPublishedAs")) {
+      try {
+        PackageList plOld = readPackageList(pr.asString("previouslyPublishedAs"));
+        check(messages, pl == null, "Has Already been published, so can't be replacing another publication"+mkError());
+        check(messages, !plOld.pid().equals(npm.id()), "Previously published package ID mismatch - has not changed: "+plOld.pid()+" vs "+npm.id()+mkError());
+        check(messages, !plOld.canonical().equals(npm.canonical()), "Previously published package canonical has not changed: "+plOld.canonical()+" vs "+npm.canonical()+mkError());
+        check(messages, plOld.getNowPublishedAs() == null, "Package "+npm.name()+" has already been been superceded by "+plOld.getNowPublishedAs()+" and can't be superceded again"+mkError());
+        check(messages, !pr.has("previouslyPublishedAs"), "Cannot have both previouslyPublishedAs and movedFrom"+mkError());
+        summary.add(new StringPair("Replaces", plOld.title()+" ("+plOld.pid()+")"));
+      } catch (IOException e) {
+        check(messages, false, "!Previously published package not found at "+pr.asString("previouslyPublishedAs")+mkError());
+      }
+    }
+    if (pr.has("movedFrom")) {
+      summary.add(new StringPair("!Renames", pl.title()+" ("+pl.pid()+" / "+pl.canonical()+")"));
+      try {
+        PackageList plOld = readPackageList(determineDestination(npm));
+        check(messages, false, "A package-list.json already exists at "+pr.asString("movedFrom").replace("https:", "http:")+mkError());
+      } catch (IOException e) {
+      }
+    }
     return pr;
   }
 
@@ -433,7 +491,7 @@ public class PublicationChecker {
   }
 
   private boolean isValidStatus(String str) {
-    return Utilities.existsInList(str, "release", "trial-use", "update", "preview", "ballot", "draft", "normative+trial-use", "normative", "informative", "public-comment");
+    return Utilities.existsInList(str, "release", "trial-use", "update", "preview", "ballot", "draft", "normative+trial-use", "normative", "informative", "public-comment", "withdrawn");
   }
 
   private String getCurrentSequence(PackageList pl) {

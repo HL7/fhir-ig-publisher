@@ -26,13 +26,19 @@ public class PackageRegistryBuilder {
     return new File(Utilities.path(rootFolder, "package-registry.json"));
   }
 
+  public void updateForWithdrawal(String path, PackageList list, String withdrawalReason) throws JsonException, IOException {
+    JsonObject j = JsonParser.parseObject(prFile());
+    update(j, path+"/package-list.json", list, withdrawalReason);
+    JsonParser.compose(j, new FileOutputStream(prFile()), true);
+  }
+
   public void update(String path, PackageList list) throws JsonException, IOException {
     JsonObject j = JsonParser.parseObject(prFile());
-    update(j, path+"/package-list.json", list);
+    update(j, path+"/package-list.json", list, null);
     JsonParser.compose(j, new FileOutputStream(prFile()), true);
   }
   
-  private void update(JsonObject json, String path, PackageList pl) {
+  private void update(JsonObject json, String path, PackageList pl, String withdrawalReason) {
     JsonObject e = null;
     for (JsonObject t : json.forceArray("packages").asJsonObjects()) {
       if (!t.has("path")) {
@@ -48,6 +54,10 @@ public class PackageRegistryBuilder {
       json.forceArray("packages").add(e);
     } else {
       e.clear();
+    }
+    if (withdrawalReason != null) {
+      e.add("withdrawn", true);
+      e.add("withdrawn-reason", withdrawalReason);
     }
     e.add("path", path);
     e.add("package-id", pl.pid());
@@ -93,7 +103,7 @@ public class PackageRegistryBuilder {
           "information found in the package-lists is also contained in here.");
     }
     for (String path : Utilities.sorted(packages.keySet())) {
-      update(j, path,  packages.get(path));
+      update(j, path,  packages.get(path), null);
     }
     JsonParser.compose(j, new FileOutputStream(prFile()), true);
     System.out.println("Done. Built "+prFile().getAbsolutePath());

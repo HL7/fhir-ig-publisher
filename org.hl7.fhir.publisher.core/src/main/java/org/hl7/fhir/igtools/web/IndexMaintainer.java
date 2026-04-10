@@ -127,6 +127,9 @@ public class IndexMaintainer {
       o.set("refLatest", ig.refLatest);
       o.set("fvLatest", ig.fvLatest);
       o.set("verLatest", ig.verLatest);
+      if (ig.withdrawn) {
+        o.set("withdrawn", true);
+      }
     }
     String src = JsonParser.compose(json, true);
     FileUtilities.stringToFile(src, FileUtilities.changeFileExt(dest, ".json"));
@@ -290,7 +293,7 @@ public class IndexMaintainer {
     }
   }
 
-  public void updateForPublication(PackageList pl, PackageListEntry plVer, boolean milestone) throws ParseException {
+  public void updateForPublication(PackageList pl, PackageListEntry plVer, boolean milestone, boolean withdrawal) throws ParseException {
     IGIndexInformation ig = igs.get(pl.pid());
     if (ig == null) {
       ig = new IGIndexInformation(pl.pid());
@@ -298,7 +301,10 @@ public class IndexMaintainer {
       ig.name = pl.title();
       ig.descMD = pl.intro();
     }
-    if (milestone) {
+    if (withdrawal) {
+      ig.withdrawn = true;
+      ig.dateLatest = plVer.instant();
+    } else if (milestone) {
       ig.dateMilestone = plVer.instant();
       ig.refMilestone = pl.canonical();
       ig.fvMilestone = plVer.fhirVersion();
