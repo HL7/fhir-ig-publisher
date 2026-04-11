@@ -2807,8 +2807,8 @@ public class PublisherGenerator extends PublisherBase {
     msr.analyse();
     Set<String> types = new HashSet<>();
     for (StructureDefinition sd : pf.context.fetchResourcesByType(StructureDefinition.class)) {
-      if (!sd.getUrl().startsWith("http://hl7.org/fhir/StructureDefinition/") && sd.getDerivation() == StructureDefinition.TypeDerivationRule.SPECIALIZATION
-              && sd.getKind() != StructureDefinition.StructureDefinitionKind.LOGICAL && !types.contains(sd.getType())) {
+      if (sd.getUrl().equals("http://hl7.org/fhir/StructureDefinition/Base") || (sd.getDerivation() == StructureDefinition.TypeDerivationRule.SPECIALIZATION &&
+              sd.getKind() != StructureDefinition.StructureDefinitionKind.LOGICAL && !types.contains(sd.getType()))) {
         types.add(sd.getType());
         long start = System.currentTimeMillis();
         String src = msr.render(sd);
