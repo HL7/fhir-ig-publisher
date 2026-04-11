@@ -607,7 +607,7 @@ public class CrossViewRenderer extends Renderer {
       b.append("<td>");
       if (types.size() == base.size() && allMSAreSame(types)) {
         if (types.size() > 0 && types.get(0).ms) {
-          b.append(" <span style=\"color:white; background-color: red; font-weight:bold\">S</span> ");
+          b.append(" <span style=\"color:white; background-color: #D50000; font-weight:bold\">S</span> ");
         }
         b.append("(all)");
       } else {
@@ -615,7 +615,7 @@ public class CrossViewRenderer extends Renderer {
         boolean first = true;
         for (UsedType t : types) {
           if (!doMS && first && t.ms) {
-            b.append(" <span style=\"color:white; background-color: red; font-weight:bold\">S</span> ");
+            b.append(" <span style=\"color:white; background-color: #D50000; font-weight:bold\">S</span> ");
           }
           if (first) first = false;
           else b.append(" | ");
@@ -626,7 +626,7 @@ public class CrossViewRenderer extends Renderer {
             b.append(t.name);
           }
           if (doMS && t.ms) {
-            b.append(" <span style=\"color:white; background-color: red; font-weight:bold\">S</span>");
+            b.append(" <span style=\"color:white; background-color: #D50000; font-weight:bold\">S</span>");
           }
         }
       }

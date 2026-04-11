@@ -99,7 +99,9 @@ public class ValueSetRenderer extends CanonicalRenderer {
       return "<h3>"+gen.formatPhrase(RenderingContext.VSR_LOGICAL)+"</h3>\r\n" + new XhtmlComposer(XhtmlComposer.HTML).compose(vsc.getText().getDiv());
     } else if (vs.hasExtension(ExtensionDefinitions.EXT_VALUESET_RULES_TEXT)) {
       String md = processMarkdown("ValueSet.extension", vs.getExtensionString(ExtensionDefinitions.EXT_VALUESET_RULES_TEXT));
-      return "<h3>"+gen.formatPhrase(RenderingContext.VSR_LOGICAL)+"</h3>\r\n" +md;
+      return "<h3>"+gen.formatPhrase(RenderingContext.VSR_LOGICAL)+"</h3>\r\n<p>"+
+              gen.formatPhrase(RenderingContext.VSR_RULES_TEXT)+
+              "</p>\r\n" +md;
     } else {
       return "<h3>"+gen.formatPhrase(RenderingContext.VSR_LOGICAL)+"</h3>\r\n<p>"+gen.formatPhrase(RenderingI18nContext.VSR_NO_DEF)+"</p>\r\n";
       

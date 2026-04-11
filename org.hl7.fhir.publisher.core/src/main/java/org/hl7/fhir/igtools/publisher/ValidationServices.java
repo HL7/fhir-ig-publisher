@@ -656,6 +656,11 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
   }
 
   @Override
+  public String relativeDatePlaceHolder() {
+    return "{actual date}";
+  }
+
+  @Override
   public boolean isSuppressMessageId(String path, String messageId) {
     return false;
   }

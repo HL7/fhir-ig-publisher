@@ -791,6 +791,8 @@ public class PublisherIGLoader extends PublisherBase {
           break;
         case "lang-pack":
           pf.setLanguagePack("true".equals(p.getValue()));
+        case "wcag-conformant":
+          pf.setWcagConformant("true".equals(p.getValue()));
         default:
           if (pc.startsWith("wantGen-")) {
             String code = pc.substring(8);
@@ -2312,6 +2314,7 @@ public class PublisherIGLoader extends PublisherBase {
     pf.rc.setChangeVersion(pf.versionToAnnotate);
     pf.rc.setShowSummaryTable(false);
     pf.rc.setInferResourceConformance(pf.inferResourceConformance);
+    pf.rc.setWcagConformant(pf.isWcagConformant());
     for (FetchedFile f : pf.fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.getResource() instanceof CanonicalResource) {
