@@ -3862,7 +3862,7 @@ public class PublisherIGLoader extends PublisherBase {
           altered = true;
         }
         if (isNewML()) {
-          if (e.canHaveChild("language") && !e.hasChild("language")) {
+          if (e.canHaveChild("language") && !e.hasChild("language") && pf.langPolicy != ValidationPresenter.LanguagePopulationPolicy.NONE) {
             e.setChildValue("language", pf.defaultTranslationLang);
           }
           List<LanguageFileProducer.TranslationUnit> translations = findTranslations(r.fhirType(), r.getId(), r.getErrors());

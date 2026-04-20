@@ -500,7 +500,8 @@ public class PublisherProcessor extends PublisherBase  {
               if (!r.isValidated()) {
                 logDebugMessage(LogCategory.PROGRESS, "     validating " + r.getTitle());
 //              log("     validating "+r.getTitle());
-                validate(f, r);
+                boolean ignoreIdCardinalityCheck = suppressId(f, r);
+                validate(f, r, ignoreIdCardinalityCheck);
               }
             }
             if (f.getLogical() != null && f.getResources().size() == 1 && r0.fhirType().equals("Binary")) {
@@ -1686,7 +1687,7 @@ public class PublisherProcessor extends PublisherBase  {
     }
   }
 
-  private void validate(FetchedFile file, FetchedResource r) throws Exception {
+  private void validate(FetchedFile file, FetchedResource r, boolean ignoreIdCardinalityError) throws Exception {
     if (!passesValidationFilter(r)) {
       pf.noValidateResources.add(r);
       return;
@@ -1700,6 +1701,7 @@ public class PublisherProcessor extends PublisherBase  {
     r.getElement().setUserData(UserDataNames.pub_context_file, file);
     r.getElement().setUserData(UserDataNames.pub_context_resource, r);
     pf.validator.setExample(r.isExample());
+    pf.validationFetcher.setIgnoreIdCardinalityError(ignoreIdCardinalityError);
     if (r.isValidateAsResource()) {
       Resource res = r.getResource();
       if (res instanceof Bundle) {
@@ -1956,7 +1958,7 @@ public class PublisherProcessor extends PublisherBase  {
           if (r.fhirType().equals(type)) {
             logDebugMessage(LogCategory.PROGRESS, "validate res: "+r.fhirType()+"/"+r.getId());
             if (!r.isValidated()) {
-              validate(f, r);
+              validate(f, r, false);
             }
             if (SpecialTypeHandler.handlesType(r.fhirType(), this.pf.context.getVersion()) && !VersionUtilities.isR5Plus(this.pf.version)) {
               // we validated the resource as it was supplied, but now we need to
