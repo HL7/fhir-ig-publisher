@@ -328,9 +328,11 @@ public class PublicationChecker {
       }
     }
     
-    if (check(messages, pr.has("status"), "No publication request status found"+mkError())) {
-      if (check(messages, isValidStatus(pr.asString("status")), "Proposed status for this publication is not valid (valid values: release|trial-use|update|preview|ballot|draft|normative+trial-use|normative|informative|withdrawn)"+mkError())) {
-        summary.add(new StringPair("status", pr.asString("status")));                        
+    if (check(messages, pr.has("status") || mode == PublicationProcessMode.WITHDRAWAL, "No publication request status found"+mkError())) {
+      if (mode != PublicationProcessMode.WITHDRAWAL) {
+        if (check(messages, isValidStatus(pr.asString("status")), "Proposed status for this publication is not valid (valid values: release|trial-use|update|preview|ballot|draft|normative+trial-use|normative|informative|withdrawn)" + mkError())) {
+          summary.add(new StringPair("status", pr.asString("status")));
+        }
       }
     }
     summary.add(new StringPair("Release-Label", releaseLabel));
