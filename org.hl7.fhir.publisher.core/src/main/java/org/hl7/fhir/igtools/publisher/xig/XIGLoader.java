@@ -243,7 +243,6 @@ public class XIGLoader implements IPackageVisitorProcessor {
 
     } catch (Exception e) {
       System.out.println("Error loading "+type+"/"+id+" from "+pid+"("+parseVersion+"):" +e.getMessage());
-      // e.printStackTrace();
       return null;
     }
   }

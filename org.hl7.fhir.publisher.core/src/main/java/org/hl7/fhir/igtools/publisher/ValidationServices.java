@@ -35,6 +35,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.hl7.fhir.dstu2.model.Type;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.modules.IPublisherModule;
@@ -99,6 +101,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
   private List<PublisherUtils.LinkedSpecification> linkSpecMaps;
   private IPublisherModule module;
   private static boolean nsFailHasFailed = false; // work around for an THO 6.0.0 problem
+  @Getter @Setter boolean ignoreIdCardinalityError;
 
   public ValidationServices(IWorkerContext context, IGKnowledgeProvider ipg, ImplementationGuide ig, List<FetchedFile> files, List<NpmPackage> packages,
                             boolean bundleReferencesResolve, List<SpecMapManager> specMaps, List<PublisherUtils.LinkedSpecification> linkSpecMaps, IPublisherModule module, List<String> allLangs) {
@@ -661,7 +664,16 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
   }
 
   @Override
-  public boolean isSuppressMessageId(String path, String messageId) {
+  public boolean isSuppressMessageId(String path, String messageId, Object... theMessageArguments) {
+    if ("Validation_VAL_Profile_Maximum".equals(messageId) && ignoreIdCardinalityError) {
+      String pp = theMessageArguments[1].toString();
+      if (Utilities.charCount(pp, '.') == 1) {
+        String[] p = pp.split("\\.");
+        if (context.getResourceNamesAsSet().contains(p[0]) && p[1].equals("id")) {
+          return true;
+        }
+      }
+    }
     return false;
   }
 
