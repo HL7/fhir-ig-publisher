@@ -6124,6 +6124,11 @@ public class PublisherGenerator extends PublisherBase {
   }
 
   private String processRefTag(DBBuilder db, String src, FetchedFile f) throws IOException {
+    boolean named = false;
+    if (src.endsWith("'")) {
+      named = true;
+      src = src.substring(0, src.length()-1);
+    }
     if (Utilities.existsInList(src, "$ver")) {
       switch (src) {
         case "$ver": return this.pf.businessVersion;
@@ -6185,10 +6190,11 @@ public class PublisherGenerator extends PublisherBase {
             }
           }
         }
+        String name = Utilities.escapeXml(named ? src : json.has("name") ? json.asString("name") : json.asString("title"));
         if (page == null) {
-          page = lspec.getSpm().getPath(json.asString("url"), null, json.asString("resoureType"), json.asString("id"));
+          page = lspec.getSpm().getPath(json.asString("url"), null, json.asString("resourceType"), json.asString("id"));
         }
-        return "<a href=\""+page+"\">"+Utilities.escapeXml(json.has("title") ? json.asString("title") : json.asString("name"));
+        return "<a href=\""+page+"\">"+name;
       }
     }
     // use [[~[ so we don't get stuck in a loop
