@@ -222,7 +222,7 @@ public class PublicationChecker {
 
   private void checkExistingPublication(List<String> messages, NpmPackage npm, PackageList pl, JsonObject pr) {
     if (pl != null) {
-      if (pr.has("movedFrom")) {
+      if (pr != null && pr.has("movedFrom")) {
         check(messages, !npm.name().equals(pl.pid()), "Package ID matches, which is wrong. This package is " + npm.name() + " and the website is also " + pl.pid()+", but it must change" + mkError());
         check(messages, !npm.canonical().equals(pl.canonical()), "Package canonical matches, which is wrong. This package canonical is " + npm.canonical() + " and the website has " + pl.canonical()+", but it must change" + mkError());
         check(messages, !hasVersion(pl, npm.version()), "Version " + npm.version() + " has already been published" + mkWarning());
