@@ -179,7 +179,7 @@ public class IndexMaintainer {
       } else if (ig.dateMilestone.isBefore(ig.dateLatest)) {
         tr.backgroundColor("#ffebeb");
       }
-      tr.td().ah(ig.code()+"/history.html").tx(ig.code());
+      tr.td().ah(Utilities.path(ig.code(), "history.html")).tx(ig.code());
       XhtmlNode td = tr.td();
       td.b().tx(ig.name);
       td.br();
@@ -226,7 +226,7 @@ public class IndexMaintainer {
     Collections.sort(list, new DateOrderSorter());
     for (IGIndexInformation ig : list) {
       tr = tbl.tr();
-      tr.td().ah(ig.code()+"/history.html").tx(ig.code());
+      tr.td().ah(Utilities.path(ig.code(), "/history.html")).tx(ig.code());
       tr.td().tx(ig.name);
       if (ig.withdrawn) {
         tr.backgroundColor("#eeeeee");
