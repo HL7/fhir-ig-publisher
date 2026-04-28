@@ -28,13 +28,13 @@ public class PackageRegistryBuilder {
 
   public void updateForWithdrawal(String path, PackageList list, String withdrawalReason) throws JsonException, IOException {
     JsonObject j = JsonParser.parseObject(prFile());
-    update(j,  Utilities.path(path, "package-list.json"), list, withdrawalReason);
+    update(j,  Utilities.pathURL(path, "package-list.json"), list, withdrawalReason);
     JsonParser.compose(j, new FileOutputStream(prFile()), true);
   }
 
   public void update(String path, PackageList list) throws JsonException, IOException {
     JsonObject j = JsonParser.parseObject(prFile());
-    update(j, Utilities.path(path, "package-list.json"), list, null);
+    update(j, Utilities.pathURL(path, "package-list.json"), list, null);
     JsonParser.compose(j, new FileOutputStream(prFile()), true);
   }
   
