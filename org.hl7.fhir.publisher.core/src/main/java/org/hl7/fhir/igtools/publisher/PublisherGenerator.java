@@ -25,6 +25,7 @@ import org.hl7.fhir.igtools.renderers.StructureMapRenderer;
 import org.hl7.fhir.igtools.renderers.ValueSetRenderer;
 import org.hl7.fhir.igtools.spreadsheets.ObservationSummarySpreadsheetGenerator;
 import org.hl7.fhir.igtools.web.IGReleaseVersionUpdater;
+import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.r5.conformance.ConstraintJavaGenerator;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.context.ContextUtilities;
@@ -5898,6 +5899,9 @@ public class PublisherGenerator extends PublisherBase {
         ttl.setStyle(IParser.OutputStyle.PRETTY);
         ttl.compose(e, rdf, "");
         return rdf.toString();
+        
+      } else if (syntax.equals("fml")) {
+        return StructureMapUtilities.render((StructureMap)r.getResource()).trim();
       } else
         throw new FHIRException("Unrecognized syntax: " + syntax);
     } catch (Exception except) {
@@ -6265,8 +6269,8 @@ public class PublisherGenerator extends PublisherBase {
     FetchedResource r = fetchByResource(type, id);
     if (r == null)
       throw new FHIRException(("Unable to find fragment resource " + reference + " pointed to in file " + f.getName()));
-    if (!format.equals("xml") && !format.equals("json") && !format.equals("ttl"))
-      throw new FHIRException("Unrecognized fragment format " + format + " - expecting 'xml', 'json', or 'ttl' in file " + f.getName());
+    if (!format.equals("xml") && !format.equals("json") && !format.equals("ttl") && !format.equals("fml"))
+      throw new FHIRException("Unrecognized fragment format " + format + " - expecting 'xml', 'json', 'fml', or 'ttl' in file " + f.getName());
 
     Pattern filterPattern = Pattern.compile("(BASE:|EXCEPT:|ELIDE:)");
     Matcher filterMatcher = filterPattern.matcher(filters);
