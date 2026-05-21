@@ -24,8 +24,8 @@
         <maven.compiler.testSource>17</maven.compiler.testSource>
         <maven.compiler.testTarget>17</maven.compiler.testTarget>
         <logback.version>1.5.25</logback.version>
-        <log4jVersion>2.25.3</log4jVersion>
-        <jackson_version>2.21.1</jackson_version>
+        <log4jVersion>2.26.0</log4jVersion>
+        <jackson_version>2.21.3</jackson_version>
         <jackson_annotations_version>2.21</jackson_annotations_version>
         <nedap-healthcare-archie.version>3.16.0</nedap-healthcare-archie.version>
     </properties>
@@ -167,6 +167,11 @@
                 <version>${okhttp.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.thrift</groupId>
+                <artifactId>libthrift</artifactId>
+                <version>0.23.0</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
