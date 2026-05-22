@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Set;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
@@ -31,6 +33,9 @@ import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 
 public class BaseRenderer implements IMarkdownProcessor {
+  public interface ReferenceResolver {
+    StringPair processReferenceTag(String display) throws IOException;
+  }
   protected IWorkerContext context;
   protected String corePath;
   protected String prefix = ""; // path to relative root of IG, if not the same directory (currently always is)
@@ -41,9 +46,9 @@ public class BaseRenderer implements IMarkdownProcessor {
   protected MarkDownProcessor markdownEngine;
   protected RenderingContext gen;
   protected List<FetchedFile> fileList;
+  @Getter @Setter protected ReferenceResolver resolver;
 
-
-  public BaseRenderer(IWorkerContext context, String corePath, IGKnowledgeProvider igp, List<SpecMapManager> specmaps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen) {
+  public BaseRenderer(IWorkerContext context, String corePath, IGKnowledgeProvider igp, List<SpecMapManager> specmaps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen, ReferenceResolver resolver) {
     super();
     this.context = context;
     this.corePath = corePath;
@@ -53,6 +58,7 @@ public class BaseRenderer implements IMarkdownProcessor {
     this.packge = packge; 
     this.gen = gen;
     this.allTargets = allTargets;
+    this.resolver = resolver;
   }
 
   public List<FetchedFile> getFileList() {
@@ -147,7 +153,12 @@ public class BaseRenderer implements IMarkdownProcessor {
           }
           text = left+"["+display+"]("+url+")"+right;
         } else {
-          text = left+"`"+display+"`"+right;
+          StringPair pair = resolver.processReferenceTag(display);
+          if (pair != null) {
+            text = left+"["+pair.getName()+"]("+pair.getValue()+")"+right;
+          } else {
+            text = left + "`" + display + "`" + right;
+          }
         }
       } else {
         text = left+"["+display+"]("+url+")"+right;

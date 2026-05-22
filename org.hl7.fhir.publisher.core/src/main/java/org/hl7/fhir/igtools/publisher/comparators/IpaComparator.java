@@ -169,6 +169,7 @@ public class IpaComparator {
     if (errMsg == null && pid != null) {
       resources = new ArrayList<>();
       for (VersionInstance vi : versionList) {
+        logger.logMessage("Comparing IPA version "+vi.version);
         String filename = "";
         try {
           vi.resources = new ArrayList<>();

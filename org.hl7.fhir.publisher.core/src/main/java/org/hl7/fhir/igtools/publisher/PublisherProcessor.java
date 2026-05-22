@@ -1475,11 +1475,13 @@ public class PublisherProcessor extends PublisherBase  {
     if (pf.ipsComparator != null) {
       pf.ipsComparator.startChecks(pf.publishedIg);
     }
+    log(".. loaded. Process");
     for (FetchedFile f : pf.changeList) {
       f.start("checkConformanceResources3");
       try {
         for (FetchedResource r : f.getResources()) {
           if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
+            log("  ..."+r.getResource().fhirType()+" "+r.getId());
             this.pf.previousVersionComparator.check((CanonicalResource) r.getResource());
             if (this.pf.ipaComparator != null) {
               this.pf.ipaComparator.check((CanonicalResource) r.getResource());
@@ -1494,13 +1496,18 @@ public class PublisherProcessor extends PublisherBase  {
         f.finish("checkConformanceResources3");
       }
     }
+    log("finish previous version comparison");
     pf.previousVersionComparator.finishChecks();
+    log("finish ipa version");
     if (pf.ipaComparator != null) {
       pf.ipaComparator.finishChecks();
     }
+    log("finish ips version");
     if (pf.ipsComparator != null) {
       pf.ipsComparator.finishChecks();
     }
+    log("comparisons done");
+
     tts.end();
   }
 

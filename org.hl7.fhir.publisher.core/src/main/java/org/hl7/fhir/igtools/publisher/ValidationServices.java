@@ -347,6 +347,10 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
       return (v == null) || !SIDUtilities.isInvalidVersion(u, v);
     }
 
+    if (Utilities.existsInList(dropTrailingSlash(url), "http://terminology.hl7.org", "http://hl7.org/fhir")) {
+      return true;
+    }
+
     if (u.startsWith("http://hl7.org/fhirpath/System.")) {
       return (v == null || Utilities.existsInList(v, "2.0.0", "1.3.0", "1.2.0", "1.1.0", "1.0.0", "0.3.0", "0.2.0"));       
     }
@@ -446,6 +450,10 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
     }
     return false;
   }
+
+    private String dropTrailingSlash(String url) {
+        return url == null || !url.endsWith("/") ? url : url.substring(0, url.length()-1);
+    }
 
   private boolean matchesPage(String url) {
     if (url.contains("#")) {

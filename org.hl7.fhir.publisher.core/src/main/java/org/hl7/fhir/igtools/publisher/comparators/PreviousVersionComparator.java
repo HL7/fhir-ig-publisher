@@ -190,11 +190,11 @@ public class PreviousVersionComparator {
     }
   }
 
-
   public void startChecks(ImplementationGuide ig) {
     if (errMsg == null && pid != null && businessVersion != null) {
       resources = new ArrayList<>();
       for (VersionInstance vi : versionList) {
+        logger.logMessage("Comparing previous version "+vi.version);
         String filename = "";
         try {
           vi.resources = new ArrayList<>();

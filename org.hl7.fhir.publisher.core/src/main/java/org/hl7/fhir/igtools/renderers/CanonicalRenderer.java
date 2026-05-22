@@ -30,8 +30,8 @@ public class CanonicalRenderer extends BaseRenderer {
   protected String versionToAnnotate;
   protected List<RelatedIG> relatedIgs;
 
-  public CanonicalRenderer(IWorkerContext context, String corePath, CanonicalResource cr, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen, String versionToAnnotate, List<RelatedIG> relatedIgs) {
-    super(context, corePath, igp, maps, allTargets, markdownEngine, packge, gen);
+  public CanonicalRenderer(IWorkerContext context, String corePath, CanonicalResource cr, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen, String versionToAnnotate, List<RelatedIG> relatedIgs, ReferenceResolver resolver) {
+    super(context, corePath, igp, maps, allTargets, markdownEngine, packge, gen, resolver);
     this.cr = cr;
     this.destDir = destDir;
     this.versionToAnnotate = versionToAnnotate;

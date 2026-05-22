@@ -48,8 +48,8 @@ public class ExampleScenarioRenderer extends CanonicalRenderer {
   private ExampleScenario scen;
   private String destDir;
 
-  public ExampleScenarioRenderer(IWorkerContext context, String corePath, ExampleScenario scen, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen, String versionToAnnotate, List<RelatedIG> relatedIgs) {
-    super(context, corePath, scen, destDir, igp, maps, allTargets, markdownEngine, packge, gen, versionToAnnotate, relatedIgs);
+  public ExampleScenarioRenderer(IWorkerContext context, String corePath, ExampleScenario scen, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen, String versionToAnnotate, List<RelatedIG> relatedIgs, ReferenceResolver resolver) {
+    super(context, corePath, scen, destDir, igp, maps, allTargets, markdownEngine, packge, gen, versionToAnnotate, relatedIgs, resolver);
     this.scen = scen;
     this.destDir = destDir;
   }

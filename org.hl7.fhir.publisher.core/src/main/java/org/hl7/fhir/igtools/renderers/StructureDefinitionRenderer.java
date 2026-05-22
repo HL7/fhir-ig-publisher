@@ -58,6 +58,7 @@ import org.hl7.fhir.r5.renderers.StructureDefinitionRenderer.MapStructureMode;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.StructureDefinitionRendererMode;
 import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
+import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.r5.utils.ElementDefinitionUtilities;
 import org.hl7.fhir.r5.utils.ElementVisitor;
 import org.hl7.fhir.r5.utils.UserDataNames;
@@ -134,8 +135,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   private org.hl7.fhir.r5.renderers.StructureDefinitionRenderer sdr;
   private ResourceWrapper resE;
 
-  public StructureDefinitionRenderer(IWorkerContext context, String packageId, String corePath, StructureDefinition sd, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, RenderingContext gen, boolean allInvariants,Map<String, Map<String, ElementDefinition>> mapCache, String specPath, String versionToAnnotate, List<RelatedIG> relatedIgs) {
-    super(context, corePath, sd, destDir, igp, maps, allTargets, markdownEngine, packge, gen, versionToAnnotate, relatedIgs);
+  public StructureDefinitionRenderer(IWorkerContext context, String packageId, String corePath, StructureDefinition sd, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, RenderingContext gen, boolean allInvariants,Map<String, Map<String, ElementDefinition>> mapCache, String specPath, String versionToAnnotate, List<RelatedIG> relatedIgs, ReferenceResolver resolver) {
+    super(context, corePath, sd, destDir, igp, maps, allTargets, markdownEngine, packge, gen, versionToAnnotate, relatedIgs, resolver);
     this.packageId = packageId;
     this.sd = sd;
     this.destDir = destDir;
@@ -2250,7 +2251,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
   }
   
-  public String references(String lang, RenderingContext lrc) throws FHIRFormatError, IOException {
+  public String references(String lang, RenderingContext lrc) throws FHIRFormatError, IOException, EOperationOutcome {
     
     Map<String, String> base = new HashMap<>();
     Map<String, String> invoked = new HashMap<>();
@@ -2471,7 +2472,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         b.append("</table>\r\n");
       }
     }
-    return b.toString()+changeSummary();
+    XhtmlNode x = sdr.compositionSummary(sd);
+    String dc = x == null ? "" : x.toString();
+    return b.toString()+changeSummary()+dc;
   }
 
   private String nn(String s) {

@@ -106,7 +106,7 @@ import static org.hl7.fhir.igtools.publisher.Publisher.*;
  * this class is part of the Publisher Core cluster, and handles all the routines that generate content (other than QA). See @Publisher for discussion
  */
 
-public class PublisherGenerator extends PublisherBase {
+public class PublisherGenerator extends PublisherBase implements BaseRenderer.ReferenceResolver {
 
   public class Item {
     public Item(FetchedFile f, FetchedResource r, String sort) {
@@ -227,7 +227,7 @@ public class PublisherGenerator extends PublisherBase {
     }
 
     Base.setCopyUserData(true); // just keep all the user data when copying while rendering
-    pf.bdr = new BaseRenderer(pf.context, checkAppendSlash(pf.specPath), pf.igpkp, pf.specMaps, pageTargets(), pf.markdownEngine, pf.packge, pf.rc);
+    pf.bdr = new BaseRenderer(pf.context, checkAppendSlash(pf.specPath), pf.igpkp, pf.specMaps, pageTargets(), pf.markdownEngine, pf.packge, pf.rc, this);
 
     forceDir(pf.tempDir);
     forceDir(Utilities.path(pf.tempDir, "_includes"));
@@ -1130,8 +1130,7 @@ public class PublisherGenerator extends PublisherBase {
     }
 
     generateHtml(f, r, res, langElement, vars, lrc, lang);
-
-
+    
     if (wantGen(r, "history")) {
       long start = System.currentTimeMillis();
       XhtmlComposer xc = new XhtmlComposer(XhtmlComposer.XML, this.pf.module.isNoNarrative());
@@ -1191,7 +1190,7 @@ public class PublisherGenerator extends PublisherBase {
           if (html == null) {
             // No specialised renderer or it failed - fall back to JSON/XML rendering.
             String rXContentType = rX.getElement().getNamedChildValueSingle("contentType");
-            if (rXContentType != null && rXContentType.contains("xml")) {
+            if (rXContentType.contains("xml")) {
               org.hl7.fhir.r5.elementmodel.XmlParser xmlParser = new org.hl7.fhir.r5.elementmodel.XmlParser(this.pf.context);
               XmlXHtmlRenderer xmlXHtmlRenderer = new XmlXHtmlRenderer();
               xmlXHtmlRenderer.setPrism(true);
@@ -1204,7 +1203,7 @@ public class PublisherGenerator extends PublisherBase {
               }
               xmlParser.compose(rX.getLogicalElement(), xmlXHtmlRenderer);
               html = xmlXHtmlRenderer.toString();
-            } else if (rXContentType != null && rXContentType.contains("json")) {
+            } else if (rXContentType.contains("json")) {
               JsonXhtmlRenderer jsonXhtmlRenderer = new JsonXhtmlRenderer();
               jsonXhtmlRenderer.setPrism(true);
               org.hl7.fhir.r5.elementmodel.JsonParser jsonParser = new org.hl7.fhir.r5.elementmodel.JsonParser(this.pf.context);
@@ -1466,7 +1465,7 @@ public class PublisherGenerator extends PublisherBase {
    * @throws Exception
    */
   private void generateOutputsCodeSystem(FetchedFile f, FetchedResource fr, CodeSystem cs, Map<String, String> vars, String prefixForContainer, RenderingContext lrc, String lang) throws Exception {
-    CodeSystemRenderer csr = new CodeSystemRenderer(this.pf.context, this.pf.specPath, cs, this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, lrc, this.pf.versionToAnnotate, this.pf.relatedIGs);
+    CodeSystemRenderer csr = new CodeSystemRenderer(this.pf.context, this.pf.specPath, cs, this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, lrc, this.pf.versionToAnnotate, this.pf.relatedIGs, this);
     csr.setFileList(this.pf.fileList);
     if (wantGen(fr, "summary")) {
       long start = System.currentTimeMillis();
@@ -1516,7 +1515,7 @@ public class PublisherGenerator extends PublisherBase {
    * @throws Exception
    */
   private void generateOutputsValueSet(FetchedFile f, FetchedResource r, ValueSet vs, Map<String, String> vars, String prefixForContainer, DBBuilder db, RenderingContext lrc, String lang) throws Exception {
-    ValueSetRenderer vsr = new ValueSetRenderer(this.pf.context, this.pf.specPath, vs, this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, lrc, this.pf.versionToAnnotate, this.pf.relatedIGs);
+    ValueSetRenderer vsr = new ValueSetRenderer(this.pf.context, this.pf.specPath, vs, this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, lrc, this.pf.versionToAnnotate, this.pf.relatedIGs, this);
     vsr.setFileList(this.pf.fileList);
     if (wantGen(r, "summary")) {
       long start = System.currentTimeMillis();
@@ -1813,7 +1812,7 @@ public class PublisherGenerator extends PublisherBase {
       fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-json-schema", "yet to be done: json schema as html", null, f.getOutputNames(), start, "json-schema", "StructureDefinition", lang);
     }
 
-    StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(this.pf.context, this.pf.packageId(), checkAppendSlash(this.pf.specPath), sd, Utilities.path(this.pf.tempDir), this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, this.pf.fileList, lrc, this.pf.allInvariants, this.pf.sdMapCache, this.pf.specPath, this.pf.versionToAnnotate, this.pf.relatedIGs);
+    StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(this.pf.context, this.pf.packageId(), checkAppendSlash(this.pf.specPath), sd, Utilities.path(this.pf.tempDir), this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, this.pf.fileList, lrc, this.pf.allInvariants, this.pf.sdMapCache, this.pf.specPath, this.pf.versionToAnnotate, this.pf.relatedIGs, this);
     sdr.setNoXigLink(this.pf.noXigLink);
 
     if (wantGen(r, "summary")) {
@@ -2158,7 +2157,7 @@ public class PublisherGenerator extends PublisherBase {
   }
 
   private void generateOutputsStructureMap(FetchedFile f, FetchedResource r, StructureMap map, Map<String,String> vars, String prefixForContainer, RenderingContext lrc, String lang) throws Exception {
-    StructureMapRenderer smr = new StructureMapRenderer(this.pf.context, checkAppendSlash(this.pf.specPath), map, Utilities.path(this.pf.tempDir), this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, lrc, this.pf.versionToAnnotate, this.pf.relatedIGs);
+    StructureMapRenderer smr = new StructureMapRenderer(this.pf.context, checkAppendSlash(this.pf.specPath), map, Utilities.path(this.pf.tempDir), this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, lrc, this.pf.versionToAnnotate, this.pf.relatedIGs, this);
     if (wantGen(r, "summary")) {
       long start = System.currentTimeMillis();
       fragment("StructureMap-"+prefixForContainer+map.getId()+"-summary", smr.summaryTable(r, wantGen(r, "xml"), wantGen(r, "json"), wantGen(r, "ttl"), this.pf.igpkp.summaryRows()), f.getOutputNames(), r, vars, null, start, "summary", "StructureMap", lang);
@@ -2191,7 +2190,7 @@ public class PublisherGenerator extends PublisherBase {
   }
 
   private void generateOutputsCanonical(FetchedFile f, FetchedResource r, CanonicalResource cr, Map<String,String> vars, String prefixForContainer, RenderingContext lrc, String lang) throws Exception {
-    CanonicalRenderer smr = new CanonicalRenderer(this.pf.context, checkAppendSlash(this.pf.specPath), cr, Utilities.path(this.pf.tempDir), this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, lrc, this.pf.versionToAnnotate, this.pf.relatedIGs);
+    CanonicalRenderer smr = new CanonicalRenderer(this.pf.context, checkAppendSlash(this.pf.specPath), cr, Utilities.path(this.pf.tempDir), this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, lrc, this.pf.versionToAnnotate, this.pf.relatedIGs, this);
     if (wantGen(r, "summary")) {
       long start = System.currentTimeMillis();
       fragment(cr.fhirType()+"-"+prefixForContainer+cr.getId()+"-summary", smr.summaryTable(r, wantGen(r, "xml"), wantGen(r, "json"), wantGen(r, "ttl"), this.pf.igpkp.summaryRows()), f.getOutputNames(), r, vars, null, start, "summary", "Canonical", lang);
@@ -2216,7 +2215,7 @@ public class PublisherGenerator extends PublisherBase {
   }
 
   private void generateOutputsExampleScenario(FetchedFile f, FetchedResource r, ExampleScenario scen, Map<String,String> vars, String prefixForContainer, RenderingContext lrc, String lang) throws Exception {
-    ExampleScenarioRenderer er = new ExampleScenarioRenderer(this.pf.context, checkAppendSlash(this.pf.specPath), scen, Utilities.path(this.pf.tempDir), this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, lrc.copy(false).setDefinitionsTarget(this.pf.igpkp.getDefinitionsName(r)), this.pf.versionToAnnotate, this.pf.relatedIGs);
+    ExampleScenarioRenderer er = new ExampleScenarioRenderer(this.pf.context, checkAppendSlash(this.pf.specPath), scen, Utilities.path(this.pf.tempDir), this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, lrc.copy(false).setDefinitionsTarget(this.pf.igpkp.getDefinitionsName(r)), this.pf.versionToAnnotate, this.pf.relatedIGs, this);
     if (wantGen(r, "actor-table")) {
       long start = System.currentTimeMillis();
       fragment("ExampleScenario-"+prefixForContainer+scen.getId()+"-actor-table", er.render(RenderingContext.ExampleScenarioRendererMode.ACTORS), f.getOutputNames(), r, vars, null, start, "actor-table", "ExampleScenario", lang);
@@ -2236,7 +2235,7 @@ public class PublisherGenerator extends PublisherBase {
   }
 
   private void generateOutputsQuestionnaire(FetchedFile f, FetchedResource r, Questionnaire q, Map<String,String> vars, String prefixForContainer, RenderingContext lrc, String lang) throws Exception {
-    QuestionnaireRenderer qr = new QuestionnaireRenderer(this.pf.context, checkAppendSlash(this.pf.specPath), q, Utilities.path(this.pf.tempDir), this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, lrc.copy(false).setDefinitionsTarget(this.pf.igpkp.getDefinitionsName(r)).setPackageInformation(this.pf.packageInfo), this.pf.versionToAnnotate, this.pf.relatedIGs);
+    QuestionnaireRenderer qr = new QuestionnaireRenderer(this.pf.context, checkAppendSlash(this.pf.specPath), q, Utilities.path(this.pf.tempDir), this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, lrc.copy(false).setDefinitionsTarget(this.pf.igpkp.getDefinitionsName(r)).setPackageInformation(this.pf.packageInfo), this.pf.versionToAnnotate, this.pf.relatedIGs, this);
     if (wantGen(r, "summary")) {
       long start = System.currentTimeMillis();
       fragment("Questionnaire-"+prefixForContainer+q.getId()+"-summary", qr.summaryTable(r, wantGen(r, "xml"), wantGen(r, "json"), wantGen(r, "ttl"), this.pf.igpkp.summaryRows()), f.getOutputNames(), r, vars, null, start, "summary", "Questionnaire", lang);
@@ -2309,7 +2308,7 @@ public class PublisherGenerator extends PublisherBase {
       }
     }
 
-    QuestionnaireResponseRenderer qr = new QuestionnaireResponseRenderer(this.pf.context, checkAppendSlash(this.pf.specPath), r.getElement(), Utilities.path(this.pf.tempDir), this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, lrc);
+    QuestionnaireResponseRenderer qr = new QuestionnaireResponseRenderer(this.pf.context, checkAppendSlash(this.pf.specPath), r.getElement(), Utilities.path(this.pf.tempDir), this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, lrc, this);
     if (wantGen(r, "tree")) {
       long start = System.currentTimeMillis();
       fragment("QuestionnaireResponse-"+prefixForContainer+r.getId()+"-tree", qr.render(RenderingContext.QuestionnaireRendererMode.TREE), f.getOutputNames(), r, vars, null, start, "tree", "QuestionnaireResponse", lang);
@@ -2837,7 +2836,7 @@ public class PublisherGenerator extends PublisherBase {
         fragment("maps-"+sd.getTypeTail(), src, pf.otherFilesRun, start, "maps", "Cross", lang);
       }
     }
-    DeprecationRenderer dpr = new DeprecationRenderer(pf.context, checkAppendSlash(pf.specPath), pf.igpkp, pf.specMaps, pageTargets(), pf.markdownEngine, pf.packge, rc.copy(false));
+    DeprecationRenderer dpr = new DeprecationRenderer(pf.context, checkAppendSlash(pf.specPath), pf.igpkp, pf.specMaps, pageTargets(), pf.markdownEngine, pf.packge, rc.copy(false), this);
     long start = System.currentTimeMillis();
     fragment("deprecated-list", dpr.deprecationSummary(pf.fileList, pf.previousVersionComparator), pf.otherFilesRun, start, "deprecated-list", "Cross", lang);
     start = System.currentTimeMillis();
@@ -5310,7 +5309,7 @@ public class PublisherGenerator extends PublisherBase {
 
 
   private void generateOutputsOperationDefinition(FetchedFile f, FetchedResource r, OperationDefinition od, Map<String, String> vars, boolean regen, String prefixForContainer, RenderingContext lrc, String lang) throws FHIRException, IOException {
-    OperationDefinitionRenderer odr = new OperationDefinitionRenderer(this.pf.context, checkAppendSlash(this.pf.specPath), od, Utilities.path(this.pf.tempDir), this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, this.pf.fileList, lrc, this.pf.versionToAnnotate, this.pf.relatedIGs);
+    OperationDefinitionRenderer odr = new OperationDefinitionRenderer(this.pf.context, checkAppendSlash(this.pf.specPath), od, Utilities.path(this.pf.tempDir), this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, this.pf.fileList, lrc, this.pf.versionToAnnotate, this.pf.relatedIGs, this);
     if (wantGen(r, "summary")) {
       long start = System.currentTimeMillis();
       fragment("OperationDefinition-"+prefixForContainer+od.getId()+"-summary", odr.summary(), f.getOutputNames(), r, vars, null, start, "summary", "OperationDefinition", lang);
@@ -6146,6 +6145,18 @@ public class PublisherGenerator extends PublisherBase {
   }
 
   private String processRefTag(DBBuilder db, String src, FetchedFile f) throws IOException {
+    StringPair ref = processReferenceTag(src);
+    if (ref == null) {
+      // use [[~[ so we don't get stuck in a loop
+      return "[[~["+src+"]]]";
+    } else if (ref.getValue() == null) {
+      return ref.getName();
+    } else {
+      return "<a href=\""+ref.getValue()+"\">"+Utilities.escapeXml(ref.getName())+"</a>";
+    }
+  }
+
+  public StringPair processReferenceTag(String src) throws IOException {
     boolean named = false;
     if (src.endsWith("'")) {
       named = true;
@@ -6153,14 +6164,13 @@ public class PublisherGenerator extends PublisherBase {
     }
     if (Utilities.existsInList(src, "$ver")) {
       switch (src) {
-        case "$ver": return this.pf.businessVersion;
+        case "$ver": return new StringPair(this.pf.businessVersion, null);
       }
     } else if (Utilities.isAbsoluteUrl(src)) {
-
       try {
         CanonicalResource cr = (CanonicalResource) this.pf.context.fetchResource(Resource.class, src);
         if (cr != null && cr.hasWebPath()) {
-          return "<a href=\""+cr.getWebPath()+"\">"+Utilities.escapeXml(cr.present())+"</a>";
+          return new StringPair(cr.present(), cr.getWebPath());
         }
       } catch (Exception e) {
       }
@@ -6170,7 +6180,7 @@ public class PublisherGenerator extends PublisherBase {
           if (r.getResource() instanceof CanonicalResource) {
             CanonicalResource cr = (CanonicalResource) r.getResource();
             if (src.equalsIgnoreCase(cr.getName()) && cr.hasWebPath()) {
-              return "<a href=\""+cr.getWebPath()+"\">"+Utilities.escapeXml(cr.present())+"</a>";
+              return  new StringPair(cr.present(), cr.getWebPath());
             }
           }
         }
@@ -6178,7 +6188,7 @@ public class PublisherGenerator extends PublisherBase {
       try {
         StructureDefinition sd = this.pf.context.fetchTypeDefinition(src);
         if (sd != null) {
-          return "<a href=\""+sd.getWebPath()+"\">"+Utilities.escapeXml(sd.present())+"</a>";
+          return new StringPair(sd.present(), sd.getWebPath());
         }
       } catch (Exception e) {
         // nothing
@@ -6186,7 +6196,7 @@ public class PublisherGenerator extends PublisherBase {
     }
     for (RelatedIG rig : this.pf.relatedIGs) {
       if (rig.getId().equals(src) && rig.getWebLocation() != null) {
-        return "<a href=\""+rig.getWebLocation()+"\">"+Utilities.escapeXml(rig.getTitle())+"</a>";
+        return new StringPair(rig.getTitle(), rig.getWebLocation());
       }
     }
     for (PublisherUtils.LinkedSpecification lspec : pf.linkSpecMaps) {
@@ -6216,11 +6226,10 @@ public class PublisherGenerator extends PublisherBase {
         if (page == null) {
           page = lspec.getSpm().getPath(json.asString("url"), null, json.asString("resourceType"), json.asString("id"));
         }
-        return "<a href=\""+page+"\">"+name;
+        return  new StringPair(name, page);
       }
     }
-    // use [[~[ so we don't get stuck in a loop
-    return "[[~["+src+"]]]";
+    return null;
   }
 
 

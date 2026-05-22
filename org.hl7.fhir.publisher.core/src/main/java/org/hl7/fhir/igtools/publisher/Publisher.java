@@ -1227,6 +1227,10 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       I18nBase.setUseMessageIdsDirectly(true);
     }
 
+    // Install any editor-supplied PO overlays before message bundles or the
+    // validation engine load — they latch on first access. 
+    TranslationOverrideArgs.applyIfRequested(args);
+
     if (CliParams.hasNamedParam(args, "-gui")) {
       IGPublisherUI.main(args);
       return;
@@ -1286,6 +1290,13 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       System.out.println("");
       System.out.println("-packages: a directory to load packages (*.tgz) from before resolving dependencies");
       System.out.println("           this parameter can be present multiple times");
+      System.out.println("");
+      System.out.println("-po: (optional) Load translations from a .po file at runtime. Repeatable.");
+      System.out.println("     Overrides shipped properties for the bundle+locale derived from the filename");
+      System.out.println("     (e.g. validator-messages-de.po, rendering-phrases-pt_BR.po).");
+      System.out.println("-po-dir: (optional) Load every .po file under the given directory. Repeatable.");
+      System.out.println("-po-stale-handling: (optional, default 'include') include|exclude|warn — how to");
+      System.out.println("     treat translations whose English source has drifted from the shipped jar.");
       System.out.println("");
       System.out.println("The most important output from the publisher is qa.html");
       System.out.println("");
