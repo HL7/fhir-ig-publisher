@@ -25,8 +25,8 @@ public class OperationDefinitionRenderer extends CanonicalRenderer {
   private String destDir;
   private List<FetchedFile> files;
 
-  public OperationDefinitionRenderer(IWorkerContext context, String corePath, OperationDefinition od, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, RenderingContext gen, String versionToAnnotate, List<RelatedIG> relatedIgs) {
-    super(context, corePath, od, destDir, igp, maps, allTargets, markdownEngine, packge, gen, versionToAnnotate, relatedIgs);
+  public OperationDefinitionRenderer(IWorkerContext context, String corePath, OperationDefinition od, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, RenderingContext gen, String versionToAnnotate, List<RelatedIG> relatedIgs, ReferenceResolver resolver) {
+    super(context, corePath, od, destDir, igp, maps, allTargets, markdownEngine, packge, gen, versionToAnnotate, relatedIgs, resolver);
     this.od = od;
     this.destDir = destDir;
     utils = new ProfileUtilities(context, null, igp);

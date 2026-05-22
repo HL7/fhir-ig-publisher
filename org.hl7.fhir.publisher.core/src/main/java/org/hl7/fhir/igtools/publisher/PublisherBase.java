@@ -1492,7 +1492,7 @@ public class PublisherBase implements ILoggingService {
     if (add) {
       Element pp = p.addElement("parameter");
       pp.setChildValue("name", pn);
-      pp.setChildValue("valueUri", new UriType(v));
+      pp.setChildValue("valueCanonical", new CanonicalType(v));
       pp.setUserData(UserDataNames.auto_added_parameter, true);
     }
   }
