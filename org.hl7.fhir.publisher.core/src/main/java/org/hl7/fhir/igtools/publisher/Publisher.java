@@ -1228,8 +1228,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     }
 
     // Install any editor-supplied PO overlays before message bundles or the
-    // validation engine load — they latch on first access. Mirrors the
-    // validator CLI's -po / -po-dir / -po-stale-handling flags.
+    // validation engine load — they latch on first access. 
     TranslationOverrideArgs.applyIfRequested(args);
 
     if (CliParams.hasNamedParam(args, "-gui")) {
