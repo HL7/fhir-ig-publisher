@@ -4249,6 +4249,11 @@ public class PublisherIGLoader extends PublisherBase {
         }
         this.pf.igpkp.checkForPath(f, r, bc, false);
         try {
+          // check if it's a preregistered additional resource, and unregister the pre-registration if it is
+          StructureDefinition sdTemp = getAdditionalResources(bc.getVersionedUrl());
+          if (sdTemp != null) {
+            this.pf.context.dropResource(sdTemp);
+          }
           this.pf.context.cacheResourceFromPackage(bc, this.pf.packageInfo);
         } catch (Exception e) {
           throw new Exception("Exception loading "+bc.getUrl()+": "+e.getMessage(), e);
@@ -4285,6 +4290,15 @@ public class PublisherIGLoader extends PublisherBase {
         r.setElement(convertToElement(r, b));
       }
     }
+  }
+
+  private StructureDefinition getAdditionalResources(String versionedUrl) {
+    for (StructureDefinition sd : additionalResources) {
+      if (versionedUrl.equals(sd.getVersionedUrl())) {
+        return sd;
+      }
+    }
+    return null;
   }
 
   private boolean isCustomResource(FetchedFile f) throws IOException {

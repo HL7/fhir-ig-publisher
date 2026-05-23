@@ -263,7 +263,6 @@ public class PreviousVersionComparator {
           session.setAnnotate(vi.annotate);
           //    session.setDebug(true);
           for (ProfilePair c : comparisons) {
-//            System.out.println("Version Comparison: compare "+vi.version+" to current for "+c.getUrl());
             session.compare(c.left, c.right);      
           }
           FileUtilities.createDirectory(Utilities.path(dstDir, "comparison-v"+vi.version));
