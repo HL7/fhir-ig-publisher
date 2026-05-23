@@ -311,7 +311,7 @@ public class TemplateRenderer {
         }
         b.append("\r\n");
 
-        if (!elem.prohibited()) {
+        if (!elem.prohibited() && !elem.hasContentReference()) {
           for (ElementDefinition child : children) {
             generateCoreElemXml(b, child, indent + 1, rootName, pathName + "." + en, backbone);
           }
@@ -679,7 +679,7 @@ public class TemplateRenderer {
     if (elem.prohibited())
       b.append("</span>");
 
-    if (children.size() > 0) {
+    if (children.size() > 0 && !elem.hasContentReference()) {
       b.append("\r\n");
       int c = 0;
       for (ElementDefinition child : children) {
