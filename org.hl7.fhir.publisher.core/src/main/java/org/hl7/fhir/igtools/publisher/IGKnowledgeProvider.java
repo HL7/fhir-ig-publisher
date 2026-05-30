@@ -419,9 +419,12 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       JsonObject cfg = null;
       if (cfg == null && r.fhirType().equals("StructureDefinition")) {
         cfg = defaultConfig.getJsonObject(r.fhirType()+":"+getSDType(r));
+      } else if (cfg == null && r.fhirType().equals("ImplementationGuide")) {
+        if (!r.getElement().hasChild("experimental") || !r.getElement().getChildValue("experimental").equals("true"))
+          cfg = defaultConfig.getJsonObject(r.fhirType()+":base");
       }
       if (cfg == null)
-        cfg = template.getConfig(r.fhirType(), r.getId());        
+        cfg = template.getConfig(r.fhirType(), r.getId(), false);        
       if (cfg == null && r.isExample()) {
         if (r.isCanonical(context))
           cfg = defaultConfig.getJsonObject("example:canonical");
@@ -436,6 +439,8 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
           cfg = defaultConfig.getJsonObject("Any:canonical");
         }
       }
+      if (cfg == null)
+        cfg = template.getConfig(r.fhirType(), r.getId(), true);        
       r.setConfig(cfg);
     }
     if (r.getConfig() == null && resourceConfig != null) {

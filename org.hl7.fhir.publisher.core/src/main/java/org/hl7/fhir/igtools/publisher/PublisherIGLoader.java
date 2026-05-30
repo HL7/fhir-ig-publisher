@@ -3747,7 +3747,6 @@ public class PublisherIGLoader extends PublisherBase {
             }
             checkResourceUnique(type+"/"+id, file.getPath(), cause);
             r.setElement(e).setId(id).setType(type);
-            pf.igpkp.findConfiguration(file, r);
             binary = false;
           } else {
             id = new File(file.getPath()).getName();
@@ -3755,7 +3754,6 @@ public class PublisherIGLoader extends PublisherBase {
             // are we going to treat it as binary, or something else?
             checkResourceUnique("Binary/"+id, file.getPath(), cause);
             r.setElement(e).setId(id).setType("Binary");
-            pf.igpkp.findConfiguration(file, r);
             binary = true;
           }
         } else {
@@ -3795,7 +3793,6 @@ public class PublisherIGLoader extends PublisherBase {
           }
           r.setId(id);
           r.setElement(e);
-          pf.igpkp.findConfiguration(file, r);
         }
         if (!suppressLoading) {
           if (srcForLoad == null)
@@ -3838,6 +3835,7 @@ public class PublisherIGLoader extends PublisherBase {
             }
           }
         }
+        pf.igpkp.findConfiguration(file, r);
 
         r.setTitle(e.getChildValue("name"));
         Element m = e.getNamedChild("meta");

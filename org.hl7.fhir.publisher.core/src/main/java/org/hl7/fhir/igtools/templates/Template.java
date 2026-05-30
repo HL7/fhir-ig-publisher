@@ -536,11 +536,11 @@ public class Template {
     }
   }
 
-  public JsonObject getConfig(String type, String id) {
+  public JsonObject getConfig(String type, String id, boolean allowAny) {
     if (defaults!=null) {
       if (defaults.has(type))
         return (JsonObject)defaults.get(type);
-      else if (defaults.has("Any"))
+      else if (allowAny && defaults.has("Any"))
         return (JsonObject)defaults.get("Any");
     }
     return null;
