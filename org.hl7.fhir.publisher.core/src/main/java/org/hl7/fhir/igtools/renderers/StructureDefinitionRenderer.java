@@ -1122,7 +1122,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       // 'primary' indicates if this is the initial definition of the constraint or if it's a subsequently profiled
       // version of the constraint.  The logic here could probably use some work, but all it does is make sure the
       // 'official' one comes first, so it's not critical that there are issues.
-      if (!c.hasSource() || c.getSource().equals(sd.getUrl()) || (c.getSource().startsWith("http://hl7.org/fhir/StructureDefinition/") && !c.getSource().substring(41).contains("/"))) {
+      if (isOwnInvariant(c) || (c.getSource().startsWith("http://hl7.org/fhir/StructureDefinition/") && !c.getSource().substring(41).contains("/"))) {
         if (primary == null) {
           primary = variations.get(constraintHash(c));
           if (primary==null)
@@ -1187,6 +1187,28 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
   }
 
+  /**
+   * True when a constraint belongs to this profile itself (i.e. it is not inherited from a base
+   * definition), so it must still be shown when inherited invariants are suppressed
+   * (show-inherited-invariants:false). A constraint with no source, or whose source matches this
+   * profile's canonical url - ignoring any |version suffix that pin-canonicals may append - is "own".
+   */
+  private boolean isOwnInvariant(ElementDefinitionConstraintComponent c) {
+    return !c.hasSource() || sameCanonical(c.getSource(), sd.getUrl());
+  }
+
+  private static boolean sameCanonical(String a, String b) {
+    return unversionedUrl(a).equals(unversionedUrl(b));
+  }
+
+  private static String unversionedUrl(String u) {
+    if (u == null) {
+      return "";
+    }
+    int i = u.indexOf('|');
+    return i >= 0 ? u.substring(0, i) : u;
+  }
+
   public List<ElementDefinition> elementsForMode(int genMode) {
     switch (genMode) {
     case GEN_MODE_DIFF:
@@ -1238,7 +1260,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         ConstraintInfo ci = constraintMap.get(key);
         for (ConstraintVariation cv : ci.getVariations()) {
           ElementDefinitionConstraintComponent inv = cv.getConstraint();
-          if (!inv.hasSource() || inv.getSource().equals(sd.getUrl()) || allInvariants || genMode!=GEN_MODE_DIFF ) {
+          if (isOwnInvariant(inv) || allInvariants) {
             tr = tbl.tr();
             tr.td().tx(inv.getKey());
             tr.td().tx(grade(inv));
