@@ -376,7 +376,11 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     for (FetchedFile f : pf.fileList) {
       f.trim();
     }
-    pf.context.unload();
+    // NB: pf.context.unload() intentionally moved to the end of createIg(). genCombinedPackage()
+    // (below, same method) and other later work still use the terminology context; unloading here
+    // flushes+clears the tx cache mid-build, after which those value-set expansions overwrite the
+    // persisted cache with partial data. (As of hapifhir/org.hl7.fhir.core#2473, using the tx cache
+    // after unload() is a hard error.)
     for (RelatedIG ig : pf.relatedIGs) {
       ig.dump();
     }
