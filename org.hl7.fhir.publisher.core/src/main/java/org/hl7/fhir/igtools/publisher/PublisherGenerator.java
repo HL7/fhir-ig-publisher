@@ -1168,9 +1168,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           }
         }
         String html = null;
-        if (rX.getLogicalElement() != null) {
+        if (rX.getLogicalElement() != null || (rX.getElement() != null && !rX.getElement().fhirType().equals("Binary"))) {
           // Try to use a specialised renderer for this logical model.
-          String logicalType = rX.getLogicalElement().fhirTypeRoot();
+          String logicalType = rX.getLogicalElement() != null ? rX.getLogicalElement().fhirTypeRoot() : rX.getElement().fhirType();
           RenderingContext xlrc = lrc.copy(false);
           xlrc.setRules(RenderingContext.GenerationRules.IG_PUBLISHER);
           ResourceRenderer rr = RendererFactory.factory(logicalType, xlrc);
@@ -1178,7 +1178,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           if (!(rr instanceof ProfileDrivenRenderer)) {
             // Has specialised renderer - try to use it.
             try {
-              ResourceWrapper rw = ResourceWrapper.forResource(xlrc.getContextUtilities(), rX.getLogicalElement());
+              ResourceWrapper rw = ResourceWrapper.forResource(xlrc.getContextUtilities(), rX.getLogicalElement() != null ? rX.getLogicalElement() : rX.getElement());
               XhtmlNode renderedXhtml = rr.buildNarrative(rw);
               if (renderedXhtml != null) {
                 html = pfx + new XhtmlComposer(XhtmlComposer.HTML).compose(renderedXhtml);
