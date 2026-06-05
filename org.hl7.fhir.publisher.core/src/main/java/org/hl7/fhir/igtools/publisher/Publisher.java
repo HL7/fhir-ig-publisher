@@ -455,6 +455,11 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         log("Generating QA");
         log("Validation output in "+val.generate(pf.sourceIg.getName(), pf.errors, pf.fileList, Utilities.path(settings.getDestDir() != null ? settings.getDestDir() : pf.outputDir, "qa.html"), pf.suppressedMessages, pinSummary()));
       }
+      // All terminology consumers are done by here: genCombinedPackage() (value-set expansion, in
+      // generator.generate() above) and QA. Unload now -- this performs the final flush of the tx
+      // cache, so the complete cache is persisted to disk. Nothing may use the terminology context
+      // after this point (hapifhir/org.hl7.fhir.core#2473 makes post-unload tx-cache use a hard error).
+      pf.context.unload();
       recordOutcome(null, val);
       buildTracker.setBooleanProperty("status", "complete", true, null);
       buildTracker.save();
