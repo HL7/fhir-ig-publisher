@@ -3249,9 +3249,11 @@ public class PublisherIGLoader extends PublisherBase {
               res.addElement("base").setValue(baseName);
             }
             String code = res.getNamedChildValue("code");
-            res.forceElement("id").setValue(baseName+"-"+code);
-            res.forceElement("url").setValue("http://hl7.org/fhir/SearchParameter/"+baseName+"-"+code);
-            res.forceElement("name").setValue(baseName+Utilities.capitalize(code)+"SearchParam");
+            String nameForParam = Utilities.makeNameFromCode(code);
+            String idForParam = Utilities.makeId(code);
+            res.forceElement("id").setValue(baseName+"-"+idForParam);
+            res.forceElement("url").setValue("http://hl7.org/fhir/SearchParameter/"+baseName+"-"+idForParam);
+            res.forceElement("name").setValue(baseName+Utilities.capitalize(nameForParam)+"SearchParam");
             res.forceElement("title").setValue(baseName+" "+Utilities.capitalize(code)+" Search Parameter");
           }
           r.setId(res.getIdBase());
