@@ -376,6 +376,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     for (FetchedFile f : pf.fileList) {
       f.trim();
     }
+    genCombinedPackage();
     pf.context.unload();
     for (RelatedIG ig : pf.relatedIGs) {
       ig.dump();
@@ -463,7 +464,6 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
             pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.EXCEPTION, "package.tgz", "Error converting pacakge to R4B: "+e.getMessage(), ValidationMessage.IssueSeverity.ERROR));
           }
         }
-        genCombinedPackage();
 
         if (settings.getMode() == null || settings.getMode() == PublisherUtils.IGBuildMode.MANUAL) {
           if (settings.isCacheVersion()) {
