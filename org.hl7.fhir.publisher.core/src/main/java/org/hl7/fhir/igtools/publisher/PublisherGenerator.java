@@ -962,6 +962,48 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
   }
 
 
+  // A3: shell for a "view source" page that fetches the raw resource file (same directory) and
+  // highlights it client-side with Prism (already loaded on the page), instead of baking the full
+  // highlighted+linked source into every page. Trade-off: the in-source FHIR reference hyperlinks
+  // (which the server-side renderer adds) are not present in this client-side view; syntax
+  // highlighting and the raw content are. Opt-in via the 'dynamic-source-viewers' parameter.
+  // The JS lives in a separate file (dynamic-source.js) referenced relatively, because HTMLInspector
+  // disallows inline <script> in generated pages.
+  private static final String DYNAMIC_SOURCE_JS_FILE = "dynamic-source.js";
+  private boolean dynamicSourceJsWritten = false;
+
+  private String dynamicSourceShell(FetchedResource r, String ext, String prismLang) throws IOException {
+    ensureDynamicSourceJs();
+    String raw = Utilities.escapeXml(r.fhirType()+"-"+r.getId()+"."+ext);
+    return "<pre class=\"fhir-source-dyn\" data-src=\""+raw+"\" style=\"white-space: pre; text-wrap: nowrap; width: auto;\">"
+        + "<code class=\"language-"+prismLang+"\">Loading source…</code></pre>"
+        + "<script src=\""+DYNAMIC_SOURCE_JS_FILE+"\"> </script>";
+  }
+
+  private void ensureDynamicSourceJs() throws IOException {
+    if (dynamicSourceJsWritten) {
+      return;
+    }
+    dynamicSourceJsWritten = true;
+    String path = Utilities.path(pf.tempDir, DYNAMIC_SOURCE_JS_FILE);
+    FileUtilities.stringToFile(DYNAMIC_SOURCE_JS, path);
+    pf.otherFilesRun.add(path); // so it is treated as expected output and not cleaned up
+  }
+
+  // Self-contained, idempotent. Fetches each pre.fhir-source-dyn's data-src and renders it; highlights
+  // with Prism if available, otherwise shows the raw text.
+  private static final String DYNAMIC_SOURCE_JS =
+      "(function(){function go(){var els=document.querySelectorAll('pre.fhir-source-dyn[data-src]');"
+    + "Array.prototype.forEach.call(els,function(pre){"
+    + "if(pre.getAttribute('data-done'))return;pre.setAttribute('data-done','1');"
+    + "var code=pre.querySelector('code');var src=pre.getAttribute('data-src');"
+    + "fetch(src,{cache:'no-cache'}).then(function(r){if(!r.ok)throw 0;return r.text();}).then(function(t){"
+    + "code.textContent=t;if(window.Prism&&Prism.highlightElement){try{Prism.highlightElement(code);}catch(e){}}"
+    + "}).catch(function(){code.textContent='(unable to load '+src+')';});"
+    + "});}"
+    + "if(document.readyState!=='loading'){go();}else{document.addEventListener('DOMContentLoaded',go);}"
+    + "})();";
+
   private void saveFileOutputs(FetchedFile f, String lang) throws IOException, FHIRException {
     long start = System.currentTimeMillis();
     if (f.getResources().size() == 1) {
@@ -1093,41 +1135,59 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
     if (wantGen(r, "xml-html")) {
       long start = System.currentTimeMillis();
-      XmlXHtmlRenderer x = new XmlXHtmlRenderer();
-      x.setPrism(size < PRISM_SIZE_LIMIT);
-      xp.setLinkResolver(this.pf.igpkp);
-      xp.setShowDecorations(false);
-      if (suppressId(f, r)) {
-        xp.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
+      String content;
+      if (pf.dynamicSourceViewers) {
+        content = dynamicSourceShell(r, "xml", "markup");
+      } else {
+        XmlXHtmlRenderer x = new XmlXHtmlRenderer();
+        x.setPrism(size < PRISM_SIZE_LIMIT);
+        xp.setLinkResolver(this.pf.igpkp);
+        xp.setShowDecorations(false);
+        if (suppressId(f, r)) {
+          xp.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
+        }
+        xp.compose(e, x);
+        content = x.toString();
       }
-      xp.compose(e, x);
-      fragment(r.fhirType()+"-"+r.getId()+"-xml-html", x.toString(), f.getOutputNames(), r, vars, "xml", start, "xml-html", "Resource", lang);
+      fragment(r.fhirType()+"-"+r.getId()+"-xml-html", content, f.getOutputNames(), r, vars, "xml", start, "xml-html", "Resource", lang);
     }
     if (wantGen(r, "json-html")) {
       long start = System.currentTimeMillis();
-      JsonXhtmlRenderer j = new JsonXhtmlRenderer();
-      j.setPrism(size < PRISM_SIZE_LIMIT);
-      org.hl7.fhir.r5.elementmodel.JsonParser jp = new org.hl7.fhir.r5.elementmodel.JsonParser(this.pf.context);
-      jp.setLinkResolver(this.pf.igpkp);
-      jp.setAllowComments(true);
-      if (suppressId(f, r)) {
-        jp.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
+      String content;
+      if (pf.dynamicSourceViewers) {
+        content = dynamicSourceShell(r, "json", "json");
+      } else {
+        JsonXhtmlRenderer j = new JsonXhtmlRenderer();
+        j.setPrism(size < PRISM_SIZE_LIMIT);
+        org.hl7.fhir.r5.elementmodel.JsonParser jp = new org.hl7.fhir.r5.elementmodel.JsonParser(this.pf.context);
+        jp.setLinkResolver(this.pf.igpkp);
+        jp.setAllowComments(true);
+        if (suppressId(f, r)) {
+          jp.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
+        }
+        jp.compose(e, j);
+        content = j.toString();
       }
-      jp.compose(e, j);
-      fragment(r.fhirType()+"-"+r.getId()+"-json-html", j.toString(), f.getOutputNames(), r, vars, "json", start, "json-html", "Resource", lang);
+      fragment(r.fhirType()+"-"+r.getId()+"-json-html", content, f.getOutputNames(), r, vars, "json", start, "json-html", "Resource", lang);
     }
 
     if (wantGen(r, "ttl-html")) {
       long start = System.currentTimeMillis();
-      org.hl7.fhir.r5.elementmodel.TurtleParser ttl = new org.hl7.fhir.r5.elementmodel.TurtleParser(this.pf.context);
-      ttl.setLinkResolver(this.pf.igpkp);
-      Turtle rdf = new Turtle();
-      if (suppressId(f, r)) {
-        ttl.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
+      String content;
+      if (pf.dynamicSourceViewers) {
+        content = dynamicSourceShell(r, "ttl", "turtle");
+      } else {
+        org.hl7.fhir.r5.elementmodel.TurtleParser ttl = new org.hl7.fhir.r5.elementmodel.TurtleParser(this.pf.context);
+        ttl.setLinkResolver(this.pf.igpkp);
+        Turtle rdf = new Turtle();
+        if (suppressId(f, r)) {
+          ttl.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
+        }
+        ttl.setStyle(IParser.OutputStyle.PRETTY);
+        ttl.compose(e, rdf, "");
+        content = rdf.asHtml(size < PRISM_SIZE_LIMIT);
       }
-      ttl.setStyle(IParser.OutputStyle.PRETTY);
-      ttl.compose(e, rdf, "");
-      fragment(r.fhirType()+"-"+r.getId()+"-ttl-html", rdf.asHtml(size < PRISM_SIZE_LIMIT), f.getOutputNames(), r, vars, "ttl", start, "ttl-html", "Resource", lang);
+      fragment(r.fhirType()+"-"+r.getId()+"-ttl-html", content, f.getOutputNames(), r, vars, "ttl", start, "ttl-html", "Resource", lang);
     }
 
     generateHtml(f, r, res, langElement, vars, lrc, lang);

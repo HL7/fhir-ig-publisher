@@ -661,6 +661,9 @@ public class PublisherIGLoader extends PublisherBase {
         case "produce-jekyll-data":
           pf.produceJekyllData = "true".equals(p.getValue());
           break;
+        case "dynamic-source-viewers":
+          pf.dynamicSourceViewers = "true".equals(p.getValue());
+          break;
         case "page-factory":
           dir = Utilities.path(pf.rootDir, "temp", "factory-pages", "factory"+ pf.pageFactories.size());
           FileUtilities.createDirectory(dir);
