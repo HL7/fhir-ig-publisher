@@ -664,6 +664,9 @@ public class PublicationProcess {
         
         List<String> ignoreList = new ArrayList<>();
         ignoreList.add(destVer);
+        if (dynamicPublishBox) {
+          System.out.println("dynamic-publish-box enabled: skipping the per-past-version publish box rewrite (resolved client-side from package-list.json) - the version tree is not required locally");
+        }
         // get the current content from the source
         for (PackageListEntry v : pl.versions()) {
           if (v != plVer) {
@@ -671,13 +674,23 @@ public class PublicationProcess {
             if (path != null) {
               String relPath = FileUtilities.getRelativePath(fRoot.getAbsolutePath(), path);
               ignoreList.add(path);
-              src.needFolder(relPath, false);
-              if (!v.cibuild() && (!v.current() || prSrc.has("movedFrom"))) {
-                String pv = v.path();
-                String vCode = pv.substring(pv.lastIndexOf("/")+1);
-                String dv = Utilities.path(fRoot, relPath);
-                System.out.println("Update publish box for version "+v.version()+" @ "+v.path());
-                updatePublishBox(pl, v, dv, pv, destination, fRoot.getAbsolutePath(), false, null, null, null, url, jsonXmlClones, dynamicPublishBox);
+              // When dynamic-publish-box is enabled, the per-version publish box (current-version
+              // reference + "Page versions" list) is resolved client-side from package-list.json, so
+              // every past version's pages are byte-identical regardless of which version is current.
+              // Rewriting them therefore produces no changes - pure overhead that also forces the
+              // entire version tree to be present locally (src.needFolder copies each one in). Skip
+              // pulling each old version into the working tree and skip the no-op rewrite, so a
+              // milestone no longer requires the full tree. ignoreList is still populated above, so
+              // any old versions that do happen to be present remain protected from the delete sweep.
+              if (!dynamicPublishBox) {
+                src.needFolder(relPath, false);
+                if (!v.cibuild() && (!v.current() || prSrc.has("movedFrom"))) {
+                  String pv = v.path();
+                  String vCode = pv.substring(pv.lastIndexOf("/")+1);
+                  String dv = Utilities.path(fRoot, relPath);
+                  System.out.println("Update publish box for version "+v.version()+" @ "+v.path());
+                  updatePublishBox(pl, v, dv, pv, destination, fRoot.getAbsolutePath(), false, null, null, null, url, jsonXmlClones, dynamicPublishBox);
+                }
               }
             }
           }
