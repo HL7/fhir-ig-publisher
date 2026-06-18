@@ -237,6 +237,9 @@ public class PublisherFields {
     CSVWriter allProfilesCsv;
     StructureDefinitionSpreadsheetGenerator allProfilesXlsx;
     boolean produceJekyllData;
+    // A3: emit the json/xml/ttl "view source" pages as a small client-side shell that fetches the raw
+    // file and highlights it (instead of baking the full highlighted source into every page). Opt-in.
+    boolean dynamicSourceViewers;
     boolean noUsageCheck;
     boolean hasTranslations;
     String defaultTranslationLang;
