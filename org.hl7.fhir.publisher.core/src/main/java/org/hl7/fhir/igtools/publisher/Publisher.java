@@ -683,6 +683,11 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         j.add("package-id", pf.packageId());
         j.add("ig-ver", pf.publishedIg.getVersion());
       }
+      if (settings.getMode() == PublisherUtils.IGBuildMode.PUBLICATION) {
+        // Lever C (-reuse-build): record the final publication path this output was rendered for, so
+        // -go-publish -reuse-build can verify a pre-built output is publication-ready before adopting it.
+        j.add("publication-url", targetUrl());
+      }
       j.add("date", new SimpleDateFormat("EEE, dd MMM, yyyy HH:mm:ss Z", new Locale("en", "US")).format(pf.getExecTime().getTime()));
       j.add("dateISO8601", new DateTimeType(pf.getExecTime()).asStringValue());
       if (val != null) {
