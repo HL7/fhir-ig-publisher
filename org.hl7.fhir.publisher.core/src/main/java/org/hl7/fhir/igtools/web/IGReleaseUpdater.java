@@ -92,14 +92,20 @@ public class IGReleaseUpdater {
   private File sft;
   private boolean fullUpdate;
   private String historySource;
+  private boolean dynamicPublishBox;
 
   public IGReleaseUpdater(String folder, String url, String rootFolder, IGRegistryMaintainer reg, ServerType serverType, List<String> otherSpecs, File sft, boolean full, String historySource) throws IOException {
+    this(folder, url, rootFolder, reg, serverType, otherSpecs, sft, full, historySource, false);
+  }
+
+  public IGReleaseUpdater(String folder, String url, String rootFolder, IGRegistryMaintainer reg, ServerType serverType, List<String> otherSpecs, File sft, boolean full, String historySource, boolean dynamicPublishBox) throws IOException {
     this.folder = folder;
     this.url = url;
     this.rootFolder = rootFolder;
     this.fullUpdate = full;
     this.sft = sft;
     this.historySource = historySource;
+    this.dynamicPublishBox = dynamicPublishBox;
     if (!"".equals("http://hl7.org/fhir")) { // keep the main spec out of the registry
       this.reg = reg;
     }
@@ -329,11 +335,11 @@ public class IGReleaseUpdater {
       return false;
     }
     boolean vc = false;
-    IGReleaseVersionUpdater igvu = new IGReleaseVersionUpdater(vf, url, rootFolder, ignoreList, ignoreListOuter, version, folder);
+    IGReleaseVersionUpdater igvu = new IGReleaseVersionUpdater(vf, url, rootFolder, ignoreList, ignoreListOuter, version, folder, dynamicPublishBox);
     if (updateStatements) {
       PackageList pl = new PackageList(ig);
       PackageListEntry pv = pl.findByVersion(version.asString("version"));
-      String fragment = PublishBoxStatementGenerator.genFragment(pl, pv, pl.current(), canonical, pv == pl.current(), false);
+      String fragment = PublishBoxStatementGenerator.genFragment(pl, pv, pl.current(), canonical, pv == pl.current(), false, dynamicPublishBox);
       System.out.println("  "+vf+": "+fragment);
       igvu.updateStatement(fragment, ignoreList != null ? 0 : 1, milestones);
       System.out.println("  .. "+igvu.getCountTotal()+" files checked, "+igvu.getCountUpdated()+" updated");
