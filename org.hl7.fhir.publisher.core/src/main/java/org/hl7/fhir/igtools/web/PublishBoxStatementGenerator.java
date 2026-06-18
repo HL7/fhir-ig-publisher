@@ -112,7 +112,15 @@ public class PublishBoxStatementGenerator {
     + "if(!dyn.length&&!pv.length)return;"
     + "var canonical=dyn.length?dyn[0].getAttribute('data-pb-canonical'):null;"
     + "if(!canonical)return;"
-    + "var plUrl=pn(canonical);if(!plUrl)return;plUrl=plUrl+'/package-list.json';"
+    // locate package-list.json relative to THIS page's served location (so it works under any base
+    // path - preview/staging/mirror - not only when served at the canonical path). Derive the IG root
+    // from this page's own version folder in the URL; fall back to the canonical path.
+    + "var pgVer=(dyn.length?dyn[0]:pv[0]).getAttribute('data-pb-version');"
+    + "var igRoot=null;"
+    + "if(pgVer){var seg='/'+pgVer+'/';var si=location.pathname.indexOf(seg);if(si>=0)igRoot=location.pathname.slice(0,si);}"
+    + "if(igRoot===null)igRoot=pn(canonical);"
+    + "if(igRoot===null)return;"
+    + "var plUrl=igRoot+'/package-list.json';"
     + "fetch(plUrl,{cache:'no-cache'}).then(function(r){return r.json();}).then(function(pl){"
     + "var list=(pl&&pl.list)||[];"
     + "var cur=null;list.forEach(function(e){if(e&&e.current===true&&e.version!=='current'&&typeof e.path==='string'&&e.path.indexOf(canonical)===0){cur=e;}});"
