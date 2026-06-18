@@ -605,19 +605,45 @@ public class PublicationProcess {
 
       // create a temporary copy and build in that:
       File temp = cloneToTemp(tempDir, fSource, npm.name()+"#"+npm.version());
-      File tempM = null; 
+      File tempM = null;
       System.out.println("Build IG at "+fSource.getAbsolutePath()+": final copy suitable for publication (in "+temp.getAbsolutePath()+")");
       String[] baseParams = new String[] {"-publish", pathVer, "-no-exit" };
       String tx = getNamedParam(args, "-tx");
       if (tx != null) {
         baseParams = Utilities.concatStringArray(baseParams, new String[] {"-tx", tx});
       }
-      runBuild(qa, temp.getAbsolutePath(), Utilities.concatStringArray(baseParams, new String[] {"-ig", temp.getAbsolutePath(), "-resetTx"}));
+
+      // Lever C (-reuse-build, opt-in, off by default): the publication pipeline normally renders the IG
+      // twice (an -ig step, then this -publish render). When -reuse-build is passed AND the pre-built
+      // output that was cloned into temp/output was itself rendered in PUBLICATION mode for this exact
+      // pathVer (verified via the qa.json "publication-url" marker), adopt it instead of re-rendering.
+      // Any mismatch falls back to the full render, so this can never publish stale/non-publication output.
+      boolean reuseBuild = hasParam(args, "-reuse-build");
+      boolean reused = false;
+      if (reuseBuild) {
+        if (isReusablePublicationBuild(temp, pathVer)) {
+          System.out.println("[-reuse-build] Adopting pre-built publication output at "+Utilities.path(temp.getAbsolutePath(), "output")+" (skipping the internal -publish render for "+pathVer+")");
+          reused = true;
+        } else {
+          System.out.println("[-reuse-build] Pre-built output is not a verified PUBLICATION build for "+pathVer+" - performing a full -publish render");
+        }
+      }
+      if (!reused) {
+        runBuild(qa, temp.getAbsolutePath(), Utilities.concatStringArray(baseParams, new String[] {"-ig", temp.getAbsolutePath(), "-resetTx"}));
+      }
 
       if (mode != PublicationProcessMode.WORKING) {
         tempM = cloneToTemp(tempDir, temp, npm.name()+"#"+npm.version()+"-milestone");
-        System.out.println("Build IG at "+fSource.getAbsolutePath()+": final copy suitable for publication (in "+tempM.getAbsolutePath()+") (milestone build)");        
-        runBuild(qa, tempM.getAbsolutePath(), Utilities.concatStringArray(baseParams, new String[] {"-ig", tempM.getAbsolutePath(), "-milestone"}));
+        // The only render-time difference between a -publish and a -milestone build is related-IG link
+        // targets (canonical vs web-location). When the IG declares no related IGs, the milestone render
+        // is byte-identical to the (reused) -publish render, so we can reuse it too; otherwise re-render.
+        boolean reuseMilestone = reused && !hasRelatedIGs(prSrc);
+        if (reuseMilestone) {
+          System.out.println("[-reuse-build] No related IGs declared - reusing the publication output for the milestone build too (in "+tempM.getAbsolutePath()+")");
+        } else {
+          System.out.println("Build IG at "+fSource.getAbsolutePath()+": final copy suitable for publication (in "+tempM.getAbsolutePath()+") (milestone build)");
+          runBuild(qa, tempM.getAbsolutePath(), Utilities.concatStringArray(baseParams, new String[] {"-ig", tempM.getAbsolutePath(), "-milestone"}));
+        }
       }
 
       // 2. make a copy of what we built
@@ -1247,6 +1273,41 @@ public class PublicationProcess {
       }
     }
     return null;
+  }
+
+  private static boolean hasParam(String[] args, String param) {
+    for (String a : args) {
+      if (param.equals(a)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Lever C (-reuse-build): true when the output cloned into temp/output was rendered in PUBLICATION
+   * mode for exactly this pathVer. The publisher records that path in qa.json as "publication-url" only
+   * when run with -publish; a normal -ig (MANUAL) build has no such marker, so this returns false and
+   * the caller falls back to a full render.
+   */
+  private boolean isReusablePublicationBuild(File temp, String pathVer) {
+    try {
+      File fQA = new File(Utilities.path(temp.getAbsolutePath(), "output", "qa.json"));
+      if (!fQA.exists()) {
+        return false;
+      }
+      JsonObject tqa = JsonParser.parseObject(loadFile("Reuse-build QA file", fQA.getAbsolutePath()));
+      String pubUrl = tqa.asString("publication-url");
+      return pubUrl != null && pubUrl.equals(pathVer);
+    } catch (Exception e) {
+      System.out.println("[-reuse-build] Could not verify pre-built output ("+e.getMessage()+") - performing a full render");
+      return false;
+    }
+  }
+
+  private boolean hasRelatedIGs(JsonObject prSrc) {
+    JsonObject related = prSrc.getJsonObject("related");
+    return related != null && !related.getProperties().isEmpty();
   }
 
 
