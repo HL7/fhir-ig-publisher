@@ -58,9 +58,14 @@ public class IGReleaseVersionUpdater {
   private int clonedTotal;
   private String rootUrl;
   private String rootFolder;
+  private boolean dynamicPublishBox;
 
 
   public IGReleaseVersionUpdater(String folder, String rootUrl, String rootFolder, List<String> ignoreList, List<String> ignoreListOuter, JsonObject version, String currentFolder) {
+    this(folder, rootUrl, rootFolder, ignoreList, ignoreListOuter, version, currentFolder, false);
+  }
+
+  public IGReleaseVersionUpdater(String folder, String rootUrl, String rootFolder, List<String> ignoreList, List<String> ignoreListOuter, JsonObject version, String currentFolder, boolean dynamicPublishBox) {
     this.folder = folder;
     this.ignoreList = ignoreList;
     this.ignoreListOuter = ignoreListOuter;
@@ -68,6 +73,7 @@ public class IGReleaseVersionUpdater {
     this.currentFolder = currentFolder;
     this.rootFolder = rootFolder;
     this.rootUrl = rootUrl;
+    this.dynamicPublishBox = dynamicPublishBox;
   }
 
   public void updateStatement(String fragment, int level, List<PackageListEntry> milestones) throws FileNotFoundException, IOException {
@@ -160,7 +166,13 @@ public class IGReleaseVersionUpdater {
     if (milestones == null) {
       return "";
     }
-    String relpath = FileUtilities.getRelativePath(folder, f.getAbsolutePath()); 
+    if (dynamicPublishBox) {
+      // version-agnostic placeholder: the "Page versions: ..." list is resolved client-side from
+      // package-list.json (see PublishBoxStatementGenerator's script), so adding a new milestone
+      // folder no longer rewrites this line in every past version's pages.
+      return "<span class=\"fhir-pb-page-versions\" data-pb-version=\""+Utilities.escapeXml(version.asString("version"))+"\"></span>";
+    }
+    String relpath = FileUtilities.getRelativePath(folder, f.getAbsolutePath());
     CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder(" ");
     int i = 0;
     for (PackageListEntry t : milestones) {
