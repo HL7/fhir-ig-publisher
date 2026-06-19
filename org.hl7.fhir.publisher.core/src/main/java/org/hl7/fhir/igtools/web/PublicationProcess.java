@@ -1059,6 +1059,8 @@ public class PublicationProcess {
       IGReleaseRedirectionBuilder rb = new IGReleaseRedirectionBuilder(destVer, pl.canonical(), plVer.path(), rootFolder);
       if (serverType == ServerType.APACHE) {
         rb.buildApacheRedirections();
+      } else if (serverType == ServerType.CLOUD) {
+        rb.buildCloudRedirections();
       } else if (serverType == ServerType.ASP2) {
         rb.buildNewAspRedirections(false, false);
       } else if (serverType == ServerType.ASP1) {
