@@ -377,7 +377,11 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       f.trim();
     }
     genCombinedPackage();
-    pf.context.unload();
+    if (pf.txUnloadEarly) {
+      // memory-starved IGs opt into unloading terminology now, before HTML inspection.
+      // The trade-off is that conformance statement rendering (which needs terminology) won't work.
+      pf.context.unload();
+    }
     for (RelatedIG ig : pf.relatedIGs) {
       ig.dump();
     }
@@ -583,6 +587,12 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       zip.close();
       FileUtilities.copyFile(Utilities.path(pf.tempDir, "full-ig.zip"), Utilities.path(pf.outputDir, "full-ig.zip"));
       log("Final .zip built");
+    }
+    if (!pf.txUnloadEarly) {
+      // default path: terminology stayed loaded through HTML inspection (so conformance
+      // statement rendering works); unload it now that the inspector is complete.
+      pf.context.unload();
+      System.gc();
     }
   }
 

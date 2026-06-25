@@ -361,6 +361,9 @@ public class PublisherIGLoader extends PublisherBase {
             pf.resourceFactoryDirs.add(dir);
           }
           break;
+        case "tx-unload-early":
+          pf.txUnloadEarly = "true".equals(p.getValue());
+          break;
         case "autoload-resources":
           pf.autoLoad = "true".equals(p.getValue());
           break;
