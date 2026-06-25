@@ -129,6 +129,7 @@ public class PublisherFields {
     String altCanonical;
     boolean makeQA = true;
     boolean bundleReferencesResolve = true;
+    boolean txUnloadEarly = false; // if true, unload the terminology context before HTML inspection (saves memory, but conformance statement rendering won't have terminology available)
     CqlSubSystem cql;
     File killFile;
     List<PageFactory> pageFactories = new ArrayList<PageFactory>();

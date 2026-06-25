@@ -253,6 +253,9 @@ public class DBBuilder {
   private MarkDownProcessor md = new MarkDownProcessor(Dialect.COMMON_MARK);
   private List<CodeSystem> codesystems = new ArrayList<>();
   private List<ConceptMap> mappings = new ArrayList<>();
+  // canonical urls (url and url|version) of code systems already in the database,
+  // whether from this IG or pulled in on demand by an SQL codeSystems list
+  private Set<String> codeSystemUrlsInDB = new HashSet<>();
   private List<FetchedFile> files;
   private int lastMDKey;
   private int lastResKey;
@@ -350,44 +353,16 @@ public class DBBuilder {
         r.getElement().setUserData(UserDataNames.Storage_key, lastResKey);
       } else {
         CanonicalResource cr = (CanonicalResource) r.getResource();
-        PreparedStatement psql = con.prepareStatement("Insert into Resources (key, type, custom, id, web, url, version, status, date, name, title, experimental, realm, description, purpose, copyright, copyrightLabel, standardStatus, derivation, kind, sdType, base, content, supplements, json) "+
-            "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        psql.setInt(1, ++lastResKey);
-        bindString(psql, 2,  r.fhirType());
-        psql.setInt(3, r.getElement().getProperty().getStructure().hasUserData(UserDataNames.loader_custom_resource) ? 1 : 0);
-        bindString(psql, 4,  r.getId());
-
-        bindString(psql, 5,  cr.getWebPath());
-        bindString(psql, 6,  cr.getUrl());
-        bindString(psql, 7,  cr.getVersion());
-        bindString(psql, 8,  cr.getStatus().toCode());
-        bindString(psql, 9,  cr.getDateElement().primitiveValue());
-        bindString(psql, 10,  cr.getName());
-        bindString(psql, 11,  cr.getTitle());
-        bindString(psql, 12,  cr.getExperimentalElement().primitiveValue());
-        bindString(psql, 13, realm(cr));
-        bindString(psql, 14, cr.getDescription());
-        bindString(psql, 15, cr.getPurpose());
-        bindString(psql, 16, cr.getCopyright());
-        bindString(psql, 17, cr.getCopyrightLabel());
-        bindString(psql, 18, ExtensionUtilities.getStandardsStatus(cr) == null ? null : ExtensionUtilities.getStandardsStatus(cr).toCode());
-        bindString(psql, 19, derivation(cr));
-        bindString(psql, 20, kind(cr));
-        bindString(psql, 21, sdType(cr));
-        bindString(psql, 22, base(cr));
-        bindString(psql, 23, content(cr));
-        bindString(psql, 24, supplements(cr));
-        psql.setBytes(25, json);
-        psql.executeUpdate();    
+        int custom = r.getElement().getProperty().getStructure().hasUserData(UserDataNames.loader_custom_resource) ? 1 : 0;
+        int key = insertCanonicalResource(cr, r.fhirType(), r.getId(), json, custom);
         if (cr instanceof CodeSystem) {
           codesystems.add((CodeSystem) cr);
+          registerCodeSystemUrl((CodeSystem) cr);
         } else if (cr instanceof ConceptMap) {
           mappings.add((ConceptMap) cr);
         }
-        cr.setUserData(UserDataNames.db_key, lastResKey);
-        cr.setUserData(UserDataNames.Storage_key, lastResKey);
-        r.getElement().setUserData(UserDataNames.Storage_key, lastResKey);
-      } 
+        r.getElement().setUserData(UserDataNames.Storage_key, key);
+      }
     } catch (SQLException e) {
       errors.add(e.getMessage());
       if (debug) {
@@ -395,6 +370,55 @@ public class DBBuilder {
       }
     }
     time(start);
+  }
+
+  /**
+   * Insert a single canonical resource row into the Resources table, set its db_key/Storage_key
+   * user data, and return the allocated key. Does not populate the concept/property/etc tables, and
+   * does not add the resource to the codesystems/mappings lists - callers decide that.
+   */
+  private int insertCanonicalResource(CanonicalResource cr, String type, String id, byte[] json, int custom) throws SQLException {
+    PreparedStatement psql = con.prepareStatement("Insert into Resources (key, type, custom, id, web, url, version, status, date, name, title, experimental, realm, description, purpose, copyright, copyrightLabel, standardStatus, derivation, kind, sdType, base, content, supplements, json) "+
+        "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    psql.setInt(1, ++lastResKey);
+    bindString(psql, 2,  type);
+    psql.setInt(3, custom);
+    bindString(psql, 4,  id);
+    bindString(psql, 5,  cr.getWebPath());
+    bindString(psql, 6,  cr.getUrl());
+    bindString(psql, 7,  cr.getVersion());
+    bindString(psql, 8,  cr.hasStatus() ? cr.getStatus().toCode() : null);
+    bindString(psql, 9,  cr.getDateElement().primitiveValue());
+    bindString(psql, 10,  cr.getName());
+    bindString(psql, 11,  cr.getTitle());
+    bindString(psql, 12,  cr.getExperimentalElement().primitiveValue());
+    bindString(psql, 13, realm(cr));
+    bindString(psql, 14, cr.getDescription());
+    bindString(psql, 15, cr.getPurpose());
+    bindString(psql, 16, cr.getCopyright());
+    bindString(psql, 17, cr.getCopyrightLabel());
+    bindString(psql, 18, ExtensionUtilities.getStandardsStatus(cr) == null ? null : ExtensionUtilities.getStandardsStatus(cr).toCode());
+    bindString(psql, 19, derivation(cr));
+    bindString(psql, 20, kind(cr));
+    bindString(psql, 21, sdType(cr));
+    bindString(psql, 22, base(cr));
+    bindString(psql, 23, content(cr));
+    bindString(psql, 24, supplements(cr));
+    psql.setBytes(25, json);
+    psql.executeUpdate();
+    cr.setUserData(UserDataNames.db_key, lastResKey);
+    cr.setUserData(UserDataNames.Storage_key, lastResKey);
+    return lastResKey;
+  }
+
+  private String csKey(String url, String version) {
+    return version == null ? url : url + "|" + version;
+  }
+
+  private void registerCodeSystemUrl(CodeSystem cs) {
+    if (cs.hasUrl()) {
+      codeSystemUrlsInDB.add(csKey(cs.getUrl(), cs.getVersion()));
+    }
   }
 
   private String derivation(CanonicalResource cr) {
@@ -460,64 +484,10 @@ public class DBBuilder {
       try {
         con.setAutoCommit(false);
 
-        PreparedStatement psql = con.prepareStatement("Insert into Properties (Key, ResourceKey, Code, Uri, Description, Type) "+
-            "values (?, ?, ?, ?, ?, ?)");
         for (CodeSystem cs : codesystems) {
-          for (PropertyComponent p : cs.getProperty()) { 
-            psql.setInt(1, ++lastPropKey);
-            psql.setInt(2, ((Integer) cs.getUserData(UserDataNames.db_key)).intValue());
-            bindString(psql, 3, p.getCode());
-            bindString(psql, 4, p.getUri());
-            bindString(psql, 5, p.getDescription());
-            bindString(psql, 6, p.getType().toCode());  
-            psql.addBatch();
-            p.setUserData(UserDataNames.db_key, lastPropKey);   
-          }
+          addCodeSystemContent(cs);
         }
-        psql.executeBatch();
-
-        psql = con.prepareStatement("Insert into Concepts (Key, ResourceKey, ParentKey,  Code, Display, Definition) "+
-            "values (?, ?, ?, ?, ?, ?)");
-        for (CodeSystem cs : codesystems) {
-          addConcepts(cs, cs.getConcept(), psql, 0);
-        }
-        psql.executeBatch();
-
-        psql = con.prepareStatement("Insert into ConceptProperties (Key, ResourceKey, ConceptKey, PropertyKey, Code, Value) "+
-            "values (?, ?, ?, ?, ?, ?)");
-        for (CodeSystem cs : codesystems) {
-          addConceptProperties(cs, cs.getConcept(), psql);
-        }
-        psql.executeBatch();
-
-        psql = con.prepareStatement("Insert into Designations (Key, ResourceKey, ConceptKey, UseSystem, UseCode, Lang, Value) "+
-            "values (?, ?, ?, ?, ?, ?, ?)");
-        for (CodeSystem cs : codesystems) {
-          addConceptDesignations(cs, cs.getConcept(), psql);
-        }
-        psql.executeBatch();
-
-        psql = con.prepareStatement("Insert into ConceptMappings (Key, ResourceKey, SourceSystem, SourceVersion, SourceCode, Relationship, TargetSystem, TargetVersion, TargetCode) "+
-            "values (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        for (ConceptMap cm : mappings) {
-          for (ConceptMapGroupComponent grp : cm.getGroup()) {
-            for (SourceElementComponent src : grp.getElement()) {
-              for (TargetElementComponent tgt : src.getTarget()) {
-                psql.setInt(1, ++lastMapKey);
-                psql.setInt(2, ((Integer) cm.getUserData(UserDataNames.db_key)).intValue());
-                bindString(psql, 3, grp.getSourceElement().baseUrl());
-                bindString(psql, 4, grp.getSourceElement().version());
-                bindString(psql, 5, src.getCode());
-                bindString(psql, 6, tgt.getRelationshipElement().primitiveValue());
-                bindString(psql, 7, grp.getTargetElement().baseUrl());
-                bindString(psql, 8, grp.getTargetElement().version());
-                bindString(psql, 9, tgt.getCode());
-                psql.addBatch();
-              }
-            }
-          }
-        }
-        psql.executeBatch();
+        addConceptMaps();
 
         con.commit();
       } catch (SQLException e) {
@@ -528,6 +498,116 @@ public class DBBuilder {
       }
     } catch (SQLException e) {
       errors.add(e.getMessage());
+      if (debug) {
+        e.printStackTrace();
+      }
+    }
+    time(start);
+  }
+
+  /**
+   * Populate the Properties, Concepts, ConceptProperties and Designations tables for a single code
+   * system. The code system must already have its db_key user data set (see insertCanonicalResource).
+   * The caller is responsible for transaction management.
+   */
+  private void addCodeSystemContent(CodeSystem cs) throws SQLException {
+    PreparedStatement psql = con.prepareStatement("Insert into Properties (Key, ResourceKey, Code, Uri, Description, Type) "+
+        "values (?, ?, ?, ?, ?, ?)");
+    for (PropertyComponent p : cs.getProperty()) {
+      psql.setInt(1, ++lastPropKey);
+      psql.setInt(2, ((Integer) cs.getUserData(UserDataNames.db_key)).intValue());
+      bindString(psql, 3, p.getCode());
+      bindString(psql, 4, p.getUri());
+      bindString(psql, 5, p.getDescription());
+      bindString(psql, 6, p.getType().toCode());
+      psql.addBatch();
+      p.setUserData(UserDataNames.db_key, lastPropKey);
+    }
+    psql.executeBatch();
+
+    psql = con.prepareStatement("Insert into Concepts (Key, ResourceKey, ParentKey,  Code, Display, Definition) "+
+        "values (?, ?, ?, ?, ?, ?)");
+    addConcepts(cs, cs.getConcept(), psql, 0);
+    psql.executeBatch();
+
+    psql = con.prepareStatement("Insert into ConceptProperties (Key, ResourceKey, ConceptKey, PropertyKey, Code, Value) "+
+        "values (?, ?, ?, ?, ?, ?)");
+    addConceptProperties(cs, cs.getConcept(), psql);
+    psql.executeBatch();
+
+    psql = con.prepareStatement("Insert into Designations (Key, ResourceKey, ConceptKey, UseSystem, UseCode, Lang, Value) "+
+        "values (?, ?, ?, ?, ?, ?, ?)");
+    addConceptDesignations(cs, cs.getConcept(), psql);
+    psql.executeBatch();
+  }
+
+  /** Populate the ConceptMappings table from the concept maps in this IG. Caller manages the transaction. */
+  private void addConceptMaps() throws SQLException {
+    PreparedStatement psql = con.prepareStatement("Insert into ConceptMappings (Key, ResourceKey, SourceSystem, SourceVersion, SourceCode, Relationship, TargetSystem, TargetVersion, TargetCode) "+
+        "values (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    for (ConceptMap cm : mappings) {
+      for (ConceptMapGroupComponent grp : cm.getGroup()) {
+        for (SourceElementComponent src : grp.getElement()) {
+          for (TargetElementComponent tgt : src.getTarget()) {
+            psql.setInt(1, ++lastMapKey);
+            psql.setInt(2, ((Integer) cm.getUserData(UserDataNames.db_key)).intValue());
+            bindString(psql, 3, grp.getSourceElement().baseUrl());
+            bindString(psql, 4, grp.getSourceElement().version());
+            bindString(psql, 5, src.getCode());
+            bindString(psql, 6, tgt.getRelationshipElement().primitiveValue());
+            bindString(psql, 7, grp.getTargetElement().baseUrl());
+            bindString(psql, 8, grp.getTargetElement().version());
+            bindString(psql, 9, tgt.getCode());
+            psql.addBatch();
+          }
+        }
+      }
+    }
+    psql.executeBatch();
+  }
+
+  /**
+   * Ensure the nominated code system is present in the package.db so that SQL queries can reference its
+   * concepts. The code system is resolved from the IG's dependencies (the worker context) and added to
+   * the Resources/Concepts/etc tables on demand. It is deliberately NOT added to the codesystems list,
+   * so it does not appear in the CodeSystemList table alongside the IG's own code systems.
+   */
+  public void ensureCodeSystemInDB(String url) {
+    long start = System.currentTimeMillis();
+    if (con == null || url == null || codeSystemUrlsInDB.contains(url)) {
+      time(start);
+      return;
+    }
+    CodeSystem cs = context.fetchResource(CodeSystem.class, url, IWorkerContext.VersionResolutionRules.defaultRule());
+    if (cs == null) {
+      errors.add("The code system '"+url+"' was named in an SQL codeSystems list, but it could not be found");
+      time(start);
+      return;
+    }
+    String key = csKey(cs.getUrl(), cs.getVersion());
+    if (codeSystemUrlsInDB.contains(key)) {
+      codeSystemUrlsInDB.add(url); // remember the alias the author used
+      time(start);
+      return;
+    }
+    try {
+      byte[] json = new org.hl7.fhir.r5.formats.JsonParser().composeBytes(cs);
+      boolean origAutoCommit = con.getAutoCommit();
+      try {
+        con.setAutoCommit(false);
+        insertCanonicalResource(cs, cs.fhirType(), cs.getIdBase(), json, 0);
+        addCodeSystemContent(cs);
+        con.commit();
+      } catch (SQLException e) {
+        try { con.rollback(); } catch (SQLException ignored) {}
+        throw e;
+      } finally {
+        con.setAutoCommit(origAutoCommit);
+      }
+      codeSystemUrlsInDB.add(key);
+      codeSystemUrlsInDB.add(url);
+    } catch (Exception e) {
+      errors.add("Error adding code system '"+url+"' to the database: "+e.getMessage());
       if (debug) {
         e.printStackTrace();
       }
@@ -909,6 +989,14 @@ public class DBBuilder {
       if (sql.startsWith("{")) {
         JsonObject json = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(sql);
         ctrl.setQuery(json.asString("query"));
+        if (json.has("codeSystems")) {
+          if (!json.get("codeSystems").isJsonArray()) {
+            throw new FHIRException("The 'codeSystems' property must be an array of strings");
+          }
+          for (String csUrl : json.getJsonArray("codeSystems").asStrings()) {
+            ensureCodeSystemInDB(csUrl);
+          }
+        }
         if (json.has("class")) {
           ctrl.setClss(json.asString("class"));
         } else {
