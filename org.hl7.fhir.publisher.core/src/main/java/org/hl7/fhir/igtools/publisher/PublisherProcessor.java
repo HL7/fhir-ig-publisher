@@ -662,7 +662,7 @@ public class PublisherProcessor extends PublisherBase  {
       for (FetchedResource r : f.getResources()) {
         if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
           CanonicalResource cr = (CanonicalResource) r.getResource();
-          if (r.isExample()) {
+          if (!r.isExample()) {
             List<String> oids = loadOids(cr);
             if (oids.isEmpty()) {
               if (Utilities.existsInList(r.getResource().fhirType(), "CodeSystem", "ValueSet")) {
