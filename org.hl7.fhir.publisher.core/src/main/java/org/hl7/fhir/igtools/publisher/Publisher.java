@@ -1222,6 +1222,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       FhirSettings.setExplicitFilePath(CliParams.getNamedParam(args, FHIR_SETTINGS_PARAM));
     }
     ManagedWebAccess.loadFromFHIRSettings();
+    TerminologyClientContext.setCanUseCacheId(true);
 
     if (CliParams.hasNamedParam(args, "-produce-translator-ids")) {
       I18nBase.setUseMessageIdsDirectly(true);
