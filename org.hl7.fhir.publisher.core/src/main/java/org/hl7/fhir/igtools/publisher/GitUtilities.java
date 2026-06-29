@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.MalformedURLException;
+import java.net.URI;
 import java.net.URL;
 
 public class GitUtilities {
@@ -76,7 +77,7 @@ public class GitUtilities {
 	 */
 	protected static String getURLWithNoUserInfo(final String url, final String urlSource) {
 		try {
-			URL newUrl = new URL(url);
+			URL newUrl = URI.create(url).toURL();
             if (newUrl.getUserInfo() != null) {
 				System.out.println("Info @ Removing user info from GIT URL. Source: " + urlSource);
 				return new URL(newUrl.getProtocol(), newUrl.getHost(), newUrl.getPort(), newUrl.getFile()).toString();
