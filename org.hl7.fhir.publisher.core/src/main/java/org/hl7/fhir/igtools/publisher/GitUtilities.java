@@ -7,6 +7,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.MalformedURLException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 
 public class GitUtilities {
@@ -80,13 +81,13 @@ public class GitUtilities {
 			URL newUrl = URI.create(url).toURL();
             if (newUrl.getUserInfo() != null) {
 				System.out.println("Info @ Removing user info from GIT URL. Source: " + urlSource);
-				return new URL(newUrl.getProtocol(), newUrl.getHost(), newUrl.getPort(), newUrl.getFile()).toString();
+				return new URI(newUrl.getProtocol(), null, newUrl.getHost(), newUrl.getPort(), newUrl.getPath(), newUrl.getQuery(), null).toURL().toString();
 			}
 			return url;
-		} catch (MalformedURLException e) {
+		} catch (MalformedURLException | URISyntaxException e ) {
 			System.out.println("Warning @ Git URL is not a valid URl. Source: " + urlSource);
 			return null;
-		}
-	}
+		} 
+    }
 
 }
