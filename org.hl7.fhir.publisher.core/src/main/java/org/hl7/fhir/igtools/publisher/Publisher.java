@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.file.Path;
@@ -1135,7 +1136,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 
 
   private void download(String address, String filename) throws IOException {
-    URL url = new URL(address);
+    URL url = URI.create(address).toURL();
     URLConnection c = url.openConnection();
     InputStream s = c.getInputStream();
     FileOutputStream f = new FileOutputStream(filename);

@@ -1,6 +1,7 @@
 package org.hl7.fhir.igtools.renderers;
 
 import java.io.IOException;
+import java.net.URI;
 import java.net.URL;
 import java.util.List;
 import java.util.Map;
@@ -127,7 +128,7 @@ public class IPViewRenderer {
 
   private String host(String url) {
     try {
-      URL u = new URL(url);
+      URL u = URI.create(url).toURL();
       return u.getHost();
     } catch (Exception e) {
       return url;
