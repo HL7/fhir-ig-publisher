@@ -84,10 +84,10 @@ public class GitUtilities {
 				return new URI(newUrl.getProtocol(), null, newUrl.getHost(), newUrl.getPort(), newUrl.getPath(), newUrl.getQuery(), null).toURL().toString();
 			}
 			return url;
-		} catch (MalformedURLException | URISyntaxException e ) {
+		} catch (MalformedURLException | URISyntaxException | IllegalArgumentException e ) {
 			System.out.println("Warning @ Git URL is not a valid URl. Source: " + urlSource);
 			return null;
-		} 
+		}
     }
 
 }
