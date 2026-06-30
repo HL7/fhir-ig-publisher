@@ -1823,7 +1823,8 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-json-schema", "yet to be done: json schema as html", null, f.getOutputNames(), start, "json-schema", "StructureDefinition", lang);
     }
 
-    StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(this.pf.context, this.pf.packageId(), checkAppendSlash(this.pf.specPath), sd, Utilities.path(this.pf.tempDir), this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, this.pf.fileList, lrc, this.pf.allInvariants, this.pf.sdMapCache, this.pf.specPath, this.pf.versionToAnnotate, this.pf.relatedIGs, this);
+    String structureDefinitionImageFolder = lang == null ? Utilities.path(this.pf.tempDir) : Utilities.path(this.pf.tempDir, lang);
+    StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(this.pf.context, this.pf.packageId(), checkAppendSlash(this.pf.specPath), sd, structureDefinitionImageFolder, this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, this.pf.fileList, lrc, this.pf.allInvariants, this.pf.sdMapCache, this.pf.specPath, this.pf.versionToAnnotate, this.pf.relatedIGs, this);
     sdr.setNoXigLink(this.pf.noXigLink);
 
     if (wantGen(r, "summary")) {
