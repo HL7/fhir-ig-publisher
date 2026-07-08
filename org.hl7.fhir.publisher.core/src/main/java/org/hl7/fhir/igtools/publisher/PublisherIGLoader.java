@@ -93,6 +93,16 @@ import static org.hl7.fhir.igtools.publisher.Publisher.TOOLING_IG_CURRENT_RELEAS
  */
 
 public class PublisherIGLoader extends PublisherBase {
+  /**
+   * Repeating complex extension on {@code ImplementationGuide.dependsOn} that overrides, adds, or
+   * removes a dependency for a specific target FHIR version. Sub-extensions:
+   * {@code fhirVersion} (code, 1..1), {@code packageId} (id, 0..1), {@code version} (string, 0..1),
+   * {@code use} (code, 0..1: {@code override} (default) | {@code remove}). Read by literal URL,
+   * mirroring the pattern already used for {@code ig-link-dependency}. The exact URL is not yet
+   * ratified in the tools IG (Open Question) and is isolated here so a rename is one line.
+   */
+  public static final String EXT_IG_DEP_VERSION = "http://hl7.org/fhir/tools/StructureDefinition/ig-dependency-for-version";
+
   private List<StructureDefinition> additionalResources = new ArrayList<>();
 
   public PublisherIGLoader(PublisherSettings settings) {
@@ -562,6 +572,7 @@ public class PublisherIGLoader extends PublisherBase {
           if (p.getValue().equals("true")) {
             pf.logLoading = true;
           }
+          break;
         case "generate-version":
           pf.generateVersions.add(p.getValue());
           break;
@@ -1049,7 +1060,9 @@ public class PublisherIGLoader extends PublisherBase {
 
     int i = 0;
     for (ImplementationGuide.ImplementationGuideDependsOnComponent dep : pf.sourceIg.getDependsOn()) {
-      loadIg(dep, i, !dep.hasUserData(UserDataNames.pub_no_load_deps), false);
+      if (isDepApplicableForVersion(dep, canonicalTarget(pf.version))) {
+        loadIg(dep, i, !dep.hasUserData(UserDataNames.pub_no_load_deps), false);
+      }
       i++;
     }
     if (!pf.packageId().contains("hl7.fhir.uv.tools") && !dependsOnTooling(pf.sourceIg.getDependsOn())) {
@@ -2285,7 +2298,9 @@ public class PublisherIGLoader extends PublisherBase {
       if (!dep.hasPackageId())
         throw new FHIRException("Unknown package id for "+dep.getUri());
     }
-    pf.npm = new NPMPackageGenerator(pf.packageId(), Utilities.path(pf.outputDir, "package.tgz"), pf.igpkp.getCanonical(), targetUrl(), PackageGenerator.PackageType.IG, pf.publishedIg, pf.getExecTime().getTime(), relatedIgMap(), !settings.isPublishing());
+    ImplementationGuide baseVig = pf.publishedIg.copy();
+    applyPerVersionDeps(baseVig, pf.context.getVersion(), pf.context.getVersion());
+    pf.npm = new NPMPackageGenerator(pf.packageId(), Utilities.path(pf.outputDir, "package.tgz"), pf.igpkp.getCanonical(), targetUrl(), PackageGenerator.PackageType.IG, baseVig, pf.getExecTime().getTime(), relatedIgMap(), !settings.isPublishing());
     for (String v : pf.generateVersions) {
       ImplementationGuide vig = pf.publishedIg.copy();
       checkIgDeps(vig, v);
@@ -2682,13 +2697,98 @@ public class PublisherIGLoader extends PublisherBase {
   }
 
   private void checkIgDeps(ImplementationGuide vig, String ver) {
-    if ("r4b".equals(ver)) {
-      ver = "r4";
+    applyPerVersionDeps(vig, ver, pf.context.getVersion());
+  }
+
+  /**
+   * A stable key used for all FHIR-version <i>matching</i> (generate-version tokens,
+   * {@code EXT_IG_DEP_VERSION.fhirVersion}, resource inclusion targets). Folds every spelling of a
+   * version onto its family: {@code 4.0}/{@code 4.0.1}/{@code r4} -&gt; {@code r4},
+   * {@code 4.3}/{@code 4.3.0}/{@code r4b} -&gt; {@code r4b}, {@code 5.0.0}/{@code r5} -&gt; {@code r5}.
+   * <p>
+   * NB: {@code VersionUtilities.versionFromCode} is deliberately <b>not</b> used as the match key -
+   * it leaves {@code 4.0}/{@code 4.3} unexpanded (does not yield {@code 4.0.1}/{@code 4.3.0}), so it
+   * cannot reliably equate an author's {@code generate-version 4.0} with an extension
+   * {@code fhirVersion 4.0.1}. Family-name folding via {@code getNameForVersion} does.
+   */
+  public static String canonicalTarget(String token) {
+    return VersionUtilities.getNameForVersion(token).toLowerCase();
+  }
+
+  /**
+   * Lowercase short name ({@code r4}/{@code r4b}/{@code r5}) of a version, used only for the legacy
+   * package-id suffix rename - never as a match key.
+   */
+  static String suffixName(String token) {
+    return VersionUtilities.getNameForVersion(token).toLowerCase();
+  }
+
+  /**
+   * Whether a {@code dependsOn} entry applies to the given (canonical, see {@link #canonicalTarget})
+   * FHIR version:
+   * <ul>
+   *   <li>no {@code EXT_IG_DEP_VERSION} occurrences -&gt; applies to every version (legacy behaviour);</li>
+   *   <li>an occurrence matching {@code canonicalVer} -&gt; applies unless that occurrence is {@code use=remove};</li>
+   *   <li>occurrences present but none matches -&gt; version-scoped, so it does <b>not</b> apply.</li>
+   * </ul>
+   * This single predicate is consulted at every {@code dependsOn} consumer (the dependency load loop,
+   * base/variant package generation, the dependency table, and the publication check) so a
+   * version-scoped entry is never loaded, validated, rendered, or packaged for a version it does not
+   * apply to.
+   */
+  public static boolean isDepApplicableForVersion(ImplementationGuide.ImplementationGuideDependsOnComponent dep, String canonicalVer) {
+    List<Extension> occurrences = dep.getExtensionsByUrl(EXT_IG_DEP_VERSION);
+    if (occurrences.isEmpty()) {
+      return true;
     }
-    String ov = VersionUtilities.getNameForVersion(pf.context.getVersion()).toLowerCase();
+    for (Extension ext : occurrences) {
+      String fv = ExtensionUtilities.readStringExtension(ext, "fhirVersion");
+      if (fv != null && canonicalTarget(fv).equals(canonicalVer)) {
+        return !"remove".equals(ExtensionUtilities.readStringExtension(ext, "use"));
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Transform, in place, {@code vig}'s {@code dependsOn} into the effective set for target FHIR
+   * version {@code targetToken} (a generate-version token, or the base version for the R5 "base
+   * view"). Replaces the historical suffix-rename that lived in {@code checkIgDeps}:
+   * <ul>
+   *   <li>entries not applicable for the target (see {@link #isDepApplicableForVersion}) are removed;</li>
+   *   <li>entries with a matching {@code EXT_IG_DEP_VERSION} occurrence get its {@code packageId}/{@code version} overrides;</li>
+   *   <li>entries without the extension get the legacy package-id suffix rename
+   *       ({@code .<sourceSuffix>} -&gt; {@code .<targetSuffix>}, preserving today's {@code r4b}-&gt;{@code r4}
+   *       forcing), except when the target is the source version itself (the base view), where no rename applies.</li>
+   * </ul>
+   */
+  public static void applyPerVersionDeps(ImplementationGuide vig, String targetToken, String sourceVersion) {
+    String canonicalVer = canonicalTarget(targetToken);
+    boolean targetIsSource = canonicalVer.equals(canonicalTarget(sourceVersion));
+    String sourceSuffix = suffixName(sourceVersion);
+    String legacyTarget = "r4b".equals(targetToken) ? "r4" : targetToken;
+    vig.getDependsOn().removeIf(dep -> !isDepApplicableForVersion(dep, canonicalVer));
     for (ImplementationGuide.ImplementationGuideDependsOnComponent dep : vig.getDependsOn()) {
-      if (dep.getPackageId().endsWith("."+ov) ) {
-        dep.setPackageId(dep.getPackageId().replace("."+ov, "."+ver));
+      List<Extension> occurrences = dep.getExtensionsByUrl(EXT_IG_DEP_VERSION);
+      if (occurrences.isEmpty()) {
+        if (!targetIsSource && dep.getPackageId() != null && dep.getPackageId().endsWith("."+sourceSuffix)) {
+          dep.setPackageId(dep.getPackageId().replace("."+sourceSuffix, "."+legacyTarget));
+        }
+        continue;
+      }
+      for (Extension ext : occurrences) {
+        String fv = ExtensionUtilities.readStringExtension(ext, "fhirVersion");
+        if (fv != null && canonicalTarget(fv).equals(canonicalVer)) {
+          String pid = ExtensionUtilities.readStringExtension(ext, "packageId");
+          String version = ExtensionUtilities.readStringExtension(ext, "version");
+          if (pid != null) {
+            dep.setPackageId(pid);
+          }
+          if (version != null) {
+            dep.setVersion(version);
+          }
+          break;
+        }
       }
     }
   }
