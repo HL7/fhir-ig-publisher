@@ -2369,6 +2369,11 @@ public class PublisherIGLoader extends PublisherBase {
     for (String s : pf.r4bExclusions) {
       pf.r4tor4b.markExempt(s, false);
     }
+    if (VersionUtilities.isR5Plus(pf.version) && !pf.generateVersions.isEmpty()) {
+      pf.cvAnalyser = new CrossVersionAnalyser();
+      pf.cvAnalyser.setContext(pf.context);
+      pf.cvAnalyser.setTargets(pf.generateVersions);
+    }
     pf.realmRules = makeRealmBusinessRules();
     pf.previousVersionComparator = makePreviousVersionComparator();
     pf.ipaComparator = makeIpaComparator();

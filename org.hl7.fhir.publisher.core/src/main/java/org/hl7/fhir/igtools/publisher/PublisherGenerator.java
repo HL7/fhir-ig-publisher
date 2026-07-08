@@ -2895,7 +2895,12 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     pf.ipStmt = new IPStatementsRenderer(pf.context, pf.markdownEngine, pf.packageId(), rc).genIpStatements(pf.fileList, lang);
     trackedFragment("1", "ip-statements", pf.ipStmt, pf.otherFilesRun, start, "ip-statements", "Cross", lang);
     start = System.currentTimeMillis();
-    if (VersionUtilities.isR4Ver(pf.version) || VersionUtilities.isR4BVer(pf.version)) {
+    if (pf.cvAnalyser != null) {
+      start = System.currentTimeMillis();
+      fragment("cross-version-analysis", pf.cvAnalyser.generate(pf.npmName, false), pf.otherFilesRun, start, "cross-version-analysis", "Cross", lang);
+      start = System.currentTimeMillis();
+      fragment("cross-version-analysis-inline", pf.cvAnalyser.generate(pf.npmName, true), pf.otherFilesRun, start, "cross-version-analysis-inline", "Cross", lang);
+    } else if (VersionUtilities.isR4Ver(pf.version) || VersionUtilities.isR4BVer(pf.version)) {
       start = System.currentTimeMillis();
       trackedFragment("2", "cross-version-analysis", pf.r4tor4b.generate(pf.npmName, false), pf.otherFilesRun, start, "cross-version-analysis", "Cross", lang);
       start = System.currentTimeMillis();
@@ -5758,6 +5763,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       for (String v : this.pf.generateVersions) {
         String ver = VersionUtilities.versionFromCode(v);
         if (!includedInVersion(r, ver)) {
+          if (this.pf.cvAnalyser != null) {
+            this.pf.cvAnalyser.recordOmission(ver, r.fhirType()+"/"+r.getId());
+          }
           continue; // resource scoped out of this target version via *-inclusion (intentional membership omission)
         }
         Resource res = r.hasOtherVersions() && r.getOtherVersions().containsKey(ver+"-"+r.fhirType()) ? r.getOtherVersions().get(ver+"-"+r.fhirType()).getResource() : r.getResource();
@@ -5767,6 +5775,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
             resVer = convVersion(res.copy(), ver);
           } catch (Exception e) {
             System.out.println("Unable to convert "+res.fhirType()+"/"+res.getId()+" to "+ver+": "+e.getMessage());
+            if (this.pf.cvAnalyser != null) {
+              this.pf.cvAnalyser.recordProblem(ver, res.fhirType()+"/"+r.getId(), e.getMessage());
+            }
             resVer = null;
           }
           if (resVer != null) {

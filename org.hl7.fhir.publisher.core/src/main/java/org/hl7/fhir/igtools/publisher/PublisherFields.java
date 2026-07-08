@@ -229,6 +229,7 @@ public class PublisherFields {
     List<StructureDefinition> modifierExtensions = new ArrayList<StructureDefinition>();
     Object branchName;
     R4ToR4BAnalyser r4tor4b;
+    CrossVersionAnalyser cvAnalyser;
     List<String> r4Exclusions = new ArrayList<>();
     List<String> r4bExclusions = new ArrayList<>();
     Set<String> r4Inclusions = new HashSet<>();

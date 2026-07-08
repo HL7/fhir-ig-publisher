@@ -395,6 +395,9 @@ public class PublisherProcessor extends PublisherBase  {
       log.add(new ProfileVersionAdaptor.ConversionMessage(e.getMessage(), ProfileVersionAdaptor.ConversionMessageStatus.ERROR));
       r.getOtherVersions().put(v+"-StructureDefinition", new FetchedResource.AlternativeVersionResource(log, null));
     }
+    if (pf.cvAnalyser != null) {
+      pf.cvAnalyser.record(v, r.fhirType()+"/"+r.getId(), log);
+    }
   }
 
   private void generateOtherVersion(FetchedResource r, ProfileVersionAdaptor pva, String v, SearchParameter resource) throws FileNotFoundException, IOException {
@@ -407,6 +410,9 @@ public class PublisherProcessor extends PublisherBase  {
       System.out.println("Error converting "+r.getId()+" to "+v+": "+e.getMessage());
       log.add(new ProfileVersionAdaptor.ConversionMessage(e.getMessage(), ProfileVersionAdaptor.ConversionMessageStatus.ERROR));
       r.getOtherVersions().put(v+"-SearchParameter", new FetchedResource.AlternativeVersionResource(log, null));
+    }
+    if (pf.cvAnalyser != null) {
+      pf.cvAnalyser.record(v, r.fhirType()+"/"+r.getId(), log);
     }
   }
 
