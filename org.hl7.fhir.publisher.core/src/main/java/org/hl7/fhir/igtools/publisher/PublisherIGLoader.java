@@ -669,6 +669,15 @@ public class PublisherIGLoader extends PublisherBase {
         case "r4b-exclusion":
           pf.r4bExclusions.add(p.getValue());
           break;
+        case "r4-inclusion":
+          pf.r4Inclusions.add(p.getValue());
+          break;
+        case "r4b-inclusion":
+          pf.r4bInclusions.add(p.getValue());
+          break;
+        case "r5-inclusion":
+          pf.r5Inclusions.add(p.getValue());
+          break;
         case "display-warnings":
           pf.displayWarnings = "true".equals(p.getValue());
           break;

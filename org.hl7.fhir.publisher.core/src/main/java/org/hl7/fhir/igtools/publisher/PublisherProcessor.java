@@ -271,6 +271,9 @@ public class PublisherProcessor extends PublisherBase  {
           f.start("generateOtherVersions");
           try {
             for (FetchedResource r : f.getResources()) {
+              if (!includedInVersion(r, version)) {
+                continue;
+              }
               if (r.getResource() instanceof StructureDefinition) {
                 generateOtherVersion(r, pva, version, (StructureDefinition) r.getResource());
               }

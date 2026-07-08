@@ -1299,6 +1299,72 @@ public class PublisherBase implements ILoggingService {
     }
   }
 
+  /**
+   * Whether resource {@code r} should be written into the package for the given target FHIR version.
+   * Governed by the {@code r4-inclusion}/{@code r4b-inclusion}/{@code r5-inclusion} author params using
+   * tag-membership semantics: a resource listed in <i>any</i> inclusion set appears <b>only</b> in the
+   * listed version(s); a resource in <i>no</i> inclusion set appears in <b>all</b> versions (today's
+   * default, which also gates the R5 base package via {@code r5-inclusion}). Only active for an R5
+   * base; for any other base version this always returns true (no behaviour change).
+   */
+  protected boolean includedInVersion(FetchedResource r, String versionToken) {
+    return isIncludedInVersion(resourceKeys(r), versionToken, pf.version, pf.r5Inclusions, pf.r4Inclusions, pf.r4bInclusions);
+  }
+
+  /** Testable core of {@link #includedInVersion}: resolves membership from a resource's identifier
+   *  keys ({@code Type/id} and/or canonical URL) against the three inclusion sets. */
+  static boolean isIncludedInVersion(Set<String> keys, String versionToken, String baseVersion,
+      Set<String> r5Inclusions, Set<String> r4Inclusions, Set<String> r4bInclusions) {
+    if (!VersionUtilities.isR5Plus(baseVersion)) {
+      return true;
+    }
+    Set<String> listed = new HashSet<>();
+    if (containsAny(r5Inclusions, keys)) {
+      listed.add("r5");
+    }
+    if (containsAny(r4Inclusions, keys)) {
+      listed.add("r4");
+    }
+    if (containsAny(r4bInclusions, keys)) {
+      listed.add("r4b");
+    }
+    if (listed.isEmpty()) {
+      return true;
+    }
+    return listed.contains(PublisherIGLoader.canonicalTarget(versionToken));
+  }
+
+  private static boolean containsAny(Set<String> set, Set<String> keys) {
+    if (set == null || set.isEmpty()) {
+      return false;
+    }
+    for (String k : keys) {
+      if (set.contains(k)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private Set<String> resourceKeys(FetchedResource r) {
+    Set<String> keys = new HashSet<>();
+    if (r.fhirType() != null && r.getId() != null) {
+      keys.add(r.fhirType()+"/"+r.getId());
+    }
+    if (r.getResource() instanceof CanonicalResource) {
+      String url = ((CanonicalResource) r.getResource()).getUrl();
+      if (url != null) {
+        keys.add(url);
+      }
+    } else if (r.getElement() != null) {
+      String url = r.getElement().getChildValue("url");
+      if (url != null) {
+        keys.add(url);
+      }
+    }
+    return keys;
+  }
+
   public class FragmentUseRecord {
 
     public int count;

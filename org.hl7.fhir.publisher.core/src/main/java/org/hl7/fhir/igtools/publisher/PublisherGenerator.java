@@ -5744,17 +5744,22 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     Element eNN = element;
     jp.compose(element, bsj, IParser.OutputStyle.NORMAL, this.pf.igpkp.getCanonical());
     if (!r.isCustomResource()) {
-      this.pf.npm.addFile(isExample(f,r ) ? NPMPackageGenerator.Category.EXAMPLE : NPMPackageGenerator.Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", bsj.toByteArray());
-      if (isNewML()) {
-        for (String l : allLangs()) {
-          Element le = this.pf.langUtils.copyToLanguage(element, l, true, r.getElement().getChildValue("language"), pf.defaultTranslationLang, r.getErrors()); // todo: should we keep this?
-          ByteArrayOutputStream bsjl = new ByteArrayOutputStream();
-          jp.compose(le, bsjl, IParser.OutputStyle.NORMAL, this.pf.igpkp.getCanonical());
-          this.pf.lnpms.get(l).addFile(isExample(f,r ) ? NPMPackageGenerator.Category.EXAMPLE : NPMPackageGenerator.Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", bsjl.toByteArray());
+      if (includedInVersion(r, this.pf.version)) {
+        this.pf.npm.addFile(isExample(f,r ) ? NPMPackageGenerator.Category.EXAMPLE : NPMPackageGenerator.Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", bsj.toByteArray());
+        if (isNewML()) {
+          for (String l : allLangs()) {
+            Element le = this.pf.langUtils.copyToLanguage(element, l, true, r.getElement().getChildValue("language"), pf.defaultTranslationLang, r.getErrors()); // todo: should we keep this?
+            ByteArrayOutputStream bsjl = new ByteArrayOutputStream();
+            jp.compose(le, bsjl, IParser.OutputStyle.NORMAL, this.pf.igpkp.getCanonical());
+            this.pf.lnpms.get(l).addFile(isExample(f,r ) ? NPMPackageGenerator.Category.EXAMPLE : NPMPackageGenerator.Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", bsjl.toByteArray());
+          }
         }
       }
       for (String v : this.pf.generateVersions) {
         String ver = VersionUtilities.versionFromCode(v);
+        if (!includedInVersion(r, ver)) {
+          continue; // resource scoped out of this target version via *-inclusion (intentional membership omission)
+        }
         Resource res = r.hasOtherVersions() && r.getOtherVersions().containsKey(ver+"-"+r.fhirType()) ? r.getOtherVersions().get(ver+"-"+r.fhirType()).getResource() : r.getResource();
         if (res != null) {
           byte[] resVer = null;

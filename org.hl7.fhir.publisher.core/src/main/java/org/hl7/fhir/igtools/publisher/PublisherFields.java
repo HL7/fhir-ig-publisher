@@ -231,6 +231,9 @@ public class PublisherFields {
     R4ToR4BAnalyser r4tor4b;
     List<String> r4Exclusions = new ArrayList<>();
     List<String> r4bExclusions = new ArrayList<>();
+    Set<String> r4Inclusions = new HashSet<>();
+    Set<String> r4bInclusions = new HashSet<>();
+    Set<String> r5Inclusions = new HashSet<>();
     List<DependencyAnalyser.ArtifactDependency> dependencyList;
     Map<String, List<String>> trackedFragments = new HashMap<String, List<String>>();
     PackageInformation packageInfo;
