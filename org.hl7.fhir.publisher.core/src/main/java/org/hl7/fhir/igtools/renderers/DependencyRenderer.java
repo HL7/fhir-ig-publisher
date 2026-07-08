@@ -21,6 +21,7 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.DependencyAnalyser;
 import org.hl7.fhir.igtools.publisher.DependencyAnalyser.ArtifactDependency;
+import org.hl7.fhir.igtools.publisher.PublisherIGLoader;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.igtools.templates.TemplateManager;
 import org.hl7.fhir.r5.context.IWorkerContext;
@@ -206,13 +207,64 @@ public class DependencyRenderer {
     }
   }
 
+  /**
+   * The base-view match key ({@link PublisherIGLoader#canonicalTarget}) for the IG's own FHIR
+   * version, or null if unknown. Used to filter version-scoped {@code dependsOn} entries out of the
+   * (R5) dependency table so it agrees with the (R5) package.json.
+   */
+  static String baseVersionKey(ImplementationGuide ig) {
+    return ig.hasFhirVersion() && ig.getFhirVersion().get(0).getValue() != null
+        ? PublisherIGLoader.canonicalTarget(ig.getFhirVersion().get(0).getValue().toCode()) : null;
+  }
+
+  /**
+   * A human-readable note describing the {@code EXT_IG_DEP_VERSION} per-version overrides/removals on
+   * a {@code dependsOn} entry (e.g. " (R4: pkg#1.2.3; not used in R4B)"), or "" when the entry has no
+   * such extension.
+   */
+  static String perVersionNote(ImplementationGuideDependsOnComponent d) {
+    List<String> parts = new ArrayList<>();
+    for (Extension ext : d.getExtensionsByUrl(PublisherIGLoader.EXT_IG_DEP_VERSION)) {
+      String fv = ExtensionUtilities.readStringExtension(ext, "fhirVersion");
+      if (fv == null) {
+        continue;
+      }
+      String name = VersionUtilities.getNameForVersion(fv);
+      if ("remove".equals(ExtensionUtilities.readStringExtension(ext, "use"))) {
+        parts.add("not used in " + name);
+      } else {
+        String pid = ExtensionUtilities.readStringExtension(ext, "packageId");
+        String ver = ExtensionUtilities.readStringExtension(ext, "version");
+        if (pid != null || ver != null) {
+          parts.add(name + ": " + (pid != null ? pid : d.getPackageId()) + "#" + (ver != null ? ver : d.getVersion()));
+        } else {
+          parts.add("also for " + name);
+        }
+      }
+    }
+    return parts.isEmpty() ? "" : " (" + String.join("; ", parts) + ")";
+  }
+
+  private String reasonWithVersions(ImplementationGuideDependsOnComponent d) {
+    String reason = d.hasReason() ? d.getReason() : ExtensionUtilities.readStringExtension(d, ExtensionDefinitions.EXT_IGDEP_COMMENT);
+    String note = perVersionNote(d);
+    if (note.isEmpty()) {
+      return reason;
+    }
+    return (reason == null ? "" : reason) + note;
+  }
+
   public String renderNonTech(ImplementationGuide ig) throws FHIRException, IOException {
     packagesByName = new HashMap<String, PackageInfo>();
+    String baseVer = baseVersionKey(ig);
     for (ImplementationGuideDependsOnComponent d : ig.getDependsOn()) {
+      if (baseVer != null && !PublisherIGLoader.isDepApplicableForVersion(d, baseVer)) {
+        continue;
+      }
       NpmPackage p = resolve(d);
       boolean dloaded = isLoaded(p);
       if (dloaded) {
-        addPackage(p, d.hasReason() ? d.getReason() : ExtensionUtilities.readStringExtension(d, ExtensionDefinitions.EXT_IGDEP_COMMENT), true);
+        addPackage(p, reasonWithVersions(d), true);
       }
     }
 
@@ -296,9 +348,13 @@ public class DependencyRenderer {
   }
 
   public String render(ImplementationGuide ig, boolean QA, boolean details, boolean first) throws FHIRException, IOException {
+    String baseVer = baseVersionKey(ig);
     boolean hasDesc = false;
     for (ImplementationGuideDependsOnComponent d : ig.getDependsOn()) {
-      hasDesc = hasDesc || d.hasExtension(ExtensionDefinitions.EXT_IGDEP_COMMENT) || d.hasReason();
+      if (baseVer != null && !PublisherIGLoader.isDepApplicableForVersion(d, baseVer)) {
+        continue;
+      }
+      hasDesc = hasDesc || d.hasExtension(ExtensionDefinitions.EXT_IGDEP_COMMENT) || d.hasReason() || d.hasExtension(PublisherIGLoader.EXT_IG_DEP_VERSION);
     }
     
     HierarchicalTableGenerator gen = new HierarchicalTableGenerator(rc, dstFolder, true, true, "dep");
@@ -313,11 +369,14 @@ public class DependencyRenderer {
     
     Row row = addBaseRow(gen, model, ig, QA, hasDesc);
     for (ImplementationGuideDependsOnComponent d : ig.getDependsOn()) {
+      if (baseVer != null && !PublisherIGLoader.isDepApplicableForVersion(d, baseVer)) {
+        continue;
+      }
       try {
         NpmPackage p = resolve(d);
         boolean dloaded = isLoaded(p);
         if (QA || dloaded) {
-          addPackageRow(gen, row.getSubRows(), p, d.getVersion(), realm, QA, b, d.hasReason() ? d.getReason() : ExtensionUtilities.readStringExtension(d, ExtensionDefinitions.EXT_IGDEP_COMMENT), hasDesc, processed, listed, dloaded, false);
+          addPackageRow(gen, row.getSubRows(), p, d.getVersion(), realm, QA, b, reasonWithVersions(d), hasDesc, processed, listed, dloaded, false);
         }
       } catch (Exception e) {
         e.printStackTrace();
