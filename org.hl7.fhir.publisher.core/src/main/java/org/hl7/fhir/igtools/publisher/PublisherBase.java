@@ -1258,34 +1258,44 @@ public class PublisherBase implements ILoggingService {
     if (res.hasWebPath() && (res instanceof DomainResource)) {
       ExtensionUtilities.setUrlExtension((DomainResource) res, ExtensionDefinitions.EXT_WEB_SOURCE_NEW, res.getWebPath());
     }
+    return serializeForVersion(res, v, pf.version, pf.packageId());
+  }
+
+  /**
+   * Convert an R5 resource and serialize it as the wire bytes for the target FHIR version {@code v}.
+   * <p>
+   * Extracted from {@link #convVersion(Resource, String)} so the per-version dispatch - in particular
+   * the R4 ({@code VersionConvertorFactory_40_50}) vs R4B ({@code VersionConvertorFactory_43_50}) split -
+   * can be unit-tested without constructing a {@link PublisherBase}. {@code sourceVersion} and
+   * {@code basePackageId} carry the two pieces of instance state the R5 pre-stamping needs (formerly
+   * {@code pf.version} and {@code pf.packageId()}).
+   */
+  static byte[] serializeForVersion(Resource res, String v, String sourceVersion, String basePackageId) throws FHIRException, IOException {
     String version = v.startsWith("r") ? VersionUtilities.versionFromCode(v) : v;
-//    checkForCoreDependencies(res);
-    convertResourceR5(res, v);
+    if (res instanceof ImplementationGuide) {
+      ImplementationGuide ig = (ImplementationGuide) res;
+      ig.getFhirVersion().clear();
+      ig.getFhirVersion().add(new Enumeration<>(new Enumerations.FHIRVersionEnumFactory(), sourceVersion));
+      ig.setPackageId(basePackageId+"."+v);
+    }
+    if (res instanceof StructureDefinition) {
+      StructureDefinition sd = (StructureDefinition) res;
+      sd.setFhirVersion(Enumerations.FHIRVersion.fromCode(v));
+    }
     if (VersionUtilities.isR2Ver(version)) {
       return new org.hl7.fhir.dstu2.formats.JsonParser().composeBytes(VersionConvertorFactory_10_50.convertResource(res));
     } else if (VersionUtilities.isR2BVer(version)) {
       return new org.hl7.fhir.dstu2016may.formats.JsonParser().composeBytes(VersionConvertorFactory_14_50.convertResource(res));
     } else if (VersionUtilities.isR3Ver(version)) {
       return new org.hl7.fhir.dstu3.formats.JsonParser().composeBytes(VersionConvertorFactory_30_50.convertResource(res, new BaseAdvisor_30_50(false)));
-    } else if (VersionUtilities.isR4Ver(version) || VersionUtilities.isR4BVer(version)) {
+    } else if (VersionUtilities.isR4Ver(version)) {
       return new org.hl7.fhir.r4.formats.JsonParser().composeBytes(VersionConvertorFactory_40_50.convertResource(res));
+    } else if (VersionUtilities.isR4BVer(version)) {
+      return new org.hl7.fhir.r4b.formats.JsonParser().composeBytes(VersionConvertorFactory_43_50.convertResource(res));
     } else if (VersionUtilities.isR5Plus(version)) {
       return new org.hl7.fhir.r5.formats.JsonParser().composeBytes(res);
     } else {
       throw new Error("Unknown version "+version);
-    }
-  }
-
-  private void convertResourceR5(Resource res, String v) {
-    if (res instanceof ImplementationGuide) {
-      ImplementationGuide ig = (ImplementationGuide) res;
-      ig.getFhirVersion().clear();
-      ig.getFhirVersion().add(new Enumeration<>(new Enumerations.FHIRVersionEnumFactory(), pf.version));
-      ig.setPackageId(pf.packageId()+"."+v);
-    }
-    if (res instanceof StructureDefinition) {
-      StructureDefinition sd = (StructureDefinition) res;
-      sd.setFhirVersion(Enumerations.FHIRVersion.fromCode(v));
     }
   }
 
