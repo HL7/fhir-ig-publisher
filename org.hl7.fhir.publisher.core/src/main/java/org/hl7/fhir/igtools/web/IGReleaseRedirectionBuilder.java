@@ -91,31 +91,24 @@ public class IGReleaseRedirectionBuilder {
       "    \r\n"+
       "You should not be seeing this page. If you do, PHP has failed badly.\r\n";
 
-  private static final String HTML_TEMPLATE = "<?php\r\n"+
-      "function Redirect($url)\r\n"+
-      "{\r\n"+
-      "  header('Location: ' . $url, true, 302);\r\n"+
-      "  exit();\r\n"+
-      "}\r\n"+
-      "\r\n"+
-      "$accept = $_SERVER['HTTP_ACCEPT'];\r\n"+
-      "if (strpos($accept, 'application/json+fhir') !== false)\r\n"+
-      "  Redirect('{{literal}}.json2');\r\n"+
-      "elseif (strpos($accept, 'application/fhir+json') !== false)\r\n"+
-      "  Redirect('{{literal}}.json1');\r\n"+
-      "elseif (strpos($accept, 'json') !== false)\r\n"+
-      "  Redirect('{{literal}}.json');\r\n"+
-      "elseif (strpos($accept, 'application/xml+fhir') !== false)\r\n"+
-      "  Redirect('{{literal}}.xml2');\r\n"+
-      "elseif (strpos($accept, 'application/fhir+xml') !== false)\r\n"+
-      "  Redirect('{{literal}}.xml1');\r\n"+
-      "elseif (strpos($accept, 'html') !== false)\r\n"+
-      "  Redirect('{{html}}');\r\n"+
-      "else \r\n"+
-      "  Redirect('{{literal}}.xml');\r\n"+
-      "?>\r\n"+
-      "    \r\n"+
-      "You should not be seeing this page. If you do, PHP has failed badly.\r\n";
+  // Static HTML redirect for cloud / static hosting (e.g. S3, GitHub Pages, Netlify)
+  // that cannot execute server-side scripts. Content negotiation on the Accept header
+  // is not possible without a server runtime, so this redirects browsers to the human
+  // readable page and links the JSON/XML representations for machine clients.
+  private static final String HTML_TEMPLATE = "<!DOCTYPE html>\r\n"+
+      "<html lang=\"en\">\r\n"+
+      "<head>\r\n"+
+      "  <meta charset=\"utf-8\"/>\r\n"+
+      "  <meta http-equiv=\"refresh\" content=\"0; url={{html}}\"/>\r\n"+
+      "  <link rel=\"canonical\" href=\"{{html}}\"/>\r\n"+
+      "  <title>Redirecting&hellip;</title>\r\n"+
+      "  <script type=\"text/javascript\">window.location.replace(\"{{html}}\");</script>\r\n"+
+      "</head>\r\n"+
+      "<body>\r\n"+
+      "  <p>This FHIR resource is published at <a href=\"{{html}}\">{{html}}</a>. Redirecting now&hellip;</p>\r\n"+
+      "  <p>Machine-readable formats: <a href=\"{{literal}}.json\">JSON</a> &middot; <a href=\"{{literal}}.xml\">XML</a></p>\r\n"+
+      "</body>\r\n"+
+      "</html>\r\n";
   
   private static final String WC_START_ROOT = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" + 
       "<configuration>\n" + 
@@ -181,7 +174,7 @@ public class IGReleaseRedirectionBuilder {
     }
   }
   
-  public void buildCloudRedirections() throws IOException {    
+  public void buildCloudRedirections() throws IOException {
     Map<String, String> map = createMap(false);
     if (map != null) {
       for (String s : map.keySet()) {
@@ -189,11 +182,49 @@ public class IGReleaseRedirectionBuilder {
           String path = Utilities.path(folder, s, "index.html");
           String p = s.replace("/", "-");
           String litPath = Utilities.path(folder, p);
-          if (new File(litPath+".xml").exists() && new File(litPath+".json").exists()) 
+          if (new File(litPath+".xml").exists() && new File(litPath+".json").exists())
             createHtmlRedirect(path, map.get(s), Utilities.pathURL(vpath, p));
+        } else if (s.contains("://")) {
+          // The canonical is hosted in a different namespace than the IG (e.g. an AU
+          // external-terminology extension: resource id 'au-x' but canonical '.../ValueSet/x').
+          // The resource renders as <Type>-<id>.html, but canonical resolution targets
+          // <Type>-<tail>.html (tail = the canonical's last segment), so the published canonical
+          // 404s. Emit a flat alias <Type>-<tail>.html that redirects to the real rendered file.
+          createCanonicalUrlAlias(s, map.get(s));
         }
       }
     }
+  }
+
+  /**
+   * Emit a flat redirect alias for a canonical whose last path segment differs from the rendered
+   * resource id. spec.internals already records the canonical -> rendered-file mapping; this
+   * materialises it as <Type>-<tail>.html -> <Type>-<id>.html so dereferencing the published
+   * canonical resolves. No-op when the canonical tail already equals the id (the common case).
+   */
+  private void createCanonicalUrlAlias(String canonicalUrl, String targetUrl) throws IOException {
+    String[] seg = canonicalUrl.split("/");
+    if (seg.length < 2 || targetUrl == null) {
+      return;
+    }
+    String aliasName = seg[seg.length - 2] + "-" + seg[seg.length - 1];        // <Type>-<tail>
+    String targetFile = targetUrl.substring(targetUrl.lastIndexOf('/') + 1);   // <Type>-<id>.html
+    if ((aliasName + ".html").equals(targetFile)) {
+      return; // canonical tail already matches the rendered id - nothing to alias
+    }
+    if (!new File(Utilities.path(folder, targetFile)).exists()) {
+      return; // only alias when the real rendered page is present in this folder
+    }
+    String aliasPath = Utilities.path(folder, aliasName + ".html");
+    if (new File(aliasPath).exists() && !isRedirectStub(aliasPath)) {
+      return; // never overwrite a real rendered page that happens to share the alias name
+    }
+    String litSrc = targetUrl.endsWith(".html") ? targetUrl.substring(0, targetUrl.length() - 5) : targetUrl;
+    createHtmlRedirect(aliasPath, targetUrl, litSrc);
+  }
+
+  private boolean isRedirectStub(String path) throws IOException {
+    return FileUtilities.fileToString(path).contains("window.location.replace");
   }
   
   public void buildNewAspRedirections(boolean isCore, boolean isCoreRoot) throws IOException {
