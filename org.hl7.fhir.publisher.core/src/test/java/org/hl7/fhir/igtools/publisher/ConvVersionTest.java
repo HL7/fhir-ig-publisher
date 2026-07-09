@@ -2,6 +2,7 @@ package org.hl7.fhir.igtools.publisher;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
 import java.util.Arrays;
@@ -33,6 +34,14 @@ class ConvVersionTest {
         false, "Patient");
     sd.setBaseDefinition("http://hl7.org/fhir/StructureDefinition/Patient");
     sd.setDerivation(StructureDefinition.TypeDerivationRule.CONSTRAINT);
+    return sd;
+  }
+
+  /** A profile carrying {@code versionAlgorithm[x]} - a CanonicalResource element introduced in R5
+   *  with no R4/R4B equivalent, so a genuine downgrade must drop it (a mere relabel would keep it). */
+  private StructureDefinition profileWithVersionAlgorithm() {
+    StructureDefinition sd = sampleProfile();
+    sd.setVersionAlgorithm(new org.hl7.fhir.r5.model.StringType("semver"));
     return sd;
   }
 
@@ -68,6 +77,30 @@ class ConvVersionTest {
     // The R4B bytes must not be the R4 bytes relabeled: they are produced by different
     // convertor factories/parsers and at minimum the fhirVersion element differs.
     assertFalse(Arrays.equals(r4Bytes, r4bBytes), "R4B output must differ from R4 output");
+  }
+
+  @Test
+  void structureDefinition_r5OnlyElement_droppedOnDowngrade_notRelabeled() throws Exception {
+    // Genuine downgrade (not R5 relabeled): an R5-only element (versionAlgorithm[x]) must survive R5
+    // serialization but be dropped by the R4/R4B conversion, and the result must still parse as an
+    // R4/R4B StructureDefinition.
+    byte[] r5Bytes = PublisherBase.serializeForVersion(profileWithVersionAlgorithm(), "5.0.0", SOURCE_VERSION, BASE_PACKAGE_ID);
+    byte[] r4Bytes = PublisherBase.serializeForVersion(profileWithVersionAlgorithm(), "4.0.1", SOURCE_VERSION, BASE_PACKAGE_ID);
+    byte[] r4bBytes = PublisherBase.serializeForVersion(profileWithVersionAlgorithm(), "4.3.0", SOURCE_VERSION, BASE_PACKAGE_ID);
+
+    String r5Json = new String(r5Bytes, java.nio.charset.StandardCharsets.UTF_8);
+    String r4Json = new String(r4Bytes, java.nio.charset.StandardCharsets.UTF_8);
+    String r4bJson = new String(r4bBytes, java.nio.charset.StandardCharsets.UTF_8);
+
+    assertTrue(r5Json.contains("versionAlgorithm"), "R5 output carries the R5-only versionAlgorithm element");
+    assertFalse(r4Json.contains("versionAlgorithm"), "R4 downgrade genuinely drops the R5-only element (not a relabel)");
+    assertFalse(r4bJson.contains("versionAlgorithm"), "R4B downgrade genuinely drops the R5-only element (not a relabel)");
+
+    // The downgraded bytes still parse under their target-version parsers as StructureDefinitions.
+    assertEquals("StructureDefinition",
+        new org.hl7.fhir.r4.formats.JsonParser().parse(new ByteArrayInputStream(r4Bytes)).fhirType());
+    assertEquals("StructureDefinition",
+        new org.hl7.fhir.r4b.formats.JsonParser().parse(new ByteArrayInputStream(r4bBytes)).fhirType());
   }
 
   @Test

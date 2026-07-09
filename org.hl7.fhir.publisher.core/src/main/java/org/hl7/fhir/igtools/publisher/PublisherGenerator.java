@@ -455,11 +455,14 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           addFileToNpm(NPMPackageGenerator.Category.OTHER, "publication-request.json", FileUtilities.fileToBytes(pr));
         }
         pf.npm.finish();
+        ensureCorePackageDependency(pf.npm);
         for (NPMPackageGenerator vnpm : pf.vnpms.values()) {
           vnpm.finish();
+          ensureCorePackageDependency(vnpm);
         }
         for (NPMPackageGenerator vnpm : pf.lnpms.values()) {
           vnpm.finish();
+          ensureCorePackageDependency(vnpm);
         }
         if (pf.r4tor4b.canBeR4() && pf.r4tor4b.canBeR4B()) {
           try {
@@ -594,6 +597,16 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       pf.context.unload();
       System.gc();
     }
+  }
+
+  /**
+   * Ensure a finished package declares a FHIR core dependency (patching R5/R6 packages that FHIR core's
+   * {@code packageForVersion} leaves without one - the base package, the {@code .r5} variant, per-language
+   * packages). Delegates to the testable static {@link PublisherBase#patchMissingCoreDependency(JsonObject, String)};
+   * a no-op once a core dep is present, so it defers cleanly to an eventual upstream core fix.
+   */
+  private void ensureCorePackageDependency(NPMPackageGenerator gen) throws IOException {
+    patchMissingCoreDependency(gen.getPackageJ(), gen.filename());
   }
 
   private void genCombinedPackage() throws IOException {

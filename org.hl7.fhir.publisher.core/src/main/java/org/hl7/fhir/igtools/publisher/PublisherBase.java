@@ -26,9 +26,12 @@ import org.hl7.fhir.r5.utils.client.FHIRToolingClient;
 import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.filesystem.CSFile;
 import org.hl7.fhir.utilities.i18n.RegionToLocaleMapper;
+import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.model.JsonPrimitive;
+import org.hl7.fhir.utilities.json.model.JsonProperty;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
+import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.PackageHacker;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 
@@ -1297,6 +1300,96 @@ public class PublisherBase implements ILoggingService {
     } else {
       throw new Error("Unknown version "+version);
     }
+  }
+
+  /**
+   * Whether a finished package's {@code dependencies} object already declares a FHIR core package
+   * (e.g. {@code hl7.fhir.r4.core}, {@code hl7.fhir.r5.core}). Used by {@link #patchMissingCoreDependency}
+   * so the expected core dependency is added only when none is present - keeping the guard idempotent
+   * and free of duplicate-key crashes once upstream core (whose {@code packageForVersion} omits R5/R6)
+   * is fixed to add it itself.
+   *
+   * @param dependencies the finished manifest's {@code dependencies} object, or {@code null}
+   * @return {@code true} iff at least one dependency name matches {@code hl7.fhir.r<N>[b].core}
+   */
+  static boolean hasFhirCoreDependency(JsonObject dependencies) {
+    if (dependencies == null) {
+      return false;
+    }
+    for (JsonProperty p : dependencies.getProperties()) {
+      if (p.getName() != null && p.getName().matches("^hl7\\.fhir\\.r\\d+b?\\.core$")) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * The FHIR core package a manifest carrying the given {@code fhirVersion} is expected to depend on,
+   * as a {@code {packageId, version}} pair - e.g. {@code 5.0.0 -> {hl7.fhir.r5.core, 5.0.0}},
+   * {@code 4.0.1 -> {hl7.fhir.r4.core, 4.0.1}}, {@code 4.3.0 -> {hl7.fhir.r4b.core, 4.3.0}}. The family
+   * is resolved via {@link VersionUtilities#getNameForVersion(String)} and the canonical version via
+   * {@link VersionUtilities#versionFromCode(String)}.
+   *
+   * @param fhirVersion the package's target FHIR version (canonical, e.g. from {@code fhirVersions[0]})
+   * @return the {@code {packageId, version}} pair, or {@code null} if the version family cannot be resolved
+   */
+  static String[] expectedCoreDependency(String fhirVersion) {
+    if (fhirVersion == null) {
+      return null;
+    }
+    try {
+      String name = VersionUtilities.getNameForVersion(fhirVersion);
+      if (name == null || name.isEmpty()) {
+        return null;
+      }
+      return new String[] { "hl7.fhir." + name.toLowerCase() + ".core", VersionUtilities.versionFromCode(fhirVersion) };
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  /**
+   * Post-{@code finish()} safety net: ensure the finished package at {@code packageFilename} declares a
+   * FHIR core dependency. FHIR core's {@code NPMPackageGenerator.packageForVersion} auto-adds the core
+   * dep for R2..R4B but returns {@code null} for R5/R6, so R5/R6 packages (the base package, the
+   * {@code .r5} variant, per-language packages) ship without {@code hl7.fhir.r5.core}. When {@code manifest}
+   * already declares a core dep this is a no-op (so it never duplicates a key and auto-defers once upstream
+   * core is fixed); otherwise it reopens the {@code .tgz}, adds the expected core dep, saves it back, and
+   * mirrors the addition into {@code manifest} so a later in-memory read agrees with disk.
+   *
+   * @param manifest        the finished manifest (a generator's {@code getPackageJ()}), or {@code null}
+   * @param packageFilename the finished {@code .tgz} on disk to patch when a core dep is missing
+   * @return {@code true} iff the package was patched (a core dep was added), {@code false} if left untouched
+   */
+  static boolean patchMissingCoreDependency(JsonObject manifest, String packageFilename) throws IOException {
+    if (manifest == null) {
+      return false;
+    }
+    if (hasFhirCoreDependency(manifest.getJsonObject("dependencies"))) {
+      return false;
+    }
+    JsonArray fhirVersions = manifest.getJsonArray("fhirVersions");
+    if (fhirVersions == null || fhirVersions.size() == 0) {
+      return false;
+    }
+    String[] core = expectedCoreDependency(fhirVersions.get(0).asString());
+    if (core == null) {
+      return false;
+    }
+    // Reopen the finished .tgz (fromPackage reads it fully into memory, so the input can be closed
+    // before we truncate the same path) and add the missing core dep. package.json carries no
+    // resourceType, so .index.json/.index.db need no rebuild.
+    NpmPackage tgz;
+    try (InputStream in = new FileInputStream(packageFilename)) {
+      tgz = NpmPackage.fromPackage(in);
+    }
+    tgz.getNpm().forceObject("dependencies").add(core[0], core[1]);
+    try (OutputStream out = new FileOutputStream(packageFilename)) {
+      tgz.save(out);
+    }
+    manifest.forceObject("dependencies").add(core[0], core[1]);
+    return true;
   }
 
   /**
