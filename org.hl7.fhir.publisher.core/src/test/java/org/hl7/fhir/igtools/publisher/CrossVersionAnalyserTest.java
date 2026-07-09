@@ -52,6 +52,24 @@ class CrossVersionAnalyserTest {
   }
 
   @Test
+  void inlineOutputEscapesSpecialChars() {
+    CrossVersionAnalyser a = analyser();
+    // author-controlled resource key + conversion message + omission key with XML metacharacters
+    a.recordProblem("4.0.1", "StructureDefinition/a<b>", "value <x> & \"y\" not representable");
+    a.recordOmission("4.3.0", "ValueSet/d<e>&f");
+    String inline = a.generate("my.pkg", true);
+    // escaped exactly as the block branch does (Utilities.escapeXml: < > & ")
+    assertTrue(inline.contains("&lt;"), inline);
+    assertTrue(inline.contains("&gt;"), inline);
+    assertTrue(inline.contains("&amp;"), inline);
+    assertTrue(inline.contains("&quot;"), inline);
+    // no raw, unescaped author substrings leak into the fragment
+    assertFalse(inline.contains("a<b>"), inline);
+    assertFalse(inline.contains("<x>"), inline);
+    assertFalse(inline.contains("d<e>"), inline);
+  }
+
+  @Test
   void allCleanRendersOkMessage() {
     CrossVersionAnalyser a = analyser();
     String html = a.generate("my.pkg", false);

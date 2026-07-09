@@ -122,12 +122,12 @@ public class CrossVersionAnalyser {
         List<String> parts = new ArrayList<>();
         if (hasProbs) {
           for (Map.Entry<String, List<String>> e : probs.entrySet()) {
-            parts.add(e.getKey() + " (" + String.join("; ", e.getValue()) + ")");
+            parts.add(Utilities.escapeXml(e.getKey()) + " (" + Utilities.escapeXml(String.join("; ", e.getValue())) + ")");
           }
         }
         if (hasOms) {
           for (String o : oms) {
-            parts.add(o + " not included");
+            parts.add(Utilities.escapeXml(o) + " not included");
           }
         }
         b.append("Conversion to " + nm + ": " + String.join(", ", parts) + ". ");
