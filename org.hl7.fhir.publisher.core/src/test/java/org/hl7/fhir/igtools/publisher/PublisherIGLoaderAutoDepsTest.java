@@ -2,12 +2,14 @@ package org.hl7.fhir.igtools.publisher;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Predicate;
 
 import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
 import org.hl7.fhir.r5.extensions.ExtensionUtilities;
@@ -139,6 +141,91 @@ class PublisherIGLoaderAutoDepsTest {
     assertEquals(1, r4bUtg.size());
     assertEquals("hl7.terminology.r4", r4bUtg.get(0).getPackageId(), "auto entry forced to .r4 for the R4B view");
     assertTrue(isAuto(r4bUtg.get(0), PublisherIGLoader.AUTO_DEP_COMMENT_UTG));
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // Phase 2 - applicability-aware auto-add guard (autoDepGuardView feeding the dependsOn* predicates)
+  // ---------------------------------------------------------------------------------------------
+
+  @Test
+  void guardView_multiVersion_dropsNonApplicableFamily_perFamily() {
+    // A family declared only for another FHIR version must not appear in the base-version guard view,
+    // so the auto-add proceeds - checked for each of the three families.
+    assertScopedAwayFamilyNotSuppressed("hl7.terminology.r4", PublisherIGLoader::dependsOnUTG);
+    assertScopedAwayFamilyNotSuppressed("hl7.fhir.uv.extensions.r4", PublisherIGLoader::dependsOnExtensions);
+    assertScopedAwayFamilyNotSuppressed("hl7.fhir.uv.tools.r4", PublisherIGLoader::dependsOnTooling);
+  }
+
+  private void assertScopedAwayFamilyNotSuppressed(String pkgR4, Predicate<List<ImplementationGuideDependsOnComponent>> family) {
+    ImplementationGuide ig = baseIg();
+    addAuthorScoped(ig, pkgR4, "6.1.0", "4.0.1"); // R4-only
+    List<ImplementationGuideDependsOnComponent> raw = ig.getDependsOn();
+    assertTrue(family.test(raw), pkgR4 + ": raw list sees the family");
+    assertFalse(family.test(PublisherIGLoader.autoDepGuardView(raw, "r5", true)), pkgR4 + ": R5 guard view excludes the R4-only entry");
+  }
+
+  @Test
+  void guardView_singleVersion_preservesLegacySuppression() {
+    ImplementationGuide ig = baseIg();
+    addAuthorScoped(ig, "hl7.terminology.r4", "6.1.0", "4.0.1"); // R4-only
+    List<ImplementationGuideDependsOnComponent> raw = ig.getDependsOn();
+    List<ImplementationGuideDependsOnComponent> view = PublisherIGLoader.autoDepGuardView(raw, "r5", false);
+    assertSame(raw, view, "single-version returns the raw list reference unchanged");
+    assertTrue(PublisherIGLoader.dependsOnUTG(view), "single-version keeps legacy suppression even for a scoped entry");
+  }
+
+  @Test
+  void guardView_applicableEntry_stillSuppresses() {
+    // un-scoped entry applies to every version -> stays in the R5 view -> still suppresses the auto-add
+    ImplementationGuide unscoped = baseIg();
+    ImplementationGuideDependsOnComponent u = unscoped.addDependsOn();
+    u.setPackageId("hl7.terminology.r5");
+    u.setUri(UTG_URI);
+    u.setVersion("6.1.0");
+    assertTrue(PublisherIGLoader.dependsOnUTG(PublisherIGLoader.autoDepGuardView(unscoped.getDependsOn(), "r5", true)));
+
+    // base-version-scoped (5.0.0 occurrence) entry applies to R5 -> stays in the R5 view
+    ImplementationGuide scoped = baseIg();
+    addAuthorScoped(scoped, "hl7.terminology.r5", "6.1.0", "5.0.0");
+    assertTrue(PublisherIGLoader.dependsOnUTG(PublisherIGLoader.autoDepGuardView(scoped.getDependsOn(), "r5", true)));
+  }
+
+  @Test
+  void infoTriggerCondition_firesOnlyWhenScopedAway() {
+    // The INFORMATION message fires iff multiVersion && rawHad<Family> && !dependsOn<Family>(guardDeps),
+    // where rawHad<Family> is captured from the pre-mutation list. This pins that predicate without
+    // standing up the full loader (and guards against a "check after the auto-add mutated the list" bug).
+    boolean multiVersion = true;
+
+    ImplementationGuide scopedAway = baseIg();
+    addAuthorScoped(scopedAway, "hl7.terminology.r4", "6.1.0", "4.0.1"); // R4-only on an R5 base
+    boolean rawHadUTG = PublisherIGLoader.dependsOnUTG(scopedAway.getDependsOn());
+    List<ImplementationGuideDependsOnComponent> guardDeps = PublisherIGLoader.autoDepGuardView(scopedAway.getDependsOn(), "r5", multiVersion);
+    assertTrue(multiVersion && rawHadUTG && !PublisherIGLoader.dependsOnUTG(guardDeps), "INFO fires when the family is declared for other versions only");
+
+    ImplementationGuide applicable = baseIg();
+    addAuthorScoped(applicable, "hl7.terminology.r5", "6.1.0", "5.0.0"); // applicable to R5
+    boolean rawHadUTG2 = PublisherIGLoader.dependsOnUTG(applicable.getDependsOn());
+    List<ImplementationGuideDependsOnComponent> guardDeps2 = PublisherIGLoader.autoDepGuardView(applicable.getDependsOn(), "r5", multiVersion);
+    assertFalse(multiVersion && rawHadUTG2 && !PublisherIGLoader.dependsOnUTG(guardDeps2), "INFO does not fire when an applicable entry supplies the family");
+  }
+
+  @Test
+  void tooling_scopedAway_doesNotSuppressBaseAutoAdd() {
+    // R4-only tooling on an R5 base: the guard view excludes it, so the base still auto-adds R5 tooling.
+    ImplementationGuide ig = baseIg();
+    addAuthorScoped(ig, "hl7.fhir.uv.tools.r4", "0.4.0", "4.0.1");
+    assertTrue(PublisherIGLoader.dependsOnTooling(ig.getDependsOn()), "raw list sees the tooling family");
+    assertFalse(PublisherIGLoader.dependsOnTooling(PublisherIGLoader.autoDepGuardView(ig.getDependsOn(), "r5", true)),
+            "R5 guard view excludes the R4-only tooling entry");
+
+    // The R4 variant carries the author's applicable tooling entry with no duplicate packageId. Auto
+    // tooling is an internal EXT_IGINTERNAL_DEPENDENCY (never a dependsOn entry), so no manifest collision.
+    ImplementationGuide r4 = baseIg();
+    addAuthorScoped(r4, "hl7.fhir.uv.tools.r4", "0.4.0", "4.0.1");
+    PublisherIGLoader.applyPerVersionDeps(r4, "r4", R5);
+    assertNoDuplicatePackageId(r4);
+    assertEquals(1, family(r4, "hl7.fhir.uv.tools").size());
   }
 
   // ---------------------------------------------------------------------------------------------

@@ -1015,7 +1015,17 @@ public class PublisherIGLoader extends PublisherBase {
     pf.fetcher.setContext(pf.context);
     pf.template.loadSummaryRows(pf.igpkp.summaryRows());
 
-    if (VersionUtilities.isR4Plus(pf.version) && !dependsOnExtensions(pf.sourceIg.getDependsOn()) && !pf.packageId().contains("hl7.fhir.uv.extensions")) {
+    boolean multiVersion = !pf.generateVersions.isEmpty();
+    // In a multi-version build, decide "is this family already supplied?" from the entries applicable
+    // to the base FHIR version, not the raw list - a dependency scoped to another version must not
+    // suppress this package's auto-add. Capture raw-list family presence up front (before the
+    // extensions/UTG auto-adds mutate pf.sourceIg.getDependsOn() in place) for the INFORMATION check.
+    List<ImplementationGuide.ImplementationGuideDependsOnComponent> guardDeps = autoDepGuardView(pf.sourceIg.getDependsOn(), canonicalTarget(pf.version), multiVersion);
+    boolean rawHadExt = dependsOnExtensions(pf.sourceIg.getDependsOn());
+    boolean rawHadUTG = dependsOnUTG(pf.sourceIg.getDependsOn());
+    boolean rawHadTooling = dependsOnTooling(pf.sourceIg.getDependsOn());
+
+    if (VersionUtilities.isR4Plus(pf.version) && !dependsOnExtensions(guardDeps) && !pf.packageId().contains("hl7.fhir.uv.extensions")) {
       ImplementationGuide.ImplementationGuideDependsOnComponent dep = new ImplementationGuide.ImplementationGuideDependsOnComponent();
       dep.setUserData(UserDataNames.pub_no_load_deps, "true");
       dep.setId("hl7ext");
@@ -1024,8 +1034,12 @@ public class PublisherIGLoader extends PublisherBase {
       dep.setVersion(pf.pcm.getLatestVersion(dep.getPackageId(), true));
       dep.addExtension(ExtensionDefinitions.EXT_IGDEP_COMMENT, new MarkdownType(AUTO_DEP_COMMENT_EXTENSIONS));
       pf.sourceIg.getDependsOn().add(0, dep);
+      if (multiVersion && rawHadExt) {
+        pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.INFORMATIONAL, "ImplementationGuide.dependsOn",
+                "The HL7 Extension Pack ("+dep.getPackageId()+") was automatically added for the "+pf.version+" package: the declared dependency on the HL7 Extension Pack is scoped to other FHIR versions only", ValidationMessage.IssueSeverity.INFORMATION));
+      }
     }
-    if (!dependsOnUTG(pf.sourceIg.getDependsOn()) && !pf.packageId().contains("hl7.terminology")) {
+    if (!dependsOnUTG(guardDeps) && !pf.packageId().contains("hl7.terminology")) {
       ImplementationGuide.ImplementationGuideDependsOnComponent dep = new ImplementationGuide.ImplementationGuideDependsOnComponent();
       dep.setUserData(UserDataNames.pub_no_load_deps, "true");
       dep.setId("hl7tx");
@@ -1034,8 +1048,12 @@ public class PublisherIGLoader extends PublisherBase {
       dep.setVersion(pf.pcm.getLatestVersion(dep.getPackageId(), true));
       dep.addExtension(ExtensionDefinitions.EXT_IGDEP_COMMENT, new MarkdownType(AUTO_DEP_COMMENT_UTG));
       pf.sourceIg.getDependsOn().add(0, dep);
+      if (multiVersion && rawHadUTG) {
+        pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.INFORMATIONAL, "ImplementationGuide.dependsOn",
+                "HL7 Terminology ("+dep.getPackageId()+") was automatically added for the "+pf.version+" package: the declared dependency on HL7 Terminology is scoped to other FHIR versions only", ValidationMessage.IssueSeverity.INFORMATION));
+      }
     }
-    if (!pf.packageId().contains("hl7.fhir.uv.tools") && !dependsOnTooling(pf.sourceIg.getDependsOn())) {
+    if (!pf.packageId().contains("hl7.fhir.uv.tools") && !dependsOnTooling(guardDeps)) {
       String toolingPackageName = getToolingPackageName();
       String toolingPackageId = toolingPackageName +"#"+TOOLING_IG_CURRENT_RELEASE;
       boolean toolsExists = false;
@@ -1048,6 +1066,10 @@ public class PublisherIGLoader extends PublisherBase {
       }
       if (!toolsExists) {
         pf.sourceIg.getDefinition().addExtension(ExtensionConstants.EXT_IGINTERNAL_DEPENDENCY, new CodeType(toolingPackageId));
+      }
+      if (multiVersion && rawHadTooling) {
+        pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.INFORMATIONAL, "ImplementationGuide.dependsOn",
+                "HL7 FHIR Tooling ("+toolingPackageName+") was automatically added for the "+pf.version+" package: the declared dependency on HL7 FHIR Tooling is scoped to other FHIR versions only", ValidationMessage.IssueSeverity.INFORMATION));
       }
     }
 
@@ -1084,7 +1106,7 @@ public class PublisherIGLoader extends PublisherBase {
       }
       i++;
     }
-    if (!pf.packageId().contains("hl7.fhir.uv.tools") && !dependsOnTooling(pf.sourceIg.getDependsOn())) {
+    if (!pf.packageId().contains("hl7.fhir.uv.tools") && !dependsOnTooling(guardDeps)) {
       loadIg("igtools", getToolingPackageName(), TOOLING_IG_CURRENT_RELEASE, "http://hl7.org/fhir/tools/ImplementationGuide/hl7.fhir.uv.tools", i, false, true);
     }
     for (Extension ig : pf.sourceIg.getDefinition().getExtensionsByUrl(ExtensionConstants.EXT_IGINTERNAL_DEPENDENCY)) {
@@ -1559,7 +1581,7 @@ public class PublisherIGLoader extends PublisherBase {
   }
 
 
-  private boolean dependsOnUTG(List<ImplementationGuide.ImplementationGuideDependsOnComponent> dependsOn) {
+  static boolean dependsOnUTG(List<ImplementationGuide.ImplementationGuideDependsOnComponent> dependsOn) {
     for (ImplementationGuide.ImplementationGuideDependsOnComponent d : dependsOn) {
       if (d.hasPackageId() && d.getPackageId().contains("hl7.terminology")) {
         return true;
@@ -1572,7 +1594,7 @@ public class PublisherIGLoader extends PublisherBase {
   }
 
 
-  private boolean dependsOnTooling(List<ImplementationGuide.ImplementationGuideDependsOnComponent> dependsOn) {
+  static boolean dependsOnTooling(List<ImplementationGuide.ImplementationGuideDependsOnComponent> dependsOn) {
     for (ImplementationGuide.ImplementationGuideDependsOnComponent d : dependsOn) {
       if (d.hasPackageId() && d.getPackageId().contains("hl7.fhir.uv.tools")) {
         return true;
@@ -1585,7 +1607,7 @@ public class PublisherIGLoader extends PublisherBase {
   }
 
 
-  private boolean dependsOnExtensions(List<ImplementationGuide.ImplementationGuideDependsOnComponent> dependsOn) {
+  static boolean dependsOnExtensions(List<ImplementationGuide.ImplementationGuideDependsOnComponent> dependsOn) {
     for (ImplementationGuide.ImplementationGuideDependsOnComponent d : dependsOn) {
       if (d.hasPackageId() && Utilities.existsInList(d.getPackageId(), "hl7.fhir.uv.extensions", "hl7.fhir.uv.extensions.r3", "hl7.fhir.uv.extensions.r4", "hl7.fhir.uv.extensions.r5", "hl7.fhir.uv.extensions.r6")) {
         return true;
@@ -1595,6 +1617,27 @@ public class PublisherIGLoader extends PublisherBase {
       }
     }
     return false;
+  }
+
+  /**
+   * The view of {@code dependsOn} that the auto-add guards consult when deciding whether a family
+   * (Extensions / UTG / Tooling) is already supplied. In a <b>multi-version</b> build only entries
+   * applicable to {@code canonicalVer} (see {@link #isDepApplicableForVersion}) are considered, so a
+   * dependency an author scoped to <i>another</i> FHIR version no longer suppresses the base
+   * package's auto-add. In a single-version build the raw list is returned unchanged (same reference)
+   * so legacy suppression behaviour is preserved byte-for-byte.
+   */
+  static List<ImplementationGuide.ImplementationGuideDependsOnComponent> autoDepGuardView(List<ImplementationGuide.ImplementationGuideDependsOnComponent> dependsOn, String canonicalVer, boolean multiVersion) {
+    if (!multiVersion) {
+      return dependsOn;
+    }
+    List<ImplementationGuide.ImplementationGuideDependsOnComponent> view = new ArrayList<>();
+    for (ImplementationGuide.ImplementationGuideDependsOnComponent dep : dependsOn) {
+      if (isDepApplicableForVersion(dep, canonicalVer)) {
+        view.add(dep);
+      }
+    }
+    return view;
   }
 
 
