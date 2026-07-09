@@ -583,9 +583,18 @@ public class PublisherIGLoader extends PublisherBase {
             pf.logLoading = true;
           }
           break;
-        case "generate-version":
-          pf.generateVersions.add(p.getValue());
+        case "generate-version": {
+          String gv = p.getValue();
+          if (!gv.toLowerCase().startsWith("r")) {
+            pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher,
+                ValidationMessage.IssueType.BUSINESSRULE, "ImplementationGuide.definition.parameter[generate-version]",
+                "generate-version '"+gv+"' is a numeric FHIR version code; use the canonical short form '"+suffixName(gv)+"' instead. "
+                + "Numeric codes are accepted but yield non-canonical package identifiers/metadata and may not match upstream package names.",
+                ValidationMessage.IssueSeverity.WARNING).setMessageId(PublisherMessageIds.GENERATE_VERSION_NUMERIC_TOKEN));
+          }
+          pf.generateVersions.add(gv);
           break;
+        }
         case "conversion-version":
           conversionVersions.add(p.getValue());
           break;
@@ -2366,8 +2375,9 @@ public class PublisherIGLoader extends PublisherBase {
     for (String v : pf.generateVersions) {
       ImplementationGuide vig = pf.publishedIg.copy();
       checkIgDeps(vig, v);
-      pf.vnpms.put(v, new NPMPackageGenerator(pf.packageId()+"."+v, Utilities.path(pf.outputDir, pf.basePackageId()+"."+v+".tgz"),
-              pf.igpkp.getCanonical(), targetUrl(), PackageGenerator.PackageType.IG,  vig, pf.getExecTime().getTime(), relatedIgMap(), !settings.isPublishing(), VersionUtilities.versionFromCode(v)));
+      String vSuffix = suffixName(v);
+      pf.vnpms.put(v, new NPMPackageGenerator(pf.packageId()+"."+vSuffix, Utilities.path(pf.outputDir, pf.basePackageId()+"."+vSuffix+".tgz"),
+              pf.igpkp.getCanonical(), targetUrl(), PackageGenerator.PackageType.IG,  vig, pf.getExecTime().getTime(), relatedIgMap(), !settings.isPublishing(), canonicalVersion(v)));
     }
     if (isNewML()) {
       for (String l : allLangs()) {
@@ -2791,6 +2801,17 @@ public class PublisherIGLoader extends PublisherBase {
   }
 
   /**
+   * The canonical full version ({@code 4.0.1}/{@code 4.3.0}/{@code 5.0.0}) for a
+   * generate-version token, folding numeric short forms ({@code 4.0}/{@code 4.3}) and
+   * symbolic spellings ({@code r4}/{@code r4b}/{@code r5}) onto the family's canonical
+   * version. Used only where a concrete FHIRVersion/package fhirVersion is stamped -
+   * never as a match key.
+   */
+  static String canonicalVersion(String token) {
+    return VersionUtilities.versionFromCode(canonicalTarget(token));
+  }
+
+  /**
    * Whether a {@code dependsOn} entry applies to the given (canonical, see {@link #canonicalTarget})
    * FHIR version:
    * <ul>
@@ -2833,7 +2854,8 @@ public class PublisherIGLoader extends PublisherBase {
     String canonicalVer = canonicalTarget(targetToken);
     boolean targetIsSource = canonicalVer.equals(canonicalTarget(sourceVersion));
     String sourceSuffix = suffixName(sourceVersion);
-    String legacyTarget = "r4b".equals(targetToken) ? "r4" : targetToken;
+    String targetSuffix = suffixName(targetToken);
+    String legacyTarget = "r4b".equals(targetSuffix) ? "r4" : targetSuffix;
     vig.getDependsOn().removeIf(dep -> !isDepApplicableForVersion(dep, canonicalVer));
     for (ImplementationGuide.ImplementationGuideDependsOnComponent dep : vig.getDependsOn()) {
       List<Extension> occurrences = dep.getExtensionsByUrl(EXT_IG_DEP_VERSION);

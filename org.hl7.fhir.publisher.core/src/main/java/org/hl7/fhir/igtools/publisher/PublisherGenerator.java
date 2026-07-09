@@ -483,7 +483,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         }
         JsonArray json = new JsonArray();
         for (String s : pf.generateVersions) {
-          json.add(s);
+          json.add(PublisherIGLoader.suffixName(s));
           //generatePackageVersion(npm.filename(), s);
         }
         FileUtilities.bytesToFile(org.hl7.fhir.utilities.json.parser.JsonParser.composeBytes(json), Utilities.path(pf.outputDir, "sub-package-list.json"));

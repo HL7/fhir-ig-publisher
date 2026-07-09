@@ -1276,11 +1276,11 @@ public class PublisherBase implements ILoggingService {
       ImplementationGuide ig = (ImplementationGuide) res;
       ig.getFhirVersion().clear();
       ig.getFhirVersion().add(new Enumeration<>(new Enumerations.FHIRVersionEnumFactory(), sourceVersion));
-      ig.setPackageId(basePackageId+"."+v);
+      ig.setPackageId(basePackageId+"."+PublisherIGLoader.suffixName(v));
     }
     if (res instanceof StructureDefinition) {
       StructureDefinition sd = (StructureDefinition) res;
-      sd.setFhirVersion(Enumerations.FHIRVersion.fromCode(v));
+      sd.setFhirVersion(Enumerations.FHIRVersion.fromCode(PublisherIGLoader.canonicalVersion(v)));
     }
     if (VersionUtilities.isR2Ver(version)) {
       return new org.hl7.fhir.dstu2.formats.JsonParser().composeBytes(VersionConvertorFactory_10_50.convertResource(res));

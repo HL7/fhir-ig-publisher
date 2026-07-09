@@ -131,4 +131,16 @@ class CheckIgDepsTest {
       assertEquals("9.9.9", over.getVersion(), "token " + token);
     }
   }
+
+  @Test
+  void plainDep_numericTokens_useFamilySuffix() {
+    // Numeric generate-version tokens must yield the same legacy suffix rename as the symbolic
+    // spellings: the plain R5 dep renames to .r4 (R4B family forced to .r4), never to a raw
+    // ".4.0"/".4.3.0"-style suffix that names a package which does not exist upstream (M2).
+    for (String token : new String[] {"4.0", "4.0.1", "4.3", "4.3.0"}) {
+      ImplementationGuide ig = sampleIg();
+      PublisherIGLoader.applyPerVersionDeps(ig, token, R5);
+      assertEquals("test.plain.r4", byUri(ig, "http://example.org/plain").getPackageId(), "token " + token);
+    }
+  }
 }

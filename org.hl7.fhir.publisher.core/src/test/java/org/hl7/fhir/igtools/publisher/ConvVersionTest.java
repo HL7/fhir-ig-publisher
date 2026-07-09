@@ -71,6 +71,23 @@ class ConvVersionTest {
   }
 
   @Test
+  void structureDefinition_numericShortTokens_stampCanonicalFhirVersion() throws Exception {
+    // Short numeric tokens (4.0/4.3) must stamp the canonical full version (4.0.1/4.3.0) on the
+    // serialized StructureDefinition, matching the symbolic/full spellings - not the raw short
+    // form (formerly stamped as non-canonical 4.0/4.3) (M2).
+    byte[] r4Bytes = PublisherBase.serializeForVersion(sampleProfile(), "4.0", SOURCE_VERSION, BASE_PACKAGE_ID);
+    byte[] r4bBytes = PublisherBase.serializeForVersion(sampleProfile(), "4.3", SOURCE_VERSION, BASE_PACKAGE_ID);
+
+    org.hl7.fhir.r4.model.StructureDefinition r4sd = (org.hl7.fhir.r4.model.StructureDefinition)
+        new org.hl7.fhir.r4.formats.JsonParser().parse(new ByteArrayInputStream(r4Bytes));
+    org.hl7.fhir.r4b.model.StructureDefinition r4bsd = (org.hl7.fhir.r4b.model.StructureDefinition)
+        new org.hl7.fhir.r4b.formats.JsonParser().parse(new ByteArrayInputStream(r4bBytes));
+
+    assertEquals("4.0.1", r4sd.getFhirVersion().toCode());
+    assertEquals("4.3.0", r4bsd.getFhirVersion().toCode());
+  }
+
+  @Test
   void codeSystem_serializesParseablyForR4AndR4B() throws Exception {
     byte[] r4Bytes = PublisherBase.serializeForVersion(sampleCodeSystem(), "4.0.1", SOURCE_VERSION, BASE_PACKAGE_ID);
     byte[] r4bBytes = PublisherBase.serializeForVersion(sampleCodeSystem(), "4.3.0", SOURCE_VERSION, BASE_PACKAGE_ID);
