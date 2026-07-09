@@ -84,6 +84,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.function.Predicate;
 
 import static org.hl7.fhir.igtools.publisher.Publisher.IG_NAME;
 import static org.hl7.fhir.igtools.publisher.Publisher.TOOLING_IG_CURRENT_RELEASE;
@@ -102,6 +103,15 @@ public class PublisherIGLoader extends PublisherBase {
    * ratified in the tools IG (Open Question) and is isolated here so a rename is one line.
    */
   public static final String EXT_IG_DEP_VERSION = "http://hl7.org/fhir/tools/StructureDefinition/ig-dependency-for-version";
+
+  /**
+   * {@code EXT_IGDEP_COMMENT} markdown values written on the auto-added HL7 Extension Pack / HL7
+   * Terminology dependencies. Kept as constants so the single source of truth is shared between the
+   * add site (where the comment is written) and the per-version dedup in {@link #applyPerVersionDeps}
+   * (where an auto-added entry is recognised by this comment).
+   */
+  static final String AUTO_DEP_COMMENT_EXTENSIONS = "Automatically added as a dependency - all IGs depend on the HL7 Extension Pack";
+  static final String AUTO_DEP_COMMENT_UTG = "Automatically added as a dependency - all IGs depend on HL7 Terminology";
 
   private List<StructureDefinition> additionalResources = new ArrayList<>();
 
@@ -1012,7 +1022,7 @@ public class PublisherIGLoader extends PublisherBase {
       dep.setPackageId(getExtensionsPackageName());
       dep.setUri("http://hl7.org/fhir/extensions/ImplementationGuide/hl7.fhir.uv.extensions");
       dep.setVersion(pf.pcm.getLatestVersion(dep.getPackageId(), true));
-      dep.addExtension(ExtensionDefinitions.EXT_IGDEP_COMMENT, new MarkdownType("Automatically added as a dependency - all IGs depend on the HL7 Extension Pack"));
+      dep.addExtension(ExtensionDefinitions.EXT_IGDEP_COMMENT, new MarkdownType(AUTO_DEP_COMMENT_EXTENSIONS));
       pf.sourceIg.getDependsOn().add(0, dep);
     }
     if (!dependsOnUTG(pf.sourceIg.getDependsOn()) && !pf.packageId().contains("hl7.terminology")) {
@@ -1022,7 +1032,7 @@ public class PublisherIGLoader extends PublisherBase {
       dep.setPackageId(getUTGPackageName());
       dep.setUri("http://terminology.hl7.org/ImplementationGuide/hl7.terminology");
       dep.setVersion(pf.pcm.getLatestVersion(dep.getPackageId(), true));
-      dep.addExtension(ExtensionDefinitions.EXT_IGDEP_COMMENT, new MarkdownType("Automatically added as a dependency - all IGs depend on HL7 Terminology"));
+      dep.addExtension(ExtensionDefinitions.EXT_IGDEP_COMMENT, new MarkdownType(AUTO_DEP_COMMENT_UTG));
       pf.sourceIg.getDependsOn().add(0, dep);
     }
     if (!pf.packageId().contains("hl7.fhir.uv.tools") && !dependsOnTooling(pf.sourceIg.getDependsOn())) {
@@ -2803,6 +2813,74 @@ public class PublisherIGLoader extends PublisherBase {
           }
           break;
         }
+      }
+    }
+    dedupAutoAddedFamily(vig.getDependsOn(), PublisherIGLoader::isUTGFamily);
+    dedupAutoAddedFamily(vig.getDependsOn(), PublisherIGLoader::isExtensionsFamily);
+  }
+
+  /**
+   * True when {@code dep} is one of the auto-added HL7 Extension Pack / HL7 Terminology dependencies,
+   * recognised by the {@link ExtensionDefinitions#EXT_IGDEP_COMMENT} marker written at the add site
+   * (a copy-safe persisted extension, unlike transient {@code userData}).
+   */
+  private static boolean isAutoAddedDep(ImplementationGuide.ImplementationGuideDependsOnComponent dep) {
+    String comment = ExtensionUtilities.readStringExtension(dep, ExtensionDefinitions.EXT_IGDEP_COMMENT);
+    return AUTO_DEP_COMMENT_EXTENSIONS.equals(comment) || AUTO_DEP_COMMENT_UTG.equals(comment);
+  }
+
+  /** Single-entry counterpart of {@link #dependsOnUTG(List)} (HL7 Terminology / UTG family). */
+  private static boolean isUTGFamily(ImplementationGuide.ImplementationGuideDependsOnComponent dep) {
+    if (dep.hasPackageId() && dep.getPackageId().contains("hl7.terminology")) {
+      return true;
+    }
+    return dep.hasUri() && dep.getUri().contains("terminology.hl7");
+  }
+
+  /** Single-entry counterpart of {@link #dependsOnExtensions(List)} (HL7 Extension Pack family). */
+  private static boolean isExtensionsFamily(ImplementationGuide.ImplementationGuideDependsOnComponent dep) {
+    if (dep.hasPackageId() && Utilities.existsInList(dep.getPackageId(), "hl7.fhir.uv.extensions", "hl7.fhir.uv.extensions.r3", "hl7.fhir.uv.extensions.r4", "hl7.fhir.uv.extensions.r5", "hl7.fhir.uv.extensions.r6")) {
+      return true;
+    }
+    return dep.hasUri() && dep.getUri().contains("hl7.org/fhir/extensions");
+  }
+
+  /**
+   * After the per-version transform, collapse a single auto-added family (UTG or Extensions) to at
+   * most one entry, preferring the author's applicable entry over the un-scoped auto-added one:
+   * <ul>
+   *   <li><b>(A) author-wins</b> - if the family has both an auto-added entry and a non-auto entry,
+   *       drop the auto-added entry(ies);</li>
+   *   <li><b>(B) exact-packageId safety net</b> - if two entries still share a final {@code packageId}
+   *       (e.g. an author copied the auto-comment onto their own entry), keep the last occurrence
+   *       (authored entries are appended after the index-0 auto entry) and drop the earlier one(s).</li>
+   * </ul>
+   * Confined to the two auto-added families so a pure author-vs-author duplicate in an unrelated
+   * family still surfaces as it does today (a hard packaging error, not a silent merge).
+   */
+  private static void dedupAutoAddedFamily(List<ImplementationGuide.ImplementationGuideDependsOnComponent> deps, Predicate<ImplementationGuide.ImplementationGuideDependsOnComponent> inFamily) {
+    boolean hasAuto = false;
+    boolean hasNonAuto = false;
+    for (ImplementationGuide.ImplementationGuideDependsOnComponent dep : deps) {
+      if (inFamily.test(dep)) {
+        if (isAutoAddedDep(dep)) {
+          hasAuto = true;
+        } else {
+          hasNonAuto = true;
+        }
+      }
+    }
+    if (hasAuto && hasNonAuto) {
+      deps.removeIf(dep -> inFamily.test(dep) && isAutoAddedDep(dep));
+    }
+    Set<String> seen = new HashSet<>();
+    for (int i = deps.size() - 1; i >= 0; i--) {
+      ImplementationGuide.ImplementationGuideDependsOnComponent dep = deps.get(i);
+      if (!inFamily.test(dep) || dep.getPackageId() == null) {
+        continue;
+      }
+      if (!seen.add(dep.getPackageId())) {
+        deps.remove(i);
       }
     }
   }
