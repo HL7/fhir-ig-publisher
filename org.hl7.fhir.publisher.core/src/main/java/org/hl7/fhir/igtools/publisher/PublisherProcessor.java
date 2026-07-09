@@ -295,6 +295,9 @@ public class PublisherProcessor extends PublisherBase  {
           f.start("generateOtherVersions");
           try {
             for (FetchedResource r : f.getResources()) {
+              if (!includedInVersion(r, version)) {
+                continue;
+              }
               if (r.getResource() != null) {
                 checkForCoreDependencies(this.pf.vnpms.get(v), tctxt, r.getResource(), targetNpm);
               }
