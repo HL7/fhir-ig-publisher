@@ -2894,12 +2894,15 @@ public class PublisherIGLoader extends PublisherBase {
    * <ul>
    *   <li><b>(A) author-wins</b> - if the family has both an auto-added entry and a non-auto entry,
    *       drop the auto-added entry(ies);</li>
-   *   <li><b>(B) exact-packageId safety net</b> - if two entries still share a final {@code packageId}
-   *       (e.g. an author copied the auto-comment onto their own entry), keep the last occurrence
-   *       (authored entries are appended after the index-0 auto entry) and drop the earlier one(s).</li>
+   *   <li><b>(B) exact-packageId safety net</b> - if two entries in this family still share a final
+   *       {@code packageId} <i>and at least one of them is the auto-added entry</i> (e.g. an author
+   *       copied the auto-comment onto their own entry, so (A) could not tell them apart), keep the
+   *       last occurrence (authored entries are appended after the index-0 auto entry) and drop the
+   *       earlier one(s).</li>
    * </ul>
-   * Confined to the two auto-added families so a pure author-vs-author duplicate in an unrelated
-   * family still surfaces as it does today (a hard packaging error, not a silent merge).
+   * Confined to the two auto-added families, and (B) further confined to duplicates that involve an
+   * auto-added entry, so a pure author-vs-author duplicate {@code packageId} still surfaces as it
+   * does today (a hard packaging error, not a silent merge) rather than being quietly collapsed.
    */
   private static void dedupAutoAddedFamily(List<ImplementationGuide.ImplementationGuideDependsOnComponent> deps, Predicate<ImplementationGuide.ImplementationGuideDependsOnComponent> inFamily) {
     boolean hasAuto = false;
@@ -2916,10 +2919,16 @@ public class PublisherIGLoader extends PublisherBase {
     if (hasAuto && hasNonAuto) {
       deps.removeIf(dep -> inFamily.test(dep) && isAutoAddedDep(dep));
     }
+    Set<String> autoPackageIds = new HashSet<>();
+    for (ImplementationGuide.ImplementationGuideDependsOnComponent dep : deps) {
+      if (inFamily.test(dep) && isAutoAddedDep(dep) && dep.getPackageId() != null) {
+        autoPackageIds.add(dep.getPackageId());
+      }
+    }
     Set<String> seen = new HashSet<>();
     for (int i = deps.size() - 1; i >= 0; i--) {
       ImplementationGuide.ImplementationGuideDependsOnComponent dep = deps.get(i);
-      if (!inFamily.test(dep) || dep.getPackageId() == null) {
+      if (!inFamily.test(dep) || dep.getPackageId() == null || !autoPackageIds.contains(dep.getPackageId())) {
         continue;
       }
       if (!seen.add(dep.getPackageId())) {

@@ -33,9 +33,10 @@ import org.junit.jupiter.api.Test;
  *       suppress the base package's auto-add, while single-version builds keep the legacy behaviour.</li>
  * </ul>
  * Tooling has no variant-package coverage because it is added as an internal build-time dependency
- * ({@code EXT_IGINTERNAL_DEPENDENCY}, see {@code PublisherIGLoader} ~1042/1050/1090) and is never
- * written to a package manifest ({@code NPMPackageGenerator} iterates only {@code ig.getDependsOn()}),
- * so it can never collide there.
+ * ({@code EXT_IGINTERNAL_DEPENDENCY}: added at {@code PublisherIGLoader:1068}, loaded at {@code :1112})
+ * and is never written to a package manifest ({@code NPMPackageGenerator} builds {@code dependencies}
+ * from {@code ig.getDependsOn()} only, e.g. {@code org.hl7.fhir.r5/.../NPMPackageGenerator.java:273}),
+ * so it can never produce the duplicate-{@code packageId} collision the dedup guards against.
  */
 class PublisherIGLoaderAutoDepsTest {
 
@@ -141,6 +142,26 @@ class PublisherIGLoaderAutoDepsTest {
     assertEquals(1, r4bUtg.size());
     assertEquals("hl7.terminology.r4", r4bUtg.get(0).getPackageId(), "auto entry forced to .r4 for the R4B view");
     assertTrue(isAuto(r4bUtg.get(0), PublisherIGLoader.AUTO_DEP_COMMENT_UTG));
+  }
+
+  @Test
+  void dedup_authorVsAuthorDuplicate_stillSurfaces() {
+    // Two author entries resolving to the same packageId, with NO auto entry in the group: a genuine
+    // authoring mistake that must still surface downstream (a duplicate manifest key crash), not be
+    // silently collapsed. Part-B is gated on an auto-added entry being present in the group.
+    ImplementationGuide ig = baseIg();
+    ImplementationGuideDependsOnComponent a = ig.addDependsOn();
+    a.setUri("http://example.org/utg-a");
+    a.setPackageId("hl7.terminology.r5");
+    a.setVersion("6.1.0");
+    ImplementationGuideDependsOnComponent b = ig.addDependsOn();
+    b.setUri("http://example.org/utg-b");
+    b.setPackageId("hl7.terminology.r5");
+    b.setVersion("6.2.0");
+
+    PublisherIGLoader.applyPerVersionDeps(ig, R5, R5);
+
+    assertEquals(2, family(ig, UTG_MARKER).size(), "author-vs-author duplicate is preserved, not swallowed");
   }
 
   // ---------------------------------------------------------------------------------------------
