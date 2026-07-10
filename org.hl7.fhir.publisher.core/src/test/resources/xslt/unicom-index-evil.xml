@@ -1,4 +1,4 @@
-<!DOCTYPE foo [<!ENTITY example SYSTEM "/etc/passwd"> ]>
+<!DOCTYPE foo [<!ENTITY example SYSTEM "file://etc/passwd"> ]>
 
 <div xmlns="http://www.w3.org/1999/xhtml" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://hl7.org/fhir" lang="en">
     <data value="">&example;</data>
