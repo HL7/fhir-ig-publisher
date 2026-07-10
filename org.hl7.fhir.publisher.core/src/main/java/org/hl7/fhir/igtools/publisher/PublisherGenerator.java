@@ -5760,14 +5760,31 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     ByteArrayOutputStream bsj = new ByteArrayOutputStream();
     org.hl7.fhir.r5.elementmodel.JsonParser jp = new org.hl7.fhir.r5.elementmodel.JsonParser(this.pf.context);
     Element element = r.getElement();
-    Element eNN = element;
-    jp.compose(element, bsj, IParser.OutputStyle.NORMAL, this.pf.igpkp.getCanonical());
+    boolean embeddedIg = r.getResource() != null && r.getResource() == this.pf.publishedIg;
+    Element baseElement = element;
+    if (embeddedIg) {
+      // H3: the base package embeds the effective base IG - per-target (R5) dependencies and a
+      // definition.resource list filtered to base (R5) membership. Built on a copy of the fully
+      // generated IG POJO (narrative + generated extensions) with the same helpers as the variant
+      // path, then converted back to an element for the compose / per-language paths below (mirrors
+      // the updateImplementationGuide() convertToElement pattern).
+      ImplementationGuide baseIg = ((ImplementationGuide) r.getResource()).copy();
+      applyEffectiveDependsOn(baseIg, this.pf.getEffectiveBaseIg());
+      filterResourceMembership(baseIg, this.pf.version);
+      try {
+        baseElement = convertToElement(r, baseIg);
+      } catch (Exception e) {
+        throw new FHIRException("Unable to build the embedded base ImplementationGuide: "+e.getMessage(), e);
+      }
+    }
+    Element eNN = baseElement;
+    jp.compose(baseElement, bsj, IParser.OutputStyle.NORMAL, this.pf.igpkp.getCanonical());
     if (!r.isCustomResource()) {
       if (includedInVersion(r, this.pf.version)) {
         this.pf.npm.addFile(isExample(f,r ) ? NPMPackageGenerator.Category.EXAMPLE : NPMPackageGenerator.Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", bsj.toByteArray());
         if (isNewML()) {
           for (String l : allLangs()) {
-            Element le = this.pf.langUtils.copyToLanguage(element, l, true, r.getElement().getChildValue("language"), pf.defaultTranslationLang, r.getErrors()); // todo: should we keep this?
+            Element le = this.pf.langUtils.copyToLanguage(baseElement, l, true, r.getElement().getChildValue("language"), pf.defaultTranslationLang, r.getErrors()); // todo: should we keep this?
             ByteArrayOutputStream bsjl = new ByteArrayOutputStream();
             jp.compose(le, bsjl, IParser.OutputStyle.NORMAL, this.pf.igpkp.getCanonical());
             this.pf.lnpms.get(l).addFile(isExample(f,r ) ? NPMPackageGenerator.Category.EXAMPLE : NPMPackageGenerator.Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", bsjl.toByteArray());
@@ -5782,7 +5799,19 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           }
           continue; // resource scoped out of this target version via *-inclusion (intentional membership omission)
         }
-        Resource res = r.hasOtherVersions() && r.getOtherVersions().containsKey(ver+"-"+r.fhirType()) ? r.getOtherVersions().get(ver+"-"+r.fhirType()).getResource() : r.getResource();
+        Resource res;
+        if (embeddedIg) {
+          // H3: each variant package embeds the effective per-version IG - target-suffixed deps
+          // (from checkIgDeps) and a target-filtered definition.resource - built on the fully
+          // generated IG so narrative/generated extensions survive; convVersion then stamps the
+          // target fhirVersion and packageId suffix.
+          ImplementationGuide vig = ((ImplementationGuide) r.getResource()).copy();
+          applyEffectiveDependsOn(vig, this.pf.effectiveVersionIgs.get(v));
+          filterResourceMembership(vig, v);
+          res = vig;
+        } else {
+          res = r.hasOtherVersions() && r.getOtherVersions().containsKey(ver+"-"+r.fhirType()) ? r.getOtherVersions().get(ver+"-"+r.fhirType()).getResource() : r.getResource();
+        }
         if (res != null) {
           byte[] resVer = null;
           try {
@@ -5823,7 +5852,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
     if (this.pf.module.isNoNarrative()) {
       // we don't use the narrative in these resources in _includes, so we strip it - it slows Jekyll down greatly
-      eNN = (Element) element.copy();
+      eNN = (Element) baseElement.copy();
       eNN.removeChild("text");
       bsj = new ByteArrayOutputStream();
       jp.compose(eNN, bsj, IParser.OutputStyle.PRETTY, this.pf.igpkp.getCanonical());

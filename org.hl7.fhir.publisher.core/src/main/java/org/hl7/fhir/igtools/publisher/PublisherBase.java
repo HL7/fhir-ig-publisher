@@ -40,6 +40,7 @@ import java.io.*;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.function.Function;
 
 /**
  * this class is part of the Publisher Core cluster. See @Publisher for discussion
@@ -1269,16 +1270,21 @@ public class PublisherBase implements ILoggingService {
    * <p>
    * Extracted from {@link #convVersion(Resource, String)} so the per-version dispatch - in particular
    * the R4 ({@code VersionConvertorFactory_40_50}) vs R4B ({@code VersionConvertorFactory_43_50}) split -
-   * can be unit-tested without constructing a {@link PublisherBase}. {@code sourceVersion} and
-   * {@code basePackageId} carry the two pieces of instance state the R5 pre-stamping needs (formerly
-   * {@code pf.version} and {@code pf.packageId()}).
+   * can be unit-tested without constructing a {@link PublisherBase}. {@code basePackageId} carries the
+   * instance state the embedded-IG {@code packageId} suffixing needs (formerly {@code pf.packageId()}).
+   * <p>
+   * An embedded {@link ImplementationGuide} is stamped with the <i>target</i> {@code fhirVersion}
+   * ({@code v}) and a target-suffixed {@code packageId} - matching the StructureDefinition branch -
+   * so each per-version package advertises its own version rather than the base (source) one.
+   * {@code sourceVersion} is retained on the signature for the sole production caller
+   * ({@code convVersion} passes {@code pf.version}) and is no longer consulted here.
    */
   static byte[] serializeForVersion(Resource res, String v, String sourceVersion, String basePackageId) throws FHIRException, IOException {
     String version = v.startsWith("r") ? VersionUtilities.versionFromCode(v) : v;
     if (res instanceof ImplementationGuide) {
       ImplementationGuide ig = (ImplementationGuide) res;
       ig.getFhirVersion().clear();
-      ig.getFhirVersion().add(new Enumeration<>(new Enumerations.FHIRVersionEnumFactory(), sourceVersion));
+      ig.getFhirVersion().add(new Enumeration<>(new Enumerations.FHIRVersionEnumFactory(), PublisherIGLoader.canonicalVersion(v)));
       ig.setPackageId(basePackageId+"."+PublisherIGLoader.suffixName(v));
     }
     if (res instanceof StructureDefinition) {
@@ -1499,6 +1505,75 @@ public class PublisherBase implements ILoggingService {
       }
     }
     return keys;
+  }
+
+  /** Resolve a {@code definition.resource.reference} ({@code Type/id}) to the identity keys of the
+   *  {@link FetchedResource} it points at ({@code Type/id} and/or canonical URL, per
+   *  {@link #resourceKeys}), so a canonical-keyed inclusion set is honoured. Falls back to the bare
+   *  reference when the resource is not (yet) in {@code pf.fileList}. */
+  private Set<String> resourceKeysForReference(String reference) {
+    FetchedResource fr = resolveLocalReference(reference);
+    if (fr != null) {
+      return resourceKeys(fr);
+    }
+    Set<String> keys = new HashSet<>();
+    if (reference != null) {
+      keys.add(reference);
+    }
+    return keys;
+  }
+
+  private FetchedResource resolveLocalReference(String reference) {
+    if (reference == null || pf.fileList == null) {
+      return null;
+    }
+    for (FetchedFile tf : pf.fileList) {
+      for (FetchedResource tr : tf.getResources()) {
+        if (reference.equals(tr.getLocalRef())) {
+          return tr;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Remove {@code definition.resource} entries not included in the target version (H3). Testable core:
+   * {@code keyResolver} maps each {@code definition.resource.reference} to that resource's identity keys
+   * (the same {@code Type/id} + canonical-URL key set {@link #resourceKeys} builds), so a resource
+   * excluded via a canonical-keyed inclusion set is still dropped. No-op unless the base is R5+.
+   */
+  static void filterResourceMembership(ImplementationGuide ig, String versionToken, String baseVersion,
+      Function<String, Set<String>> keyResolver, Set<String> r5Inclusions, Set<String> r4Inclusions, Set<String> r4bInclusions) {
+    if (!VersionUtilities.isR5Plus(baseVersion) || !ig.hasDefinition()) {
+      return;
+    }
+    ig.getDefinition().getResource().removeIf(res -> {
+      String ref = res.hasReference() ? res.getReference().getReference() : null;
+      Set<String> keys = keyResolver.apply(ref);
+      return !isIncludedInVersion(keys, versionToken, baseVersion, r5Inclusions, r4Inclusions, r4bInclusions);
+    });
+  }
+
+  /** Instance wrapper over {@link #filterResourceMembership(ImplementationGuide, String, String, Function, Set, Set, Set)}
+   *  that resolves references through {@code pf.fileList} and reads the inclusion sets from {@code pf}. */
+  protected void filterResourceMembership(ImplementationGuide ig, String versionToken) {
+    filterResourceMembership(ig, versionToken, pf.version, this::resourceKeysForReference,
+        pf.r5Inclusions, pf.r4Inclusions, pf.r4bInclusions);
+  }
+
+  /** Overlay the effective (per-target) {@code dependsOn} onto {@code target}'s POJO, used for both the
+   *  base and variant embedded IGs so they reference the target-suffixed/filtered packages. Mirrors the
+   *  effective {@code dependsOn} exactly (clear + re-add copies), so filtered/reordered entries are
+   *  handled without any positional assumption. */
+  static void applyEffectiveDependsOn(ImplementationGuide target, ImplementationGuide effective) {
+    if (effective == null) {
+      return;
+    }
+    target.getDependsOn().clear();
+    for (ImplementationGuide.ImplementationGuideDependsOnComponent d : effective.getDependsOn()) {
+      target.getDependsOn().add(d.copy());
+    }
   }
 
   public class FragmentUseRecord {

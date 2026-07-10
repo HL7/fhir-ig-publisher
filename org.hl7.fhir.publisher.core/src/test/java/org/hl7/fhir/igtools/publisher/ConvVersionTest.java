@@ -8,7 +8,9 @@ import java.io.ByteArrayInputStream;
 import java.util.Arrays;
 
 import org.hl7.fhir.r5.model.CodeSystem;
+import org.hl7.fhir.r5.model.Enumeration;
 import org.hl7.fhir.r5.model.Enumerations;
+import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.junit.jupiter.api.Test;
 
@@ -43,6 +45,17 @@ class ConvVersionTest {
     StructureDefinition sd = sampleProfile();
     sd.setVersionAlgorithm(new org.hl7.fhir.r5.model.StringType("semver"));
     return sd;
+  }
+
+  private ImplementationGuide sampleIg() {
+    ImplementationGuide ig = new ImplementationGuide();
+    ig.setUrl("http://example.org/fhir/ImplementationGuide/example");
+    ig.setName("Example");
+    ig.setPackageId("example.test");
+    ig.setVersion("0.1.0");
+    ig.setStatus(Enumerations.PublicationStatus.ACTIVE);
+    ig.getFhirVersion().add(new Enumeration<>(new Enumerations.FHIRVersionEnumFactory(), "5.0.0"));
+    return ig;
   }
 
   private CodeSystem sampleCodeSystem() {
@@ -118,6 +131,24 @@ class ConvVersionTest {
 
     assertEquals("4.0.1", r4sd.getFhirVersion().toCode());
     assertEquals("4.3.0", r4bsd.getFhirVersion().toCode());
+  }
+
+  @Test
+  void implementationGuide_stampsTargetFhirVersionNotSource() throws Exception {
+    // H3: the embedded IG must be stamped with the *target* FHIR version, not the base (source) R5,
+    // and its packageId suffixed with the target family - matching the SD branch.
+    byte[] r4Bytes = PublisherBase.serializeForVersion(sampleIg(), "4.0.1", SOURCE_VERSION, BASE_PACKAGE_ID);
+    byte[] r4bBytes = PublisherBase.serializeForVersion(sampleIg(), "4.3.0", SOURCE_VERSION, BASE_PACKAGE_ID);
+
+    org.hl7.fhir.r4.model.ImplementationGuide r4ig = (org.hl7.fhir.r4.model.ImplementationGuide)
+        new org.hl7.fhir.r4.formats.JsonParser().parse(new ByteArrayInputStream(r4Bytes));
+    org.hl7.fhir.r4b.model.ImplementationGuide r4big = (org.hl7.fhir.r4b.model.ImplementationGuide)
+        new org.hl7.fhir.r4b.formats.JsonParser().parse(new ByteArrayInputStream(r4bBytes));
+
+    assertEquals("4.0.1", r4ig.getFhirVersion().get(0).getValue().toCode(), "R4 embedded IG stamped 4.0.1 (target), not 5.0.0 (source)");
+    assertEquals("4.3.0", r4big.getFhirVersion().get(0).getValue().toCode(), "R4B embedded IG stamped 4.3.0 (target)");
+    assertEquals("example.test.r4", r4ig.getPackageId(), "packageId suffixed with target family");
+    assertEquals("example.test.r4b", r4big.getPackageId());
   }
 
   @Test
