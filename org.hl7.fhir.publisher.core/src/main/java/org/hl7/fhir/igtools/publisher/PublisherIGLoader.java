@@ -2376,10 +2376,12 @@ public class PublisherIGLoader extends PublisherBase {
         throw new FHIRException("Unknown package id for "+dep.getUri());
     }
     ImplementationGuide baseVig = pf.publishedIg.copy();
+    preserveAliasUserData(pf.publishedIg, baseVig);
     applyPerVersionDeps(baseVig, pf.context.getVersion(), pf.context.getVersion());
     pf.npm = new NPMPackageGenerator(pf.packageId(), Utilities.path(pf.outputDir, "package.tgz"), pf.igpkp.getCanonical(), targetUrl(), PackageGenerator.PackageType.IG, baseVig, pf.getExecTime().getTime(), relatedIgMap(), !settings.isPublishing());
     for (String v : pf.generateVersions) {
       ImplementationGuide vig = pf.publishedIg.copy();
+      preserveAliasUserData(pf.publishedIg, vig);
       checkIgDeps(vig, v);
       String vSuffix = suffixName(v);
       pf.vnpms.put(v, new NPMPackageGenerator(pf.packageId()+"."+vSuffix, Utilities.path(pf.outputDir, pf.basePackageId()+"."+vSuffix+".tgz"),
@@ -2913,6 +2915,35 @@ public class PublisherIGLoader extends PublisherBase {
     }
     // no occurrences, or none resolvable -> legacy behaviour: applies to every version
     return !anyResolvable;
+  }
+
+  /**
+   * Re-apply the {@link UserDataNames#IG_DEP_ALIASED} marker onto {@code to}'s {@code dependsOn}
+   * entries wherever the corresponding entry in {@code from} carries it.
+   * <p>
+   * The marker is transient {@code userData} set at load time (see the {@code @npm:} alias parsing
+   * in {@link #loadIg}); it tells {@code NPMPackageGenerator} to emit {@code <id>@npm:<packageId>}
+   * in the generated {@code package.json} rather than the bare {@code packageId}. A plain
+   * {@link ImplementationGuide#copy()} performed before rendering (when {@code Base.copyUserData}
+   * is still {@code false}) silently drops it, so every per-version/base copy must restore it or the
+   * emitted package manifests lose their npm aliases.
+   * <p>
+   * Must be called <em>immediately</em> after the copy, before {@link #applyPerVersionDeps} (or
+   * {@code checkIgDeps}) mutates the list — the two lists are only guaranteed to be positionally
+   * aligned at that point.
+   */
+  public static void preserveAliasUserData(ImplementationGuide from, ImplementationGuide to) {
+    if (from == null || to == null) {
+      return;
+    }
+    List<ImplementationGuide.ImplementationGuideDependsOnComponent> fromDeps = from.getDependsOn();
+    List<ImplementationGuide.ImplementationGuideDependsOnComponent> toDeps = to.getDependsOn();
+    int n = Math.min(fromDeps.size(), toDeps.size());
+    for (int i = 0; i < n; i++) {
+      if (fromDeps.get(i).getPackageIdElement().hasUserData(UserDataNames.IG_DEP_ALIASED)) {
+        toDeps.get(i).getPackageIdElement().setUserData(UserDataNames.IG_DEP_ALIASED, true);
+      }
+    }
   }
 
   /**
