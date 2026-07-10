@@ -244,5 +244,3 @@ shell-scripts/go-publish-fhir.txt
 .run/JUnit Validation.run.xml
 
 .run/
-
-scratch/
