@@ -38,20 +38,19 @@ Your concerns:
 - **Consistency** — does this change follow the patterns already
   established in this repo? Naming, error handling, logging, module
   registration and lifecycle, project layout, the documented
-  conventions (e.g., CommonJS `require`/`module.exports`,
-  `Logger.getInstance()` child loggers instead of `console.log`,
-  `escape-html` for user-facing output, `npm test` and `npm run lint`
-  as the canonical test/lint commands).
+  conventions (e.g., the Java / JUnit 5 test layout under
+  `src/test/java`, the existing package structure and code style, and
+  `mvn -pl org.hl7.fhir.publisher.core test` as the canonical test
+  command).
 - **Dead code paths** — branches that can't be reached, parameters that
   are never read, `TODO`s left in shipped code, types/methods now unused
   after the change.
 - **Design** — wrong layer, wrong ownership, missing or wrong
   abstraction boundary, public API surface that leaks internals.
-- **Correctness smells** — off-by-one, null/undefined handling,
-  boundary conditions, race conditions, unhandled promise rejections,
-  floating promises / missing `await`, error-first callback
-  mishandling, resource leaks (unclosed `sqlite3` handles, file
-  descriptors, streams), swallowed errors.
+- **Correctness smells** — off-by-one, null handling,
+  boundary conditions, race conditions, unsynchronized shared mutable
+  state, resource leaks (unclosed streams/readers or other
+  `AutoCloseable` resources, file descriptors), swallowed exceptions.
 
 ### Role 2 — Staff-level QA Lead (test & verifiability review)
 
@@ -180,10 +179,11 @@ mis-scoping before any expensive work happens.
 3. **Pre-flight.**
    - Confirm the working tree state with `git status` so you know
      whether `working-tree` scope would actually contain anything.
-   - Confirm the test/lint commands referenced by the repo (e.g.,
-     `npm test`, `npm run lint`, and per-module scripts such as
-     `npm run test:shl`) are available — you will *not* run them, but
-     you will reference them in the QA review.
+   - Confirm the test commands referenced by the repo (e.g.,
+     `mvn -pl org.hl7.fhir.publisher.core test`, and targeted runs such
+     as `mvn -pl org.hl7.fhir.publisher.core -Dtest=ClassName test`) are
+     available — you will *not* run them, but you will reference them in
+     the QA review.
 4. **Run the two review passes.** Prefer running them in parallel as
    sub-agents (one `general-purpose` or `code-review` agent per role)
    so they can't anchor on each other. Each sub-agent:
@@ -197,8 +197,9 @@ mis-scoping before any expensive work happens.
 5. **Synthesize.** Put on the synthesizer hat. Merge duplicates,
    re-rank by severity, drop noise, write the final report using
    the format below.
-6. **Sanity-check** the final report against the rubber-duck agent if
-   it contains any Blocker or High finding, or any
+6. **Sanity-check** the final report against the rubber-duck agent (or,
+   if the `rubber-duck` agent is unavailable, a `general-purpose` agent)
+   if it contains any Blocker or High finding, or any
    architecture-level recommendation. Adopt critique findings that
    prevent miscommunication; set aside findings that bloat the
    report. Briefly note in your reply what (if anything) changed.
@@ -242,7 +243,7 @@ Each finding is independently actionable.
 
 #### B1. {Short title}
 
-- **Where:** `path/to/file.js:120-138` (or symbol name)
+- **Where:** `path/to/File.java:120-138` (or symbol name)
 - **Source:** Engineering / QA / Both
 - **What:** {1–3 sentences. The problem, in observable terms.}
 - **Why it matters:** {1–2 sentences. Concrete risk if shipped as-is.}
@@ -278,8 +279,8 @@ Each finding is independently actionable.
 ## Verification Steps the Team Should Run
 
 - {Specific commands. E.g.,
-  `npm test -- --testPathPattern=cs/cs-snomed` or
-  `npm test -- -t "expands ValueSet"`}
+  `mvn -pl org.hl7.fhir.publisher.core -Dtest=ConvVersionTest test` or
+  `mvn -pl org.hl7.fhir.publisher.core "-Dtest=ConvVersionTest,EmbeddedIgFidelityTest" test`}
 - {Manual steps if applicable}
 
 ## Out of Scope / Deferred
@@ -349,12 +350,11 @@ against a slot whose `analysis.md` already exists:
   would catch does not deserve a finding number. Mention it once
   in a single Nit line at most, or omit it entirely.
 - **Honor repo conventions and stored memories.** Use them as the
-  baseline for "consistency" findings — CommonJS `require`/
-  `module.exports`, `Logger.getInstance()` child loggers instead of
-  `console.log`, `escape-html` for user-facing output, data paths via
-  the `folders` (folder-setup) singleton, `npm test` and
-  `npm run lint` as the canonical test/lint commands, and any other
-  documented preferences in `.github/copilot-instructions.md`. A
+  baseline for "consistency" findings — the Java / JUnit 5 test layout
+  under `src/test/java`, the existing package structure and code style,
+  `mvn -pl org.hl7.fhir.publisher.core test` as the canonical test
+  command, and any other documented preferences in
+  `.github/copilot-instructions.md`. A
   change that violates a documented convention is at least a Medium
   finding unless explicitly justified.
 - **Severity is the synthesizer's call.** Do not pass through the

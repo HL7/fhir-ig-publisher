@@ -158,7 +158,8 @@ sibling source request (`featurerequest.md` / `bugreport.md`).
       resume from this same loop on the next invocation.
 4. **Final verification.** When the loop exits because all phases are
    `Complete`, run the broader test command from the plan (or the repo
-   default, `npm test`) once more end-to-end.
+   default, `mvn -pl org.hl7.fhir.publisher.core test`) once more
+   end-to-end.
 5. **Final wrap-up.** Fires only when the loop has fully exited (all
    phases `Complete`, a `Blocked` phase, a scope-exceeded decision,
    or a checkpoint boundary). Never fires per-phase. Report:
@@ -229,13 +230,15 @@ When `plan.md` already shows `In-progress` or partial completion:
   source request.
 - **Source request is still read-only** here, just as in `dev-plan`.
 - **No push, no PR.** Local commits only.
-- **Honor repo conventions and stored memories** — CommonJS
-  `require`/`module.exports`, `Logger.getInstance()` child loggers
-  instead of `console.log`, `escape-html` for user-facing output,
-  `npm test` and `npm run lint` as the canonical test/lint commands,
-  and any other documented preferences in
-  `.github/copilot-instructions.md`. If a convention contradicts the
-  plan, prefer the convention and note the deviation in `plan.md`.
+- **Honor repo conventions and stored memories** — this is a Maven/Java
+  repo: `mvn -pl org.hl7.fhir.publisher.core test` (whole core suite) and
+  `mvn -pl org.hl7.fhir.publisher.core -Dtest=ClassName test` (targeted
+  JUnit) are the canonical test commands, JUnit 5 tests live under
+  `src/test/java`, and conventional-commit messages carry the repo's
+  required co-author trailer. Follow these and any other documented
+  preferences in `.github/copilot-instructions.md`. If a convention
+  contradicts the plan, prefer the convention and note the deviation in
+  `plan.md`.
 - **Stop on red.** A failed verification is a stop condition, not
   something to "fix next time". Mark the phase `Blocked`, record why,
   and report back.

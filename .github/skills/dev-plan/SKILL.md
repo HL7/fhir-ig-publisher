@@ -135,8 +135,8 @@ buildable state. Phases run sequentially.
 **Verification:**
 
 - {Specific command(s) to run, e.g.,
-  `npm test -- --testPathPattern=cs/cs-snomed` or
-  `npm test -- -t "expands ValueSet"`}
+  `mvn -pl org.hl7.fhir.publisher.core -Dtest=ConvVersionTest test` or
+  `mvn -pl org.hl7.fhir.publisher.core "-Dtest=ConvVersionTest,EmbeddedIgFidelityTest" test`}
 - {Expected result — what success looks like}
 
 **Status:** Pending
@@ -152,8 +152,8 @@ buildable state. Phases run sequentially.
 - **New tests:** {list of new test names + project, with the behavior
   each one pins down}
 - **Existing tests touched:** {list, with why}
-- **Manual verification (if any):** {steps a human runs, e.g., start
-  the server with `npm run dev` and hit endpoint X}
+- **Manual verification (if any):** {steps a human runs, e.g., build a
+  sample IG with the publisher jar and inspect the generated package}
 
 ## Risks & Mitigations
 
@@ -208,11 +208,12 @@ When `plan.md` already exists:
   rework it.
 - **Name specifics.** Files, classes, functions, test methods,
   commands. No "the relevant module".
-- **Honor repo conventions.** Use the test/lint commands documented in
-  this repo (e.g., `npm test`, `npm run lint`, and per-module scripts
-  such as `npm run test:shl`). Use the language/style preferences
-  recorded in repo guidance (e.g., CommonJS `require`/`module.exports`,
-  `Logger.getInstance()` child loggers instead of `console.log`,
-  `escape-html` for user-facing output).
+- **Honor repo conventions.** Use the Maven build/test commands for this
+  Java repo — the whole core-module suite via
+  `mvn -pl org.hl7.fhir.publisher.core test`, or targeted JUnit classes
+  via `mvn -pl org.hl7.fhir.publisher.core -Dtest=ClassName test`. Follow
+  the repo's Java / JUnit 5 conventions (tests under `src/test/java`, the
+  existing package layout and code style) and any preferences recorded in
+  repo guidance.
 - **Do not commit.** Files under `scratch/` are gitignored on purpose.
   `dev-do` will commit *implementation* code, not the plan itself.
