@@ -2927,11 +2927,11 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
     DependencyRenderer depr = new DependencyRenderer(pf.pcm, pf.tempDir, pf.npmName, pf.templateManager, makeDependencies(), pf.context, pf.markdownEngine, rc, pf.specMaps);
     start = System.currentTimeMillis();
-    trackedFragment("3", "dependency-table", depr.render(pf.publishedIg, false, true, true), pf.otherFilesRun, start, "dependency-table", "Cross", lang);
+    trackedFragment("3", "dependency-table", depr.render(pf.getEffectiveBaseIg(), false, true, true), pf.otherFilesRun, start, "dependency-table", "Cross", lang);
     start = System.currentTimeMillis();
-    trackedFragment("3", "dependency-table-short", depr.render(pf.publishedIg, false, false, false), pf.otherFilesRun, start, "dependency-table-short", "Cross", lang);
+    trackedFragment("3", "dependency-table-short", depr.render(pf.getEffectiveBaseIg(), false, false, false), pf.otherFilesRun, start, "dependency-table-short", "Cross", lang);
     start = System.currentTimeMillis();
-    trackedFragment("3", "dependency-table-nontech", depr.renderNonTech(pf.publishedIg), pf.otherFilesRun, start, "dependency-table-nontech", "Cross", lang);
+    trackedFragment("3", "dependency-table-nontech", depr.renderNonTech(pf.getEffectiveBaseIg()), pf.otherFilesRun, start, "dependency-table-nontech", "Cross", lang);
     start = System.currentTimeMillis();
     trackedFragment("4", "globals-table", depr.renderGlobals(), pf.otherFilesRun, start, "globals-table", "Cross", lang);
     start = System.currentTimeMillis();

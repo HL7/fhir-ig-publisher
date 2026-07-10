@@ -112,6 +112,16 @@ public class PublisherFields {
     List<Resource> loaded = new ArrayList<Resource>();
     ImplementationGuide sourceIg;
     ImplementationGuide publishedIg;
+    /**
+     * The base-target effective view of {@link #publishedIg}: a copy with per-version dependency
+     * overrides applied (see {@code PublisherIGLoader.applyPerVersionDeps}) and npm-alias markers
+     * preserved. Backs the base {@code package.tgz}, the dependency table, and the publication check
+     * so every base-target consumer sees the same overridden deps. Set during IG load; use
+     * {@link #getEffectiveBaseIg()} to read it (null-safe before load completes).
+     */
+    ImplementationGuide effectiveBaseIg;
+    /** Per generate-version effective views (keyed by generate-version token), analogous to {@link #effectiveBaseIg}. */
+    Map<String, ImplementationGuide> effectiveVersionIgs = new HashMap<String, ImplementationGuide>();
     List<ValidationMessage> errors = new ArrayList<ValidationMessage>();
     Set<String> otherFilesStartup = new HashSet<String>();
     Set<String> otherFilesRun = new HashSet<>();
@@ -328,5 +338,14 @@ public class PublisherFields {
     public String basePackageId() {
         var ig = publishedIg == null ? sourceIg : publishedIg;
         return ig.getPackageId();
+    }
+
+    /**
+     * The base-target effective IG for every base-target dependency consumer (base manifest,
+     * dependency table, publication check). Falls back to {@link #publishedIg} when the effective
+     * view has not been built yet (e.g. before IG load completes), so callers never see {@code null}.
+     */
+    public ImplementationGuide getEffectiveBaseIg() {
+        return effectiveBaseIg != null ? effectiveBaseIg : publishedIg;
     }
 }

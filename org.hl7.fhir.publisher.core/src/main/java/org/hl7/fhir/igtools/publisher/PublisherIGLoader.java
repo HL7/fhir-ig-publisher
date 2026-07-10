@@ -1117,7 +1117,12 @@ public class PublisherIGLoader extends PublisherBase {
     validateDependencyVersionTokens(pf.sourceIg, pf.errors);
     for (ImplementationGuide.ImplementationGuideDependsOnComponent dep : pf.sourceIg.getDependsOn()) {
       if (isDepApplicableForVersion(dep, canonicalTarget(pf.version))) {
-        loadIg(dep, i, !dep.hasUserData(UserDataNames.pub_no_load_deps), false);
+        // Load the base-target *effective* dependency (author EXT_IG_DEP_VERSION packageId/version
+        // overrides applied) on a copy, so the build resolves the same package the base manifest,
+        // dependency table, and publication check declare - without mutating the shared source IG.
+        ImplementationGuide.ImplementationGuideDependsOnComponent effective = dep.copy();
+        applyEffectiveOverride(effective, pf.version, pf.version);
+        loadIg(effective, i, !dep.hasUserData(UserDataNames.pub_no_load_deps), false);
       }
       i++;
     }
@@ -2377,12 +2382,14 @@ public class PublisherIGLoader extends PublisherBase {
     }
     ImplementationGuide baseVig = pf.publishedIg.copy();
     preserveAliasUserData(pf.publishedIg, baseVig);
-    applyPerVersionDeps(baseVig, pf.context.getVersion(), pf.context.getVersion());
+    applyPerVersionDeps(baseVig, pf.version, pf.version);
+    pf.effectiveBaseIg = baseVig;
     pf.npm = new NPMPackageGenerator(pf.packageId(), Utilities.path(pf.outputDir, "package.tgz"), pf.igpkp.getCanonical(), targetUrl(), PackageGenerator.PackageType.IG, baseVig, pf.getExecTime().getTime(), relatedIgMap(), !settings.isPublishing());
     for (String v : pf.generateVersions) {
       ImplementationGuide vig = pf.publishedIg.copy();
       preserveAliasUserData(pf.publishedIg, vig);
       checkIgDeps(vig, v);
+      pf.effectiveVersionIgs.put(v, vig);
       String vSuffix = suffixName(v);
       pf.vnpms.put(v, new NPMPackageGenerator(pf.packageId()+"."+vSuffix, Utilities.path(pf.outputDir, pf.basePackageId()+"."+vSuffix+".tgz"),
               pf.igpkp.getCanonical(), targetUrl(), PackageGenerator.PackageType.IG,  vig, pf.getExecTime().getTime(), relatedIgMap(), !settings.isPublishing(), canonicalVersion(v)));
@@ -2958,36 +2965,57 @@ public class PublisherIGLoader extends PublisherBase {
    *       forcing), except when the target is the source version itself (the base view), where no rename applies.</li>
    * </ul>
    */
-  public static void applyPerVersionDeps(ImplementationGuide vig, String targetToken, String sourceVersion) {
+  /**
+   * Apply, in place, the effective per-target transform to a single {@code dependsOn} entry for
+   * target {@code targetToken} (with base FHIR version {@code sourceVersion}). This is the exact
+   * per-entry logic {@link #applyPerVersionDeps} runs, factored out so the dependency <i>loader</i>
+   * (which must load the overridden package) and the manifest/table/check <i>writers</i> cannot
+   * diverge:
+   * <ul>
+   *   <li>an entry with a matching {@code EXT_IG_DEP_VERSION} occurrence takes that occurrence's
+   *       {@code packageId}/{@code version} overrides;</li>
+   *   <li>an entry without the extension gets the legacy {@code .<sourceSuffix>} -&gt;
+   *       {@code .<targetSuffix>} package-id rename (preserving the {@code r4b}-&gt;{@code r4}
+   *       forcing), except when the target is the source version itself (the base view).</li>
+   * </ul>
+   * Applicability ({@link #isDepApplicableForVersion}) and auto-added-family de-duplication are the
+   * caller's responsibility ({@link #applyPerVersionDeps} does both around this call).
+   */
+  public static void applyEffectiveOverride(ImplementationGuide.ImplementationGuideDependsOnComponent dep, String targetToken, String sourceVersion) {
     String canonicalVer = canonicalTarget(targetToken);
     boolean targetIsSource = canonicalVer.equals(canonicalTarget(sourceVersion));
     String sourceSuffix = suffixName(sourceVersion);
     String targetSuffix = suffixName(targetToken);
     String legacyTarget = "r4b".equals(targetSuffix) ? "r4" : targetSuffix;
+    List<Extension> occurrences = dep.getExtensionsByUrl(EXT_IG_DEP_VERSION);
+    if (occurrences.isEmpty()) {
+      if (!targetIsSource && dep.getPackageId() != null && dep.getPackageId().endsWith("."+sourceSuffix)) {
+        dep.setPackageId(dep.getPackageId().replace("."+sourceSuffix, "."+legacyTarget));
+      }
+      return;
+    }
+    for (Extension ext : occurrences) {
+      String fv = ExtensionUtilities.readStringExtension(ext, "fhirVersion");
+      String depVer = fv == null ? null : canonicalTargetOrNull(fv);
+      if (depVer != null && depVer.equals(canonicalVer)) {
+        String pid = ExtensionUtilities.readStringExtension(ext, "packageId");
+        String version = ExtensionUtilities.readStringExtension(ext, "version");
+        if (pid != null) {
+          dep.setPackageId(pid);
+        }
+        if (version != null) {
+          dep.setVersion(version);
+        }
+        return;
+      }
+    }
+  }
+
+  public static void applyPerVersionDeps(ImplementationGuide vig, String targetToken, String sourceVersion) {
+    String canonicalVer = canonicalTarget(targetToken);
     vig.getDependsOn().removeIf(dep -> !isDepApplicableForVersion(dep, canonicalVer));
     for (ImplementationGuide.ImplementationGuideDependsOnComponent dep : vig.getDependsOn()) {
-      List<Extension> occurrences = dep.getExtensionsByUrl(EXT_IG_DEP_VERSION);
-      if (occurrences.isEmpty()) {
-        if (!targetIsSource && dep.getPackageId() != null && dep.getPackageId().endsWith("."+sourceSuffix)) {
-          dep.setPackageId(dep.getPackageId().replace("."+sourceSuffix, "."+legacyTarget));
-        }
-        continue;
-      }
-      for (Extension ext : occurrences) {
-        String fv = ExtensionUtilities.readStringExtension(ext, "fhirVersion");
-        String depVer = fv == null ? null : canonicalTargetOrNull(fv);
-        if (depVer != null && depVer.equals(canonicalVer)) {
-          String pid = ExtensionUtilities.readStringExtension(ext, "packageId");
-          String version = ExtensionUtilities.readStringExtension(ext, "version");
-          if (pid != null) {
-            dep.setPackageId(pid);
-          }
-          if (version != null) {
-            dep.setVersion(version);
-          }
-          break;
-        }
-      }
+      applyEffectiveOverride(dep, targetToken, sourceVersion);
     }
     dedupAutoAddedFamily(vig.getDependsOn(), PublisherIGLoader::isUTGFamily);
     dedupAutoAddedFamily(vig.getDependsOn(), PublisherIGLoader::isExtensionsFamily);

@@ -79,4 +79,26 @@ class DependencyRendererPerVersionTest {
     // as an R5 dependency (agreeing with the R5 package.json produced in Phase 2).
     assertFalse(PublisherIGLoader.isDepApplicableForVersion(add, baseVer));
   }
+
+  @Test
+  void baseView_listsOverriddenDepWithEffectivePackageId() {
+    // 0709-09 H2: the base dependency table is rendered from the *effective* base IG (pf.effectiveBaseIg),
+    // so a base-version override must (a) still pass the renderer's base-view applicability filter and
+    // (b) carry the overridden packageId that render() resolves and shows - not the raw one.
+    ImplementationGuide ig = new ImplementationGuide();
+    ig.getFhirVersion().add(new Enumeration<>(new Enumerations.FHIRVersionEnumFactory(), "5.0.0"));
+    ImplementationGuideDependsOnComponent dep = dep("http://example.org/base", "test.base.r5", "1.0.0");
+    addOccurrence(dep, "5.0.0", "test.base.override", "2.0.0", null);
+    ig.getDependsOn().add(dep);
+
+    // build the effective base view exactly as PublisherIGLoader does for pf.effectiveBaseIg
+    PublisherIGLoader.applyPerVersionDeps(ig, "5.0.0", "5.0.0");
+
+    String baseVer = DependencyRenderer.baseVersionKey(ig);
+    assertEquals("r5", baseVer);
+    ImplementationGuideDependsOnComponent effective = ig.getDependsOn().get(0);
+    assertTrue(PublisherIGLoader.isDepApplicableForVersion(effective, baseVer), "the overridden dep is still listed by the base table");
+    assertEquals("test.base.override", effective.getPackageId(), "render() resolves the overridden packageId");
+    assertEquals("2.0.0", effective.getVersion(), "render() resolves the overridden version");
+  }
 }
