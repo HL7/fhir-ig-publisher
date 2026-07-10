@@ -585,14 +585,19 @@ public class PublisherIGLoader extends PublisherBase {
           break;
         case "generate-version": {
           String gv = p.getValue();
-          if (!gv.toLowerCase().startsWith("r")) {
-            pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher,
-                ValidationMessage.IssueType.BUSINESSRULE, "ImplementationGuide.definition.parameter[generate-version]",
-                "generate-version '"+gv+"' is a numeric FHIR version code; use the canonical short form '"+suffixName(gv)+"' instead. "
-                + "Numeric codes are accepted but yield non-canonical package identifiers/metadata and may not match upstream package names.",
-                ValidationMessage.IssueSeverity.WARNING).setMessageId(PublisherMessageIds.GENERATE_VERSION_NUMERIC_TOKEN));
+          ValidationMessage tokenIssue = versionTokenIssue(gv, "ImplementationGuide.definition.parameter[generate-version]", true);
+          if (tokenIssue != null) {
+            pf.errors.add(tokenIssue);
+          } else {
+            if (!gv.toLowerCase().startsWith("r")) {
+              pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher,
+                  ValidationMessage.IssueType.BUSINESSRULE, "ImplementationGuide.definition.parameter[generate-version]",
+                  "generate-version '"+gv+"' is a numeric FHIR version code; use the canonical short form '"+canonicalTargetOrNull(gv)+"' instead. "
+                  + "Numeric codes are accepted but yield non-canonical package identifiers/metadata and may not match upstream package names.",
+                  ValidationMessage.IssueSeverity.WARNING).setMessageId(PublisherMessageIds.GENERATE_VERSION_NUMERIC_TOKEN));
+            }
+            pf.generateVersions.add(gv);
           }
-          pf.generateVersions.add(gv);
           break;
         }
         case "conversion-version":
@@ -1109,6 +1114,7 @@ public class PublisherIGLoader extends PublisherBase {
     }
 
     int i = 0;
+    validateDependencyVersionTokens(pf.sourceIg, pf.errors);
     for (ImplementationGuide.ImplementationGuideDependsOnComponent dep : pf.sourceIg.getDependsOn()) {
       if (isDepApplicableForVersion(dep, canonicalTarget(pf.version))) {
         loadIg(dep, i, !dep.hasUserData(UserDataNames.pub_no_load_deps), false);
@@ -2793,6 +2799,73 @@ public class PublisherIGLoader extends PublisherBase {
   }
 
   /**
+   * Null-safe counterpart of {@link #canonicalTarget} for <b>author-supplied</b> version tokens
+   * (the {@code generate-version} parameter and {@code EXT_IG_DEP_VERSION.fhirVersion}). Returns the
+   * lowercased family ({@code r2}..{@code r6}) for a recognised version, or {@code null} when the
+   * token is non-semver (so {@code getNameForVersion} throws) <b>or</b> resolves to the unknown
+   * family {@code "R?"} (e.g. {@code 4.2.0}). Never throws. {@link #canonicalTarget} itself is left
+   * unchanged so build-internal (already-validated) callers keep their current behaviour.
+   */
+  public static String canonicalTargetOrNull(String token) {
+    try {
+      String name = VersionUtilities.getNameForVersion(token);
+      if (name == null || "R?".equals(name)) {
+        return null;
+      }
+      return name.toLowerCase();
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  /**
+   * Validates an author-supplied FHIR version token, returning a {@link ValidationMessage} to report
+   * (or {@code null} when the token is a recognised version). A {@code generate-version} token that
+   * cannot be resolved is an {@link ValidationMessage.IssueSeverity#ERROR}
+   * ({@link PublisherMessageIds#GENERATE_VERSION_UNKNOWN}) - that target is skipped; an unresolved
+   * {@code EXT_IG_DEP_VERSION.fhirVersion} is a {@link ValidationMessage.IssueSeverity#WARNING}
+   * ({@link PublisherMessageIds#DEPENDENCY_VERSION_UNKNOWN}) - the version-specific override is
+   * ignored and the dependency keeps its default (legacy) behaviour.
+   */
+  static ValidationMessage versionTokenIssue(String token, String path, boolean isGenerateVersion) {
+    if (canonicalTargetOrNull(token) != null) {
+      return null;
+    }
+    if (isGenerateVersion) {
+      return new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE, path,
+          "generate-version '"+token+"' is not a recognised FHIR version; expected one of r2/r3/r4/r4b/r5/r6 "
+          + "(or an equivalent numeric code such as 4.0.1). No package is generated for this token.",
+          ValidationMessage.IssueSeverity.ERROR).setMessageId(PublisherMessageIds.GENERATE_VERSION_UNKNOWN);
+    } else {
+      return new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE, path,
+          "dependency fhirVersion '"+token+"' is not a recognised FHIR version; expected one of r2/r3/r4/r4b/r5/r6 "
+          + "(or an equivalent numeric code such as 4.0.1). The version-specific override is ignored and the dependency keeps its default behaviour.",
+          ValidationMessage.IssueSeverity.WARNING).setMessageId(PublisherMessageIds.DEPENDENCY_VERSION_UNKNOWN);
+    }
+  }
+
+  /**
+   * Emits one {@link PublisherMessageIds#DEPENDENCY_VERSION_UNKNOWN} warning per unresolved
+   * {@code EXT_IG_DEP_VERSION.fhirVersion} across the IG's {@code dependsOn} entries. Run once at
+   * load time so the author is told about a typo'd override token rather than the override being
+   * silently ignored - and so the warning is not multiplied per generated version.
+   */
+  static void validateDependencyVersionTokens(ImplementationGuide ig, List<ValidationMessage> errors) {
+    for (ImplementationGuide.ImplementationGuideDependsOnComponent dep : ig.getDependsOn()) {
+      String path = "ImplementationGuide.dependsOn["+(dep.hasPackageId() ? dep.getPackageId() : dep.getId())+"]";
+      for (Extension ext : dep.getExtensionsByUrl(EXT_IG_DEP_VERSION)) {
+        String fv = ExtensionUtilities.readStringExtension(ext, "fhirVersion");
+        if (fv != null) {
+          ValidationMessage vm = versionTokenIssue(fv, path, false);
+          if (vm != null) {
+            errors.add(vm);
+          }
+        }
+      }
+    }
+  }
+
+  /**
    * Lowercase short name ({@code r4}/{@code r4b}/{@code r5}) of a version, used only for the legacy
    * package-id suffix rename - never as a match key.
    */
@@ -2826,16 +2899,20 @@ public class PublisherIGLoader extends PublisherBase {
    */
   public static boolean isDepApplicableForVersion(ImplementationGuide.ImplementationGuideDependsOnComponent dep, String canonicalVer) {
     List<Extension> occurrences = dep.getExtensionsByUrl(EXT_IG_DEP_VERSION);
-    if (occurrences.isEmpty()) {
-      return true;
-    }
+    boolean anyResolvable = false;
     for (Extension ext : occurrences) {
       String fv = ExtensionUtilities.readStringExtension(ext, "fhirVersion");
-      if (fv != null && canonicalTarget(fv).equals(canonicalVer)) {
+      String depVer = fv == null ? null : canonicalTargetOrNull(fv);
+      if (depVer == null) {
+        continue; // unresolvable/typo'd fhirVersion - treat the occurrence as absent (never throw)
+      }
+      anyResolvable = true;
+      if (depVer.equals(canonicalVer)) {
         return !"remove".equals(ExtensionUtilities.readStringExtension(ext, "use"));
       }
     }
-    return false;
+    // no occurrences, or none resolvable -> legacy behaviour: applies to every version
+    return !anyResolvable;
   }
 
   /**
@@ -2867,7 +2944,8 @@ public class PublisherIGLoader extends PublisherBase {
       }
       for (Extension ext : occurrences) {
         String fv = ExtensionUtilities.readStringExtension(ext, "fhirVersion");
-        if (fv != null && canonicalTarget(fv).equals(canonicalVer)) {
+        String depVer = fv == null ? null : canonicalTargetOrNull(fv);
+        if (depVer != null && depVer.equals(canonicalVer)) {
           String pid = ExtensionUtilities.readStringExtension(ext, "packageId");
           String version = ExtensionUtilities.readStringExtension(ext, "version");
           if (pid != null) {

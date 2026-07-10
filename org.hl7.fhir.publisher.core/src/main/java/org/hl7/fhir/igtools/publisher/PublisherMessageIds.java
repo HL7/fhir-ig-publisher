@@ -11,5 +11,7 @@ public class PublisherMessageIds {
   public static final String RESOURCE_CONVERSION_NOT_POSSIBLE = "RESOURCE_CONVERSION_NOT_POSSIBLE";
   public static final String PIN_VERSION = "PIN_VERSION";
   public static final String GENERATE_VERSION_NUMERIC_TOKEN = "GENERATE_VERSION_NUMERIC_TOKEN";
+  public static final String GENERATE_VERSION_UNKNOWN = "GENERATE_VERSION_UNKNOWN";
+  public static final String DEPENDENCY_VERSION_UNKNOWN = "DEPENDENCY_VERSION_UNKNOWN";
 
 }
