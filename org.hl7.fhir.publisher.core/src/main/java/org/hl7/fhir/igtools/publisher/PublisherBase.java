@@ -1303,11 +1303,11 @@ public class PublisherBase implements ILoggingService {
   }
 
   /**
-   * Whether a finished package's {@code dependencies} object already declares a FHIR core package
-   * (e.g. {@code hl7.fhir.r4.core}, {@code hl7.fhir.r5.core}). Used by {@link #patchMissingCoreDependency}
-   * so the expected core dependency is added only when none is present - keeping the guard idempotent
-   * and free of duplicate-key crashes once upstream core (whose {@code packageForVersion} omits R5/R6)
-   * is fixed to add it itself.
+   * Whether a finished package's {@code dependencies} object declares <i>any</i> FHIR core package
+   * (e.g. {@code hl7.fhir.r4.core}, {@code hl7.fhir.r5.core}). A family-agnostic "any core present"
+   * query. NB: {@link #patchMissingCoreDependency} no longer uses this as its gate - it partitions
+   * core entries by family so a wrong-family core is corrected rather than accepted - but this remains
+   * a useful predicate (and is pinned by tests).
    *
    * @param dependencies the finished manifest's {@code dependencies} object, or {@code null}
    * @return {@code true} iff at least one dependency name matches {@code hl7.fhir.r<N>[b].core}
@@ -1328,8 +1328,9 @@ public class PublisherBase implements ILoggingService {
    * The FHIR core package a manifest carrying the given {@code fhirVersion} is expected to depend on,
    * as a {@code {packageId, version}} pair - e.g. {@code 5.0.0 -> {hl7.fhir.r5.core, 5.0.0}},
    * {@code 4.0.1 -> {hl7.fhir.r4.core, 4.0.1}}, {@code 4.3.0 -> {hl7.fhir.r4b.core, 4.3.0}}. The family
-   * is resolved via {@link VersionUtilities#getNameForVersion(String)} and the canonical version via
-   * {@link VersionUtilities#versionFromCode(String)}.
+   * is resolved via {@link PublisherIGLoader#canonicalTargetOrNull(String)} (so an unknown, ballot, or
+   * non-semver version yields {@code null} rather than a malformed {@code hl7.fhir.r?.core}) and the
+   * canonical version via {@link VersionUtilities#versionFromCode(String)}.
    *
    * @param fhirVersion the package's target FHIR version (canonical, e.g. from {@code fhirVersions[0]})
    * @return the {@code {packageId, version}} pair, or {@code null} if the version family cannot be resolved
@@ -1338,35 +1339,39 @@ public class PublisherBase implements ILoggingService {
     if (fhirVersion == null) {
       return null;
     }
+    String family = PublisherIGLoader.canonicalTargetOrNull(fhirVersion);
+    if (family == null) {
+      return null; // unknown/ballot/non-semver version -> no expected core (never hl7.fhir.r?.core)
+    }
     try {
-      String name = VersionUtilities.getNameForVersion(fhirVersion);
-      if (name == null || name.isEmpty()) {
-        return null;
-      }
-      return new String[] { "hl7.fhir." + name.toLowerCase() + ".core", VersionUtilities.versionFromCode(fhirVersion) };
+      return new String[] { "hl7.fhir." + family + ".core", VersionUtilities.versionFromCode(fhirVersion) };
     } catch (Exception e) {
       return null;
     }
   }
 
   /**
-   * Post-{@code finish()} safety net: ensure the finished package at {@code packageFilename} declares a
-   * FHIR core dependency. FHIR core's {@code NPMPackageGenerator.packageForVersion} auto-adds the core
-   * dep for R2..R4B but returns {@code null} for R5/R6, so R5/R6 packages (the base package, the
-   * {@code .r5} variant, per-language packages) ship without {@code hl7.fhir.r5.core}. When {@code manifest}
-   * already declares a core dep this is a no-op (so it never duplicates a key and auto-defers once upstream
-   * core is fixed); otherwise it reopens the {@code .tgz}, adds the expected core dep, saves it back, and
-   * mirrors the addition into {@code manifest} so a later in-memory read agrees with disk.
+   * Post-{@code finish()} safety net: ensure the finished package at {@code packageFilename} declares the
+   * <b>correct target</b> FHIR core dependency. FHIR core's {@code NPMPackageGenerator.packageForVersion}
+   * auto-adds the core dep for R2..R4B but returns {@code null} for R5/R6, so R5/R6 packages (the base
+   * package, the {@code .r5} variant, per-language packages) ship without {@code hl7.fhir.r5.core}.
+   * <p>
+   * The expected {@code {id, version}} is derived from the package's own {@code fhirVersions[0]} first;
+   * every {@code hl7.fhir.r<N>[b].core} entry is then partitioned into the matching one vs wrong-family
+   * ones. Wrong-family cores are removed (one {@link PublisherMessageIds#CORE_DEPENDENCY_FAMILY_CORRECTED}
+   * warning each) and the expected core is ensured present - so a stale/foreign-family core neither
+   * suppresses the required one (the old {@code hasFhirCoreDependency} gate defect) nor survives alongside
+   * it. A package already carrying <b>only</b> the expected core is a genuine no-op (no {@code .tgz}
+   * rewrite); an unresolvable version is a clean no-op (never {@code hl7.fhir.r?.core}). When a rewrite is
+   * needed the {@code .tgz} is reopened, corrected, saved, and the change mirrored into {@code manifest}.
    *
    * @param manifest        the finished manifest (a generator's {@code getPackageJ()}), or {@code null}
-   * @param packageFilename the finished {@code .tgz} on disk to patch when a core dep is missing
-   * @return {@code true} iff the package was patched (a core dep was added), {@code false} if left untouched
+   * @param packageFilename the finished {@code .tgz} on disk to patch when a core dep is missing/wrong
+   * @param messages        optional sink for {@code CORE_DEPENDENCY_FAMILY_CORRECTED} warnings (may be {@code null})
+   * @return {@code true} iff the package was rewritten (a core dep was added and/or a wrong-family core removed)
    */
-  static boolean patchMissingCoreDependency(JsonObject manifest, String packageFilename) throws IOException {
+  static boolean patchMissingCoreDependency(JsonObject manifest, String packageFilename, List<ValidationMessage> messages) throws IOException {
     if (manifest == null) {
-      return false;
-    }
-    if (hasFhirCoreDependency(manifest.getJsonObject("dependencies"))) {
       return false;
     }
     JsonArray fhirVersions = manifest.getJsonArray("fhirVersions");
@@ -1377,18 +1382,56 @@ public class PublisherBase implements ILoggingService {
     if (core == null) {
       return false;
     }
+    // Partition existing core-family deps into the expected one vs wrong-family ones. A package can
+    // carry BOTH the expected core and a stale/foreign-family core, so we must not short-circuit on
+    // "expected already present" - that would leave two cores.
+    List<String> wrongFamily = new ArrayList<>();
+    boolean expectedPresent = false;
+    JsonObject deps = manifest.getJsonObject("dependencies");
+    if (deps != null) {
+      for (JsonProperty p : deps.getProperties()) {
+        String nm = p.getName();
+        if (nm != null && nm.matches("^hl7\\.fhir\\.r\\d+b?\\.core$")) {
+          if (nm.equals(core[0])) {
+            expectedPresent = true;
+          } else {
+            wrongFamily.add(nm);
+          }
+        }
+      }
+    }
+    if (expectedPresent && wrongFamily.isEmpty()) {
+      return false; // genuine no-op: only the expected core is present
+    }
+    String pkgName = manifest.asString("name");
     // Reopen the finished .tgz (fromPackage reads it fully into memory, so the input can be closed
-    // before we truncate the same path) and add the missing core dep. package.json carries no
+    // before we truncate the same path) and correct the core deps. package.json carries no
     // resourceType, so .index.json/.index.db need no rebuild.
     NpmPackage tgz;
     try (InputStream in = new FileInputStream(packageFilename)) {
       tgz = NpmPackage.fromPackage(in);
     }
-    tgz.getNpm().forceObject("dependencies").add(core[0], core[1]);
+    JsonObject tgzDeps = tgz.getNpm().forceObject("dependencies");
+    JsonObject manifestDeps = manifest.forceObject("dependencies");
+    for (String wf : wrongFamily) {
+      tgzDeps.remove(wf);
+      manifestDeps.remove(wf);
+      if (messages != null) {
+        messages.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE,
+            "ImplementationGuide",
+            "The generated package"+(pkgName == null ? "" : " '"+pkgName+"'")+" declared FHIR core dependency '"+wf
+            +"', which is from a different FHIR version family than the package's FHIR version ("+core[1]
+            +"); it has been replaced with '"+core[0]+"#"+core[1]+"'.",
+            ValidationMessage.IssueSeverity.WARNING).setMessageId(PublisherMessageIds.CORE_DEPENDENCY_FAMILY_CORRECTED));
+      }
+    }
+    if (!expectedPresent) {
+      tgzDeps.add(core[0], core[1]);
+      manifestDeps.add(core[0], core[1]);
+    }
     try (OutputStream out = new FileOutputStream(packageFilename)) {
       tgz.save(out);
     }
-    manifest.forceObject("dependencies").add(core[0], core[1]);
     return true;
   }
 

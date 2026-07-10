@@ -600,13 +600,14 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
   }
 
   /**
-   * Ensure a finished package declares a FHIR core dependency (patching R5/R6 packages that FHIR core's
-   * {@code packageForVersion} leaves without one - the base package, the {@code .r5} variant, per-language
-   * packages). Delegates to the testable static {@link PublisherBase#patchMissingCoreDependency(JsonObject, String)};
-   * a no-op once a core dep is present, so it defers cleanly to an eventual upstream core fix.
+   * Ensure a finished package declares the correct target FHIR core dependency (patching R5/R6 packages
+   * that FHIR core's {@code packageForVersion} leaves without one - the base package, the {@code .r5}
+   * variant, per-language packages - and correcting a wrong-family core in place). Delegates to the
+   * testable static {@link PublisherBase#patchMissingCoreDependency(JsonObject, String, java.util.List)},
+   * threading {@code pf.errors} so any {@code CORE_DEPENDENCY_FAMILY_CORRECTED} warning reaches the author.
    */
   private void ensureCorePackageDependency(NPMPackageGenerator gen) throws IOException {
-    patchMissingCoreDependency(gen.getPackageJ(), gen.filename());
+    patchMissingCoreDependency(gen.getPackageJ(), gen.filename(), pf.errors);
   }
 
   private void genCombinedPackage() throws IOException {
