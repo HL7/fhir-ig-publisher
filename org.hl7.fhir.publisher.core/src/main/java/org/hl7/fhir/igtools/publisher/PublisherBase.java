@@ -982,7 +982,7 @@ public class PublisherBase implements ILoggingService {
   }
 
   protected boolean forHL7orFHIR() {
-    return pf.igpkp.getCanonical().contains("hl7.org") || pf.igpkp.getCanonical().contains("fhir.org") ;
+    return pf.igpkp.getCanonical().contains("hl7.org/") || pf.igpkp.getCanonical().contains("fhir.org/") ;
   }
 
   protected boolean suppressId(FetchedFile f, FetchedResource r) {
