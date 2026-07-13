@@ -350,7 +350,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     FileUtilities.bytesToFile(pf.extensionTracker.generate(), Utilities.path(pf.tempDir, "usage-stats.json"));
     try {
       log("Sending Usage Stats to Server");
-      pf.extensionTracker.sendToServer("http://tx.fhir.org/ext-tracker");
+      pf.extensionTracker.sendToServer("https://tx.fhir.org/ext-tracker");
     } catch (Exception e) {
       log("Submitting Usage Stats failed: "+e.getMessage());
     }

@@ -1278,7 +1278,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       System.out.println("  see Wiki for Documentation");
       System.out.println("");
       System.out.println("-tx: (optional) Address to use for terminology server ");
-      System.out.println("  (default is http://tx.fhir.org)");
+      System.out.println("  (default is https://tx.fhir.org)");
       System.out.println("  use 'n/a' to run without a terminology server");
       System.out.println("");
       System.out.println("-no-network: (optional) Stop the IG publisher accessing the network");
