@@ -455,11 +455,14 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           addFileToNpm(NPMPackageGenerator.Category.OTHER, "publication-request.json", FileUtilities.fileToBytes(pr));
         }
         pf.npm.finish();
+        ensureCorePackageDependency(pf.npm);
         for (NPMPackageGenerator vnpm : pf.vnpms.values()) {
           vnpm.finish();
+          ensureCorePackageDependency(vnpm);
         }
         for (NPMPackageGenerator vnpm : pf.lnpms.values()) {
           vnpm.finish();
+          ensureCorePackageDependency(vnpm);
         }
         if (pf.r4tor4b.canBeR4() && pf.r4tor4b.canBeR4B()) {
           try {
@@ -483,7 +486,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         }
         JsonArray json = new JsonArray();
         for (String s : pf.generateVersions) {
-          json.add(s);
+          json.add(PublisherIGLoader.suffixName(s));
           //generatePackageVersion(npm.filename(), s);
         }
         FileUtilities.bytesToFile(org.hl7.fhir.utilities.json.parser.JsonParser.composeBytes(json), Utilities.path(pf.outputDir, "sub-package-list.json"));
@@ -594,6 +597,17 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       pf.context.unload();
       System.gc();
     }
+  }
+
+  /**
+   * Ensure a finished package declares the correct target FHIR core dependency (patching R5/R6 packages
+   * that FHIR core's {@code packageForVersion} leaves without one - the base package, the {@code .r5}
+   * variant, per-language packages - and correcting a wrong-family core in place). Delegates to the
+   * testable static {@link PublisherBase#patchMissingCoreDependency(JsonObject, String, java.util.List)},
+   * threading {@code pf.errors} so any {@code CORE_DEPENDENCY_FAMILY_CORRECTED} warning reaches the author.
+   */
+  private void ensureCorePackageDependency(NPMPackageGenerator gen) throws IOException {
+    patchMissingCoreDependency(gen.getPackageJ(), gen.filename(), pf.errors);
   }
 
   private void genCombinedPackage() throws IOException {
@@ -2895,7 +2909,12 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     pf.ipStmt = new IPStatementsRenderer(pf.context, pf.markdownEngine, pf.packageId(), rc).genIpStatements(pf.fileList, lang);
     trackedFragment("1", "ip-statements", pf.ipStmt, pf.otherFilesRun, start, "ip-statements", "Cross", lang);
     start = System.currentTimeMillis();
-    if (VersionUtilities.isR4Ver(pf.version) || VersionUtilities.isR4BVer(pf.version)) {
+    if (pf.cvAnalyser != null) {
+      start = System.currentTimeMillis();
+      fragment("cross-version-analysis", pf.cvAnalyser.generate(pf.npmName, false), pf.otherFilesRun, start, "cross-version-analysis", "Cross", lang);
+      start = System.currentTimeMillis();
+      fragment("cross-version-analysis-inline", pf.cvAnalyser.generate(pf.npmName, true), pf.otherFilesRun, start, "cross-version-analysis-inline", "Cross", lang);
+    } else if (VersionUtilities.isR4Ver(pf.version) || VersionUtilities.isR4BVer(pf.version)) {
       start = System.currentTimeMillis();
       trackedFragment("2", "cross-version-analysis", pf.r4tor4b.generate(pf.npmName, false), pf.otherFilesRun, start, "cross-version-analysis", "Cross", lang);
       start = System.currentTimeMillis();
@@ -2908,11 +2927,11 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
     DependencyRenderer depr = new DependencyRenderer(pf.pcm, pf.tempDir, pf.npmName, pf.templateManager, makeDependencies(), pf.context, pf.markdownEngine, rc, pf.specMaps);
     start = System.currentTimeMillis();
-    trackedFragment("3", "dependency-table", depr.render(pf.publishedIg, false, true, true), pf.otherFilesRun, start, "dependency-table", "Cross", lang);
+    trackedFragment("3", "dependency-table", depr.render(pf.getEffectiveBaseIg(), false, true, true), pf.otherFilesRun, start, "dependency-table", "Cross", lang);
     start = System.currentTimeMillis();
-    trackedFragment("3", "dependency-table-short", depr.render(pf.publishedIg, false, false, false), pf.otherFilesRun, start, "dependency-table-short", "Cross", lang);
+    trackedFragment("3", "dependency-table-short", depr.render(pf.getEffectiveBaseIg(), false, false, false), pf.otherFilesRun, start, "dependency-table-short", "Cross", lang);
     start = System.currentTimeMillis();
-    trackedFragment("3", "dependency-table-nontech", depr.renderNonTech(pf.publishedIg), pf.otherFilesRun, start, "dependency-table-nontech", "Cross", lang);
+    trackedFragment("3", "dependency-table-nontech", depr.renderNonTech(pf.getEffectiveBaseIg()), pf.otherFilesRun, start, "dependency-table-nontech", "Cross", lang);
     start = System.currentTimeMillis();
     trackedFragment("4", "globals-table", depr.renderGlobals(), pf.otherFilesRun, start, "globals-table", "Cross", lang);
     start = System.currentTimeMillis();
@@ -5741,27 +5760,67 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     ByteArrayOutputStream bsj = new ByteArrayOutputStream();
     org.hl7.fhir.r5.elementmodel.JsonParser jp = new org.hl7.fhir.r5.elementmodel.JsonParser(this.pf.context);
     Element element = r.getElement();
-    Element eNN = element;
-    jp.compose(element, bsj, IParser.OutputStyle.NORMAL, this.pf.igpkp.getCanonical());
+    boolean embeddedIg = r.getResource() != null && r.getResource() == this.pf.publishedIg;
+    Element baseElement = element;
+    if (embeddedIg) {
+      // H3: the base package embeds the effective base IG - per-target (R5) dependencies and a
+      // definition.resource list filtered to base (R5) membership. Built on a copy of the fully
+      // generated IG POJO (narrative + generated extensions) with the same helpers as the variant
+      // path, then converted back to an element for the compose / per-language paths below (mirrors
+      // the updateImplementationGuide() convertToElement pattern).
+      ImplementationGuide baseIg = ((ImplementationGuide) r.getResource()).copy();
+      applyEffectiveDependsOn(baseIg, this.pf.getEffectiveBaseIg());
+      filterResourceMembership(baseIg, this.pf.version);
+      try {
+        baseElement = convertToElement(r, baseIg);
+      } catch (Exception e) {
+        throw new FHIRException("Unable to build the embedded base ImplementationGuide: "+e.getMessage(), e);
+      }
+    }
+    Element eNN = baseElement;
+    jp.compose(baseElement, bsj, IParser.OutputStyle.NORMAL, this.pf.igpkp.getCanonical());
     if (!r.isCustomResource()) {
-      this.pf.npm.addFile(isExample(f,r ) ? NPMPackageGenerator.Category.EXAMPLE : NPMPackageGenerator.Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", bsj.toByteArray());
-      if (isNewML()) {
-        for (String l : allLangs()) {
-          Element le = this.pf.langUtils.copyToLanguage(element, l, true, r.getElement().getChildValue("language"), pf.defaultTranslationLang, r.getErrors()); // todo: should we keep this?
-          ByteArrayOutputStream bsjl = new ByteArrayOutputStream();
-          jp.compose(le, bsjl, IParser.OutputStyle.NORMAL, this.pf.igpkp.getCanonical());
-          this.pf.lnpms.get(l).addFile(isExample(f,r ) ? NPMPackageGenerator.Category.EXAMPLE : NPMPackageGenerator.Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", bsjl.toByteArray());
+      if (includedInVersion(r, this.pf.version)) {
+        this.pf.npm.addFile(isExample(f,r ) ? NPMPackageGenerator.Category.EXAMPLE : NPMPackageGenerator.Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", bsj.toByteArray());
+        if (isNewML()) {
+          for (String l : allLangs()) {
+            Element le = this.pf.langUtils.copyToLanguage(baseElement, l, true, r.getElement().getChildValue("language"), pf.defaultTranslationLang, r.getErrors()); // todo: should we keep this?
+            ByteArrayOutputStream bsjl = new ByteArrayOutputStream();
+            jp.compose(le, bsjl, IParser.OutputStyle.NORMAL, this.pf.igpkp.getCanonical());
+            this.pf.lnpms.get(l).addFile(isExample(f,r ) ? NPMPackageGenerator.Category.EXAMPLE : NPMPackageGenerator.Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", bsjl.toByteArray());
+          }
         }
       }
       for (String v : this.pf.generateVersions) {
         String ver = VersionUtilities.versionFromCode(v);
-        Resource res = r.hasOtherVersions() && r.getOtherVersions().containsKey(ver+"-"+r.fhirType()) ? r.getOtherVersions().get(ver+"-"+r.fhirType()).getResource() : r.getResource();
+        if (!includedInVersion(r, ver)) {
+          if (this.pf.cvAnalyser != null) {
+            this.pf.cvAnalyser.recordOmission(ver, r.fhirType()+"/"+r.getId());
+          }
+          continue; // resource scoped out of this target version via *-inclusion (intentional membership omission)
+        }
+        Resource res;
+        if (embeddedIg) {
+          // H3: each variant package embeds the effective per-version IG - target-suffixed deps
+          // (from checkIgDeps) and a target-filtered definition.resource - built on the fully
+          // generated IG so narrative/generated extensions survive; convVersion then stamps the
+          // target fhirVersion and packageId suffix.
+          ImplementationGuide vig = ((ImplementationGuide) r.getResource()).copy();
+          applyEffectiveDependsOn(vig, this.pf.effectiveVersionIgs.get(v));
+          filterResourceMembership(vig, v);
+          res = vig;
+        } else {
+          res = r.hasOtherVersions() && r.getOtherVersions().containsKey(ver+"-"+r.fhirType()) ? r.getOtherVersions().get(ver+"-"+r.fhirType()).getResource() : r.getResource();
+        }
         if (res != null) {
           byte[] resVer = null;
           try {
             resVer = convVersion(res.copy(), ver);
           } catch (Exception e) {
             System.out.println("Unable to convert "+res.fhirType()+"/"+res.getId()+" to "+ver+": "+e.getMessage());
+            if (this.pf.cvAnalyser != null) {
+              this.pf.cvAnalyser.recordProblem(ver, res.fhirType()+"/"+r.getId(), e.getMessage());
+            }
             resVer = null;
           }
           if (resVer != null) {
@@ -5793,7 +5852,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
     if (this.pf.module.isNoNarrative()) {
       // we don't use the narrative in these resources in _includes, so we strip it - it slows Jekyll down greatly
-      eNN = (Element) element.copy();
+      eNN = (Element) baseElement.copy();
       eNN.removeChild("text");
       bsj = new ByteArrayOutputStream();
       jp.compose(eNN, bsj, IParser.OutputStyle.PRETTY, this.pf.igpkp.getCanonical());

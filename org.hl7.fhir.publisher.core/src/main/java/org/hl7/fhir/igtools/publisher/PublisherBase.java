@@ -26,9 +26,12 @@ import org.hl7.fhir.r5.utils.client.FHIRToolingClient;
 import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.filesystem.CSFile;
 import org.hl7.fhir.utilities.i18n.RegionToLocaleMapper;
+import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.model.JsonPrimitive;
+import org.hl7.fhir.utilities.json.model.JsonProperty;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
+import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.PackageHacker;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 
@@ -37,6 +40,7 @@ import java.io.*;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.function.Function;
 
 /**
  * this class is part of the Publisher Core cluster. See @Publisher for discussion
@@ -1258,17 +1262,45 @@ public class PublisherBase implements ILoggingService {
     if (res.hasWebPath() && (res instanceof DomainResource)) {
       ExtensionUtilities.setUrlExtension((DomainResource) res, ExtensionDefinitions.EXT_WEB_SOURCE_NEW, res.getWebPath());
     }
+    return serializeForVersion(res, v, pf.version, pf.packageId());
+  }
+
+  /**
+   * Convert an R5 resource and serialize it as the wire bytes for the target FHIR version {@code v}.
+   * <p>
+   * Extracted from {@link #convVersion(Resource, String)} so the per-version dispatch - in particular
+   * the R4 ({@code VersionConvertorFactory_40_50}) vs R4B ({@code VersionConvertorFactory_43_50}) split -
+   * can be unit-tested without constructing a {@link PublisherBase}. {@code basePackageId} carries the
+   * instance state the embedded-IG {@code packageId} suffixing needs (formerly {@code pf.packageId()}).
+   * <p>
+   * An embedded {@link ImplementationGuide} is stamped with the <i>target</i> {@code fhirVersion}
+   * ({@code v}) and a target-suffixed {@code packageId} - matching the StructureDefinition branch -
+   * so each per-version package advertises its own version rather than the base (source) one.
+   * {@code sourceVersion} is retained on the signature for the sole production caller
+   * ({@code convVersion} passes {@code pf.version}) and is no longer consulted here.
+   */
+  static byte[] serializeForVersion(Resource res, String v, String sourceVersion, String basePackageId) throws FHIRException, IOException {
     String version = v.startsWith("r") ? VersionUtilities.versionFromCode(v) : v;
-//    checkForCoreDependencies(res);
-    convertResourceR5(res, v);
+    if (res instanceof ImplementationGuide) {
+      ImplementationGuide ig = (ImplementationGuide) res;
+      ig.getFhirVersion().clear();
+      ig.getFhirVersion().add(new Enumeration<>(new Enumerations.FHIRVersionEnumFactory(), PublisherIGLoader.canonicalVersion(v)));
+      ig.setPackageId(basePackageId+"."+PublisherIGLoader.suffixName(v));
+    }
+    if (res instanceof StructureDefinition) {
+      StructureDefinition sd = (StructureDefinition) res;
+      sd.setFhirVersion(Enumerations.FHIRVersion.fromCode(PublisherIGLoader.canonicalVersion(v)));
+    }
     if (VersionUtilities.isR2Ver(version)) {
       return new org.hl7.fhir.dstu2.formats.JsonParser().composeBytes(VersionConvertorFactory_10_50.convertResource(res));
     } else if (VersionUtilities.isR2BVer(version)) {
       return new org.hl7.fhir.dstu2016may.formats.JsonParser().composeBytes(VersionConvertorFactory_14_50.convertResource(res));
     } else if (VersionUtilities.isR3Ver(version)) {
       return new org.hl7.fhir.dstu3.formats.JsonParser().composeBytes(VersionConvertorFactory_30_50.convertResource(res, new BaseAdvisor_30_50(false)));
-    } else if (VersionUtilities.isR4Ver(version) || VersionUtilities.isR4BVer(version)) {
+    } else if (VersionUtilities.isR4Ver(version)) {
       return new org.hl7.fhir.r4.formats.JsonParser().composeBytes(VersionConvertorFactory_40_50.convertResource(res));
+    } else if (VersionUtilities.isR4BVer(version)) {
+      return new org.hl7.fhir.r4b.formats.JsonParser().composeBytes(VersionConvertorFactory_43_50.convertResource(res));
     } else if (VersionUtilities.isR5Plus(version)) {
       return new org.hl7.fhir.r5.formats.JsonParser().composeBytes(res);
     } else {
@@ -1276,16 +1308,271 @@ public class PublisherBase implements ILoggingService {
     }
   }
 
-  private void convertResourceR5(Resource res, String v) {
-    if (res instanceof ImplementationGuide) {
-      ImplementationGuide ig = (ImplementationGuide) res;
-      ig.getFhirVersion().clear();
-      ig.getFhirVersion().add(new Enumeration<>(new Enumerations.FHIRVersionEnumFactory(), pf.version));
-      ig.setPackageId(pf.packageId()+"."+v);
+  /**
+   * Whether a finished package's {@code dependencies} object declares <i>any</i> FHIR core package
+   * (e.g. {@code hl7.fhir.r4.core}, {@code hl7.fhir.r5.core}). A family-agnostic "any core present"
+   * query. NB: {@link #patchMissingCoreDependency} no longer uses this as its gate - it partitions
+   * core entries by family so a wrong-family core is corrected rather than accepted - but this remains
+   * a useful predicate (and is pinned by tests).
+   *
+   * @param dependencies the finished manifest's {@code dependencies} object, or {@code null}
+   * @return {@code true} iff at least one dependency name matches {@code hl7.fhir.r<N>[b].core}
+   */
+  static boolean hasFhirCoreDependency(JsonObject dependencies) {
+    if (dependencies == null) {
+      return false;
     }
-    if (res instanceof StructureDefinition) {
-      StructureDefinition sd = (StructureDefinition) res;
-      sd.setFhirVersion(Enumerations.FHIRVersion.fromCode(v));
+    for (JsonProperty p : dependencies.getProperties()) {
+      if (p.getName() != null && p.getName().matches("^hl7\\.fhir\\.r\\d+b?\\.core$")) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * The FHIR core package a manifest carrying the given {@code fhirVersion} is expected to depend on,
+   * as a {@code {packageId, version}} pair - e.g. {@code 5.0.0 -> {hl7.fhir.r5.core, 5.0.0}},
+   * {@code 4.0.1 -> {hl7.fhir.r4.core, 4.0.1}}, {@code 4.3.0 -> {hl7.fhir.r4b.core, 4.3.0}}. The family
+   * is resolved via {@link PublisherIGLoader#canonicalTargetOrNull(String)} (so an unknown, ballot, or
+   * non-semver version yields {@code null} rather than a malformed {@code hl7.fhir.r?.core}) and the
+   * canonical version via {@link VersionUtilities#versionFromCode(String)}.
+   *
+   * @param fhirVersion the package's target FHIR version (canonical, e.g. from {@code fhirVersions[0]})
+   * @return the {@code {packageId, version}} pair, or {@code null} if the version family cannot be resolved
+   */
+  static String[] expectedCoreDependency(String fhirVersion) {
+    if (fhirVersion == null) {
+      return null;
+    }
+    String family = PublisherIGLoader.canonicalTargetOrNull(fhirVersion);
+    if (family == null) {
+      return null; // unknown/ballot/non-semver version -> no expected core (never hl7.fhir.r?.core)
+    }
+    try {
+      return new String[] { "hl7.fhir." + family + ".core", VersionUtilities.versionFromCode(fhirVersion) };
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  /**
+   * Post-{@code finish()} safety net: ensure the finished package at {@code packageFilename} declares the
+   * <b>correct target</b> FHIR core dependency. FHIR core's {@code NPMPackageGenerator.packageForVersion}
+   * auto-adds the core dep for R2..R4B but returns {@code null} for R5/R6, so R5/R6 packages (the base
+   * package, the {@code .r5} variant, per-language packages) ship without {@code hl7.fhir.r5.core}.
+   * <p>
+   * The expected {@code {id, version}} is derived from the package's own {@code fhirVersions[0]} first;
+   * every {@code hl7.fhir.r<N>[b].core} entry is then partitioned into the matching one vs wrong-family
+   * ones. Wrong-family cores are removed (one {@link PublisherMessageIds#CORE_DEPENDENCY_FAMILY_CORRECTED}
+   * warning each) and the expected core is ensured present - so a stale/foreign-family core neither
+   * suppresses the required one (the old {@code hasFhirCoreDependency} gate defect) nor survives alongside
+   * it. A package already carrying <b>only</b> the expected core is a genuine no-op (no {@code .tgz}
+   * rewrite); an unresolvable version is a clean no-op (never {@code hl7.fhir.r?.core}). When a rewrite is
+   * needed the {@code .tgz} is reopened, corrected, saved, and the change mirrored into {@code manifest}.
+   *
+   * @param manifest        the finished manifest (a generator's {@code getPackageJ()}), or {@code null}
+   * @param packageFilename the finished {@code .tgz} on disk to patch when a core dep is missing/wrong
+   * @param messages        optional sink for {@code CORE_DEPENDENCY_FAMILY_CORRECTED} warnings (may be {@code null})
+   * @return {@code true} iff the package was rewritten (a core dep was added and/or a wrong-family core removed)
+   */
+  static boolean patchMissingCoreDependency(JsonObject manifest, String packageFilename, List<ValidationMessage> messages) throws IOException {
+    if (manifest == null) {
+      return false;
+    }
+    JsonArray fhirVersions = manifest.getJsonArray("fhirVersions");
+    if (fhirVersions == null || fhirVersions.size() == 0) {
+      return false;
+    }
+    String[] core = expectedCoreDependency(fhirVersions.get(0).asString());
+    if (core == null) {
+      return false;
+    }
+    // Partition existing core-family deps into the expected one vs wrong-family ones. A package can
+    // carry BOTH the expected core and a stale/foreign-family core, so we must not short-circuit on
+    // "expected already present" - that would leave two cores.
+    List<String> wrongFamily = new ArrayList<>();
+    boolean expectedPresent = false;
+    JsonObject deps = manifest.getJsonObject("dependencies");
+    if (deps != null) {
+      for (JsonProperty p : deps.getProperties()) {
+        String nm = p.getName();
+        if (nm != null && nm.matches("^hl7\\.fhir\\.r\\d+b?\\.core$")) {
+          if (nm.equals(core[0])) {
+            expectedPresent = true;
+          } else {
+            wrongFamily.add(nm);
+          }
+        }
+      }
+    }
+    if (expectedPresent && wrongFamily.isEmpty()) {
+      return false; // genuine no-op: only the expected core is present
+    }
+    String pkgName = manifest.asString("name");
+    // Reopen the finished .tgz (fromPackage reads it fully into memory, so the input can be closed
+    // before we truncate the same path) and correct the core deps. package.json carries no
+    // resourceType, so .index.json/.index.db need no rebuild.
+    NpmPackage tgz;
+    try (InputStream in = new FileInputStream(packageFilename)) {
+      tgz = NpmPackage.fromPackage(in);
+    }
+    JsonObject tgzDeps = tgz.getNpm().forceObject("dependencies");
+    JsonObject manifestDeps = manifest.forceObject("dependencies");
+    for (String wf : wrongFamily) {
+      tgzDeps.remove(wf);
+      manifestDeps.remove(wf);
+      if (messages != null) {
+        messages.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE,
+            "ImplementationGuide",
+            "The generated package"+(pkgName == null ? "" : " '"+pkgName+"'")+" declared FHIR core dependency '"+wf
+            +"', which is from a different FHIR version family than the package's FHIR version ("+core[1]
+            +"); it has been replaced with '"+core[0]+"#"+core[1]+"'.",
+            ValidationMessage.IssueSeverity.WARNING).setMessageId(PublisherMessageIds.CORE_DEPENDENCY_FAMILY_CORRECTED));
+      }
+    }
+    if (!expectedPresent) {
+      tgzDeps.add(core[0], core[1]);
+      manifestDeps.add(core[0], core[1]);
+    }
+    try (OutputStream out = new FileOutputStream(packageFilename)) {
+      tgz.save(out);
+    }
+    return true;
+  }
+
+  /**
+   * Whether resource {@code r} should be written into the package for the given target FHIR version.
+   * Governed by the {@code r4-inclusion}/{@code r4b-inclusion}/{@code r5-inclusion} author params using
+   * tag-membership semantics: a resource listed in <i>any</i> inclusion set appears <b>only</b> in the
+   * listed version(s); a resource in <i>no</i> inclusion set appears in <b>all</b> versions (today's
+   * default, which also gates the R5 base package via {@code r5-inclusion}). Only active for an R5
+   * base; for any other base version this always returns true (no behaviour change).
+   */
+  protected boolean includedInVersion(FetchedResource r, String versionToken) {
+    return isIncludedInVersion(resourceKeys(r), versionToken, pf.version, pf.r5Inclusions, pf.r4Inclusions, pf.r4bInclusions);
+  }
+
+  /** Testable core of {@link #includedInVersion}: resolves membership from a resource's identifier
+   *  keys ({@code Type/id} and/or canonical URL) against the three inclusion sets. */
+  static boolean isIncludedInVersion(Set<String> keys, String versionToken, String baseVersion,
+      Set<String> r5Inclusions, Set<String> r4Inclusions, Set<String> r4bInclusions) {
+    if (!VersionUtilities.isR5Plus(baseVersion)) {
+      return true;
+    }
+    Set<String> listed = new HashSet<>();
+    if (containsAny(r5Inclusions, keys)) {
+      listed.add("r5");
+    }
+    if (containsAny(r4Inclusions, keys)) {
+      listed.add("r4");
+    }
+    if (containsAny(r4bInclusions, keys)) {
+      listed.add("r4b");
+    }
+    if (listed.isEmpty()) {
+      return true;
+    }
+    return listed.contains(PublisherIGLoader.canonicalTarget(versionToken));
+  }
+
+  private static boolean containsAny(Set<String> set, Set<String> keys) {
+    if (set == null || set.isEmpty()) {
+      return false;
+    }
+    for (String k : keys) {
+      if (set.contains(k)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private Set<String> resourceKeys(FetchedResource r) {
+    Set<String> keys = new HashSet<>();
+    if (r.fhirType() != null && r.getId() != null) {
+      keys.add(r.fhirType()+"/"+r.getId());
+    }
+    if (r.getResource() instanceof CanonicalResource) {
+      String url = ((CanonicalResource) r.getResource()).getUrl();
+      if (url != null) {
+        keys.add(url);
+      }
+    } else if (r.getElement() != null) {
+      String url = r.getElement().getChildValue("url");
+      if (url != null) {
+        keys.add(url);
+      }
+    }
+    return keys;
+  }
+
+  /** Resolve a {@code definition.resource.reference} ({@code Type/id}) to the identity keys of the
+   *  {@link FetchedResource} it points at ({@code Type/id} and/or canonical URL, per
+   *  {@link #resourceKeys}), so a canonical-keyed inclusion set is honoured. Falls back to the bare
+   *  reference when the resource is not (yet) in {@code pf.fileList}. */
+  private Set<String> resourceKeysForReference(String reference) {
+    FetchedResource fr = resolveLocalReference(reference);
+    if (fr != null) {
+      return resourceKeys(fr);
+    }
+    Set<String> keys = new HashSet<>();
+    if (reference != null) {
+      keys.add(reference);
+    }
+    return keys;
+  }
+
+  private FetchedResource resolveLocalReference(String reference) {
+    if (reference == null || pf.fileList == null) {
+      return null;
+    }
+    for (FetchedFile tf : pf.fileList) {
+      for (FetchedResource tr : tf.getResources()) {
+        if (reference.equals(tr.getLocalRef())) {
+          return tr;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Remove {@code definition.resource} entries not included in the target version (H3). Testable core:
+   * {@code keyResolver} maps each {@code definition.resource.reference} to that resource's identity keys
+   * (the same {@code Type/id} + canonical-URL key set {@link #resourceKeys} builds), so a resource
+   * excluded via a canonical-keyed inclusion set is still dropped. No-op unless the base is R5+.
+   */
+  static void filterResourceMembership(ImplementationGuide ig, String versionToken, String baseVersion,
+      Function<String, Set<String>> keyResolver, Set<String> r5Inclusions, Set<String> r4Inclusions, Set<String> r4bInclusions) {
+    if (!VersionUtilities.isR5Plus(baseVersion) || !ig.hasDefinition()) {
+      return;
+    }
+    ig.getDefinition().getResource().removeIf(res -> {
+      String ref = res.hasReference() ? res.getReference().getReference() : null;
+      Set<String> keys = keyResolver.apply(ref);
+      return !isIncludedInVersion(keys, versionToken, baseVersion, r5Inclusions, r4Inclusions, r4bInclusions);
+    });
+  }
+
+  /** Instance wrapper over {@link #filterResourceMembership(ImplementationGuide, String, String, Function, Set, Set, Set)}
+   *  that resolves references through {@code pf.fileList} and reads the inclusion sets from {@code pf}. */
+  protected void filterResourceMembership(ImplementationGuide ig, String versionToken) {
+    filterResourceMembership(ig, versionToken, pf.version, this::resourceKeysForReference,
+        pf.r5Inclusions, pf.r4Inclusions, pf.r4bInclusions);
+  }
+
+  /** Overlay the effective (per-target) {@code dependsOn} onto {@code target}'s POJO, used for both the
+   *  base and variant embedded IGs so they reference the target-suffixed/filtered packages. Mirrors the
+   *  effective {@code dependsOn} exactly (clear + re-add copies), so filtered/reordered entries are
+   *  handled without any positional assumption. */
+  static void applyEffectiveDependsOn(ImplementationGuide target, ImplementationGuide effective) {
+    if (effective == null) {
+      return;
+    }
+    target.getDependsOn().clear();
+    for (ImplementationGuide.ImplementationGuideDependsOnComponent d : effective.getDependsOn()) {
+      target.getDependsOn().add(d.copy());
     }
   }
 
