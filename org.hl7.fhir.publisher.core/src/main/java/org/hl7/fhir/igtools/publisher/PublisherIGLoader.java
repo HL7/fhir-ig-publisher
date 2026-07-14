@@ -78,6 +78,7 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import java.io.*;
+import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.file.Files;
@@ -2015,7 +2016,7 @@ public class PublisherIGLoader extends PublisherBase {
 
   private InputStream fetchFromSource(String id, String source) throws IOException {
     logDebugMessage(LogCategory.INIT, "Fetch "+id+" package from "+source);
-    URL url = new URL(source+"?nocache=" + System.currentTimeMillis());
+    URL url = URI.create(source+"?nocache=" + System.currentTimeMillis()).toURL();
     URLConnection c = url.openConnection();
     return c.getInputStream();
   }

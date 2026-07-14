@@ -91,6 +91,7 @@ import org.xml.sax.InputSource;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.*;
+import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -4651,7 +4652,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
                 jNode.add("name", displayForCountryCode(cd.getCode()));
                 File flagFile = new File(pf.vsCache + "/" + code + ".svg");
                 if (!flagFile.exists() && !pf.ignoreFlags.contains(code)) {
-                  URL url2 = new URL("https://flagcdn.com/" + pf.shortCountryCode.get(code.toUpperCase()).toLowerCase() + ".svg");
+                  URL url2 = URI.create("https://flagcdn.com/" + pf.shortCountryCode.get(code.toUpperCase()).toLowerCase() + ".svg").toURL();
                   try {
                     InputStream in = url2.openStream();
                     Files.copy(in, Paths.get(flagFile.getAbsolutePath()));
@@ -4670,7 +4671,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
                 jNode.add("name", displayForStateCode(cd.getCode()) + " (" + displayForCountryCode(codeParts[0]) + ")");
                 File flagFile = new File(pf.vsCache + "/" + code + ".svg");
                 if (!flagFile.exists()) {
-                  URL url = new URL("http://flags.ox3.in/svg/" + codeParts[0].toLowerCase() + "/" + codeParts[1].toLowerCase() + ".svg");
+                  URL url = URI.create("http://flags.ox3.in/svg/" + codeParts[0].toLowerCase() + "/" + codeParts[1].toLowerCase() + ".svg").toURL();
                   try (InputStream in = url.openStream()) {
                     Files.copy(in, Paths.get(flagFile.getAbsolutePath()));
                   } catch (Exception e) {
