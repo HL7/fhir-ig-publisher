@@ -1207,11 +1207,16 @@ public class PublicationProcess {
 
   private void runBuild(JsonObject qa, String path, String[] args) throws Exception {
     File f = new File(Utilities.path(path, "output", "qa.json"));
-    if (!f.exists()) {
+    // Clear any stale qa.json first. The build folder is a clone of the draft, so it
+    // already contains the draft's output/qa.json. We must delete it before the build,
+    // otherwise - if the build aborts (e.g. SUSHI fails) and -no-exit stops the failure
+    // from propagating out of Publisher.main - the leftover qa.json makes the post-build
+    // existence check below pass, and we'd publish the stale draft output.
+    if (f.exists()) {
       f.delete();
     }
-    
-    Publisher.main(args); // any exceptions, we just let them propagate
+
+    Publisher.main(args); // -no-exit means failures don't throw here; the qa.json check below is the guard
 
     // check it built ok:
     if (!f.exists()) {

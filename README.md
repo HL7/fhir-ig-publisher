@@ -154,7 +154,7 @@ Setup a launch.json file in the .vscode folder with the following content:
             "cwd": "c:/git/hl7/utg",
             "args": [
                 "-ig", ".",
-                "-tx", "http://tx.fhir.org/r4"
+                "-tx", "https://tx.fhir.org/r4"
             ]
         }
     ]

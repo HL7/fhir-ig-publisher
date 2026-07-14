@@ -106,7 +106,14 @@ public class PublisherIGLoader extends PublisherBase {
     if (settings.getMode() == PublisherUtils.IGBuildMode.PUBLICATION)
       log("Build Formal Publication package, intended for "+getTargetOutput());
 
-    log("API keys loaded from "+ FhirSettings.getFilePath());
+    String fhirSettingsPath = FhirSettings.getFilePath();
+    if (fhirSettingsPath == null) {
+      log("No FHIR settings file configured; using defaults (no API keys or npm path)");
+    } else if (!new File(fhirSettingsPath).exists()) {
+      log("No FHIR settings file at " + fhirSettingsPath + "; using defaults (no API keys or npm path)");
+    } else {
+      log("FHIR settings loaded from " + fhirSettingsPath);
+    }
 
     pf.templateManager = new TemplateManager(pf.pcm, pf.logger);
     pf.templateProvider = new IGPublisherLiquidTemplateServices();
