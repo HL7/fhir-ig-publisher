@@ -108,7 +108,7 @@ public class AdjunctFileLoader {
   }
   
   /**
-   * This services is invoked twice. The first time, on the elemnt model, as soon as a resource is loaded. 
+   * This services is invoked twice. The first time, on the element model, as soon as a resource is loaded. 
    * But it will be invoked a second time for Metadata resources, once the metdata resource has been loaded,
    * so we ignore them the first time around
    * 
@@ -117,14 +117,30 @@ public class AdjunctFileLoader {
    * @param metadataResourceNames
    * @return
    */
-  public boolean replaceAttachments1(FetchedFile f, FetchedResource r, List<String> metadataResourceNames) {    
+  public boolean replaceAttachments1(FetchedFile f, FetchedResource r, List<String> metadataResourceNames) {
     if (r.getElement().fhirType().equals("Binary")) {
       return processBinary(f, r.getElement());
-    } else if (!Utilities.existsInList(r.getElement().fhirType(), metadataResourceNames)) {
-      return processByElement(f, r.getElement());
-    } else {
-      return false;
     }
+    boolean changed = false;
+    if (r.getElement().hasChildren("contained")) {
+      // We also need to check for Binaries in contained resources.  We don't need to worry about attachments because that search is already recursive
+      changed =  processContainedBinary(f, r.getElement());
+    }
+    if (!Utilities.existsInList(r.getElement().fhirType(), metadataResourceNames)) {
+      changed = changed || processByElement(f, r.getElement());
+    }
+    return changed;
+  }
+
+  public boolean processContainedBinary(FetchedFile f, Element e) {
+    boolean res = false;
+    for (Element c : e.getChildren("contained")) {
+      if (c.fhirType().equals("Binary")) {
+        if (processBinary(f, c))
+          res = true;
+      }
+    }
+    return res;
   }
 
   private boolean processByElement(FetchedFile f, Element e) {
@@ -145,7 +161,7 @@ public class AdjunctFileLoader {
     }
     return res;
   }
-
+  
   public boolean processBinary(FetchedFile f, Element e) {
     boolean res = false;
     String n = e.getChildValue("data");
@@ -209,8 +225,10 @@ public class AdjunctFileLoader {
       return "image/png";
     } else if ("gif".equals(ext)) {
       return "image/gif";
-    } else if ("jog".equals(ext)) {
+    } else if ("jpg".equals(ext)) {
       return "image/jpeg";
+    } else if ("svg".equals(ext)) {
+      return "image/svg+xml";
     } else if ("cql".equals(ext)) {
       return "text/cql";
     } else if ("feature".equals(ext)) {
