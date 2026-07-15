@@ -1,0 +1,167 @@
+package org.hl7.fhir.igtools.publisher;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.ByteArrayInputStream;
+import java.util.Arrays;
+
+import org.hl7.fhir.r5.model.CodeSystem;
+import org.hl7.fhir.r5.model.Enumeration;
+import org.hl7.fhir.r5.model.Enumerations;
+import org.hl7.fhir.r5.model.ImplementationGuide;
+import org.hl7.fhir.r5.model.StructureDefinition;
+import org.junit.jupiter.api.Test;
+
+/**
+ * Pins the per-version serialization dispatch extracted into
+ * {@link PublisherBase#serializeForVersion(org.hl7.fhir.r5.model.Resource, String, String, String)}.
+ * <p>
+ * In particular it guards the R4 ({@code VersionConvertorFactory_40_50}) vs R4B
+ * ({@code VersionConvertorFactory_43_50}) split: before this fix, an R4B target was
+ * silently serialized as R4 bytes mislabeled 4.3.0. The CodeSystem case additionally
+ * exercises the conformance/core-dependency path used by
+ * {@code PublisherProcessor.checkForCoreDependenciesCS/VS}, which serializes via the
+ * same {@code convVersion} dispatch.
+ */
+class ConvVersionTest {
+
+  private static final String SOURCE_VERSION = "5.0.0";
+  private static final String BASE_PACKAGE_ID = "example.test";
+
+  private StructureDefinition sampleProfile() {
+    StructureDefinition sd = new StructureDefinition("http://example.org/fhir/StructureDefinition/test-profile",
+        "TestProfile", Enumerations.PublicationStatus.ACTIVE, StructureDefinition.StructureDefinitionKind.RESOURCE,
+        false, "Patient");
+    sd.setBaseDefinition("http://hl7.org/fhir/StructureDefinition/Patient");
+    sd.setDerivation(StructureDefinition.TypeDerivationRule.CONSTRAINT);
+    return sd;
+  }
+
+  /** A profile carrying {@code versionAlgorithm[x]} - a CanonicalResource element introduced in R5
+   *  with no R4/R4B equivalent, so a genuine downgrade must drop it (a mere relabel would keep it). */
+  private StructureDefinition profileWithVersionAlgorithm() {
+    StructureDefinition sd = sampleProfile();
+    sd.setVersionAlgorithm(new org.hl7.fhir.r5.model.StringType("semver"));
+    return sd;
+  }
+
+  private ImplementationGuide sampleIg() {
+    ImplementationGuide ig = new ImplementationGuide();
+    ig.setUrl("http://example.org/fhir/ImplementationGuide/example");
+    ig.setName("Example");
+    ig.setPackageId("example.test");
+    ig.setVersion("0.1.0");
+    ig.setStatus(Enumerations.PublicationStatus.ACTIVE);
+    ig.getFhirVersion().add(new Enumeration<>(new Enumerations.FHIRVersionEnumFactory(), "5.0.0"));
+    return ig;
+  }
+
+  private CodeSystem sampleCodeSystem() {
+    CodeSystem cs = new CodeSystem();
+    cs.setUrl("http://example.org/fhir/CodeSystem/test-cs");
+    cs.setVersion("1.0.0");
+    cs.setName("TestCodeSystem");
+    cs.setStatus(Enumerations.PublicationStatus.ACTIVE);
+    cs.setContent(Enumerations.CodeSystemContentMode.COMPLETE);
+    cs.setCaseSensitive(true);
+    cs.addConcept().setCode("a").setDisplay("A");
+    return cs;
+  }
+
+  @Test
+  void structureDefinition_serializesAsGenuineR4AndR4B() throws Exception {
+    byte[] r4Bytes = PublisherBase.serializeForVersion(sampleProfile(), "4.0.1", SOURCE_VERSION, BASE_PACKAGE_ID);
+    byte[] r4bBytes = PublisherBase.serializeForVersion(sampleProfile(), "4.3.0", SOURCE_VERSION, BASE_PACKAGE_ID);
+
+    org.hl7.fhir.r4.model.Resource r4res = new org.hl7.fhir.r4.formats.JsonParser().parse(new ByteArrayInputStream(r4Bytes));
+    org.hl7.fhir.r4b.model.Resource r4bres = new org.hl7.fhir.r4b.formats.JsonParser().parse(new ByteArrayInputStream(r4bBytes));
+
+    assertEquals("StructureDefinition", r4res.fhirType());
+    assertEquals("StructureDefinition", r4bres.fhirType());
+
+    // fhirVersion is stamped per target (SD carries it and serializeForVersion sets it).
+    org.hl7.fhir.r4.model.StructureDefinition r4sd = (org.hl7.fhir.r4.model.StructureDefinition) r4res;
+    org.hl7.fhir.r4b.model.StructureDefinition r4bsd = (org.hl7.fhir.r4b.model.StructureDefinition) r4bres;
+    assertEquals("4.0.1", r4sd.getFhirVersion().toCode());
+    assertEquals("4.3.0", r4bsd.getFhirVersion().toCode());
+
+    // The R4B bytes must not be the R4 bytes relabeled: they are produced by different
+    // convertor factories/parsers and at minimum the fhirVersion element differs.
+    assertFalse(Arrays.equals(r4Bytes, r4bBytes), "R4B output must differ from R4 output");
+  }
+
+  @Test
+  void structureDefinition_r5OnlyElement_droppedOnDowngrade_notRelabeled() throws Exception {
+    // Genuine downgrade (not R5 relabeled): an R5-only element (versionAlgorithm[x]) must survive R5
+    // serialization but be dropped by the R4/R4B conversion, and the result must still parse as an
+    // R4/R4B StructureDefinition.
+    byte[] r5Bytes = PublisherBase.serializeForVersion(profileWithVersionAlgorithm(), "5.0.0", SOURCE_VERSION, BASE_PACKAGE_ID);
+    byte[] r4Bytes = PublisherBase.serializeForVersion(profileWithVersionAlgorithm(), "4.0.1", SOURCE_VERSION, BASE_PACKAGE_ID);
+    byte[] r4bBytes = PublisherBase.serializeForVersion(profileWithVersionAlgorithm(), "4.3.0", SOURCE_VERSION, BASE_PACKAGE_ID);
+
+    String r5Json = new String(r5Bytes, java.nio.charset.StandardCharsets.UTF_8);
+    String r4Json = new String(r4Bytes, java.nio.charset.StandardCharsets.UTF_8);
+    String r4bJson = new String(r4bBytes, java.nio.charset.StandardCharsets.UTF_8);
+
+    assertTrue(r5Json.contains("versionAlgorithm"), "R5 output carries the R5-only versionAlgorithm element");
+    assertFalse(r4Json.contains("versionAlgorithm"), "R4 downgrade genuinely drops the R5-only element (not a relabel)");
+    assertFalse(r4bJson.contains("versionAlgorithm"), "R4B downgrade genuinely drops the R5-only element (not a relabel)");
+
+    // The downgraded bytes still parse under their target-version parsers as StructureDefinitions.
+    assertEquals("StructureDefinition",
+        new org.hl7.fhir.r4.formats.JsonParser().parse(new ByteArrayInputStream(r4Bytes)).fhirType());
+    assertEquals("StructureDefinition",
+        new org.hl7.fhir.r4b.formats.JsonParser().parse(new ByteArrayInputStream(r4bBytes)).fhirType());
+  }
+
+  @Test
+  void structureDefinition_numericShortTokens_stampCanonicalFhirVersion() throws Exception {
+    // Short numeric tokens (4.0/4.3) must stamp the canonical full version (4.0.1/4.3.0) on the
+    // serialized StructureDefinition, matching the symbolic/full spellings - not the raw short
+    // form (formerly stamped as non-canonical 4.0/4.3) (M2).
+    byte[] r4Bytes = PublisherBase.serializeForVersion(sampleProfile(), "4.0", SOURCE_VERSION, BASE_PACKAGE_ID);
+    byte[] r4bBytes = PublisherBase.serializeForVersion(sampleProfile(), "4.3", SOURCE_VERSION, BASE_PACKAGE_ID);
+
+    org.hl7.fhir.r4.model.StructureDefinition r4sd = (org.hl7.fhir.r4.model.StructureDefinition)
+        new org.hl7.fhir.r4.formats.JsonParser().parse(new ByteArrayInputStream(r4Bytes));
+    org.hl7.fhir.r4b.model.StructureDefinition r4bsd = (org.hl7.fhir.r4b.model.StructureDefinition)
+        new org.hl7.fhir.r4b.formats.JsonParser().parse(new ByteArrayInputStream(r4bBytes));
+
+    assertEquals("4.0.1", r4sd.getFhirVersion().toCode());
+    assertEquals("4.3.0", r4bsd.getFhirVersion().toCode());
+  }
+
+  @Test
+  void implementationGuide_stampsTargetFhirVersionNotSource() throws Exception {
+    // H3: the embedded IG must be stamped with the *target* FHIR version, not the base (source) R5,
+    // and its packageId suffixed with the target family - matching the SD branch.
+    byte[] r4Bytes = PublisherBase.serializeForVersion(sampleIg(), "4.0.1", SOURCE_VERSION, BASE_PACKAGE_ID);
+    byte[] r4bBytes = PublisherBase.serializeForVersion(sampleIg(), "4.3.0", SOURCE_VERSION, BASE_PACKAGE_ID);
+
+    org.hl7.fhir.r4.model.ImplementationGuide r4ig = (org.hl7.fhir.r4.model.ImplementationGuide)
+        new org.hl7.fhir.r4.formats.JsonParser().parse(new ByteArrayInputStream(r4Bytes));
+    org.hl7.fhir.r4b.model.ImplementationGuide r4big = (org.hl7.fhir.r4b.model.ImplementationGuide)
+        new org.hl7.fhir.r4b.formats.JsonParser().parse(new ByteArrayInputStream(r4bBytes));
+
+    assertEquals("4.0.1", r4ig.getFhirVersion().get(0).getValue().toCode(), "R4 embedded IG stamped 4.0.1 (target), not 5.0.0 (source)");
+    assertEquals("4.3.0", r4big.getFhirVersion().get(0).getValue().toCode(), "R4B embedded IG stamped 4.3.0 (target)");
+    assertEquals("example.test.r4", r4ig.getPackageId(), "packageId suffixed with target family");
+    assertEquals("example.test.r4b", r4big.getPackageId());
+  }
+
+  @Test
+  void codeSystem_serializesParseablyForR4AndR4B() throws Exception {
+    byte[] r4Bytes = PublisherBase.serializeForVersion(sampleCodeSystem(), "4.0.1", SOURCE_VERSION, BASE_PACKAGE_ID);
+    byte[] r4bBytes = PublisherBase.serializeForVersion(sampleCodeSystem(), "4.3.0", SOURCE_VERSION, BASE_PACKAGE_ID);
+
+    org.hl7.fhir.r4.model.Resource r4res = new org.hl7.fhir.r4.formats.JsonParser().parse(new ByteArrayInputStream(r4Bytes));
+    org.hl7.fhir.r4b.model.Resource r4bres = new org.hl7.fhir.r4b.formats.JsonParser().parse(new ByteArrayInputStream(r4bBytes));
+
+    assertEquals("CodeSystem", r4res.fhirType());
+    assertEquals("CodeSystem", r4bres.fhirType());
+    assertEquals("http://example.org/fhir/CodeSystem/test-cs", ((org.hl7.fhir.r4.model.CodeSystem) r4res).getUrl());
+    assertEquals("http://example.org/fhir/CodeSystem/test-cs", ((org.hl7.fhir.r4b.model.CodeSystem) r4bres).getUrl());
+  }
+}

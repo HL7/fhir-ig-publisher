@@ -78,12 +78,14 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import java.io.*;
+import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.function.Predicate;
 
 import static org.hl7.fhir.igtools.publisher.Publisher.IG_NAME;
 import static org.hl7.fhir.igtools.publisher.Publisher.TOOLING_IG_CURRENT_RELEASE;
@@ -93,6 +95,25 @@ import static org.hl7.fhir.igtools.publisher.Publisher.TOOLING_IG_CURRENT_RELEAS
  */
 
 public class PublisherIGLoader extends PublisherBase {
+  /**
+   * Repeating complex extension on {@code ImplementationGuide.dependsOn} that overrides, adds, or
+   * removes a dependency for a specific target FHIR version. Sub-extensions:
+   * {@code fhirVersion} (code, 1..1), {@code packageId} (id, 0..1), {@code version} (string, 0..1),
+   * {@code use} (code, 0..1: {@code override} (default) | {@code remove}). Read by literal URL,
+   * mirroring the pattern already used for {@code ig-link-dependency}. The exact URL is not yet
+   * ratified in the tools IG (Open Question) and is isolated here so a rename is one line.
+   */
+  public static final String EXT_IG_DEP_VERSION = "http://hl7.org/fhir/tools/StructureDefinition/ig-dependency-for-version";
+
+  /**
+   * {@code EXT_IGDEP_COMMENT} markdown values written on the auto-added HL7 Extension Pack / HL7
+   * Terminology dependencies. Kept as constants so the single source of truth is shared between the
+   * add site (where the comment is written) and the per-version dedup in {@link #applyPerVersionDeps}
+   * (where an auto-added entry is recognised by this comment).
+   */
+  static final String AUTO_DEP_COMMENT_EXTENSIONS = "Automatically added as a dependency - all IGs depend on the HL7 Extension Pack";
+  static final String AUTO_DEP_COMMENT_UTG = "Automatically added as a dependency - all IGs depend on HL7 Terminology";
+
   private List<StructureDefinition> additionalResources = new ArrayList<>();
 
   public PublisherIGLoader(PublisherSettings settings) {
@@ -569,9 +590,24 @@ public class PublisherIGLoader extends PublisherBase {
           if (p.getValue().equals("true")) {
             pf.logLoading = true;
           }
-        case "generate-version":
-          pf.generateVersions.add(p.getValue());
           break;
+        case "generate-version": {
+          String gv = p.getValue();
+          ValidationMessage tokenIssue = versionTokenIssue(gv, "ImplementationGuide.definition.parameter[generate-version]", true);
+          if (tokenIssue != null) {
+            pf.errors.add(tokenIssue);
+          } else {
+            if (!gv.toLowerCase().startsWith("r")) {
+              pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher,
+                  ValidationMessage.IssueType.BUSINESSRULE, "ImplementationGuide.definition.parameter[generate-version]",
+                  "generate-version '"+gv+"' is a numeric FHIR version code; use the canonical short form '"+canonicalTargetOrNull(gv)+"' instead. "
+                  + "Numeric codes are accepted but yield non-canonical package identifiers/metadata and may not match upstream package names.",
+                  ValidationMessage.IssueSeverity.WARNING).setMessageId(PublisherMessageIds.GENERATE_VERSION_NUMERIC_TOKEN));
+            }
+            pf.generateVersions.add(gv);
+          }
+          break;
+        }
         case "conversion-version":
           conversionVersions.add(p.getValue());
           break;
@@ -664,6 +700,15 @@ public class PublisherIGLoader extends PublisherBase {
           break;
         case "r4b-exclusion":
           pf.r4bExclusions.add(p.getValue());
+          break;
+        case "r4-inclusion":
+          pf.r4Inclusions.add(p.getValue());
+          break;
+        case "r4b-inclusion":
+          pf.r4bInclusions.add(p.getValue());
+          break;
+        case "r5-inclusion":
+          pf.r5Inclusions.add(p.getValue());
           break;
         case "display-warnings":
           pf.displayWarnings = "true".equals(p.getValue());
@@ -992,27 +1037,45 @@ public class PublisherIGLoader extends PublisherBase {
     pf.fetcher.setContext(pf.context);
     pf.template.loadSummaryRows(pf.igpkp.summaryRows());
 
-    if (VersionUtilities.isR4Plus(pf.version) && !dependsOnExtensions(pf.sourceIg.getDependsOn()) && !pf.packageId().contains("hl7.fhir.uv.extensions")) {
+    boolean multiVersion = !pf.generateVersions.isEmpty();
+    // In a multi-version build, decide "is this family already supplied?" from the entries applicable
+    // to the base FHIR version, not the raw list - a dependency scoped to another version must not
+    // suppress this package's auto-add. Capture raw-list family presence up front (before the
+    // extensions/UTG auto-adds mutate pf.sourceIg.getDependsOn() in place) for the INFORMATION check.
+    List<ImplementationGuide.ImplementationGuideDependsOnComponent> guardDeps = autoDepGuardView(pf.sourceIg.getDependsOn(), canonicalTarget(pf.version), multiVersion);
+    boolean rawHadExt = dependsOnExtensions(pf.sourceIg.getDependsOn());
+    boolean rawHadUTG = dependsOnUTG(pf.sourceIg.getDependsOn());
+    boolean rawHadTooling = dependsOnTooling(pf.sourceIg.getDependsOn());
+
+    if (VersionUtilities.isR4Plus(pf.version) && !dependsOnExtensions(guardDeps) && !pf.packageId().contains("hl7.fhir.uv.extensions")) {
       ImplementationGuide.ImplementationGuideDependsOnComponent dep = new ImplementationGuide.ImplementationGuideDependsOnComponent();
       dep.setUserData(UserDataNames.pub_no_load_deps, "true");
       dep.setId("hl7ext");
       dep.setPackageId(getExtensionsPackageName());
       dep.setUri("http://hl7.org/fhir/extensions/ImplementationGuide/hl7.fhir.uv.extensions");
       dep.setVersion(pf.pcm.getLatestVersion(dep.getPackageId(), true));
-      dep.addExtension(ExtensionDefinitions.EXT_IGDEP_COMMENT, new MarkdownType("Automatically added as a dependency - all IGs depend on the HL7 Extension Pack"));
+      dep.addExtension(ExtensionDefinitions.EXT_IGDEP_COMMENT, new MarkdownType(AUTO_DEP_COMMENT_EXTENSIONS));
       pf.sourceIg.getDependsOn().add(0, dep);
+      if (multiVersion && rawHadExt) {
+        pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.INFORMATIONAL, "ImplementationGuide.dependsOn",
+                "The HL7 Extension Pack ("+dep.getPackageId()+") was automatically added for the "+pf.version+" package: the declared dependency on the HL7 Extension Pack is scoped to other FHIR versions only", ValidationMessage.IssueSeverity.INFORMATION));
+      }
     }
-    if (!dependsOnUTG(pf.sourceIg.getDependsOn()) && !pf.packageId().contains("hl7.terminology")) {
+    if (!dependsOnUTG(guardDeps) && !pf.packageId().contains("hl7.terminology")) {
       ImplementationGuide.ImplementationGuideDependsOnComponent dep = new ImplementationGuide.ImplementationGuideDependsOnComponent();
       dep.setUserData(UserDataNames.pub_no_load_deps, "true");
       dep.setId("hl7tx");
       dep.setPackageId(getUTGPackageName());
       dep.setUri("http://terminology.hl7.org/ImplementationGuide/hl7.terminology");
       dep.setVersion(pf.pcm.getLatestVersion(dep.getPackageId(), true));
-      dep.addExtension(ExtensionDefinitions.EXT_IGDEP_COMMENT, new MarkdownType("Automatically added as a dependency - all IGs depend on HL7 Terminology"));
+      dep.addExtension(ExtensionDefinitions.EXT_IGDEP_COMMENT, new MarkdownType(AUTO_DEP_COMMENT_UTG));
       pf.sourceIg.getDependsOn().add(0, dep);
+      if (multiVersion && rawHadUTG) {
+        pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.INFORMATIONAL, "ImplementationGuide.dependsOn",
+                "HL7 Terminology ("+dep.getPackageId()+") was automatically added for the "+pf.version+" package: the declared dependency on HL7 Terminology is scoped to other FHIR versions only", ValidationMessage.IssueSeverity.INFORMATION));
+      }
     }
-    if (!pf.packageId().contains("hl7.fhir.uv.tools") && !dependsOnTooling(pf.sourceIg.getDependsOn())) {
+    if (!pf.packageId().contains("hl7.fhir.uv.tools") && !dependsOnTooling(guardDeps)) {
       String toolingPackageName = getToolingPackageName();
       String toolingPackageId = toolingPackageName +"#"+TOOLING_IG_CURRENT_RELEASE;
       boolean toolsExists = false;
@@ -1025,6 +1088,10 @@ public class PublisherIGLoader extends PublisherBase {
       }
       if (!toolsExists) {
         pf.sourceIg.getDefinition().addExtension(ExtensionConstants.EXT_IGINTERNAL_DEPENDENCY, new CodeType(toolingPackageId));
+      }
+      if (multiVersion && rawHadTooling) {
+        pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.INFORMATIONAL, "ImplementationGuide.dependsOn",
+                "HL7 FHIR Tooling ("+toolingPackageName+") was automatically added for the "+pf.version+" package: the declared dependency on HL7 FHIR Tooling is scoped to other FHIR versions only", ValidationMessage.IssueSeverity.INFORMATION));
       }
     }
 
@@ -1055,11 +1122,19 @@ public class PublisherIGLoader extends PublisherBase {
     }
 
     int i = 0;
+    validateDependencyVersionTokens(pf.sourceIg, pf.errors);
     for (ImplementationGuide.ImplementationGuideDependsOnComponent dep : pf.sourceIg.getDependsOn()) {
-      loadIg(dep, i, !dep.hasUserData(UserDataNames.pub_no_load_deps), false);
+      if (isDepApplicableForVersion(dep, canonicalTarget(pf.version))) {
+        // Load the base-target *effective* dependency (author EXT_IG_DEP_VERSION packageId/version
+        // overrides applied) on a copy, so the build resolves the same package the base manifest,
+        // dependency table, and publication check declare - without mutating the shared source IG.
+        ImplementationGuide.ImplementationGuideDependsOnComponent effective = dep.copy();
+        applyEffectiveOverride(effective, pf.version, pf.version);
+        loadIg(effective, i, !dep.hasUserData(UserDataNames.pub_no_load_deps), false);
+      }
       i++;
     }
-    if (!pf.packageId().contains("hl7.fhir.uv.tools") && !dependsOnTooling(pf.sourceIg.getDependsOn())) {
+    if (!pf.packageId().contains("hl7.fhir.uv.tools") && !dependsOnTooling(guardDeps)) {
       loadIg("igtools", getToolingPackageName(), TOOLING_IG_CURRENT_RELEASE, "http://hl7.org/fhir/tools/ImplementationGuide/hl7.fhir.uv.tools", i, false, true);
     }
     for (Extension ig : pf.sourceIg.getDefinition().getExtensionsByUrl(ExtensionConstants.EXT_IGINTERNAL_DEPENDENCY)) {
@@ -1534,7 +1609,7 @@ public class PublisherIGLoader extends PublisherBase {
   }
 
 
-  private boolean dependsOnUTG(List<ImplementationGuide.ImplementationGuideDependsOnComponent> dependsOn) {
+  static boolean dependsOnUTG(List<ImplementationGuide.ImplementationGuideDependsOnComponent> dependsOn) {
     for (ImplementationGuide.ImplementationGuideDependsOnComponent d : dependsOn) {
       if (d.hasPackageId() && d.getPackageId().contains("hl7.terminology")) {
         return true;
@@ -1547,7 +1622,7 @@ public class PublisherIGLoader extends PublisherBase {
   }
 
 
-  private boolean dependsOnTooling(List<ImplementationGuide.ImplementationGuideDependsOnComponent> dependsOn) {
+  static boolean dependsOnTooling(List<ImplementationGuide.ImplementationGuideDependsOnComponent> dependsOn) {
     for (ImplementationGuide.ImplementationGuideDependsOnComponent d : dependsOn) {
       if (d.hasPackageId() && d.getPackageId().contains("hl7.fhir.uv.tools")) {
         return true;
@@ -1560,7 +1635,7 @@ public class PublisherIGLoader extends PublisherBase {
   }
 
 
-  private boolean dependsOnExtensions(List<ImplementationGuide.ImplementationGuideDependsOnComponent> dependsOn) {
+  static boolean dependsOnExtensions(List<ImplementationGuide.ImplementationGuideDependsOnComponent> dependsOn) {
     for (ImplementationGuide.ImplementationGuideDependsOnComponent d : dependsOn) {
       if (d.hasPackageId() && Utilities.existsInList(d.getPackageId(), "hl7.fhir.uv.extensions", "hl7.fhir.uv.extensions.r3", "hl7.fhir.uv.extensions.r4", "hl7.fhir.uv.extensions.r5", "hl7.fhir.uv.extensions.r6")) {
         return true;
@@ -1570,6 +1645,27 @@ public class PublisherIGLoader extends PublisherBase {
       }
     }
     return false;
+  }
+
+  /**
+   * The view of {@code dependsOn} that the auto-add guards consult when deciding whether a family
+   * (Extensions / UTG / Tooling) is already supplied. In a <b>multi-version</b> build only entries
+   * applicable to {@code canonicalVer} (see {@link #isDepApplicableForVersion}) are considered, so a
+   * dependency an author scoped to <i>another</i> FHIR version no longer suppresses the base
+   * package's auto-add. In a single-version build the raw list is returned unchanged (same reference)
+   * so legacy suppression behaviour is preserved byte-for-byte.
+   */
+  static List<ImplementationGuide.ImplementationGuideDependsOnComponent> autoDepGuardView(List<ImplementationGuide.ImplementationGuideDependsOnComponent> dependsOn, String canonicalVer, boolean multiVersion) {
+    if (!multiVersion) {
+      return dependsOn;
+    }
+    List<ImplementationGuide.ImplementationGuideDependsOnComponent> view = new ArrayList<>();
+    for (ImplementationGuide.ImplementationGuideDependsOnComponent dep : dependsOn) {
+      if (isDepApplicableForVersion(dep, canonicalVer)) {
+        view.add(dep);
+      }
+    }
+    return view;
   }
 
 
@@ -1920,7 +2016,7 @@ public class PublisherIGLoader extends PublisherBase {
 
   private InputStream fetchFromSource(String id, String source) throws IOException {
     logDebugMessage(LogCategory.INIT, "Fetch "+id+" package from "+source);
-    URL url = new URL(source+"?nocache=" + System.currentTimeMillis());
+    URL url = URI.create(source+"?nocache=" + System.currentTimeMillis()).toURL();
     URLConnection c = url.openConnection();
     return c.getInputStream();
   }
@@ -2292,12 +2388,19 @@ public class PublisherIGLoader extends PublisherBase {
       if (!dep.hasPackageId())
         throw new FHIRException("Unknown package id for "+dep.getUri());
     }
-    pf.npm = new NPMPackageGenerator(pf.packageId(), Utilities.path(pf.outputDir, "package.tgz"), pf.igpkp.getCanonical(), targetUrl(), PackageGenerator.PackageType.IG, pf.publishedIg, pf.getExecTime().getTime(), relatedIgMap(), !settings.isPublishing());
+    ImplementationGuide baseVig = pf.publishedIg.copy();
+    preserveAliasUserData(pf.publishedIg, baseVig);
+    applyPerVersionDeps(baseVig, pf.version, pf.version);
+    pf.effectiveBaseIg = baseVig;
+    pf.npm = new NPMPackageGenerator(pf.packageId(), Utilities.path(pf.outputDir, "package.tgz"), pf.igpkp.getCanonical(), targetUrl(), PackageGenerator.PackageType.IG, baseVig, pf.getExecTime().getTime(), relatedIgMap(), !settings.isPublishing());
     for (String v : pf.generateVersions) {
       ImplementationGuide vig = pf.publishedIg.copy();
+      preserveAliasUserData(pf.publishedIg, vig);
       checkIgDeps(vig, v);
-      pf.vnpms.put(v, new NPMPackageGenerator(pf.packageId()+"."+v, Utilities.path(pf.outputDir, pf.basePackageId()+"."+v+".tgz"),
-              pf.igpkp.getCanonical(), targetUrl(), PackageGenerator.PackageType.IG,  vig, pf.getExecTime().getTime(), relatedIgMap(), !settings.isPublishing(), VersionUtilities.versionFromCode(v)));
+      pf.effectiveVersionIgs.put(v, vig);
+      String vSuffix = suffixName(v);
+      pf.vnpms.put(v, new NPMPackageGenerator(pf.packageId()+"."+vSuffix, Utilities.path(pf.outputDir, pf.basePackageId()+"."+vSuffix+".tgz"),
+              pf.igpkp.getCanonical(), targetUrl(), PackageGenerator.PackageType.IG,  vig, pf.getExecTime().getTime(), relatedIgMap(), !settings.isPublishing(), canonicalVersion(v)));
     }
     if (isNewML()) {
       for (String l : allLangs()) {
@@ -2351,6 +2454,11 @@ public class PublisherIGLoader extends PublisherBase {
     }
     for (String s : pf.r4bExclusions) {
       pf.r4tor4b.markExempt(s, false);
+    }
+    if (VersionUtilities.isR5Plus(pf.version) && !pf.generateVersions.isEmpty()) {
+      pf.cvAnalyser = new CrossVersionAnalyser();
+      pf.cvAnalyser.setContext(pf.context);
+      pf.cvAnalyser.setTargets(pf.generateVersions);
     }
     pf.realmRules = makeRealmBusinessRules();
     pf.previousVersionComparator = makePreviousVersionComparator();
@@ -2689,13 +2797,309 @@ public class PublisherIGLoader extends PublisherBase {
   }
 
   private void checkIgDeps(ImplementationGuide vig, String ver) {
-    if ("r4b".equals(ver)) {
-      ver = "r4";
+    applyPerVersionDeps(vig, ver, pf.context.getVersion());
+  }
+
+  /**
+   * A stable key used for all FHIR-version <i>matching</i> (generate-version tokens,
+   * {@code EXT_IG_DEP_VERSION.fhirVersion}, resource inclusion targets). Folds every spelling of a
+   * version onto its family: {@code 4.0}/{@code 4.0.1}/{@code r4} -&gt; {@code r4},
+   * {@code 4.3}/{@code 4.3.0}/{@code r4b} -&gt; {@code r4b}, {@code 5.0.0}/{@code r5} -&gt; {@code r5}.
+   * <p>
+   * NB: {@code VersionUtilities.versionFromCode} is deliberately <b>not</b> used as the match key -
+   * it leaves {@code 4.0}/{@code 4.3} unexpanded (does not yield {@code 4.0.1}/{@code 4.3.0}), so it
+   * cannot reliably equate an author's {@code generate-version 4.0} with an extension
+   * {@code fhirVersion 4.0.1}. Family-name folding via {@code getNameForVersion} does.
+   */
+  public static String canonicalTarget(String token) {
+    return VersionUtilities.getNameForVersion(token).toLowerCase();
+  }
+
+  /**
+   * Null-safe counterpart of {@link #canonicalTarget} for <b>author-supplied</b> version tokens
+   * (the {@code generate-version} parameter and {@code EXT_IG_DEP_VERSION.fhirVersion}). Returns the
+   * lowercased family ({@code r2}..{@code r6}) for a recognised version, or {@code null} when the
+   * token is non-semver (so {@code getNameForVersion} throws) <b>or</b> resolves to the unknown
+   * family {@code "R?"} (e.g. {@code 4.2.0}). Never throws. {@link #canonicalTarget} itself is left
+   * unchanged so build-internal (already-validated) callers keep their current behaviour.
+   */
+  public static String canonicalTargetOrNull(String token) {
+    try {
+      String name = VersionUtilities.getNameForVersion(token);
+      if (name == null || "R?".equals(name)) {
+        return null;
+      }
+      return name.toLowerCase();
+    } catch (Exception e) {
+      return null;
     }
-    String ov = VersionUtilities.getNameForVersion(pf.context.getVersion()).toLowerCase();
+  }
+
+  /**
+   * Validates an author-supplied FHIR version token, returning a {@link ValidationMessage} to report
+   * (or {@code null} when the token is a recognised version). A {@code generate-version} token that
+   * cannot be resolved is an {@link ValidationMessage.IssueSeverity#ERROR}
+   * ({@link PublisherMessageIds#GENERATE_VERSION_UNKNOWN}) - that target is skipped; an unresolved
+   * {@code EXT_IG_DEP_VERSION.fhirVersion} is a {@link ValidationMessage.IssueSeverity#WARNING}
+   * ({@link PublisherMessageIds#DEPENDENCY_VERSION_UNKNOWN}) - the version-specific override is
+   * ignored and the dependency keeps its default (legacy) behaviour.
+   */
+  static ValidationMessage versionTokenIssue(String token, String path, boolean isGenerateVersion) {
+    if (canonicalTargetOrNull(token) != null) {
+      return null;
+    }
+    if (isGenerateVersion) {
+      return new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE, path,
+          "generate-version '"+token+"' is not a recognised FHIR version; expected one of r2/r3/r4/r4b/r5/r6 "
+          + "(or an equivalent numeric code such as 4.0.1). No package is generated for this token.",
+          ValidationMessage.IssueSeverity.ERROR).setMessageId(PublisherMessageIds.GENERATE_VERSION_UNKNOWN);
+    } else {
+      return new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE, path,
+          "dependency fhirVersion '"+token+"' is not a recognised FHIR version; expected one of r2/r3/r4/r4b/r5/r6 "
+          + "(or an equivalent numeric code such as 4.0.1). The version-specific override is ignored and the dependency keeps its default behaviour.",
+          ValidationMessage.IssueSeverity.WARNING).setMessageId(PublisherMessageIds.DEPENDENCY_VERSION_UNKNOWN);
+    }
+  }
+
+  /**
+   * Emits one {@link PublisherMessageIds#DEPENDENCY_VERSION_UNKNOWN} warning per unresolved
+   * {@code EXT_IG_DEP_VERSION.fhirVersion} across the IG's {@code dependsOn} entries. Run once at
+   * load time so the author is told about a typo'd override token rather than the override being
+   * silently ignored - and so the warning is not multiplied per generated version.
+   */
+  static void validateDependencyVersionTokens(ImplementationGuide ig, List<ValidationMessage> errors) {
+    for (ImplementationGuide.ImplementationGuideDependsOnComponent dep : ig.getDependsOn()) {
+      String path = "ImplementationGuide.dependsOn["+(dep.hasPackageId() ? dep.getPackageId() : dep.getId())+"]";
+      for (Extension ext : dep.getExtensionsByUrl(EXT_IG_DEP_VERSION)) {
+        String fv = ExtensionUtilities.readStringExtension(ext, "fhirVersion");
+        if (fv != null) {
+          ValidationMessage vm = versionTokenIssue(fv, path, false);
+          if (vm != null) {
+            errors.add(vm);
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Lowercase short name ({@code r4}/{@code r4b}/{@code r5}) of a version, used only for the legacy
+   * package-id suffix rename - never as a match key.
+   */
+  static String suffixName(String token) {
+    return VersionUtilities.getNameForVersion(token).toLowerCase();
+  }
+
+  /**
+   * The canonical full version ({@code 4.0.1}/{@code 4.3.0}/{@code 5.0.0}) for a
+   * generate-version token, folding numeric short forms ({@code 4.0}/{@code 4.3}) and
+   * symbolic spellings ({@code r4}/{@code r4b}/{@code r5}) onto the family's canonical
+   * version. Used only where a concrete FHIRVersion/package fhirVersion is stamped -
+   * never as a match key.
+   */
+  static String canonicalVersion(String token) {
+    return VersionUtilities.versionFromCode(canonicalTarget(token));
+  }
+
+  /**
+   * Whether a {@code dependsOn} entry applies to the given (canonical, see {@link #canonicalTarget})
+   * FHIR version:
+   * <ul>
+   *   <li>no {@code EXT_IG_DEP_VERSION} occurrences -&gt; applies to every version (legacy behaviour);</li>
+   *   <li>an occurrence matching {@code canonicalVer} -&gt; applies unless that occurrence is {@code use=remove};</li>
+   *   <li>occurrences present but none matches -&gt; version-scoped, so it does <b>not</b> apply.</li>
+   * </ul>
+   * This single predicate is consulted at every {@code dependsOn} consumer (the dependency load loop,
+   * base/variant package generation, the dependency table, and the publication check) so a
+   * version-scoped entry is never loaded, validated, rendered, or packaged for a version it does not
+   * apply to.
+   */
+  public static boolean isDepApplicableForVersion(ImplementationGuide.ImplementationGuideDependsOnComponent dep, String canonicalVer) {
+    List<Extension> occurrences = dep.getExtensionsByUrl(EXT_IG_DEP_VERSION);
+    boolean anyResolvable = false;
+    for (Extension ext : occurrences) {
+      String fv = ExtensionUtilities.readStringExtension(ext, "fhirVersion");
+      String depVer = fv == null ? null : canonicalTargetOrNull(fv);
+      if (depVer == null) {
+        continue; // unresolvable/typo'd fhirVersion - treat the occurrence as absent (never throw)
+      }
+      anyResolvable = true;
+      if (depVer.equals(canonicalVer)) {
+        return !"remove".equals(ExtensionUtilities.readStringExtension(ext, "use"));
+      }
+    }
+    // no occurrences, or none resolvable -> legacy behaviour: applies to every version
+    return !anyResolvable;
+  }
+
+  /**
+   * Re-apply the {@link UserDataNames#IG_DEP_ALIASED} marker onto {@code to}'s {@code dependsOn}
+   * entries wherever the corresponding entry in {@code from} carries it.
+   * <p>
+   * The marker is transient {@code userData} set at load time (see the {@code @npm:} alias parsing
+   * in {@link #loadIg}); it tells {@code NPMPackageGenerator} to emit {@code <id>@npm:<packageId>}
+   * in the generated {@code package.json} rather than the bare {@code packageId}. A plain
+   * {@link ImplementationGuide#copy()} performed before rendering (when {@code Base.copyUserData}
+   * is still {@code false}) silently drops it, so every per-version/base copy must restore it or the
+   * emitted package manifests lose their npm aliases.
+   * <p>
+   * Must be called <em>immediately</em> after the copy, before {@link #applyPerVersionDeps} (or
+   * {@code checkIgDeps}) mutates the list — the two lists are only guaranteed to be positionally
+   * aligned at that point.
+   */
+  public static void preserveAliasUserData(ImplementationGuide from, ImplementationGuide to) {
+    if (from == null || to == null) {
+      return;
+    }
+    List<ImplementationGuide.ImplementationGuideDependsOnComponent> fromDeps = from.getDependsOn();
+    List<ImplementationGuide.ImplementationGuideDependsOnComponent> toDeps = to.getDependsOn();
+    int n = Math.min(fromDeps.size(), toDeps.size());
+    for (int i = 0; i < n; i++) {
+      if (fromDeps.get(i).getPackageIdElement().hasUserData(UserDataNames.IG_DEP_ALIASED)) {
+        toDeps.get(i).getPackageIdElement().setUserData(UserDataNames.IG_DEP_ALIASED, true);
+      }
+    }
+  }
+
+  /**
+   * Transform, in place, {@code vig}'s {@code dependsOn} into the effective set for target FHIR
+   * version {@code targetToken} (a generate-version token, or the base version for the R5 "base
+   * view"). Replaces the historical suffix-rename that lived in {@code checkIgDeps}:
+   * <ul>
+   *   <li>entries not applicable for the target (see {@link #isDepApplicableForVersion}) are removed;</li>
+   *   <li>entries with a matching {@code EXT_IG_DEP_VERSION} occurrence get its {@code packageId}/{@code version} overrides;</li>
+   *   <li>entries without the extension get the legacy package-id suffix rename
+   *       ({@code .<sourceSuffix>} -&gt; {@code .<targetSuffix>}, preserving today's {@code r4b}-&gt;{@code r4}
+   *       forcing), except when the target is the source version itself (the base view), where no rename applies.</li>
+   * </ul>
+   */
+  /**
+   * Apply, in place, the effective per-target transform to a single {@code dependsOn} entry for
+   * target {@code targetToken} (with base FHIR version {@code sourceVersion}). This is the exact
+   * per-entry logic {@link #applyPerVersionDeps} runs, factored out so the dependency <i>loader</i>
+   * (which must load the overridden package) and the manifest/table/check <i>writers</i> cannot
+   * diverge:
+   * <ul>
+   *   <li>an entry with a matching {@code EXT_IG_DEP_VERSION} occurrence takes that occurrence's
+   *       {@code packageId}/{@code version} overrides;</li>
+   *   <li>an entry without the extension gets the legacy {@code .<sourceSuffix>} -&gt;
+   *       {@code .<targetSuffix>} package-id rename (preserving the {@code r4b}-&gt;{@code r4}
+   *       forcing), except when the target is the source version itself (the base view).</li>
+   * </ul>
+   * Applicability ({@link #isDepApplicableForVersion}) and auto-added-family de-duplication are the
+   * caller's responsibility ({@link #applyPerVersionDeps} does both around this call).
+   */
+  public static void applyEffectiveOverride(ImplementationGuide.ImplementationGuideDependsOnComponent dep, String targetToken, String sourceVersion) {
+    String canonicalVer = canonicalTarget(targetToken);
+    boolean targetIsSource = canonicalVer.equals(canonicalTarget(sourceVersion));
+    String sourceSuffix = suffixName(sourceVersion);
+    String targetSuffix = suffixName(targetToken);
+    String legacyTarget = "r4b".equals(targetSuffix) ? "r4" : targetSuffix;
+    List<Extension> occurrences = dep.getExtensionsByUrl(EXT_IG_DEP_VERSION);
+    if (occurrences.isEmpty()) {
+      if (!targetIsSource && dep.getPackageId() != null && dep.getPackageId().endsWith("."+sourceSuffix)) {
+        dep.setPackageId(dep.getPackageId().replace("."+sourceSuffix, "."+legacyTarget));
+      }
+      return;
+    }
+    for (Extension ext : occurrences) {
+      String fv = ExtensionUtilities.readStringExtension(ext, "fhirVersion");
+      String depVer = fv == null ? null : canonicalTargetOrNull(fv);
+      if (depVer != null && depVer.equals(canonicalVer)) {
+        String pid = ExtensionUtilities.readStringExtension(ext, "packageId");
+        String version = ExtensionUtilities.readStringExtension(ext, "version");
+        if (pid != null) {
+          dep.setPackageId(pid);
+        }
+        if (version != null) {
+          dep.setVersion(version);
+        }
+        return;
+      }
+    }
+  }
+
+  public static void applyPerVersionDeps(ImplementationGuide vig, String targetToken, String sourceVersion) {
+    String canonicalVer = canonicalTarget(targetToken);
+    vig.getDependsOn().removeIf(dep -> !isDepApplicableForVersion(dep, canonicalVer));
     for (ImplementationGuide.ImplementationGuideDependsOnComponent dep : vig.getDependsOn()) {
-      if (dep.getPackageId().endsWith("."+ov) ) {
-        dep.setPackageId(dep.getPackageId().replace("."+ov, "."+ver));
+      applyEffectiveOverride(dep, targetToken, sourceVersion);
+    }
+    dedupAutoAddedFamily(vig.getDependsOn(), PublisherIGLoader::isUTGFamily);
+    dedupAutoAddedFamily(vig.getDependsOn(), PublisherIGLoader::isExtensionsFamily);
+  }
+
+  /**
+   * True when {@code dep} is one of the auto-added HL7 Extension Pack / HL7 Terminology dependencies,
+   * recognised by the {@link ExtensionDefinitions#EXT_IGDEP_COMMENT} marker written at the add site
+   * (a copy-safe persisted extension, unlike transient {@code userData}).
+   */
+  private static boolean isAutoAddedDep(ImplementationGuide.ImplementationGuideDependsOnComponent dep) {
+    String comment = ExtensionUtilities.readStringExtension(dep, ExtensionDefinitions.EXT_IGDEP_COMMENT);
+    return AUTO_DEP_COMMENT_EXTENSIONS.equals(comment) || AUTO_DEP_COMMENT_UTG.equals(comment);
+  }
+
+  /** Single-entry counterpart of {@link #dependsOnUTG(List)} (HL7 Terminology / UTG family). */
+  private static boolean isUTGFamily(ImplementationGuide.ImplementationGuideDependsOnComponent dep) {
+    if (dep.hasPackageId() && dep.getPackageId().contains("hl7.terminology")) {
+      return true;
+    }
+    return dep.hasUri() && dep.getUri().contains("terminology.hl7");
+  }
+
+  /** Single-entry counterpart of {@link #dependsOnExtensions(List)} (HL7 Extension Pack family). */
+  private static boolean isExtensionsFamily(ImplementationGuide.ImplementationGuideDependsOnComponent dep) {
+    if (dep.hasPackageId() && Utilities.existsInList(dep.getPackageId(), "hl7.fhir.uv.extensions", "hl7.fhir.uv.extensions.r3", "hl7.fhir.uv.extensions.r4", "hl7.fhir.uv.extensions.r5", "hl7.fhir.uv.extensions.r6")) {
+      return true;
+    }
+    return dep.hasUri() && dep.getUri().contains("hl7.org/fhir/extensions");
+  }
+
+  /**
+   * After the per-version transform, collapse a single auto-added family (UTG or Extensions) to at
+   * most one entry, preferring the author's applicable entry over the un-scoped auto-added one:
+   * <ul>
+   *   <li><b>(A) author-wins</b> - if the family has both an auto-added entry and a non-auto entry,
+   *       drop the auto-added entry(ies);</li>
+   *   <li><b>(B) exact-packageId safety net</b> - if two entries in this family still share a final
+   *       {@code packageId} <i>and at least one of them is the auto-added entry</i> (e.g. an author
+   *       copied the auto-comment onto their own entry, so (A) could not tell them apart), keep the
+   *       last occurrence (authored entries are appended after the index-0 auto entry) and drop the
+   *       earlier one(s).</li>
+   * </ul>
+   * Confined to the two auto-added families, and (B) further confined to duplicates that involve an
+   * auto-added entry, so a pure author-vs-author duplicate {@code packageId} still surfaces as it
+   * does today (a hard packaging error, not a silent merge) rather than being quietly collapsed.
+   */
+  private static void dedupAutoAddedFamily(List<ImplementationGuide.ImplementationGuideDependsOnComponent> deps, Predicate<ImplementationGuide.ImplementationGuideDependsOnComponent> inFamily) {
+    boolean hasAuto = false;
+    boolean hasNonAuto = false;
+    for (ImplementationGuide.ImplementationGuideDependsOnComponent dep : deps) {
+      if (inFamily.test(dep)) {
+        if (isAutoAddedDep(dep)) {
+          hasAuto = true;
+        } else {
+          hasNonAuto = true;
+        }
+      }
+    }
+    if (hasAuto && hasNonAuto) {
+      deps.removeIf(dep -> inFamily.test(dep) && isAutoAddedDep(dep));
+    }
+    Set<String> autoPackageIds = new HashSet<>();
+    for (ImplementationGuide.ImplementationGuideDependsOnComponent dep : deps) {
+      if (inFamily.test(dep) && isAutoAddedDep(dep) && dep.getPackageId() != null) {
+        autoPackageIds.add(dep.getPackageId());
+      }
+    }
+    Set<String> seen = new HashSet<>();
+    for (int i = deps.size() - 1; i >= 0; i--) {
+      ImplementationGuide.ImplementationGuideDependsOnComponent dep = deps.get(i);
+      if (!inFamily.test(dep) || dep.getPackageId() == null || !autoPackageIds.contains(dep.getPackageId())) {
+        continue;
+      }
+      if (!seen.add(dep.getPackageId())) {
+        deps.remove(i);
       }
     }
   }

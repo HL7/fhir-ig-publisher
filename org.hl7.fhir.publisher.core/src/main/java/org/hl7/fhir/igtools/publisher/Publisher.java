@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.file.Path;
@@ -440,8 +441,8 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       deleteDuplicateMessages();
       ValidationPresenter val = new ValidationPresenter(pf.version, workingVersion(), pf.igpkp, pf.childPublisher == null? null : pf.childPublisher.getIgpkp(), pf.rootDir, pf.npmName, pf.childPublisher == null? null : pf.childPublisher.pf.npmName,
           IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), pf.realmRules, pf.previousVersionComparator, pf.ipaComparator, pf.ipsComparator,
-          new DependencyRenderer(pf.pcm, pf.outputDir, pf.npmName, pf.templateManager, pf.dependencyList, pf.context, pf.markdownEngine, pf.rc, pf.specMaps).render(pf.publishedIg, true, false, false), new HTAAnalysisRenderer(pf.context, pf.outputDir, pf.markdownEngine).render(pf.packageId(), pf.fileList, pf.publishedIg.present()),
-          new PublicationChecker(pf.repoRoot, pf.historyPage, pf.markdownEngine, findReleaseLabelString(), pf.publishedIg, pf.relatedIGs).check(), renderGlobals(), pf.copyrightYear, pf.context, scanForR5Extensions(), pf.modifierExtensions,
+          new DependencyRenderer(pf.pcm, pf.outputDir, pf.npmName, pf.templateManager, pf.dependencyList, pf.context, pf.markdownEngine, pf.rc, pf.specMaps).render(pf.getEffectiveBaseIg(), true, false, false), new HTAAnalysisRenderer(pf.context, pf.outputDir, pf.markdownEngine).render(pf.packageId(), pf.fileList, pf.publishedIg.present()),
+          new PublicationChecker(pf.repoRoot, pf.historyPage, pf.markdownEngine, findReleaseLabelString(), pf.getEffectiveBaseIg(), pf.relatedIGs).check(), renderGlobals(), pf.copyrightYear, pf.context, scanForR5Extensions(), pf.modifierExtensions,
           generateDraftDependencies(), pf.noNarrativeResources, pf.noValidateResources, settings.isValidationOff(), settings.isGenerationOff(), pf.dependentIgFinder, pf.context.getTxClientManager(),
           fragments, makeLangInfo(), pf.relatedIGs);
       val.setValidationFlags(pf.hintAboutNonMustSupport, pf.anyExtensionsAllowed, pf.checkAggregation, pf.autoLoad, pf.showReferenceMessages, pf.noExperimentalContent, pf.displayWarnings);
@@ -1135,7 +1136,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 
 
   private void download(String address, String filename) throws IOException {
-    URL url = new URL(address);
+    URL url = URI.create(address).toURL();
     URLConnection c = url.openConnection();
     InputStream s = c.getInputStream();
     FileOutputStream f = new FileOutputStream(filename);
