@@ -137,7 +137,29 @@
   // counterpart may or may not exist, so each candidate (normally at most one) is
   // verified with a single HEAD request before a link is added. Needs a server -
   // skipped on file://, where the baked list stands.
-  function appendNewMilestones(span, list) {
+  //
+  // Candidates are probed and linked relative to the HOST THIS PAGE IS SERVED FROM
+  // (derived from the page's own URL: it ends with <version>/<data-pb-rel>, or just
+  // <data-pb-rel> for the copy at the IG root). At the canonical host that resolves to
+  // the same URLs the baked links use; on a mirror (preview/staging) it keeps the probe
+  // same-origin - a probe of the canonical host from a mirror would be blocked by CORS -
+  // and keeps the reader on the mirror. Falls back to the canonical URL when the page's
+  // URL does not have the expected shape or the milestone is not under the canonical.
+  function igRootHere(span) {
+    var rel = span.getAttribute("data-pb-rel") || "";
+    var ver = span.getAttribute("data-pb-version") || "";
+    var path = location.pathname;
+    if (!rel || path.length <= rel.length || path.slice(-rel.length) !== rel) {
+      return null;
+    }
+    path = path.slice(0, -rel.length).replace(/\/+$/, "");
+    if (ver && path.slice(-(ver.length + 1)) === "/" + ver) {
+      return path.slice(0, -(ver.length + 1)); // a page in the version's own folder
+    }
+    return path; // a page of the current version's copy at the IG root
+  }
+
+  function appendNewMilestones(span, list, canonical) {
     if (location.protocol !== "http:" && location.protocol !== "https:") {
       return;
     }
@@ -150,8 +172,13 @@
     if (!candidates.length) {
       return;
     }
+    var rootHere = igRootHere(span);
     Promise.all(candidates.map(function (m) {
-      var href = m.path.replace(/\/+$/, "") + "/" + rel;
+      var base = m.path.replace(/\/+$/, "");
+      if (rootHere !== null && canonical && base.indexOf(canonical) === 0) {
+        base = rootHere + base.slice(canonical.length);
+      }
+      var href = base + "/" + rel;
       return fetch(href, { method: "HEAD" }).then(function (r) {
         return { m: m, href: href, ok: r.ok };
       }).catch(function () {
@@ -193,9 +220,10 @@
     for (var i = 0; i < boxes.length; i++) {
       updateStatement(boxes[i], cur);
     }
+    var canonical = boxes.length ? (boxes[0].getAttribute("data-pb-canonical") || "") : "";
     var spans = document.querySelectorAll("span.fhir-pb-versions");
     for (var j = 0; j < spans.length; j++) {
-      appendNewMilestones(spans[j], list);
+      appendNewMilestones(spans[j], list, canonical);
     }
   }
 
