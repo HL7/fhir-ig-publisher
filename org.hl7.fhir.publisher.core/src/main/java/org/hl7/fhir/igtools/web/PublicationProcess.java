@@ -1199,6 +1199,14 @@ public class PublicationProcess {
     nv.setDate(date);
     if (mode != PublicationProcessMode.WORKING) {
       nv.setCurrent(true);
+      // a milestone can declare its milestone name (the label the "Page versions:" cross-links
+      // use, e.g. "R6") in the publication request. Historically milestoneName was added to
+      // package-list.json by hand after publication and picked up by the next full rewrite of
+      // the site; with dynamic-publish-box the pages of a published version are never rewritten,
+      // so the name has to be known when the version's own pages are baked.
+      if (prSrc.has("milestoneName")) {
+        nv.json().set("milestoneName", prSrc.asString("milestoneName"));
+      }
     }
 
     if (mode == PublicationProcessMode.TECHNICAL_CORRECTION) {
