@@ -597,6 +597,7 @@ public class PublicationProcess {
                          Date genDate, String username, String version, String gitSrcId, String tcName, String tcPath, PackageListEntry tcVer, String workingRoot, boolean jsonXmlClones, File igBuildZipDir, File previousPackageFile, String[] args, String replaces) throws Exception {
     // ok. all our tests have passed.
     // 1. do the publication build(s)
+    boolean dynamicPublishBox = pubSetup.getJsonObject("website").asBoolean("dynamic-publish-box");
     List<String> existingFiles = new ArrayList<>();
     if (mode == PublicationProcessMode.CREATION) {
       System.out.println("All checks passed. Create an empty history at "+destination);              
@@ -646,7 +647,21 @@ public class PublicationProcess {
       System.out.println("Update "+Utilities.path(destination, "package-list.json"));    
       PackageListEntry plVer = updatePackageList(pl, fSource.getAbsolutePath(), prSrc, pathVer,  Utilities.path(destination, "package-list.json"), mode, date,
               npm.fhirVersion(), Utilities.pathURL(pubSetup.asString("url"), tcName), subPackages, prSrc.asString("previouslyPublishedAs"));
-      updatePublishBox(pl, plVer, destVer, pathVer, destination, fRoot.getAbsolutePath(), false, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null, url, jsonXmlClones);
+      if (dynamicPublishBox) {
+        // record this version's page inventory (in its folder, written once here), and pick up the
+        // manifests of the other versions, so the "Page versions:" links baked below can be
+        // existence-checked without needing any past version's file tree locally
+        DynamicPublishBoxSupport.writePagesManifest(destVer);
+        for (PackageListEntry v : pl.versions()) {
+          if (v != plVer) {
+            String path = v.determineLocalPath(url, fRoot.getAbsolutePath());
+            if (path != null) {
+              src.needOptionalFile(Utilities.path(FileUtilities.getRelativePath(fRoot.getAbsolutePath(), path), DynamicPublishBoxSupport.PAGES_MANIFEST));
+            }
+          }
+        }
+      }
+      updatePublishBox(pl, plVer, destVer, pathVer, destination, fRoot.getAbsolutePath(), false, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null, url, jsonXmlClones, dynamicPublishBox);
 
       if (mode != PublicationProcessMode.WORKING || prSrc.has("movedFrom")) {
         String igSrc = tempM == null ? null : Utilities.path(tempM.getAbsolutePath(), "output");
@@ -663,6 +678,9 @@ public class PublicationProcess {
         
         List<String> ignoreList = new ArrayList<>();
         ignoreList.add(destVer);
+        if (dynamicPublishBox) {
+          System.out.println("dynamic-publish-box enabled: past versions' pages are not rewritten (publish-box.js corrects their statements at view time from package-list.json), and their file trees are not required locally");
+        }
         // get the current content from the source
         for (PackageListEntry v : pl.versions()) {
           if (v != plVer) {
@@ -670,13 +688,22 @@ public class PublicationProcess {
             if (path != null) {
               String relPath = FileUtilities.getRelativePath(fRoot.getAbsolutePath(), path);
               ignoreList.add(path);
-              src.needFolder(relPath, false);
-              if (!v.cibuild() && (!v.current() || prSrc.has("movedFrom"))) {
-                String pv = v.path();
-                String vCode = pv.substring(pv.lastIndexOf("/")+1);
-                String dv = Utilities.path(fRoot, relPath);
-                System.out.println("Update publish box for version "+v.version()+" @ "+v.path());
-                updatePublishBox(pl, v, dv, pv, destination, fRoot.getAbsolutePath(), false, null, null, null, url, jsonXmlClones);
+              // When dynamic-publish-box is enabled the publish box baked into a past version's
+              // pages is not touched by this publication: it was accurate when that version was
+              // published, and publish-box.js corrects it at view time from package-list.json.
+              // So the rewrite is skipped, and the version's file tree isn't pulled into the
+              // working tree (its page manifest, fetched above, covers the existence checks).
+              // ignoreList is still populated, so any version folders that are present locally
+              // remain protected from the delete sweep.
+              if (!dynamicPublishBox) {
+                src.needFolder(relPath, false);
+                if (!v.cibuild() && (!v.current() || prSrc.has("movedFrom"))) {
+                  String pv = v.path();
+                  String vCode = pv.substring(pv.lastIndexOf("/")+1);
+                  String dv = Utilities.path(fRoot, relPath);
+                  System.out.println("Update publish box for version "+v.version()+" @ "+v.path());
+                  updatePublishBox(pl, v, dv, pv, destination, fRoot.getAbsolutePath(), false, null, null, null, url, jsonXmlClones, dynamicPublishBox);
+                }
               }
             }
           }
@@ -698,11 +725,11 @@ public class PublicationProcess {
           }
           String vCode = tcPath.substring(tcPath.lastIndexOf("/")+1);
           String dv = Utilities.path(destination, vCode);
-          updatePublishBox(pl, tcVer, dv, tcPath, destination, fRoot.getAbsolutePath(), false, null, null, null, url, jsonXmlClones);
+          updatePublishBox(pl, tcVer, dv, tcPath, destination, fRoot.getAbsolutePath(), false, null, null, null, url, jsonXmlClones, dynamicPublishBox);
         }
         // we do this first in the output so we can get a proper diff
         if (igSrc != null) {
-          updatePublishBox(pl, plVer, igSrc, pathVer, igSrc, fRoot.getAbsolutePath(), true, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null, url, jsonXmlClones);
+          updatePublishBox(pl, plVer, igSrc, pathVer, igSrc, fRoot.getAbsolutePath(), true, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null, url, jsonXmlClones, dynamicPublishBox);
 
           System.out.println("Check for Files to delete");
           List<String> newFiles = igSrc == null ? new ArrayList<>() : FileUtilities.listAllFiles(igSrc, null);
@@ -711,6 +738,8 @@ public class PublicationProcess {
           existingFiles.removeAll(newFiles);
           existingFiles.removeAll(historyFiles);
           existingFiles.remove("package-list.json");
+          existingFiles.remove(DynamicPublishBoxSupport.PACKAGE_LIST_JS);
+          existingFiles.remove(DynamicPublishBoxSupport.PUBLISH_BOX_JS);
           existingFiles.remove("package-registry.json");
           existingFiles.remove("publish-setup.json");
           existingFiles.removeIf(s -> s.endsWith("web.config"));
@@ -730,7 +759,7 @@ public class PublicationProcess {
               ignoreList.add(Utilities.path(dpath, v.path().substring(path.length()+1)));
             }
           }
-          updatePublishBox(pl, pl.current(), dpath, path, dpath, fRoot.getAbsolutePath(), true, null, null, ignoreList, url, jsonXmlClones);
+          updatePublishBox(pl, pl.current(), dpath, path, dpath, fRoot.getAbsolutePath(), true, null, null, ignoreList, url, jsonXmlClones, dynamicPublishBox);
         }
       } else {
         src.cleanFolder(relDest);
@@ -757,7 +786,11 @@ public class PublicationProcess {
       System.out.println("Build is complete. "+src.verb()+" from "+ fRoot.getAbsolutePath());
     }
     new HistoryPageUpdater().updateHistoryPage(history.getAbsolutePath(), destination, templateSrc, !first && !prSrc.has("movedFrom"));
-    
+    if (dynamicPublishBox) {
+      // package-list.js + publish-box.js live in the same always-rewritten zone as history.html
+      DynamicPublishBoxSupport.writeSupportFiles(destination);
+    }
+
     logger.stop();
     FileUtils.copyFile(new File(logger.getFilename()), new File(Utilities.path(igBuildZipDir, npm.name()+"#"+npm.version()+".log")));
     src.finish(relDest, existingFiles);
@@ -1044,9 +1077,9 @@ public class PublicationProcess {
     return sdf.format(date);
   }
 
-  private void updatePublishBox(PackageList pl, PackageListEntry plVer, String destVer, String pathVer, String destination, String rootFolder, boolean current, ServerType serverType, File sft, List<String> ignoreList, String url, boolean jsonXmlClones) throws FileNotFoundException, IOException {
-    IGReleaseVersionUpdater igvu = new IGReleaseVersionUpdater(destVer, url, rootFolder, ignoreList, null, plVer.json(), destination);
-    String fragment = PublishBoxStatementGenerator.genFragment(pl, plVer, pl.current(), pl.canonical(), current, false);
+  private void updatePublishBox(PackageList pl, PackageListEntry plVer, String destVer, String pathVer, String destination, String rootFolder, boolean current, ServerType serverType, File sft, List<String> ignoreList, String url, boolean jsonXmlClones, boolean dynamicPublishBox) throws FileNotFoundException, IOException {
+    IGReleaseVersionUpdater igvu = new IGReleaseVersionUpdater(destVer, url, rootFolder, ignoreList, null, plVer.json(), destination, dynamicPublishBox);
+    String fragment = PublishBoxStatementGenerator.genFragment(pl, plVer, pl.current(), pl.canonical(), current, false, dynamicPublishBox);
     System.out.println("Publish Box Statement: "+fragment);
     igvu.updateStatement(fragment, current ? 0 : 1, pl.milestones());
     System.out.println("  .. "+igvu.getCountTotal()+" files checked, "+igvu.getCountUpdated()+" updated");
@@ -1348,7 +1381,7 @@ public class PublicationProcess {
         String vCode = pv.substring(pv.lastIndexOf("/")+1);
         String dv = Utilities.path(destination, vCode);
         System.out.println("Update publish box for version "+v.version()+" @ "+v.path());
-        updatePublishBox(pl, v, dv, pv, destination, fRoot.getAbsolutePath(), false, null, null, null, url, false);
+        updatePublishBox(pl, v, dv, pv, destination, fRoot.getAbsolutePath(), false, null, null, null, url, false, pubSetup.getJsonObject("website").asBoolean("dynamic-publish-box"));
       }
     }
 
