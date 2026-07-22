@@ -25,8 +25,8 @@
         <maven.compiler.testTarget>17</maven.compiler.testTarget>
         <logback.version>1.5.25</logback.version>
         <log4jVersion>2.26.0</log4jVersion>
-        <jackson_version>2.21.3</jackson_version>
-        <jackson_annotations_version>2.21</jackson_annotations_version>
+        <jackson_version>2.22.0</jackson_version>
+        <jackson_annotations_version>2.22</jackson_annotations_version>
         <nedap-healthcare-archie.version>3.16.0</nedap-healthcare-archie.version>
     </properties>
 
@@ -172,6 +172,21 @@
                 <groupId>org.apache.thrift</groupId>
                 <artifactId>libthrift</artifactId>
                 <version>0.23.0</version>
+            </dependency>
+            <dependency>
+                <groupId>io.opentelemetry</groupId>
+                <artifactId>opentelemetry-api</artifactId>
+                <version>1.62.0</version>
+            </dependency>
+            <dependency>
+                <groupId>io.opentelemetry</groupId>
+                <artifactId>opentelemetry-context</artifactId>
+                <version>1.62.0</version>
+            </dependency>
+            <dependency>
+                <groupId>io.opentelemetry.instrumentation</groupId>
+                <artifactId>opentelemetry-instrumentation-annotations</artifactId>
+                <version>2.27.0</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
