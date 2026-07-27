@@ -17,6 +17,7 @@ import org.hl7.fhir.r4.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
+import org.hl7.fhir.utilities.http.ManagedWebAccess;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
@@ -346,8 +347,10 @@ public class DependentIGFinder {
     
     // we only check the latest published version, and the CI build
     try {
-      PackageList pl = PackageList.fromUrl(Utilities.pathURL(guide.asString("canonical"), "package-list.json"));
       String canonical = guide.asString("canonical");
+      final String secureCanonical = ManagedWebAccess.makeSecureRef(canonical);
+      PackageList pl = PackageList.fromUrl(Utilities.pathURL(secureCanonical, "package-list.json"));
+
       DepInfo dep = new DepInfo(pid, Utilities.path(canonical, "history.html"));
       deplist.add(dep);
       for (PackageListEntry e : pl.versions()) {
