@@ -37,7 +37,7 @@ public class XSLTransformerTest {
             xslTransformer.transform(source, transform);
         } );
 
-        assertThat(exception.getMessage()).contains("External Entity");
+        assertThat(exception.getMessage()).contains("Access to URI file://etc/passwd has been prohibited");
     }
 
     private byte[] getLineSeparatorNormalizedBytes(String fileName) throws IOException {

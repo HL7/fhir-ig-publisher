@@ -445,7 +445,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
     p.setName("cross-version-"+sd.getName()+".html");
     p.setTitle("Cross-Version summary for "+sd.getName());
     p.setGeneration(GuidePageGeneration.MARKDOWN);
-    ExtensionUtilities.setStandardsStatus(p, StandardsStatus.INFORMATIVE, null);
+    ExtensionUtilities.setStandardsStatus(p, StandardsStatus.INFORMATIVE, null, null);
     FileUtilities.stringToFile(new XhtmlComposer(false, true).compose(wrapPage(body, sd.getName())), Utilities.path(path, "temp", "xver-qa", "cross-version-"+sd.getName()+".html"));
   }
 

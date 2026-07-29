@@ -2,6 +2,7 @@ package org.hl7.fhir.igtools.renderers;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -990,7 +991,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         src = vs.getUserString(UserDataNames.render_external_link);
         link = vs.getUserString(UserDataNames.render_external_link);
         try {
-          src = new URL(src).getHost();
+          src = URI.create(src).toURL().getHost();
         } catch (Exception e) {
           // nothing
         }

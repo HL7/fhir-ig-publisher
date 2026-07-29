@@ -24,6 +24,7 @@ package org.hl7.fhir.igtools.publisher;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
+import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.ArrayList;
@@ -550,7 +551,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
 
   @Override
   public byte[] fetchRaw(IResourceValidator validator, String source) throws MalformedURLException, IOException {
-    URL url = new URL(source);
+    URL url = URI.create(source).toURL();
     URLConnection c = url.openConnection();
     return FileUtilities.streamToBytes(c.getInputStream());
   }

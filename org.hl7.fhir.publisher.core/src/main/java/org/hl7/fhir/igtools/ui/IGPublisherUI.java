@@ -409,7 +409,7 @@ public class IGPublisherUI extends JFrame {
         System.out.println("  -help                         Display this help message");
         System.out.println();
         System.out.println("Examples:");
-        System.out.println("  java -jar igpublisher-ui.jar C:\\path\\to\\ig -noValidation -tx http://tx.fhir.org/r4");
+        System.out.println("  java -jar igpublisher-ui.jar C:\\path\\to\\ig -noValidation -tx https://tx.fhir.org/r4");
         System.out.println("  java -jar igpublisher-ui.jar -noSushi -autoRun");
     }
     

@@ -26,6 +26,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
+import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -351,7 +352,7 @@ public class TemplateManager {
           template = template.replace("http://", "https://");
         }
 
-        URL url = new URL(zipUrl(template));
+        URL url = URI.create(zipUrl(template)).toURL();
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         connection.setRequestMethod("GET");
         InputStream zip = connection.getInputStream();
