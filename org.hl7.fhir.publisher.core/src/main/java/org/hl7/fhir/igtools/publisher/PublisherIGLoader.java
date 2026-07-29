@@ -55,6 +55,7 @@ import org.hl7.fhir.r5.utils.validation.ValidatorSession;
 import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.filesystem.CSFile;
 import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
+import org.hl7.fhir.utilities.http.ManagedWebAccess;
 import org.hl7.fhir.utilities.i18n.*;
 import org.hl7.fhir.utilities.json.JsonException;
 import org.hl7.fhir.utilities.json.model.JsonArray;
@@ -1873,7 +1874,8 @@ public class PublisherIGLoader extends PublisherBase {
     PackageList pl;
     logDebugMessage(LogCategory.INIT, "Fetch Package history from "+Utilities.pathURL(canonical, "package-list.json"));
     try {
-      pl = PackageList.fromUrl(Utilities.pathURL(canonical, "package-list.json"));
+      final String secureCanonical = ManagedWebAccess.makeSecureRef(canonical);
+      pl = PackageList.fromUrl(Utilities.pathURL(secureCanonical, "package-list.json"));
     } catch (Exception e) {
       return null;
     }

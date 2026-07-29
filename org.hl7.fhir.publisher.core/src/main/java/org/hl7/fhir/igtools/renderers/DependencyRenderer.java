@@ -39,6 +39,7 @@ import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
+import org.hl7.fhir.utilities.http.ManagedWebAccess;
 import org.hl7.fhir.utilities.npm.BasePackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.PackageHacker;
@@ -664,7 +665,8 @@ public class DependencyRenderer {
     }
     PackageList pl;
     try {
-      pl = PackageList.fromUrl(Utilities.pathURL(canonical, "package-list.json")); 
+      final String secureCanonical = ManagedWebAccess.makeSecureRef(canonical);
+      pl = PackageList.fromUrl(Utilities.pathURL(secureCanonical, "package-list.json"));
           
     } catch (Exception e) {
       pl = null;
