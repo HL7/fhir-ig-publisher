@@ -102,7 +102,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   public static final int GEN_MODE_DIFF = 2;
   public static final int GEN_MODE_MS = 3;
   public static final int GEN_MODE_KEY = 4;
-  public static final String ANCHOR_PREFIX_MAP = "";
+  public static final String ANCHOR_PREFIX_MAP_O = "o";
+  public static final String ANCHOR_PREFIX_MAP_I = "i";
+  public static final String ANCHOR_PREFIX_MAP_E = "e";
   public static final String ANCHOR_PREFIX_SNAP = "";
   public static final String ANCHOR_PREFIX_DIFF = "diff_";
   public static final String ANCHOR_PREFIX_MS = "ms_";
@@ -1333,17 +1335,17 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       }
     }
     XhtmlNode intTable = sdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, 
-        outputTracker, false, gen, ANCHOR_PREFIX_MAP, resE, "M");
+        outputTracker, false, gen.withUniqueLocalPrefix(ANCHOR_PREFIX_MAP_I), ANCHOR_PREFIX_MAP_I, resE, "M");
 
     sdr.setMappingsMode(MapStructureMode.NOT_IN_LIST);
 
     XhtmlNode extTable = sdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, 
-        outputTracker, false, gen, ANCHOR_PREFIX_MAP, resE, "M");
+        outputTracker, false, gen.withUniqueLocalPrefix(ANCHOR_PREFIX_MAP_E), ANCHOR_PREFIX_MAP_E, resE, "M");
 
     sdr.setMappingsMode(MapStructureMode.OTHER);
 
     XhtmlNode otherTable = sdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, 
-        outputTracker, false, gen, ANCHOR_PREFIX_MAP, resE, "M");
+        outputTracker, false, gen.withUniqueLocalPrefix(ANCHOR_PREFIX_MAP_O), ANCHOR_PREFIX_MAP_O, resE, "M");
 
     if (intTable == null && extTable == null && otherTable == null) {
       return "<p>"+sdr.getContext().formatPhrase(RenderingI18nContext.STRUC_DEF_NO_MAPPINGS)+"</p>";
