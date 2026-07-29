@@ -24,6 +24,7 @@ package org.hl7.fhir.igtools.publisher;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
+import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.ArrayList;
@@ -347,6 +348,10 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
       return (v == null) || !SIDUtilities.isInvalidVersion(u, v);
     }
 
+    if (Utilities.existsInList(dropTrailingSlash(url), "http://terminology.hl7.org", "http://hl7.org/fhir")) {
+      return true;
+    }
+
     if (u.startsWith("http://hl7.org/fhirpath/System.")) {
       return (v == null || Utilities.existsInList(v, "2.0.0", "1.3.0", "1.2.0", "1.1.0", "1.0.0", "0.3.0", "0.2.0"));       
     }
@@ -447,6 +452,10 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
     return false;
   }
 
+    private String dropTrailingSlash(String url) {
+        return url == null || !url.endsWith("/") ? url : url.substring(0, url.length()-1);
+    }
+
   private boolean matchesPage(String url) {
     if (url.contains("#")) {
       url = url.substring(0, url.indexOf("#"));
@@ -542,7 +551,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
 
   @Override
   public byte[] fetchRaw(IResourceValidator validator, String source) throws MalformedURLException, IOException {
-    URL url = new URL(source);
+    URL url = URI.create(source).toURL();
     URLConnection c = url.openConnection();
     return FileUtilities.streamToBytes(c.getInputStream());
   }

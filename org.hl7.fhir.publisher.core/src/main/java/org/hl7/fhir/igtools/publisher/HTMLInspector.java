@@ -912,7 +912,15 @@ public class HTMLInspector {
 
   private boolean checkResolveLink(String filename, Location loc, String path, String ref, String text, List<ValidationMessage> messages, String uuid, XhtmlNode x, XhtmlNode parent) throws IOException {
     links++;
-    String rref = Utilities.URLDecode(ref);
+    String fn = makeLocal(filename);
+    String rref;
+    try {
+      rref = Utilities.URLDecode(ref);
+    } catch (Exception e) {
+      messages.add(new ValidationMessage(Source.LinkChecker, IssueType.NOTFOUND, fn+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())),
+              "The link '"+ref+"' for \""+text.replaceAll("[\\s\\n]+", " ").trim()+"\" contains invalid characters (around %)", IssueSeverity.ERROR).setLocationLink(uuid == null ? null : fn+"#"+uuid).setMessageId("HTML_LINK_CHECK_FAILED"));
+      return false;
+    }
     if ((rref.startsWith("http:") || rref.startsWith("https:") ) && (rref.endsWith(".sch") || rref.endsWith(".xsd") || rref.endsWith(".shex"))) { // work around for the fact that spec.internals does not track all these minor things 
       rref = FileUtilities.changeFileExt(ref, ".html");
     }
@@ -926,14 +934,12 @@ public class HTMLInspector {
     if (!resolved) {
       if (text == null)
         text = "";
-      String fn = makeLocal(filename);
       messages.add(new ValidationMessage(Source.LinkChecker, IssueType.NOTFOUND, fn+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())),
           "The link '"+ref+"' for \""+text.replaceAll("[\\s\\n]+", " ").trim()+"\" cannot be resolved"+tgtList, IssueSeverity.ERROR).setLocationLink(uuid == null ? null : fn+"#"+uuid).setMessageId("HTML_LINK_CHECK_FAILED"));
       return true;
     } else if (!bh.ok()) {
       if (text == null)
         text = "";
-      String fn = makeLocal(filename);
       messages.add(new ValidationMessage(Source.LinkChecker, IssueType.NOTFOUND, fn+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())),
           "The link '"+ref+"' for \""+text.replaceAll("[\\s\\n]+", " ").trim()+"\" is a canonical link and is therefore unsafe with regard to versions", IssueSeverity.WARNING).setLocationLink(uuid == null ? null : fn+"#"+uuid).setMessageId("HTML_LINK_VERSIONLESS_CANONICAL"));
       return false;

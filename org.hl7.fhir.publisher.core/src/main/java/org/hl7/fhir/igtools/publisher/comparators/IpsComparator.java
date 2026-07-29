@@ -29,6 +29,7 @@ import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
+import org.hl7.fhir.utilities.http.ManagedWebAccess;
 import org.hl7.fhir.utilities.i18n.RenderingI18nContext;
 import org.hl7.fhir.utilities.npm.BasePackageCacheManager;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
@@ -148,7 +149,8 @@ public class IpsComparator {
   private List<PackageListEntry> fetchVersionHistory(String canonical) { 
     try {
       canonical = PastProcessHackerUtilities.actualUrl(canonical); // hack for old publishing process problems 
-      String ppl = Utilities.pathURL(canonical, "package-list.json");
+      final String secureCanonical = ManagedWebAccess.makeSecureRef(canonical);
+      String ppl = Utilities.pathURL(secureCanonical, "package-list.json");
       logger.logMessage("Fetch "+ppl+" for version check");
       PackageList pl = PackageList.fromUrl(ppl);
       if (!canonical.equals(pl.canonical())) {
@@ -169,6 +171,7 @@ public class IpsComparator {
     if (errMsg == null && pid != null) {
       resources = new ArrayList<>();
       for (VersionInstance vi : versionList) {
+        logger.logMessage("Comparing IPS version "+vi.version);
         String filename = "";
         try {
           vi.resources = new ArrayList<>();

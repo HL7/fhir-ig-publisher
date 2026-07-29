@@ -271,6 +271,9 @@ public class PublisherProcessor extends PublisherBase  {
           f.start("generateOtherVersions");
           try {
             for (FetchedResource r : f.getResources()) {
+              if (!includedInVersion(r, version)) {
+                continue;
+              }
               if (r.getResource() instanceof StructureDefinition) {
                 generateOtherVersion(r, pva, version, (StructureDefinition) r.getResource());
               }
@@ -292,6 +295,9 @@ public class PublisherProcessor extends PublisherBase  {
           f.start("generateOtherVersions");
           try {
             for (FetchedResource r : f.getResources()) {
+              if (!includedInVersion(r, version)) {
+                continue;
+              }
               if (r.getResource() != null) {
                 checkForCoreDependencies(this.pf.vnpms.get(v), tctxt, r.getResource(), targetNpm);
               }
@@ -392,6 +398,9 @@ public class PublisherProcessor extends PublisherBase  {
       log.add(new ProfileVersionAdaptor.ConversionMessage(e.getMessage(), ProfileVersionAdaptor.ConversionMessageStatus.ERROR));
       r.getOtherVersions().put(v+"-StructureDefinition", new FetchedResource.AlternativeVersionResource(log, null));
     }
+    if (pf.cvAnalyser != null) {
+      pf.cvAnalyser.record(v, r.fhirType()+"/"+r.getId(), log);
+    }
   }
 
   private void generateOtherVersion(FetchedResource r, ProfileVersionAdaptor pva, String v, SearchParameter resource) throws FileNotFoundException, IOException {
@@ -404,6 +413,9 @@ public class PublisherProcessor extends PublisherBase  {
       System.out.println("Error converting "+r.getId()+" to "+v+": "+e.getMessage());
       log.add(new ProfileVersionAdaptor.ConversionMessage(e.getMessage(), ProfileVersionAdaptor.ConversionMessageStatus.ERROR));
       r.getOtherVersions().put(v+"-SearchParameter", new FetchedResource.AlternativeVersionResource(log, null));
+    }
+    if (pf.cvAnalyser != null) {
+      pf.cvAnalyser.record(v, r.fhirType()+"/"+r.getId(), log);
     }
   }
 
@@ -662,7 +674,7 @@ public class PublisherProcessor extends PublisherBase  {
       for (FetchedResource r : f.getResources()) {
         if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
           CanonicalResource cr = (CanonicalResource) r.getResource();
-          if (r.isExample()) {
+          if (!r.isExample()) {
             List<String> oids = loadOids(cr);
             if (oids.isEmpty()) {
               if (Utilities.existsInList(r.getResource().fhirType(), "CodeSystem", "ValueSet")) {
@@ -1475,11 +1487,13 @@ public class PublisherProcessor extends PublisherBase  {
     if (pf.ipsComparator != null) {
       pf.ipsComparator.startChecks(pf.publishedIg);
     }
+    log(".. loaded. Process");
     for (FetchedFile f : pf.changeList) {
       f.start("checkConformanceResources3");
       try {
         for (FetchedResource r : f.getResources()) {
           if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
+            log("  ..."+r.getResource().fhirType()+" "+r.getId());
             this.pf.previousVersionComparator.check((CanonicalResource) r.getResource());
             if (this.pf.ipaComparator != null) {
               this.pf.ipaComparator.check((CanonicalResource) r.getResource());
@@ -1494,13 +1508,18 @@ public class PublisherProcessor extends PublisherBase  {
         f.finish("checkConformanceResources3");
       }
     }
+    log("finish previous version comparison");
     pf.previousVersionComparator.finishChecks();
+    log("finish ipa version");
     if (pf.ipaComparator != null) {
       pf.ipaComparator.finishChecks();
     }
+    log("finish ips version");
     if (pf.ipsComparator != null) {
       pf.ipsComparator.finishChecks();
     }
+    log("comparisons done");
+
     tts.end();
   }
 

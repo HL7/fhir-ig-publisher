@@ -8,6 +8,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.hl7.fhir.igtools.publisher.PublisherIGLoader;
 import org.hl7.fhir.igtools.publisher.RelatedIG;
 import org.hl7.fhir.igtools.web.PublicationProcess.PublicationProcessMode;
 import org.hl7.fhir.r5.model.ImplementationGuide;
@@ -18,6 +19,7 @@ import org.hl7.fhir.utilities.StringPair;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
+import org.hl7.fhir.utilities.http.ManagedWebAccess;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
@@ -149,7 +151,12 @@ public class PublicationChecker {
   }
 
   private void checkIg(List<String> messages, List<StringPair> summary) {
+    String baseVer = ig.hasFhirVersion() && ig.getFhirVersion().get(0).getValue() != null
+        ? PublisherIGLoader.canonicalTarget(ig.getFhirVersion().get(0).getValue().toCode()) : null;
     for (ImplementationGuideDependsOnComponent dep : ig.getDependsOn()) {
+      if (baseVer != null && !PublisherIGLoader.isDepApplicableForVersion(dep, baseVer)) {
+        continue; // version-scoped dependency that does not apply to this IG's own FHIR version
+      }
       if (dep.getVersion() == null) {
         messages.add("Dependency on "+dep.getPackageId()+" has no version"+mkError());
       } else if ("current".equals(dep.getVersion())) {
@@ -535,7 +542,8 @@ public class PublicationChecker {
   }
   
   private PackageList readPackageList(String dst) throws IOException {
-    return PackageList.fromUrl(Utilities.pathURL(dst, "package-list.json"));
+    final String secureDst = ManagedWebAccess.makeSecureRef(dst);
+    return PackageList.fromUrl(Utilities.pathURL(secureDst, "package-list.json"));
   }
 
   private String determineDestination(NpmPackage npm) {

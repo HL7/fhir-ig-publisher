@@ -25,6 +25,7 @@ import org.hl7.fhir.igtools.renderers.StructureMapRenderer;
 import org.hl7.fhir.igtools.renderers.ValueSetRenderer;
 import org.hl7.fhir.igtools.spreadsheets.ObservationSummarySpreadsheetGenerator;
 import org.hl7.fhir.igtools.web.IGReleaseVersionUpdater;
+import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.r5.conformance.ConstraintJavaGenerator;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.context.ContextUtilities;
@@ -90,6 +91,7 @@ import org.xml.sax.InputSource;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.*;
+import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -106,7 +108,7 @@ import static org.hl7.fhir.igtools.publisher.Publisher.*;
  * this class is part of the Publisher Core cluster, and handles all the routines that generate content (other than QA). See @Publisher for discussion
  */
 
-public class PublisherGenerator extends PublisherBase {
+public class PublisherGenerator extends PublisherBase implements BaseRenderer.ReferenceResolver {
 
   public class Item {
     public Item(FetchedFile f, FetchedResource r, String sort) {
@@ -227,7 +229,7 @@ public class PublisherGenerator extends PublisherBase {
     }
 
     Base.setCopyUserData(true); // just keep all the user data when copying while rendering
-    pf.bdr = new BaseRenderer(pf.context, checkAppendSlash(pf.specPath), pf.igpkp, pf.specMaps, pageTargets(), pf.markdownEngine, pf.packge, pf.rc);
+    pf.bdr = new BaseRenderer(pf.context, checkAppendSlash(pf.specPath), pf.igpkp, pf.specMaps, pageTargets(), pf.markdownEngine, pf.packge, pf.rc, this);
 
     forceDir(pf.tempDir);
     forceDir(Utilities.path(pf.tempDir, "_includes"));
@@ -349,7 +351,7 @@ public class PublisherGenerator extends PublisherBase {
     FileUtilities.bytesToFile(pf.extensionTracker.generate(), Utilities.path(pf.tempDir, "usage-stats.json"));
     try {
       log("Sending Usage Stats to Server");
-      pf.extensionTracker.sendToServer("http://tx.fhir.org/ext-tracker");
+      pf.extensionTracker.sendToServer("https://tx.fhir.org/ext-tracker");
     } catch (Exception e) {
       log("Submitting Usage Stats failed: "+e.getMessage());
     }
@@ -375,7 +377,12 @@ public class PublisherGenerator extends PublisherBase {
     for (FetchedFile f : pf.fileList) {
       f.trim();
     }
-    pf.context.unload();
+    genCombinedPackage();
+    if (pf.txUnloadEarly) {
+      // memory-starved IGs opt into unloading terminology now, before HTML inspection.
+      // The trade-off is that conformance statement rendering (which needs terminology) won't work.
+      pf.context.unload();
+    }
     for (RelatedIG ig : pf.relatedIGs) {
       ig.dump();
     }
@@ -449,11 +456,14 @@ public class PublisherGenerator extends PublisherBase {
           addFileToNpm(NPMPackageGenerator.Category.OTHER, "publication-request.json", FileUtilities.fileToBytes(pr));
         }
         pf.npm.finish();
+        ensureCorePackageDependency(pf.npm);
         for (NPMPackageGenerator vnpm : pf.vnpms.values()) {
           vnpm.finish();
+          ensureCorePackageDependency(vnpm);
         }
         for (NPMPackageGenerator vnpm : pf.lnpms.values()) {
           vnpm.finish();
+          ensureCorePackageDependency(vnpm);
         }
         if (pf.r4tor4b.canBeR4() && pf.r4tor4b.canBeR4B()) {
           try {
@@ -462,7 +472,6 @@ public class PublisherGenerator extends PublisherBase {
             pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.EXCEPTION, "package.tgz", "Error converting pacakge to R4B: "+e.getMessage(), ValidationMessage.IssueSeverity.ERROR));
           }
         }
-        genCombinedPackage();
 
         if (settings.getMode() == null || settings.getMode() == PublisherUtils.IGBuildMode.MANUAL) {
           if (settings.isCacheVersion()) {
@@ -478,7 +487,7 @@ public class PublisherGenerator extends PublisherBase {
         }
         JsonArray json = new JsonArray();
         for (String s : pf.generateVersions) {
-          json.add(s);
+          json.add(PublisherIGLoader.suffixName(s));
           //generatePackageVersion(npm.filename(), s);
         }
         FileUtilities.bytesToFile(org.hl7.fhir.utilities.json.parser.JsonParser.composeBytes(json), Utilities.path(pf.outputDir, "sub-package-list.json"));
@@ -583,6 +592,23 @@ public class PublisherGenerator extends PublisherBase {
       FileUtilities.copyFile(Utilities.path(pf.tempDir, "full-ig.zip"), Utilities.path(pf.outputDir, "full-ig.zip"));
       log("Final .zip built");
     }
+    if (!pf.txUnloadEarly) {
+      // default path: terminology stayed loaded through HTML inspection (so conformance
+      // statement rendering works); unload it now that the inspector is complete.
+      pf.context.unload();
+      System.gc();
+    }
+  }
+
+  /**
+   * Ensure a finished package declares the correct target FHIR core dependency (patching R5/R6 packages
+   * that FHIR core's {@code packageForVersion} leaves without one - the base package, the {@code .r5}
+   * variant, per-language packages - and correcting a wrong-family core in place). Delegates to the
+   * testable static {@link PublisherBase#patchMissingCoreDependency(JsonObject, String, java.util.List)},
+   * threading {@code pf.errors} so any {@code CORE_DEPENDENCY_FAMILY_CORRECTED} warning reaches the author.
+   */
+  private void ensureCorePackageDependency(NPMPackageGenerator gen) throws IOException {
+    patchMissingCoreDependency(gen.getPackageJ(), gen.filename(), pf.errors);
   }
 
   private void genCombinedPackage() throws IOException {
@@ -1130,8 +1156,7 @@ public class PublisherGenerator extends PublisherBase {
     }
 
     generateHtml(f, r, res, langElement, vars, lrc, lang);
-
-
+    
     if (wantGen(r, "history")) {
       long start = System.currentTimeMillis();
       XhtmlComposer xc = new XhtmlComposer(XhtmlComposer.XML, this.pf.module.isNoNarrative());
@@ -1168,9 +1193,9 @@ public class PublisherGenerator extends PublisherBase {
           }
         }
         String html = null;
-        if (rX.getLogicalElement() != null) {
+        if (rX.getLogicalElement() != null || (rX.getElement() != null && !rX.getElement().fhirType().equals("Binary"))) {
           // Try to use a specialised renderer for this logical model.
-          String logicalType = rX.getLogicalElement().fhirTypeRoot();
+          String logicalType = rX.getLogicalElement() != null ? rX.getLogicalElement().fhirTypeRoot() : rX.getElement().fhirType();
           RenderingContext xlrc = lrc.copy(false);
           xlrc.setRules(RenderingContext.GenerationRules.IG_PUBLISHER);
           ResourceRenderer rr = RendererFactory.factory(logicalType, xlrc);
@@ -1178,7 +1203,7 @@ public class PublisherGenerator extends PublisherBase {
           if (!(rr instanceof ProfileDrivenRenderer)) {
             // Has specialised renderer - try to use it.
             try {
-              ResourceWrapper rw = ResourceWrapper.forResource(xlrc.getContextUtilities(), rX.getLogicalElement());
+              ResourceWrapper rw = ResourceWrapper.forResource(xlrc.getContextUtilities(), rX.getLogicalElement() != null ? rX.getLogicalElement() : rX.getElement());
               XhtmlNode renderedXhtml = rr.buildNarrative(rw);
               if (renderedXhtml != null) {
                 html = pfx + new XhtmlComposer(XhtmlComposer.HTML).compose(renderedXhtml);
@@ -1191,7 +1216,7 @@ public class PublisherGenerator extends PublisherBase {
           if (html == null) {
             // No specialised renderer or it failed - fall back to JSON/XML rendering.
             String rXContentType = rX.getElement().getNamedChildValueSingle("contentType");
-            if (rXContentType != null && rXContentType.contains("xml")) {
+            if (rXContentType.contains("xml")) {
               org.hl7.fhir.r5.elementmodel.XmlParser xmlParser = new org.hl7.fhir.r5.elementmodel.XmlParser(this.pf.context);
               XmlXHtmlRenderer xmlXHtmlRenderer = new XmlXHtmlRenderer();
               xmlXHtmlRenderer.setPrism(true);
@@ -1204,7 +1229,7 @@ public class PublisherGenerator extends PublisherBase {
               }
               xmlParser.compose(rX.getLogicalElement(), xmlXHtmlRenderer);
               html = xmlXHtmlRenderer.toString();
-            } else if (rXContentType != null && rXContentType.contains("json")) {
+            } else if (rXContentType.contains("json")) {
               JsonXhtmlRenderer jsonXhtmlRenderer = new JsonXhtmlRenderer();
               jsonXhtmlRenderer.setPrism(true);
               org.hl7.fhir.r5.elementmodel.JsonParser jsonParser = new org.hl7.fhir.r5.elementmodel.JsonParser(this.pf.context);
@@ -1466,7 +1491,7 @@ public class PublisherGenerator extends PublisherBase {
    * @throws Exception
    */
   private void generateOutputsCodeSystem(FetchedFile f, FetchedResource fr, CodeSystem cs, Map<String, String> vars, String prefixForContainer, RenderingContext lrc, String lang) throws Exception {
-    CodeSystemRenderer csr = new CodeSystemRenderer(this.pf.context, this.pf.specPath, cs, this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, lrc, this.pf.versionToAnnotate, this.pf.relatedIGs);
+    CodeSystemRenderer csr = new CodeSystemRenderer(this.pf.context, this.pf.specPath, cs, this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, lrc, this.pf.versionToAnnotate, this.pf.relatedIGs, this);
     csr.setFileList(this.pf.fileList);
     if (wantGen(fr, "summary")) {
       long start = System.currentTimeMillis();
@@ -1516,7 +1541,7 @@ public class PublisherGenerator extends PublisherBase {
    * @throws Exception
    */
   private void generateOutputsValueSet(FetchedFile f, FetchedResource r, ValueSet vs, Map<String, String> vars, String prefixForContainer, DBBuilder db, RenderingContext lrc, String lang) throws Exception {
-    ValueSetRenderer vsr = new ValueSetRenderer(this.pf.context, this.pf.specPath, vs, this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, lrc, this.pf.versionToAnnotate, this.pf.relatedIGs);
+    ValueSetRenderer vsr = new ValueSetRenderer(this.pf.context, this.pf.specPath, vs, this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, lrc, this.pf.versionToAnnotate, this.pf.relatedIGs, this);
     vsr.setFileList(this.pf.fileList);
     if (wantGen(r, "summary")) {
       long start = System.currentTimeMillis();
@@ -1813,7 +1838,7 @@ public class PublisherGenerator extends PublisherBase {
       fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-json-schema", "yet to be done: json schema as html", null, f.getOutputNames(), start, "json-schema", "StructureDefinition", lang);
     }
 
-    StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(this.pf.context, this.pf.packageId(), checkAppendSlash(this.pf.specPath), sd, Utilities.path(this.pf.tempDir), this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, this.pf.fileList, lrc, this.pf.allInvariants, this.pf.sdMapCache, this.pf.specPath, this.pf.versionToAnnotate, this.pf.relatedIGs);
+    StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(this.pf.context, this.pf.packageId(), checkAppendSlash(this.pf.specPath), sd, Utilities.path(this.pf.tempDir), this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, this.pf.fileList, lrc, this.pf.allInvariants, this.pf.sdMapCache, this.pf.specPath, this.pf.versionToAnnotate, this.pf.relatedIGs, this);
     sdr.setNoXigLink(this.pf.noXigLink);
 
     if (wantGen(r, "summary")) {
@@ -2158,7 +2183,7 @@ public class PublisherGenerator extends PublisherBase {
   }
 
   private void generateOutputsStructureMap(FetchedFile f, FetchedResource r, StructureMap map, Map<String,String> vars, String prefixForContainer, RenderingContext lrc, String lang) throws Exception {
-    StructureMapRenderer smr = new StructureMapRenderer(this.pf.context, checkAppendSlash(this.pf.specPath), map, Utilities.path(this.pf.tempDir), this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, lrc, this.pf.versionToAnnotate, this.pf.relatedIGs);
+    StructureMapRenderer smr = new StructureMapRenderer(this.pf.context, checkAppendSlash(this.pf.specPath), map, Utilities.path(this.pf.tempDir), this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, lrc, this.pf.versionToAnnotate, this.pf.relatedIGs, this);
     if (wantGen(r, "summary")) {
       long start = System.currentTimeMillis();
       fragment("StructureMap-"+prefixForContainer+map.getId()+"-summary", smr.summaryTable(r, wantGen(r, "xml"), wantGen(r, "json"), wantGen(r, "ttl"), this.pf.igpkp.summaryRows()), f.getOutputNames(), r, vars, null, start, "summary", "StructureMap", lang);
@@ -2191,7 +2216,7 @@ public class PublisherGenerator extends PublisherBase {
   }
 
   private void generateOutputsCanonical(FetchedFile f, FetchedResource r, CanonicalResource cr, Map<String,String> vars, String prefixForContainer, RenderingContext lrc, String lang) throws Exception {
-    CanonicalRenderer smr = new CanonicalRenderer(this.pf.context, checkAppendSlash(this.pf.specPath), cr, Utilities.path(this.pf.tempDir), this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, lrc, this.pf.versionToAnnotate, this.pf.relatedIGs);
+    CanonicalRenderer smr = new CanonicalRenderer(this.pf.context, checkAppendSlash(this.pf.specPath), cr, Utilities.path(this.pf.tempDir), this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, lrc, this.pf.versionToAnnotate, this.pf.relatedIGs, this);
     if (wantGen(r, "summary")) {
       long start = System.currentTimeMillis();
       fragment(cr.fhirType()+"-"+prefixForContainer+cr.getId()+"-summary", smr.summaryTable(r, wantGen(r, "xml"), wantGen(r, "json"), wantGen(r, "ttl"), this.pf.igpkp.summaryRows()), f.getOutputNames(), r, vars, null, start, "summary", "Canonical", lang);
@@ -2216,7 +2241,7 @@ public class PublisherGenerator extends PublisherBase {
   }
 
   private void generateOutputsExampleScenario(FetchedFile f, FetchedResource r, ExampleScenario scen, Map<String,String> vars, String prefixForContainer, RenderingContext lrc, String lang) throws Exception {
-    ExampleScenarioRenderer er = new ExampleScenarioRenderer(this.pf.context, checkAppendSlash(this.pf.specPath), scen, Utilities.path(this.pf.tempDir), this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, lrc.copy(false).setDefinitionsTarget(this.pf.igpkp.getDefinitionsName(r)), this.pf.versionToAnnotate, this.pf.relatedIGs);
+    ExampleScenarioRenderer er = new ExampleScenarioRenderer(this.pf.context, checkAppendSlash(this.pf.specPath), scen, Utilities.path(this.pf.tempDir), this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, lrc.copy(false).setDefinitionsTarget(this.pf.igpkp.getDefinitionsName(r)), this.pf.versionToAnnotate, this.pf.relatedIGs, this);
     if (wantGen(r, "actor-table")) {
       long start = System.currentTimeMillis();
       fragment("ExampleScenario-"+prefixForContainer+scen.getId()+"-actor-table", er.render(RenderingContext.ExampleScenarioRendererMode.ACTORS), f.getOutputNames(), r, vars, null, start, "actor-table", "ExampleScenario", lang);
@@ -2236,7 +2261,7 @@ public class PublisherGenerator extends PublisherBase {
   }
 
   private void generateOutputsQuestionnaire(FetchedFile f, FetchedResource r, Questionnaire q, Map<String,String> vars, String prefixForContainer, RenderingContext lrc, String lang) throws Exception {
-    QuestionnaireRenderer qr = new QuestionnaireRenderer(this.pf.context, checkAppendSlash(this.pf.specPath), q, Utilities.path(this.pf.tempDir), this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, lrc.copy(false).setDefinitionsTarget(this.pf.igpkp.getDefinitionsName(r)).setPackageInformation(this.pf.packageInfo), this.pf.versionToAnnotate, this.pf.relatedIGs);
+    QuestionnaireRenderer qr = new QuestionnaireRenderer(this.pf.context, checkAppendSlash(this.pf.specPath), q, Utilities.path(this.pf.tempDir), this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, lrc.copy(false).setDefinitionsTarget(this.pf.igpkp.getDefinitionsName(r)).setPackageInformation(this.pf.packageInfo), this.pf.versionToAnnotate, this.pf.relatedIGs, this);
     if (wantGen(r, "summary")) {
       long start = System.currentTimeMillis();
       fragment("Questionnaire-"+prefixForContainer+q.getId()+"-summary", qr.summaryTable(r, wantGen(r, "xml"), wantGen(r, "json"), wantGen(r, "ttl"), this.pf.igpkp.summaryRows()), f.getOutputNames(), r, vars, null, start, "summary", "Questionnaire", lang);
@@ -2309,7 +2334,7 @@ public class PublisherGenerator extends PublisherBase {
       }
     }
 
-    QuestionnaireResponseRenderer qr = new QuestionnaireResponseRenderer(this.pf.context, checkAppendSlash(this.pf.specPath), r.getElement(), Utilities.path(this.pf.tempDir), this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, lrc);
+    QuestionnaireResponseRenderer qr = new QuestionnaireResponseRenderer(this.pf.context, checkAppendSlash(this.pf.specPath), r.getElement(), Utilities.path(this.pf.tempDir), this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, lrc, this);
     if (wantGen(r, "tree")) {
       long start = System.currentTimeMillis();
       fragment("QuestionnaireResponse-"+prefixForContainer+r.getId()+"-tree", qr.render(RenderingContext.QuestionnaireRendererMode.TREE), f.getOutputNames(), r, vars, null, start, "tree", "QuestionnaireResponse", lang);
@@ -2837,7 +2862,7 @@ public class PublisherGenerator extends PublisherBase {
         fragment("maps-"+sd.getTypeTail(), src, pf.otherFilesRun, start, "maps", "Cross", lang);
       }
     }
-    DeprecationRenderer dpr = new DeprecationRenderer(pf.context, checkAppendSlash(pf.specPath), pf.igpkp, pf.specMaps, pageTargets(), pf.markdownEngine, pf.packge, rc.copy(false));
+    DeprecationRenderer dpr = new DeprecationRenderer(pf.context, checkAppendSlash(pf.specPath), pf.igpkp, pf.specMaps, pageTargets(), pf.markdownEngine, pf.packge, rc.copy(false), this);
     long start = System.currentTimeMillis();
     fragment("deprecated-list", dpr.deprecationSummary(pf.fileList, pf.previousVersionComparator), pf.otherFilesRun, start, "deprecated-list", "Cross", lang);
     start = System.currentTimeMillis();
@@ -2885,7 +2910,12 @@ public class PublisherGenerator extends PublisherBase {
     pf.ipStmt = new IPStatementsRenderer(pf.context, pf.markdownEngine, pf.packageId(), rc).genIpStatements(pf.fileList, lang);
     trackedFragment("1", "ip-statements", pf.ipStmt, pf.otherFilesRun, start, "ip-statements", "Cross", lang);
     start = System.currentTimeMillis();
-    if (VersionUtilities.isR4Ver(pf.version) || VersionUtilities.isR4BVer(pf.version)) {
+    if (pf.cvAnalyser != null) {
+      start = System.currentTimeMillis();
+      fragment("cross-version-analysis", pf.cvAnalyser.generate(pf.npmName, false), pf.otherFilesRun, start, "cross-version-analysis", "Cross", lang);
+      start = System.currentTimeMillis();
+      fragment("cross-version-analysis-inline", pf.cvAnalyser.generate(pf.npmName, true), pf.otherFilesRun, start, "cross-version-analysis-inline", "Cross", lang);
+    } else if (VersionUtilities.isR4Ver(pf.version) || VersionUtilities.isR4BVer(pf.version)) {
       start = System.currentTimeMillis();
       trackedFragment("2", "cross-version-analysis", pf.r4tor4b.generate(pf.npmName, false), pf.otherFilesRun, start, "cross-version-analysis", "Cross", lang);
       start = System.currentTimeMillis();
@@ -2898,11 +2928,11 @@ public class PublisherGenerator extends PublisherBase {
     }
     DependencyRenderer depr = new DependencyRenderer(pf.pcm, pf.tempDir, pf.npmName, pf.templateManager, makeDependencies(), pf.context, pf.markdownEngine, rc, pf.specMaps);
     start = System.currentTimeMillis();
-    trackedFragment("3", "dependency-table", depr.render(pf.publishedIg, false, true, true), pf.otherFilesRun, start, "dependency-table", "Cross", lang);
+    trackedFragment("3", "dependency-table", depr.render(pf.getEffectiveBaseIg(), false, true, true), pf.otherFilesRun, start, "dependency-table", "Cross", lang);
     start = System.currentTimeMillis();
-    trackedFragment("3", "dependency-table-short", depr.render(pf.publishedIg, false, false, false), pf.otherFilesRun, start, "dependency-table-short", "Cross", lang);
+    trackedFragment("3", "dependency-table-short", depr.render(pf.getEffectiveBaseIg(), false, false, false), pf.otherFilesRun, start, "dependency-table-short", "Cross", lang);
     start = System.currentTimeMillis();
-    trackedFragment("3", "dependency-table-nontech", depr.renderNonTech(pf.publishedIg), pf.otherFilesRun, start, "dependency-table-nontech", "Cross", lang);
+    trackedFragment("3", "dependency-table-nontech", depr.renderNonTech(pf.getEffectiveBaseIg()), pf.otherFilesRun, start, "dependency-table-nontech", "Cross", lang);
     start = System.currentTimeMillis();
     trackedFragment("4", "globals-table", depr.renderGlobals(), pf.otherFilesRun, start, "globals-table", "Cross", lang);
     start = System.currentTimeMillis();
@@ -4622,7 +4652,7 @@ public class PublisherGenerator extends PublisherBase {
                 jNode.add("name", displayForCountryCode(cd.getCode()));
                 File flagFile = new File(pf.vsCache + "/" + code + ".svg");
                 if (!flagFile.exists() && !pf.ignoreFlags.contains(code)) {
-                  URL url2 = new URL("https://flagcdn.com/" + pf.shortCountryCode.get(code.toUpperCase()).toLowerCase() + ".svg");
+                  URL url2 = URI.create("https://flagcdn.com/" + pf.shortCountryCode.get(code.toUpperCase()).toLowerCase() + ".svg").toURL();
                   try {
                     InputStream in = url2.openStream();
                     Files.copy(in, Paths.get(flagFile.getAbsolutePath()));
@@ -4641,7 +4671,7 @@ public class PublisherGenerator extends PublisherBase {
                 jNode.add("name", displayForStateCode(cd.getCode()) + " (" + displayForCountryCode(codeParts[0]) + ")");
                 File flagFile = new File(pf.vsCache + "/" + code + ".svg");
                 if (!flagFile.exists()) {
-                  URL url = new URL("http://flags.ox3.in/svg/" + codeParts[0].toLowerCase() + "/" + codeParts[1].toLowerCase() + ".svg");
+                  URL url = URI.create("http://flags.ox3.in/svg/" + codeParts[0].toLowerCase() + "/" + codeParts[1].toLowerCase() + ".svg").toURL();
                   try (InputStream in = url.openStream()) {
                     Files.copy(in, Paths.get(flagFile.getAbsolutePath()));
                   } catch (Exception e) {
@@ -5310,7 +5340,7 @@ public class PublisherGenerator extends PublisherBase {
 
 
   private void generateOutputsOperationDefinition(FetchedFile f, FetchedResource r, OperationDefinition od, Map<String, String> vars, boolean regen, String prefixForContainer, RenderingContext lrc, String lang) throws FHIRException, IOException {
-    OperationDefinitionRenderer odr = new OperationDefinitionRenderer(this.pf.context, checkAppendSlash(this.pf.specPath), od, Utilities.path(this.pf.tempDir), this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, this.pf.fileList, lrc, this.pf.versionToAnnotate, this.pf.relatedIGs);
+    OperationDefinitionRenderer odr = new OperationDefinitionRenderer(this.pf.context, checkAppendSlash(this.pf.specPath), od, Utilities.path(this.pf.tempDir), this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, this.pf.fileList, lrc, this.pf.versionToAnnotate, this.pf.relatedIGs, this);
     if (wantGen(r, "summary")) {
       long start = System.currentTimeMillis();
       fragment("OperationDefinition-"+prefixForContainer+od.getId()+"-summary", odr.summary(), f.getOutputNames(), r, vars, null, start, "summary", "OperationDefinition", lang);
@@ -5731,27 +5761,67 @@ public class PublisherGenerator extends PublisherBase {
     ByteArrayOutputStream bsj = new ByteArrayOutputStream();
     org.hl7.fhir.r5.elementmodel.JsonParser jp = new org.hl7.fhir.r5.elementmodel.JsonParser(this.pf.context);
     Element element = r.getElement();
-    Element eNN = element;
-    jp.compose(element, bsj, IParser.OutputStyle.NORMAL, this.pf.igpkp.getCanonical());
+    boolean embeddedIg = r.getResource() != null && r.getResource() == this.pf.publishedIg;
+    Element baseElement = element;
+    if (embeddedIg) {
+      // H3: the base package embeds the effective base IG - per-target (R5) dependencies and a
+      // definition.resource list filtered to base (R5) membership. Built on a copy of the fully
+      // generated IG POJO (narrative + generated extensions) with the same helpers as the variant
+      // path, then converted back to an element for the compose / per-language paths below (mirrors
+      // the updateImplementationGuide() convertToElement pattern).
+      ImplementationGuide baseIg = ((ImplementationGuide) r.getResource()).copy();
+      applyEffectiveDependsOn(baseIg, this.pf.getEffectiveBaseIg());
+      filterResourceMembership(baseIg, this.pf.version);
+      try {
+        baseElement = convertToElement(r, baseIg);
+      } catch (Exception e) {
+        throw new FHIRException("Unable to build the embedded base ImplementationGuide: "+e.getMessage(), e);
+      }
+    }
+    Element eNN = baseElement;
+    jp.compose(baseElement, bsj, IParser.OutputStyle.NORMAL, this.pf.igpkp.getCanonical());
     if (!r.isCustomResource()) {
-      this.pf.npm.addFile(isExample(f,r ) ? NPMPackageGenerator.Category.EXAMPLE : NPMPackageGenerator.Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", bsj.toByteArray());
-      if (isNewML()) {
-        for (String l : allLangs()) {
-          Element le = this.pf.langUtils.copyToLanguage(element, l, true, r.getElement().getChildValue("language"), pf.defaultTranslationLang, r.getErrors()); // todo: should we keep this?
-          ByteArrayOutputStream bsjl = new ByteArrayOutputStream();
-          jp.compose(le, bsjl, IParser.OutputStyle.NORMAL, this.pf.igpkp.getCanonical());
-          this.pf.lnpms.get(l).addFile(isExample(f,r ) ? NPMPackageGenerator.Category.EXAMPLE : NPMPackageGenerator.Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", bsjl.toByteArray());
+      if (includedInVersion(r, this.pf.version)) {
+        this.pf.npm.addFile(isExample(f,r ) ? NPMPackageGenerator.Category.EXAMPLE : NPMPackageGenerator.Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", bsj.toByteArray());
+        if (isNewML()) {
+          for (String l : allLangs()) {
+            Element le = this.pf.langUtils.copyToLanguage(baseElement, l, true, r.getElement().getChildValue("language"), pf.defaultTranslationLang, r.getErrors()); // todo: should we keep this?
+            ByteArrayOutputStream bsjl = new ByteArrayOutputStream();
+            jp.compose(le, bsjl, IParser.OutputStyle.NORMAL, this.pf.igpkp.getCanonical());
+            this.pf.lnpms.get(l).addFile(isExample(f,r ) ? NPMPackageGenerator.Category.EXAMPLE : NPMPackageGenerator.Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", bsjl.toByteArray());
+          }
         }
       }
       for (String v : this.pf.generateVersions) {
         String ver = VersionUtilities.versionFromCode(v);
-        Resource res = r.hasOtherVersions() && r.getOtherVersions().containsKey(ver+"-"+r.fhirType()) ? r.getOtherVersions().get(ver+"-"+r.fhirType()).getResource() : r.getResource();
+        if (!includedInVersion(r, ver)) {
+          if (this.pf.cvAnalyser != null) {
+            this.pf.cvAnalyser.recordOmission(ver, r.fhirType()+"/"+r.getId());
+          }
+          continue; // resource scoped out of this target version via *-inclusion (intentional membership omission)
+        }
+        Resource res;
+        if (embeddedIg) {
+          // H3: each variant package embeds the effective per-version IG - target-suffixed deps
+          // (from checkIgDeps) and a target-filtered definition.resource - built on the fully
+          // generated IG so narrative/generated extensions survive; convVersion then stamps the
+          // target fhirVersion and packageId suffix.
+          ImplementationGuide vig = ((ImplementationGuide) r.getResource()).copy();
+          applyEffectiveDependsOn(vig, this.pf.effectiveVersionIgs.get(v));
+          filterResourceMembership(vig, v);
+          res = vig;
+        } else {
+          res = r.hasOtherVersions() && r.getOtherVersions().containsKey(ver+"-"+r.fhirType()) ? r.getOtherVersions().get(ver+"-"+r.fhirType()).getResource() : r.getResource();
+        }
         if (res != null) {
           byte[] resVer = null;
           try {
             resVer = convVersion(res.copy(), ver);
           } catch (Exception e) {
             System.out.println("Unable to convert "+res.fhirType()+"/"+res.getId()+" to "+ver+": "+e.getMessage());
+            if (this.pf.cvAnalyser != null) {
+              this.pf.cvAnalyser.recordProblem(ver, res.fhirType()+"/"+r.getId(), e.getMessage());
+            }
             resVer = null;
           }
           if (resVer != null) {
@@ -5783,7 +5853,7 @@ public class PublisherGenerator extends PublisherBase {
 
     if (this.pf.module.isNoNarrative()) {
       // we don't use the narrative in these resources in _includes, so we strip it - it slows Jekyll down greatly
-      eNN = (Element) element.copy();
+      eNN = (Element) baseElement.copy();
       eNN.removeChild("text");
       bsj = new ByteArrayOutputStream();
       jp.compose(eNN, bsj, IParser.OutputStyle.PRETTY, this.pf.igpkp.getCanonical());
@@ -5920,6 +5990,9 @@ public class PublisherGenerator extends PublisherBase {
         ttl.setStyle(IParser.OutputStyle.PRETTY);
         ttl.compose(e, rdf, "");
         return rdf.toString();
+        
+      } else if (syntax.equals("fml")) {
+        return StructureMapUtilities.render((StructureMap)r.getResource()).trim();
       } else
         throw new FHIRException("Unrecognized syntax: " + syntax);
     } catch (Exception except) {
@@ -6146,6 +6219,18 @@ public class PublisherGenerator extends PublisherBase {
   }
 
   private String processRefTag(DBBuilder db, String src, FetchedFile f) throws IOException {
+    StringPair ref = processReferenceTag(src);
+    if (ref == null) {
+      // use [[~[ so we don't get stuck in a loop
+      return "[[~["+src+"]]]";
+    } else if (ref.getValue() == null) {
+      return ref.getName();
+    } else {
+      return "<a href=\""+ref.getValue()+"\">"+Utilities.escapeXml(ref.getName())+"</a>";
+    }
+  }
+
+  public StringPair processReferenceTag(String src) throws IOException {
     boolean named = false;
     if (src.endsWith("'")) {
       named = true;
@@ -6153,14 +6238,13 @@ public class PublisherGenerator extends PublisherBase {
     }
     if (Utilities.existsInList(src, "$ver")) {
       switch (src) {
-        case "$ver": return this.pf.businessVersion;
+        case "$ver": return new StringPair(this.pf.businessVersion, null);
       }
     } else if (Utilities.isAbsoluteUrl(src)) {
-
       try {
         CanonicalResource cr = (CanonicalResource) this.pf.context.fetchResource(Resource.class, src);
         if (cr != null && cr.hasWebPath()) {
-          return "<a href=\""+cr.getWebPath()+"\">"+Utilities.escapeXml(cr.present())+"</a>";
+          return new StringPair(cr.present(), cr.getWebPath());
         }
       } catch (Exception e) {
       }
@@ -6170,7 +6254,7 @@ public class PublisherGenerator extends PublisherBase {
           if (r.getResource() instanceof CanonicalResource) {
             CanonicalResource cr = (CanonicalResource) r.getResource();
             if (src.equalsIgnoreCase(cr.getName()) && cr.hasWebPath()) {
-              return "<a href=\""+cr.getWebPath()+"\">"+Utilities.escapeXml(cr.present())+"</a>";
+              return  new StringPair(cr.present(), cr.getWebPath());
             }
           }
         }
@@ -6178,7 +6262,7 @@ public class PublisherGenerator extends PublisherBase {
       try {
         StructureDefinition sd = this.pf.context.fetchTypeDefinition(src);
         if (sd != null) {
-          return "<a href=\""+sd.getWebPath()+"\">"+Utilities.escapeXml(sd.present())+"</a>";
+          return new StringPair(sd.present(), sd.getWebPath());
         }
       } catch (Exception e) {
         // nothing
@@ -6186,7 +6270,7 @@ public class PublisherGenerator extends PublisherBase {
     }
     for (RelatedIG rig : this.pf.relatedIGs) {
       if (rig.getId().equals(src) && rig.getWebLocation() != null) {
-        return "<a href=\""+rig.getWebLocation()+"\">"+Utilities.escapeXml(rig.getTitle())+"</a>";
+        return new StringPair(rig.getTitle(), rig.getWebLocation());
       }
     }
     for (PublisherUtils.LinkedSpecification lspec : pf.linkSpecMaps) {
@@ -6216,11 +6300,10 @@ public class PublisherGenerator extends PublisherBase {
         if (page == null) {
           page = lspec.getSpm().getPath(json.asString("url"), null, json.asString("resourceType"), json.asString("id"));
         }
-        return "<a href=\""+page+"\">"+name;
+        return  new StringPair(name, page);
       }
     }
-    // use [[~[ so we don't get stuck in a loop
-    return "[[~["+src+"]]]";
+    return null;
   }
 
 
@@ -6287,8 +6370,8 @@ public class PublisherGenerator extends PublisherBase {
     FetchedResource r = fetchByResource(type, id);
     if (r == null)
       throw new FHIRException(("Unable to find fragment resource " + reference + " pointed to in file " + f.getName()));
-    if (!format.equals("xml") && !format.equals("json") && !format.equals("ttl"))
-      throw new FHIRException("Unrecognized fragment format " + format + " - expecting 'xml', 'json', or 'ttl' in file " + f.getName());
+    if (!format.equals("xml") && !format.equals("json") && !format.equals("ttl") && !format.equals("fml"))
+      throw new FHIRException("Unrecognized fragment format " + format + " - expecting 'xml', 'json', 'fml', or 'ttl' in file " + f.getName());
 
     Pattern filterPattern = Pattern.compile("(BASE:|EXCEPT:|ELIDE:)");
     Matcher filterMatcher = filterPattern.matcher(filters);

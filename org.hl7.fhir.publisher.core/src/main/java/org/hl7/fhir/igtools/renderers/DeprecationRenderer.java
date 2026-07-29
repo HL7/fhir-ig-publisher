@@ -23,8 +23,8 @@ import java.util.*;
 
 public class DeprecationRenderer extends BaseRenderer {
 
-  public DeprecationRenderer(IWorkerContext context, String corePath, IGKnowledgeProvider igp, List<SpecMapManager> specmaps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen) {
-    super(context, corePath, igp, specmaps, allTargets, markdownEngine, packge, gen);
+  public DeprecationRenderer(IWorkerContext context, String corePath, IGKnowledgeProvider igp, List<SpecMapManager> specmaps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen, ReferenceResolver resolver) {
+    super(context, corePath, igp, specmaps, allTargets, markdownEngine, packge, gen, resolver);
   }
 
   public String deprecationSummary(List<FetchedFile> fileList, PreviousVersionComparator previous) throws Exception {

@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.file.Path;
@@ -440,8 +441,8 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       deleteDuplicateMessages();
       ValidationPresenter val = new ValidationPresenter(pf.version, workingVersion(), pf.igpkp, pf.childPublisher == null? null : pf.childPublisher.getIgpkp(), pf.rootDir, pf.npmName, pf.childPublisher == null? null : pf.childPublisher.pf.npmName,
           IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), pf.realmRules, pf.previousVersionComparator, pf.ipaComparator, pf.ipsComparator,
-          new DependencyRenderer(pf.pcm, pf.outputDir, pf.npmName, pf.templateManager, pf.dependencyList, pf.context, pf.markdownEngine, pf.rc, pf.specMaps).render(pf.publishedIg, true, false, false), new HTAAnalysisRenderer(pf.context, pf.outputDir, pf.markdownEngine).render(pf.packageId(), pf.fileList, pf.publishedIg.present()),
-          new PublicationChecker(pf.repoRoot, pf.historyPage, pf.markdownEngine, findReleaseLabelString(), pf.publishedIg, pf.relatedIGs).check(), renderGlobals(), pf.copyrightYear, pf.context, scanForR5Extensions(), pf.modifierExtensions,
+          new DependencyRenderer(pf.pcm, pf.outputDir, pf.npmName, pf.templateManager, pf.dependencyList, pf.context, pf.markdownEngine, pf.rc, pf.specMaps).render(pf.getEffectiveBaseIg(), true, false, false), new HTAAnalysisRenderer(pf.context, pf.outputDir, pf.markdownEngine).render(pf.packageId(), pf.fileList, pf.publishedIg.present()),
+          new PublicationChecker(pf.repoRoot, pf.historyPage, pf.markdownEngine, findReleaseLabelString(), pf.getEffectiveBaseIg(), pf.relatedIGs).check(), renderGlobals(), pf.copyrightYear, pf.context, scanForR5Extensions(), pf.modifierExtensions,
           generateDraftDependencies(), pf.noNarrativeResources, pf.noValidateResources, settings.isValidationOff(), settings.isGenerationOff(), pf.dependentIgFinder, pf.context.getTxClientManager(),
           fragments, makeLangInfo(), pf.relatedIGs);
       val.setValidationFlags(pf.hintAboutNonMustSupport, pf.anyExtensionsAllowed, pf.checkAggregation, pf.autoLoad, pf.showReferenceMessages, pf.noExperimentalContent, pf.displayWarnings);
@@ -1135,7 +1136,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 
 
   private void download(String address, String filename) throws IOException {
-    URL url = new URL(address);
+    URL url = URI.create(address).toURL();
     URLConnection c = url.openConnection();
     InputStream s = c.getInputStream();
     FileOutputStream f = new FileOutputStream(filename);
@@ -1222,10 +1223,15 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       FhirSettings.setExplicitFilePath(CliParams.getNamedParam(args, FHIR_SETTINGS_PARAM));
     }
     ManagedWebAccess.loadFromFHIRSettings();
+    TerminologyClientContext.setCanUseCacheId(true);
 
     if (CliParams.hasNamedParam(args, "-produce-translator-ids")) {
       I18nBase.setUseMessageIdsDirectly(true);
     }
+
+    // Install any editor-supplied PO overlays before message bundles or the
+    // validation engine load — they latch on first access. 
+    TranslationOverrideArgs.applyIfRequested(args);
 
     if (CliParams.hasNamedParam(args, "-gui")) {
       IGPublisherUI.main(args);
@@ -1273,7 +1279,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       System.out.println("  see Wiki for Documentation");
       System.out.println("");
       System.out.println("-tx: (optional) Address to use for terminology server ");
-      System.out.println("  (default is http://tx.fhir.org)");
+      System.out.println("  (default is https://tx.fhir.org)");
       System.out.println("  use 'n/a' to run without a terminology server");
       System.out.println("");
       System.out.println("-no-network: (optional) Stop the IG publisher accessing the network");
@@ -1286,6 +1292,13 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       System.out.println("");
       System.out.println("-packages: a directory to load packages (*.tgz) from before resolving dependencies");
       System.out.println("           this parameter can be present multiple times");
+      System.out.println("");
+      System.out.println("-po: (optional) Load translations from a .po file at runtime. Repeatable.");
+      System.out.println("     Overrides shipped properties for the bundle+locale derived from the filename");
+      System.out.println("     (e.g. validator-messages-de.po, rendering-phrases-pt_BR.po).");
+      System.out.println("-po-dir: (optional) Load every .po file under the given directory. Repeatable.");
+      System.out.println("-po-stale-handling: (optional, default 'include') include|exclude|warn — how to");
+      System.out.println("     treat translations whose English source has drifted from the shipped jar.");
       System.out.println("");
       System.out.println("The most important output from the publisher is qa.html");
       System.out.println("");
