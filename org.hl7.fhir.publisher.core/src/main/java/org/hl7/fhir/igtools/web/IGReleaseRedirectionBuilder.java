@@ -159,7 +159,7 @@ public class IGReleaseRedirectionBuilder {
   public IGReleaseRedirectionBuilder(String folder, String canonical, String vpath, String websiteRootFolder) {
    this.folder = folder; 
    this.canonical = canonical;
-   this.vpath = vpath;
+   this.vpath = vpath.replace("http://", "https://");
    this.websiteRootFolder = websiteRootFolder;
    localFolder = folder.substring(websiteRootFolder.length());
    countTotal = 0;
