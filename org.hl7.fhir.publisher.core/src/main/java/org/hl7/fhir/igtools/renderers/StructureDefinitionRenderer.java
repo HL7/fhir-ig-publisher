@@ -3173,7 +3173,10 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     Map<String, SearchParameter> splist = new HashMap<>();
     for (SearchParameter sp : context.fetchResourcesByType(SearchParameter.class)) {
       if (hasBase(sp, sd.getType())) {
-        splist.put(sp.getCode(), sp);
+        SearchParameter existing = splist.get(sp.getCode());
+        if (existing == null || isPreferredSP(sp, existing)) {
+          splist.put(sp.getCode(), sp);
+        }
       }
     }
     XhtmlNode div = new XhtmlNode(NodeType.Element, "div");
@@ -3193,6 +3196,18 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       tr.td().code(sp.getExpression());
     }
     return new XhtmlComposer(false, true).compose(div.getChildNodes());
+  }
+
+  private boolean isPreferredSP(SearchParameter candidate, SearchParameter existing) {
+    // two search parameters with the same code apply to this resource type (e.g. the core spec's
+    // multi-base 'Multiple Resources' parameter and an IG-specific one). Prefer the one defined
+    // in the IG being built; otherwise prefer the more specific one (fewer bases)
+    boolean cLocal = candidate.hasSourcePackage() && candidate.getSourcePackage().getId().equals(packageId);
+    boolean eLocal = existing.hasSourcePackage() && existing.getSourcePackage().getId().equals(packageId);
+    if (cLocal != eLocal) {
+      return cLocal;
+    }
+    return candidate.getBase().size() < existing.getBase().size();
   }
 
   private boolean hasBase(SearchParameter sp, String type) {
