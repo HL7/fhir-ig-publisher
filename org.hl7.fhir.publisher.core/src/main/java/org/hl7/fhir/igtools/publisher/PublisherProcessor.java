@@ -1493,7 +1493,7 @@ public class PublisherProcessor extends PublisherBase  {
       try {
         for (FetchedResource r : f.getResources()) {
           if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
-            log("  ..."+r.getResource().fhirType()+" "+r.getId());
+            // log("  ..."+r.getResource().fhirType()+" "+r.getId());
             this.pf.previousVersionComparator.check((CanonicalResource) r.getResource());
             if (this.pf.ipaComparator != null) {
               this.pf.ipaComparator.check((CanonicalResource) r.getResource());
