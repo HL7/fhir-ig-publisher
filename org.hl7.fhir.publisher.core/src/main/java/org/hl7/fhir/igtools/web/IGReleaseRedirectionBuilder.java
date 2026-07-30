@@ -91,31 +91,24 @@ public class IGReleaseRedirectionBuilder {
       "    \r\n"+
       "You should not be seeing this page. If you do, PHP has failed badly.\r\n";
 
-  private static final String HTML_TEMPLATE = "<?php\r\n"+
-      "function Redirect($url)\r\n"+
-      "{\r\n"+
-      "  header('Location: ' . $url, true, 302);\r\n"+
-      "  exit();\r\n"+
-      "}\r\n"+
-      "\r\n"+
-      "$accept = $_SERVER['HTTP_ACCEPT'];\r\n"+
-      "if (strpos($accept, 'application/json+fhir') !== false)\r\n"+
-      "  Redirect('{{literal}}.json2');\r\n"+
-      "elseif (strpos($accept, 'application/fhir+json') !== false)\r\n"+
-      "  Redirect('{{literal}}.json1');\r\n"+
-      "elseif (strpos($accept, 'json') !== false)\r\n"+
-      "  Redirect('{{literal}}.json');\r\n"+
-      "elseif (strpos($accept, 'application/xml+fhir') !== false)\r\n"+
-      "  Redirect('{{literal}}.xml2');\r\n"+
-      "elseif (strpos($accept, 'application/fhir+xml') !== false)\r\n"+
-      "  Redirect('{{literal}}.xml1');\r\n"+
-      "elseif (strpos($accept, 'html') !== false)\r\n"+
-      "  Redirect('{{html}}');\r\n"+
-      "else \r\n"+
-      "  Redirect('{{literal}}.xml');\r\n"+
-      "?>\r\n"+
-      "    \r\n"+
-      "You should not be seeing this page. If you do, PHP has failed badly.\r\n";
+  // Static HTML redirect for cloud / static hosting (e.g. S3, GitHub Pages, Netlify)
+  // that cannot execute server-side scripts. Content negotiation on the Accept header
+  // is not possible without a server runtime, so this redirects browsers to the human
+  // readable page and links the JSON/XML representations for machine clients.
+  private static final String HTML_TEMPLATE = "<!DOCTYPE html>\r\n"+
+      "<html lang=\"en\">\r\n"+
+      "<head>\r\n"+
+      "  <meta charset=\"utf-8\"/>\r\n"+
+      "  <meta http-equiv=\"refresh\" content=\"0; url={{html}}\"/>\r\n"+
+      "  <link rel=\"canonical\" href=\"{{html}}\"/>\r\n"+
+      "  <title>Redirecting&hellip;</title>\r\n"+
+      "  <script type=\"text/javascript\">window.location.replace(\"{{html}}\");</script>\r\n"+
+      "</head>\r\n"+
+      "<body>\r\n"+
+      "  <p>This FHIR resource is published at <a href=\"{{html}}\">{{html}}</a>. Redirecting now&hellip;</p>\r\n"+
+      "  <p>Machine-readable formats: <a href=\"{{literal}}.json\">JSON</a> &middot; <a href=\"{{literal}}.xml\">XML</a></p>\r\n"+
+      "</body>\r\n"+
+      "</html>\r\n";
   
   private static final String WC_START_ROOT = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" + 
       "<configuration>\n" + 

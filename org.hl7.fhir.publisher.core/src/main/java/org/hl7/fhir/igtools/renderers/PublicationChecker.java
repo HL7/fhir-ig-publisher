@@ -19,6 +19,7 @@ import org.hl7.fhir.utilities.StringPair;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
+import org.hl7.fhir.utilities.http.ManagedWebAccess;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
@@ -541,7 +542,8 @@ public class PublicationChecker {
   }
   
   private PackageList readPackageList(String dst) throws IOException {
-    return PackageList.fromUrl(Utilities.pathURL(dst, "package-list.json"));
+    final String secureDst = ManagedWebAccess.makeSecureRef(dst);
+    return PackageList.fromUrl(Utilities.pathURL(secureDst, "package-list.json"));
   }
 
   private String determineDestination(NpmPackage npm) {
