@@ -1252,7 +1252,7 @@ public class PublisherProcessor extends PublisherBase  {
                     first = false;
                     if (r.getResource() instanceof DomainResource && (langs.size() > 1 || !(((DomainResource) r.getResource()).hasText() && ((DomainResource) r.getResource()).getText().hasDiv()))) {
                       regen = true;
-                      ResourceRenderer rr = RendererFactory.factory(r.getResource(), lrc);
+                      ResourceRenderer rr = pf.rendererFactory.factory(r.getResource(), lrc);
                       if (rr.renderingUsesValidation()) {
                         r.setRegenAfterValidation(true);
                         this.pf.needsRegen = true;
@@ -1289,7 +1289,7 @@ public class PublisherProcessor extends PublisherBase  {
                     first = false;
                     if (isDomainResource(r) && (isRegen || langs.size() > 1 || !hasNarrative(r.getElement()))) {
                       ResourceWrapper rw = ResourceWrapper.forResource(lrc, r.getElement());
-                      ResourceRenderer rr = RendererFactory.factory(rw, lrc);
+                      ResourceRenderer rr = pf.rendererFactory.factory(rw, lrc);
                       if (rr.renderingUsesValidation()) {
                         r.setRegenAfterValidation(true);
                         this.pf.needsRegen = true;
@@ -1302,7 +1302,7 @@ public class PublisherProcessor extends PublisherBase  {
                         Element res = e.getNamedChild("resource");
                         if (res!=null && isDomainResource(res.getProperty().getStructure())) {
                           ResourceWrapper rw = ResourceWrapper.forResource(lrc, res);
-                          ResourceRenderer rr = RendererFactory.factory(rw, lrc);
+                          ResourceRenderer rr = pf.rendererFactory.factory(rw, lrc);
                           if (rr.renderingUsesValidation()) {
                             r.setRegenAfterValidation(true);
                             this.pf.needsRegen = true;

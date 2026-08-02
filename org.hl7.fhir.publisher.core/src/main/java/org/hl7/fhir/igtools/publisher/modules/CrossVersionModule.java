@@ -46,6 +46,7 @@ import org.hl7.fhir.r5.model.StructureMap.StructureMapStructureComponent;
 import org.hl7.fhir.r5.renderers.ConceptMapRenderer;
 import org.hl7.fhir.r5.renderers.ConceptMapRenderer.RenderMultiRowSortPolicy;
 import org.hl7.fhir.r5.renderers.Renderer.RenderingStatus;
+import org.hl7.fhir.r5.renderers.RendererFactory;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.GenerationRules;
@@ -211,7 +212,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
     }
     body.hr();
     
-    RenderingContext rc = new RenderingContext(engine.getVdr5(), new MarkDownProcessor(Dialect.COMMON_MARK), null, "http://hl7.org/fhir", "", null, ResourceRendererMode.TECHNICAL, GenerationRules.IG_PUBLISHER);
+    RenderingContext rc = new RenderingContext(engine.getVdr5(), new RendererFactory(),  new MarkDownProcessor(Dialect.COMMON_MARK), null, "http://hl7.org/fhir", "", null, ResourceRendererMode.TECHNICAL, GenerationRules.IG_PUBLISHER);
     rc.setPkp(this);
     var sdr = new org.hl7.fhir.r5.renderers.StructureDefinitionRenderer(rc);
     body.add(sdr.generateTable(new RenderingStatus(), "todo", sd, true,  Utilities.path(path, "temp", "xver-qa"), false, "Extension", false, "http://hl7.org/fhir", "", false, false, null, false, rc, "", ResourceWrapper.forResource(rc.getContextUtilities(), sd), "CV"));

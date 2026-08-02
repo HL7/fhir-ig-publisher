@@ -1115,7 +1115,7 @@ public class PublisherBase implements ILoggingService {
     Provenance pv = null;
     try {
       pv = (Provenance) (r == null ? convertFromElement(resource) : r);
-      RendererFactory.factory(pv, pf.rc.setParser(getTypeLoader(null))).renderResource(ResourceWrapper.forResource(pf.rc, pv));
+      pf.rendererFactory.factory(pv, pf.rc.setParser(getTypeLoader(null))).renderResource(ResourceWrapper.forResource(pf.rc, pv));
     } catch (Exception e) {
       // nothing, if there's a problem, we'll take it up elsewhere
     }
@@ -1169,7 +1169,7 @@ public class PublisherBase implements ILoggingService {
     // this list is for the index. Only some kind of resources are pulled out and presented indepedently
     List<PublisherUtils.ContainedResourceDetails> list = new ArrayList<>();
     for (Element c : e.getChildren("contained")) {
-      if (RendererFactory.hasSpecificRenderer(c.fhirType())) {
+      if (pf.rendererFactory.hasSpecificRenderer(c.fhirType())) {
         // the intent of listing a resource type is that it has multiple renderings, so gets a page of it's own
         // other wise it's rendered inline
         String t = c.getChildValue("title");

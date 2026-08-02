@@ -39,6 +39,7 @@ import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionPa
 import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionContainsComponent;
 import org.hl7.fhir.r5.renderers.ActorDefinitionRenderer;
 import org.hl7.fhir.r5.renderers.Renderer.RenderingStatus;
+import org.hl7.fhir.r5.renderers.RendererFactory;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
 import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
@@ -56,6 +57,7 @@ import org.hl7.fhir.utilities.xhtml.XhtmlToMarkdownConverter;
 import org.hl7.fhir.validation.BaseValidator.BooleanHolder;
 
 class ConformanceStatementHandler {
+
   class HomeInfo {
     LoadedFile source;
     XhtmlNode node;
@@ -104,14 +106,16 @@ class ConformanceStatementHandler {
   private ILoggingService log;
   private List<String> langList;
   private boolean forHL7;
+  private RendererFactory rendererFactory;
 
-  public ConformanceStatementHandler(HTMLInspector htmlInspector, IWorkerContext context, ILoggingService log, List<String> langList, boolean forHL7) {
+  public ConformanceStatementHandler(HTMLInspector htmlInspector, IWorkerContext context, ILoggingService log, List<String> langList, boolean forHL7, RendererFactory rendererFactory) {
     this.inspector = htmlInspector;
     this.xhtmlToMd = new XhtmlToMarkdownConverter(true);
     this.langList = langList;
     this.context = context;
     this.log = log;
     this.forHL7 = forHL7;
+    this.rendererFactory = rendererFactory;
   }
   
   /*
@@ -422,7 +426,7 @@ class ConformanceStatementHandler {
       XhtmlNode thead = confHome.addTag("thead");
       XhtmlNode tbody = confHome.addTag("tbody");
       XhtmlNode header = thead.tr().style("background-color: WhiteSmoke;");
-      rc = new RenderingContext(context, new MarkDownProcessor(MarkDownProcessor.Dialect.COMMON_MARK),
+      rc = new RenderingContext(context, new RendererFactory(), new MarkDownProcessor(MarkDownProcessor.Dialect.COMMON_MARK),
           null, "http://hl7.org/fhir", "", new Locale(lang), RenderingContext.ResourceRendererMode.END_USER, RenderingContext.GenerationRules.VALID_RESOURCE);
 
       header.th().style("text-align: center;").tx(rc.formatPhrase(RenderingContext.CSTABLE_HEAD_ID));
@@ -601,7 +605,7 @@ class ConformanceStatementHandler {
     // spans
 
     String langName = langForSource(source);
-    rc = new RenderingContext(context, new MarkDownProcessor(MarkDownProcessor.Dialect.COMMON_MARK),
+    rc = new RenderingContext(context, rendererFactory, new MarkDownProcessor(MarkDownProcessor.Dialect.COMMON_MARK),
         null, "http://hl7.org/fhir", "", new Locale(langName), RenderingContext.ResourceRendererMode.END_USER, RenderingContext.GenerationRules.VALID_RESOURCE);
     rr = new ActorDefinitionRenderer(rc);
 

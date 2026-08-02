@@ -349,6 +349,7 @@ public class PublisherIGLoader extends PublisherBase {
     boolean noCIBuildIssues = false;
     boolean keepTranslationsWhenTranslating = false;
     List<String> conversionVersions = new ArrayList<>();
+    List<String> incubatorPackages = new ArrayList<>();
     List<String> liquid0 = new ArrayList<>();
     List<String> liquid1 = new ArrayList<>();
     List<String> liquid2 = new ArrayList<>();
@@ -748,6 +749,9 @@ public class PublisherIGLoader extends PublisherBase {
         case "test-data-factories":
           pf.testDataFactories.add(p.getValue());
           break;
+        case "incubator-ig":
+          registerIncubatorIG(p.getValue(), incubatorPackages);
+          break;
         case "fixed-value-format":
           pf.fixedFormat = RenderingContext.FixedValueFormat.fromCode(p.getValue());
           break;
@@ -849,6 +853,8 @@ public class PublisherIGLoader extends PublisherBase {
           pf.setLanguagePack("true".equals(p.getValue()));
         case "wcag-conformant":
           pf.setWcagConformant("true".equals(p.getValue()));
+        case "excludettl":
+          pf.excludeTtl = true;
         default:
           if (pc.startsWith("wantGen-")) {
             String code = pc.substring(8);
@@ -993,7 +999,7 @@ public class PublisherIGLoader extends PublisherBase {
     for (PageFactory pf : pf.pageFactories) {
       pf.setContext(this.pf.context);
     }
-    pf.dr = new DataRenderer(pf.context);
+    pf.dr = new DataRenderer(pf.context, pf.rendererFactory);
     for (String s : conversionVersions) {
       loadConversionVersion(s);
     }
@@ -1099,7 +1105,7 @@ public class PublisherIGLoader extends PublisherBase {
     pf.inspector = new HTMLInspector(pf.context, pf.outputDir, pf.specMaps, pf.linkSpecMaps, this, pf.igpkp.getCanonical(), pf.packageId(), pf.sourceIg.getVersion(),
             pf.trackedFragments, pf.fileList, pf.module,
             settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD || settings.getMode() == PublisherUtils.IGBuildMode.WEBSERVER, settings.isTrackFragments() ? pf.fragmentUses : null,
-            pf.relatedIGs, noCIBuildIssues, allLangs());
+            pf.relatedIGs, noCIBuildIssues, allLangs(), pf.rendererFactory);
     pf.inspector.getManual().add("full-ig.zip");
     if (pf.historyPage != null) {
       pf.inspector.getManual().add(pf.historyPage);
@@ -1152,6 +1158,10 @@ public class PublisherIGLoader extends PublisherBase {
 
     for (String s : relatedIGParams) {
       loadRelatedIg(s);
+    }
+
+    for (String s : incubatorPackages) {
+      loadIncubatorPackage(s);
     }
 
     if (!VersionUtilities.isR5Plus(pf.context.getVersion())) {
@@ -1715,6 +1725,51 @@ public class PublisherIGLoader extends PublisherBase {
 
     loadIGPackage(name, canonical, packageId, igver, pi, loadDeps, internal);
 
+  }
+
+  /**
+   * Incubator IGs define candidate resources for a future version of FHIR (as additional resources), 
+   * and java code has been generated for them into the core library (org.hl7.fhir.r5.igs.*). The 
+   * incubator-ig parameter (which can repeat) takes a code from the list of incubator IGs that code 
+   * has been prepared for. For each such IG this registers the generated parsers with the core 
+   * parsers (overriding the base-specification definitions), collects the definition package(s) to 
+   * load into the context (see loadIncubatorPackage), and registers the IG's hand-written renderers 
+   * on the publisher's RendererFactory - so that the publisher parses, resolves and renders the 
+   * incubator version of the resources rather than the base specification version.
+   * 
+   * Codes currently supported: 
+   *   hl7.fhir.uv.testing - the FHIR Testing IG (TestPlan, TestScript, TestReport)
+   */
+  private void registerIncubatorIG(String code, List<String> packages) throws Exception {
+    switch (code) {
+    case "hl7.fhir.uv.testing":
+      org.hl7.fhir.r5.igs.testing.TestingParser.register(true);
+      packages.addAll(Arrays.asList(org.hl7.fhir.r5.igs.testing.TestingParser.packages()));
+      org.hl7.fhir.r5.igs.testing.renderers.TestingRenderers.register(pf.rendererFactory);
+      break;
+    default:
+      throw new Exception("Unknown value '"+code+"' for parameter incubator-ig: no code has been generated for that IG (see documentation at https://build.fhir.org/ig/FHIR/fhir-tools-ig/CodeSystem-ig-parameters.html)");
+    }
+  }
+
+  /**
+   * As well as registering the generated code for an incubator IG (see registerIncubatorIG), the 
+   * package that contains the definitions that the code was generated from is loaded into the 
+   * context (once it exists), so that the definitions in the context agree with the generated code
+   */
+  private void loadIncubatorPackage(String pid) throws Exception {
+    log("Load Incubator IG package "+pid);
+    NpmPackage npm = pf.pcm.loadPackage(pid);
+    IContextResourceLoader loader;
+    if (npm.hasFile("other", "spec.internals")) {
+      SpecMapManager spm = loadSpecDetails(FileUtilities.streamToBytes(npm.load("other", "spec.internals")), "incubator-"+npm.name(), npm, npm.getWebLocation());
+      loader = ValidatorUtils.loaderForVersion(npm.fhirVersion(), new PatchLoaderKnowledgeProvider(npm, spm));
+    } else {
+      loader = ValidatorUtils.loaderForVersion(npm.fhirVersion(), new org.hl7.fhir.convertors.loaders.loaderR5.NullLoaderKnowledgeProviderR5());
+    }
+    // the package is loaded as a "master" package: its definitions override the definitions
+    // in the base specification for version-less fetches (that's the point of an incubator IG)
+    pf.context.loadFromPackage(npm, loader, true);
   }
 
   private void loadIg(String name, String packageId, String igver, String uri, int index, boolean loadDeps, boolean internal) throws Exception {
@@ -2412,7 +2467,7 @@ public class PublisherIGLoader extends PublisherBase {
       }
     }
 
-    pf.rc = new RenderingContext(pf.context, pf.markdownEngine, ValidationOptions.defaults(), checkAppendSlash(pf.specPath), "", locale, RenderingContext.ResourceRendererMode.TECHNICAL, RenderingContext.GenerationRules.IG_PUBLISHER);
+    pf.rc = new RenderingContext(pf.context, pf.rendererFactory, pf.markdownEngine, ValidationOptions.defaults(), checkAppendSlash(pf.specPath), "", locale, RenderingContext.ResourceRendererMode.TECHNICAL, RenderingContext.GenerationRules.IG_PUBLISHER);
     pf.rc.setTemplateProvider(pf.templateProvider);
     pf.rc.setServices(pf.validator.getExternalHostServices());
     pf.rc.setDestDir(Utilities.path(pf.tempDir));

@@ -111,7 +111,7 @@ public class BaseRenderer implements IMarkdownProcessor {
           ResourceWithReference rr = gen.getResolver().resolve(gen, parts[0], null);
           if (rr != null) {
             if (rr.getResource() != null) {
-              display = RendererFactory.factory(rr.getResource(), gen).buildSummary(rr.getResource());
+              display = gen.getRendererFactory().factory(rr.getResource(), gen).buildSummary(rr.getResource());
             }
             url = rr.getWebPath();
           }

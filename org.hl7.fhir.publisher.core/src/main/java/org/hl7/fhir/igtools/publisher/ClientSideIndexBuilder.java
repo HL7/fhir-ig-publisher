@@ -158,7 +158,7 @@ public class ClientSideIndexBuilder {
 
   private void generateNarrative(Element resource) throws EOperationOutcome, IOException {
     ResourceWrapper rw = ResourceWrapper.forResource(cu, resource);
-    ResourceRenderer rr = RendererFactory.factory(rw, rc);
+    ResourceRenderer rr = new RendererFactory().factory(rw, rc);
     rr.renderResource(rw);
   }
 

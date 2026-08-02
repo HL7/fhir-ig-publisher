@@ -119,7 +119,7 @@ public class CodeSystemRenderer extends CanonicalRenderer {
 
     csc.setId(cs.getId()); // because that's not copied
     csc.setText(null);
-    RendererFactory.factory(csc, gen).renderResource(ResourceWrapper.forResource(gen.getContextUtilities(), csc));
+    gen.getRendererFactory().factory(csc, gen).renderResource(ResourceWrapper.forResource(gen.getContextUtilities(), csc));
 
     return new XhtmlComposer(XhtmlComposer.HTML).compose(csc.getText().getDiv());
     //    }

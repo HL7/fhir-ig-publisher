@@ -9,6 +9,7 @@ import org.hl7.fhir.igtools.renderers.CrossViewRenderer.UsedType;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
+import org.hl7.fhir.r5.renderers.RendererFactory;
 import org.hl7.fhir.r5.renderers.spreadsheets.SpreadsheetGenerator;
 import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
@@ -16,8 +17,8 @@ import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 public class ObservationSummarySpreadsheetGenerator extends SpreadsheetGenerator {
 
 
-  public ObservationSummarySpreadsheetGenerator(IWorkerContext context) {
-    super(context);
+  public ObservationSummarySpreadsheetGenerator(IWorkerContext context, RendererFactory rendererFactory) {
+    super(context, rendererFactory);
   }
 
   public ObservationSummarySpreadsheetGenerator generate(List<ObservationProfile> list) {
