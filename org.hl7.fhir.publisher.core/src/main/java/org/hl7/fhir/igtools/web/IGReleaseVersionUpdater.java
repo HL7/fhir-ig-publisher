@@ -24,7 +24,11 @@ package org.hl7.fhir.igtools.web;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.apache.commons.io.FileUtils;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
@@ -58,9 +62,15 @@ public class IGReleaseVersionUpdater {
   private int clonedTotal;
   private String rootUrl;
   private String rootFolder;
+  private boolean dynamicPublishBox;
+  private Map<String, Set<String>> pagesManifests = new HashMap<>();
 
 
   public IGReleaseVersionUpdater(String folder, String rootUrl, String rootFolder, List<String> ignoreList, List<String> ignoreListOuter, JsonObject version, String currentFolder) {
+    this(folder, rootUrl, rootFolder, ignoreList, ignoreListOuter, version, currentFolder, false);
+  }
+
+  public IGReleaseVersionUpdater(String folder, String rootUrl, String rootFolder, List<String> ignoreList, List<String> ignoreListOuter, JsonObject version, String currentFolder, boolean dynamicPublishBox) {
     this.folder = folder;
     this.ignoreList = ignoreList;
     this.ignoreListOuter = ignoreListOuter;
@@ -68,6 +78,7 @@ public class IGReleaseVersionUpdater {
     this.currentFolder = currentFolder;
     this.rootFolder = rootFolder;
     this.rootUrl = rootUrl;
+    this.dynamicPublishBox = dynamicPublishBox;
   }
 
   public void updateStatement(String fragment, int level, List<PackageListEntry> milestones) throws FileNotFoundException, IOException {
@@ -133,6 +144,14 @@ public class IGReleaseVersionUpdater {
             e = src.indexOf(END_HTML_MARKER);
           }
           if (b > -1 && e > -1) {
+            if (dynamicPublishBox && isCurrentDynamicBox(src.substring(b + l, e)) && fragment.contains("class=\"fhir-pb\"")) {
+              // the page already carries the current-format dynamic publish box for its own
+              // version. Its statement was accurate when baked and publish-box.js corrects it at
+              // view time from package-list.json, so a later publication has nothing to rewrite
+              // here - which is what keeps published versions immutable.
+              countTotal++;
+              continue;
+            }
             String updatedFragment = fragment;
             if (updatedFragment.contains("{{fn}}")) {
               String rp = getRelativePath(f.getAbsolutePath());
@@ -160,7 +179,10 @@ public class IGReleaseVersionUpdater {
     if (milestones == null) {
       return "";
     }
-    String relpath = FileUtilities.getRelativePath(folder, f.getAbsolutePath()); 
+    String relpath = FileUtilities.getRelativePath(folder, f.getAbsolutePath());
+    if (dynamicPublishBox) {
+      return dynamicPageVersions(relpath, milestones);
+    }
     CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder(" ");
     int i = 0;
     for (PackageListEntry t : milestones) {
@@ -178,6 +200,73 @@ public class IGReleaseVersionUpdater {
     }
     String result = ". Page versions: "+b.toString();
     return i == 0 ? "" : result;
+  }
+
+  /**
+   * The dynamic form of the "Page versions:" list: the same links as the static form, accurate
+   * as of publication (existence-checked against each milestone's page manifest, falling back to
+   * its file tree), wrapped in a marked span. data-pb-known records which milestones the baked
+   * list accounts for, so publish-box.js only has to consider milestones published after this
+   * page was baked (normally at most one, verified with a single HEAD request) - the reason a
+   * new milestone folder no longer rewrites this line in every past version's pages. A milestone
+   * that can be neither manifest- nor tree-checked is left out of both the list and
+   * data-pb-known, leaving it to the script to verify.
+   */
+  private String dynamicPageVersions(String relpath, List<PackageListEntry> milestones) throws IOException {
+    String relurl = relpath.replace(File.separatorChar, '/');
+    CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder(" ");
+    CommaSeparatedStringBuilder known = new CommaSeparatedStringBuilder(" ");
+    int i = 0;
+    for (PackageListEntry t : milestones) {
+      String base = Utilities.path(rootFolder, FileUtilities.getRelativePath(rootUrl, t.path()));
+      Set<String> pages = milestonePages(base, t);
+      boolean exists;
+      if (pages != null) {
+        exists = pages.contains(relurl);
+      } else if (new File(base).isDirectory()) {
+        exists = Utilities.pathFile(base, relpath).exists();
+      } else {
+        continue; // not checkable here: leave this milestone to publish-box.js
+      }
+      known.append(t.version());
+      if (exists) {
+        i++;
+        if (t.version().equals(version.asString("version"))) {
+          b.append("<b>"+Utilities.escapeXml(t.milestoneName())+"</b>");
+        } else {
+          b.append("<a data-no-external=\"true\" href=\""+Utilities.pathURL(t.path(), relurl)+"\">"+Utilities.escapeXml(t.milestoneName())+"</a>");
+        }
+      }
+    }
+    return "<span class=\"fhir-pb-versions\" data-pb-fmt=\""+PublishBoxStatementGenerator.DYNAMIC_FORMAT
+        +"\" data-pb-version=\""+Utilities.escapeXml(version.asString("version"))
+        +"\" data-pb-known=\""+Utilities.escapeXml(known.toString())
+        +"\" data-pb-rel=\""+Utilities.escapeXml(relurl)+"\">"
+        +(i == 0 ? "" : ". Page versions: "+b.toString())+"</span>";
+  }
+
+  /** the version folder's page manifest, cached per folder; null if it has none */
+  private Set<String> milestonePages(String base, PackageListEntry t) throws IOException {
+    if (!pagesManifests.containsKey(base)) {
+      Set<String> pages = new HashSet<>();
+      if (DynamicPublishBoxSupport.loadPagesManifest(base, pages)) {
+        pagesManifests.put(base, pages);
+      } else {
+        pagesManifests.put(base, null);
+        if (!new File(base).isDirectory()) {
+          System.out.println("  note: milestone "+t.version()+" @ "+base+" has neither a "+DynamicPublishBoxSupport.PAGES_MANIFEST+" nor a local file tree; its \"Page versions\" links will be resolved client-side");
+        }
+      }
+    }
+    return pagesManifests.get(base);
+  }
+
+  /** true if the current content between the publish box markers is a dynamic publish box,
+   * in the current markup format, for the version this updater is processing */
+  private boolean isCurrentDynamicBox(String existing) {
+    return existing.contains("class=\"fhir-pb\"")
+        && existing.contains("data-pb-fmt=\""+PublishBoxStatementGenerator.DYNAMIC_FORMAT+"\"")
+        && existing.contains("data-pb-version=\""+Utilities.escapeXml(version.asString("version"))+"\"");
   }
 
   private String getRelativePath(String absolutePath) {
