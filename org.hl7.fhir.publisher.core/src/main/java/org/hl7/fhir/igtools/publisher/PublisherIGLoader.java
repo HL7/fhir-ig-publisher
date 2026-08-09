@@ -2,6 +2,8 @@ package org.hl7.fhir.igtools.publisher;
 
 import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_10_50;
 import org.hl7.fhir.convertors.factory.*;
+import org.hl7.fhir.convertors.igs.testing.TestingR4Convertor;
+import org.hl7.fhir.convertors.igs.testing.TestingR5Convertor;
 import org.hl7.fhir.convertors.txClient.TerminologyClientFactory;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.openehr.ArchetypeImporter;
@@ -318,8 +320,8 @@ public class PublisherIGLoader extends PublisherBase {
 //    if (VersionUtilities.isR2Ver(pf.version) || VersionUtilities.isR2Ver(pf.version)) {
 //      throw new Error("As of the end of 2024, the FHIR  R2 (version "+ pf.version +") is no longer supported by the IG Publisher");
 //    }
-    if (!Utilities.existsInList(pf.version, "5.0.0", "4.3.0", "4.0.1", "3.0.2", "1.0.2", "6.0.0-ballot3")) {
-      throw new Error("Unable to support version '"+ pf.version +"' - must be one of 5.0.0, 4.3.0, 4.0.1, 3.0.2 or 6.0.0-ballot3");
+    if (!Utilities.existsInList(pf.version, "5.0.0", "4.3.0", "4.0.1", "3.0.2", "1.0.2", "6.0.0-ballot5")) {
+      throw new Error("Unable to support version '"+ pf.version +"' - must be one of 5.0.0, 4.3.0, 4.0.1, 3.0.2 or 6.0.0-ballot5");
     }
 
     if (!VersionUtilities.isSupportedVersion(pf.version)) {
@@ -1499,19 +1501,6 @@ public class PublisherIGLoader extends PublisherBase {
     if (pi == null) {
       throw new Error("Unable to load core package!");
     }
-    if (v.equals("current")) {
-      // currency of the current core package is a problem, since its not really version controlled.
-      // we'll check for a specified version...
-      logDebugMessage(LogCategory.INIT, "Checking hl7.fhir.core-"+v+" currency");
-      int cacheVersion = getBuildVersionForCorePackage(pi);
-      int lastAcceptableVersion = ToolsVersion.TOOLS_VERSION;
-      if (cacheVersion < lastAcceptableVersion) {
-        logDebugMessage(LogCategory.INIT, "Updating hl7.fhir.core-"+ pf.version +" package from source (too old - is "+cacheVersion+", must be "+lastAcceptableVersion);
-        pi = pf.pcm.addPackageToCache("hl7.fhir.core", "current", fetchFromSource("hl7.fhir.core-"+v, getMasterSource()), getMasterSource());
-      } else {
-        logDebugMessage(LogCategory.INIT, "   ...  ok: is "+cacheVersion+", must be "+lastAcceptableVersion);
-      }
-    }
     logDebugMessage(LogCategory.INIT, "Load hl7.fhir.core-"+v+" package from "+pi.summary());
     pf.npmList.add(pi);
 
@@ -1531,13 +1520,6 @@ public class PublisherIGLoader extends PublisherBase {
     }
     return sp;
   }
-
-  private int getBuildVersionForCorePackage(NpmPackage pi) throws IOException {
-    if (!pi.getNpm().has("tools-version"))
-      return 0;
-    return pi.getNpm().asInteger("tools-version");
-  }
-
 
   private Parameters makeExpProfile() {
     Parameters ep  = new Parameters();
@@ -1746,6 +1728,8 @@ public class PublisherIGLoader extends PublisherBase {
       org.hl7.fhir.r5.igs.testing.TestingParser.register(true);
       packages.addAll(Arrays.asList(org.hl7.fhir.r5.igs.testing.TestingParser.packages()));
       org.hl7.fhir.r5.igs.testing.renderers.TestingRenderers.register(pf.rendererFactory);
+      pf.versionConvertorRegistry.register(new TestingR4Convertor());
+      pf.versionConvertorRegistry.register(new TestingR5Convertor());
       break;
     default:
       throw new Exception("Unknown value '"+code+"' for parameter incubator-ig: no code has been generated for that IG (see documentation at https://build.fhir.org/ig/FHIR/fhir-tools-ig/CodeSystem-ig-parameters.html)");
@@ -1809,7 +1793,7 @@ public class PublisherIGLoader extends PublisherBase {
     igm.setBase2(PackageHacker.fixPackageUrl(pi.url()));
     igm.setNpm(pi);
     pf.specMaps.add(igm);
-    if (!VersionUtilities.versionMatches(pi.fhirVersion(), pf.version)) {
+    if (!VersionUtilities.versionMatches(pi.fhirVersion(), pf.version) && !(VersionUtilities.isR5Ver(pi.fhirVersion()) && VersionUtilities.isR6Ver(pf.version))) {
       if (!pi.isWarned()) {
         pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE, pf.sourceIg.fhirType()+"/"+ pf.sourceIg.getId(), "This IG is version "+ pf.version +", while the IG '"+pi.name()+"' is from version "+pi.fhirVersion(), ValidationMessage.IssueSeverity.ERROR));
         log("Version mismatch. This IG is version "+ pf.version +", while the IG '"+pi.name()+"' is from version "+pi.fhirVersion()+" (will try to run anyway)");
@@ -1868,7 +1852,7 @@ public class PublisherIGLoader extends PublisherBase {
               logDebugMessage(LogCategory.CONTEXT, "Unable to find package dependency "+fdep+". Will proceed, but likely to be be errors in qa.html etc");
             } else {
               pf.npmList.add(dpi);
-              if (!VersionUtilities.versionMatches(pi.fhirVersion(), pf.version)) {
+              if (!VersionUtilities.versionMatches(pi.fhirVersion(), pf.version) && !VersionUtilities.isR5Ver(pi.fhirVersion()) && !VersionUtilities.isR6Ver(pf.version)) {
                 if (!pi.isWarned()) {
                   pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE, pf.sourceIg.fhirType()+"/"+ pf.sourceIg.getId(), "This IG is for FHIR version "+ pf.version +", while the package '"+pi.name()+"#"+pi.version()+"' is for FHIR version "+pi.fhirVersion(), ValidationMessage.IssueSeverity.ERROR));
                   log("Version mismatch. This IG is for FHIR version "+ pf.version +", while the package '"+pi.name()+"#"+pi.version()+"' is for FHIR version "+pi.fhirVersion()+" (will ignore that and try to run anyway)");
@@ -2060,15 +2044,6 @@ public class PublisherIGLoader extends PublisherBase {
     map.setName(name);
     pf.specMaps.add(map);
     return map;
-  }
-
-  private String getMasterSource() {
-    if (VersionUtilities.isR2Ver(pf.version)) return "http://hl7.org/fhir/DSTU2/hl7.fhir.r2.core.tgz";
-    if (VersionUtilities.isR2BVer(pf.version)) return "http://hl7.org/fhir/2016May/hl7.fhir.r2b.core.tgz";
-    if (VersionUtilities.isR3Ver(pf.version)) return "http://hl7.org/fhir/STU3/hl7.fhir.r3.core.tgz";
-    if (VersionUtilities.isR4Ver(pf.version)) return "http://hl7.org/fhir/R4/hl7.fhir.r4.core.tgz";
-    if (Constants.VERSION.equals(pf.version)) return "http://hl7.org/fhir/R5/hl7.fhir.r5.core.tgz";
-    throw new Error("unknown version "+ pf.version);
   }
 
   private InputStream fetchFromSource(String id, String source) throws IOException {
@@ -4175,7 +4150,9 @@ public class PublisherIGLoader extends PublisherBase {
       if (pf.customResourceNames.contains(r.fhirType())) {
         // we're automatically an example
         res.setIsExample(true);
-        res.addProfile("http://hl7.org/fhir/StructureDefinition/"+r.fhirType());
+        String url = "http://hl7.org/fhir/StructureDefinition/"+r.fhirType();
+        StructureDefinition sd = pf.context.fetchResource(StructureDefinition.class, url);
+        res.addProfile(sd.getVersionedUrl());
       }
     }
     return changed;

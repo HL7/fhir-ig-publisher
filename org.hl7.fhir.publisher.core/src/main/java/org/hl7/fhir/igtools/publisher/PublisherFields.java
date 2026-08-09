@@ -2,6 +2,7 @@ package org.hl7.fhir.igtools.publisher;
 
 import lombok.Getter;
 import lombok.Setter;
+import org.hl7.fhir.convertors.registry.VersionConvertorRegistry;
 import org.hl7.fhir.igtools.publisher.comparators.IpaComparator;
 import org.hl7.fhir.igtools.publisher.comparators.IpsComparator;
 import org.hl7.fhir.igtools.publisher.comparators.PreviousVersionComparator;
@@ -323,6 +324,7 @@ public class PublisherFields {
 
     PublisherSigner signer;
     RendererFactory rendererFactory = new RendererFactory();
+    VersionConvertorRegistry versionConvertorRegistry = new VersionConvertorRegistry() ;
 
     public boolean excludeTtl;
 

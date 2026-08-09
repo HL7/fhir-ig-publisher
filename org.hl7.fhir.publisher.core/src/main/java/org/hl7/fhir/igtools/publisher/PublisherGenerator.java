@@ -671,7 +671,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       return true;
     if (s.startsWith("icon"))
       return true;
-    if (Utilities.existsInList(s, "modifier.png", "alert.jpg", "tree-filter.png", "mustsupport.png", "information.png", "summary.png", "new.png", "lock.png", "external.png", "cc0.png", "target.png", "link.svg"))
+    if (Utilities.existsInList(s, "modifier.png", "alert.jpg", "tree-filter.png", "mustsupport.png", "information.png", "summary.png", "help.png", "new.png", "lock.png", "external.png", "cc0.png", "target.png", "link.svg"))
       return true;
 
     return false;
@@ -1329,7 +1329,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     if (ss == null)
       ss = StandardsStatus.TRIAL_USE;
     if (fmm != null) {
-      return pf.rcLangs.get(lang).formatPhrase(RenderingContext.FMM_TABLE, fmm, checkAppendSlash(pf.specPath), ss.toDisplay());
+      return pf.rcLangs.get(lang).formatPhrase(RenderingI18nContext.FMM_TABLE, fmm, checkAppendSlash(pf.specPath), ss.toDisplay());
     } else {
       return "";
     }
@@ -4345,7 +4345,23 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       f.start("generateValidationPack");
       try {
         for (FetchedResource r : f.getResources()) {
-          if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
+          if (isAdditionalResource(r)) {
+            ByteArrayOutputStream bs = new ByteArrayOutputStream();
+            if (VersionUtilities.isR3Ver(this.pf.version)) {
+              new org.hl7.fhir.dstu3.formats.JsonParser().compose(bs, pf.versionConvertorRegistry.convertToR3(r.getResource()));
+            } else if (VersionUtilities.isR4Ver(this.pf.version)) {
+              new org.hl7.fhir.r4.formats.JsonParser().compose(bs, pf.versionConvertorRegistry.convertToR4(r.getResource()));
+            } else if (VersionUtilities.isR4BVer(this.pf.version)) {
+              // same as R4 - for now?
+              new org.hl7.fhir.r4.formats.JsonParser().compose(bs, pf.versionConvertorRegistry.convertToR4(r.getResource()));
+            } else if (VersionUtilities.isR5Plus(this.pf.version)) {
+              new org.hl7.fhir.r5.formats.JsonParser().compose(bs, pf.versionConvertorRegistry.convertToR5(r.getResource()));
+            } else {
+              throw new Exception("Unsupported version "+ this.pf.version);
+            }
+            zip.addBytes(r.fhirType()+"-"+r.getId()+".json", bs.toByteArray(), false);
+
+          } else if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
             ByteArrayOutputStream bs = new ByteArrayOutputStream();
             if (VersionUtilities.isR3Ver(this.pf.version)) {
               new org.hl7.fhir.dstu3.formats.JsonParser().compose(bs, VersionConvertorFactory_30_50.convertResource(r.getResource()));
