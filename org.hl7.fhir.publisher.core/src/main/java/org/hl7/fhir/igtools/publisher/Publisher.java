@@ -108,6 +108,8 @@ import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.hl7.fhir.validation.SQLiteINpmPackageIndexBuilderDBImpl;
 import org.hl7.fhir.validation.instance.utils.ValidationContext;
 
+import static org.hl7.fhir.igtools.publisher.CliParams.SSRF_PROTECTION_ENABLED_PARAM;
+
 /**
  * Implementation Guide Publisher
  *
@@ -1209,10 +1211,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     org.hl7.fhir.utilities.FileFormat.checkCharsetAndWarnIfNotUTF8(System.out);
 
     NpmPackage.setLoadCustomResources(true);
-    if (CliParams.hasNamedParam(args, FHIR_SETTINGS_PARAM)) {
-      FhirSettings.setExplicitFilePath(CliParams.getNamedParam(args, FHIR_SETTINGS_PARAM));
-    }
-    ManagedWebAccess.loadFromFHIRSettings();
+    applyFhirSettingsAndCliOverrides(args);
     TerminologyClientContext.setCanUseCacheId(true);
 
     if (CliParams.hasNamedParam(args, "-produce-translator-ids")) {
@@ -1631,7 +1630,27 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     if (!CliParams.hasNamedParam(args, "-no-exit")) {
       System.exit(exitCode);
     }
-  } 
+  }
+
+  /**
+   * Sets the appropriate locations for fhir-settings.json and then, in sequence:
+   *  * loads appropriate settings from the json
+   *  * overrides any settings that can be set via CLI params.
+   *
+   * @param args the CLI param args
+   */
+  private static void applyFhirSettingsAndCliOverrides(String[] args) {
+    if (CliParams.hasNamedParam(args, FHIR_SETTINGS_PARAM)) {
+      FhirSettings.setExplicitFilePath(CliParams.getNamedParam(args, FHIR_SETTINGS_PARAM));
+    }
+    ManagedWebAccess.loadFromFHIRSettings();
+    if (CliParams.hasNamedParam(args, SSRF_PROTECTION_ENABLED_PARAM)) {
+      String ssrfProtectionEnabled = CliParams.getNamedParam(args, SSRF_PROTECTION_ENABLED_PARAM);
+      if ("false".equalsIgnoreCase(ssrfProtectionEnabled)) {
+        ManagedWebAccess.setSsrfProtectionEnabled(false);
+      }
+    }
+  }
 
   private static void setLogbackConfiguration(String[] args) {
     setLogbackConfiguration(args, CliParams.DEBUG_LOG, Level.DEBUG);
