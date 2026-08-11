@@ -95,7 +95,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
     vsc.setText(null);
     if (vsc.hasCompose()) {
       vsc.setExpansion(null); // we don't want to render an expansion by mistake
-      RendererFactory.factory(vsc, gen).renderOrError(ResourceWrapper.forResource(gen, vsc));
+      gen.getRendererFactory().factory(vsc, gen).renderOrError(ResourceWrapper.forResource(gen, vsc));
       return "<h3>"+gen.formatPhrase(RenderingContext.VSR_LOGICAL)+"</h3>\r\n" + new XhtmlComposer(XhtmlComposer.HTML).compose(vsc.getText().getDiv());
     } else if (vs.hasExtension(ExtensionDefinitions.EXT_VALUESET_RULES_TEXT)) {
       String md = processMarkdown("ValueSet.extension", vs.getExtensionString(ExtensionDefinitions.EXT_VALUESET_RULES_TEXT));

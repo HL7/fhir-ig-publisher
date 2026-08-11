@@ -77,6 +77,10 @@ public class PublisherBase implements ILoggingService {
     return df.format(cal.getTime());
   }
 
+  protected boolean isAdditionalResource(FetchedResource r) {
+    return pf.versionConvertorRegistry.isHandled(r.fhirType(), pf.context.getVersion());
+  }
+
   @Nonnull
   protected FilesystemPackageCacheManager getFilesystemPackageCacheManager() throws IOException {
     if (settings.getPackageCacheFolder() != null) {
@@ -221,20 +225,17 @@ public class PublisherBase implements ILoggingService {
     while (v.indexOf(".") != v.lastIndexOf(".")) {
       v = v.substring(0, v.lastIndexOf("."));
     }
-    if (v.equals("1.0")) {
-      return PackageHacker.fixPackageUrl("http://hl7.org/fhir/DSTU2");
-    }
-    if (v.equals("1.4")) {
-      return PackageHacker.fixPackageUrl("http://hl7.org/fhir/2016May");
-    }
-    if (v.equals("3.0")) {
+    if (VersionUtilities.isR3Ver(v)) {
       return PackageHacker.fixPackageUrl("http://hl7.org/fhir/STU3");
     }
-    if (v.equals("4.0")) {
+    if (VersionUtilities.isR4Ver(v)) {
       return PackageHacker.fixPackageUrl("http://hl7.org/fhir/R4");
     }
-    if (v.equals("4.3")) {
+      if (VersionUtilities.isR4BVer(v)) {
       return PackageHacker.fixPackageUrl("http://hl7.org/fhir/R4B");
+    }
+    if (VersionUtilities.isR6Ver(v)) {
+      return PackageHacker.fixPackageUrl("http://hl7.org/fhir/6.0.0-ballot5");
     }
     return PackageHacker.fixPackageUrl("http://hl7.org/fhir/R5");
   }
@@ -1115,7 +1116,7 @@ public class PublisherBase implements ILoggingService {
     Provenance pv = null;
     try {
       pv = (Provenance) (r == null ? convertFromElement(resource) : r);
-      RendererFactory.factory(pv, pf.rc.setParser(getTypeLoader(null))).renderResource(ResourceWrapper.forResource(pf.rc, pv));
+      pf.rendererFactory.factory(pv, pf.rc.setParser(getTypeLoader(null))).renderResource(ResourceWrapper.forResource(pf.rc, pv));
     } catch (Exception e) {
       // nothing, if there's a problem, we'll take it up elsewhere
     }
@@ -1169,7 +1170,7 @@ public class PublisherBase implements ILoggingService {
     // this list is for the index. Only some kind of resources are pulled out and presented indepedently
     List<PublisherUtils.ContainedResourceDetails> list = new ArrayList<>();
     for (Element c : e.getChildren("contained")) {
-      if (RendererFactory.hasSpecificRenderer(c.fhirType())) {
+      if (pf.rendererFactory.hasSpecificRenderer(c.fhirType())) {
         // the intent of listing a resource type is that it has multiple renderings, so gets a page of it's own
         // other wise it's rendered inline
         String t = c.getChildValue("title");
@@ -1220,7 +1221,7 @@ public class PublisherBase implements ILoggingService {
     for (FetchedResource r : f.getResources()) {
       if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
         CanonicalResource bc = (CanonicalResource) r.getResource();
-        if (bc.getUrl() != null && bc.getUrl().equals(uri))
+        if (bc.getUrl() != null && (bc.getUrl().equals(uri) || bc.getVersionedUrl().equals(uri)))
           return r;
       }
     }

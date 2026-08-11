@@ -3,13 +3,7 @@ package org.hl7.fhir.igtools.publisher.loaders;
 import java.io.IOException;
 import java.util.Set;
 
-import org.hl7.fhir.convertors.loaders.loaderR5.ILoaderKnowledgeProviderR5;
-import org.hl7.fhir.convertors.loaders.loaderR5.R2016MayToR5Loader;
-import org.hl7.fhir.convertors.loaders.loaderR5.R2ToR5Loader;
-import org.hl7.fhir.convertors.loaders.loaderR5.R3ToR5Loader;
-import org.hl7.fhir.convertors.loaders.loaderR5.R4BToR5Loader;
-import org.hl7.fhir.convertors.loaders.loaderR5.R4ToR5Loader;
-import org.hl7.fhir.convertors.loaders.loaderR5.R5ToR5Loader;
+import org.hl7.fhir.convertors.loaders.loaderR5.*;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.igtools.publisher.SpecMapManager.SpecialPackageType;
@@ -60,6 +54,8 @@ public class PublisherLoader extends LoaderUtils implements ILoaderKnowledgeProv
       return new R4ToR5Loader(types, this, npm.fhirVersion()).addTag(internalUseOnly ? UserDataNames.RESOURCE_INTERNAL_USE_ONLY : null);
     } else if (VersionUtilities.isR4BVer(npm.fhirVersion())) {
       return new R4BToR5Loader(types, this, npm.fhirVersion()).addTag(internalUseOnly ? UserDataNames.RESOURCE_INTERNAL_USE_ONLY : null);
+    } else if (VersionUtilities.isR6Ver(npm.fhirVersion())) {
+      return new R6ToR5Loader(types, this).addTag(internalUseOnly ? UserDataNames.RESOURCE_INTERNAL_USE_ONLY : null);
     } else {
       return new R5ToR5Loader(types, this).addTag(internalUseOnly ? UserDataNames.RESOURCE_INTERNAL_USE_ONLY : null);
     }

@@ -2,6 +2,8 @@ package org.hl7.fhir.igtools.publisher;
 
 import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_10_50;
 import org.hl7.fhir.convertors.factory.*;
+import org.hl7.fhir.convertors.igs.testing.TestingR4Convertor;
+import org.hl7.fhir.convertors.igs.testing.TestingR5Convertor;
 import org.hl7.fhir.convertors.txClient.TerminologyClientFactory;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.openehr.ArchetypeImporter;
@@ -318,8 +320,8 @@ public class PublisherIGLoader extends PublisherBase {
 //    if (VersionUtilities.isR2Ver(pf.version) || VersionUtilities.isR2Ver(pf.version)) {
 //      throw new Error("As of the end of 2024, the FHIR  R2 (version "+ pf.version +") is no longer supported by the IG Publisher");
 //    }
-    if (!Utilities.existsInList(pf.version, "5.0.0", "4.3.0", "4.0.1", "3.0.2", "1.0.2", "6.0.0-ballot3")) {
-      throw new Error("Unable to support version '"+ pf.version +"' - must be one of 5.0.0, 4.3.0, 4.0.1, 3.0.2 or 6.0.0-ballot3");
+    if (!Utilities.existsInList(pf.version, "5.0.0", "4.3.0", "4.0.1", "3.0.2", "1.0.2", "6.0.0-ballot5")) {
+      throw new Error("Unable to support version '"+ pf.version +"' - must be one of 5.0.0, 4.3.0, 4.0.1, 3.0.2 or 6.0.0-ballot5");
     }
 
     if (!VersionUtilities.isSupportedVersion(pf.version)) {
@@ -349,6 +351,7 @@ public class PublisherIGLoader extends PublisherBase {
     boolean noCIBuildIssues = false;
     boolean keepTranslationsWhenTranslating = false;
     List<String> conversionVersions = new ArrayList<>();
+    List<String> incubatorPackages = new ArrayList<>();
     List<String> liquid0 = new ArrayList<>();
     List<String> liquid1 = new ArrayList<>();
     List<String> liquid2 = new ArrayList<>();
@@ -748,6 +751,9 @@ public class PublisherIGLoader extends PublisherBase {
         case "test-data-factories":
           pf.testDataFactories.add(p.getValue());
           break;
+        case "incubator-ig":
+          registerIncubatorIG(p.getValue(), incubatorPackages);
+          break;
         case "fixed-value-format":
           pf.fixedFormat = RenderingContext.FixedValueFormat.fromCode(p.getValue());
           break;
@@ -849,6 +855,8 @@ public class PublisherIGLoader extends PublisherBase {
           pf.setLanguagePack("true".equals(p.getValue()));
         case "wcag-conformant":
           pf.setWcagConformant("true".equals(p.getValue()));
+        case "excludettl":
+          pf.excludeTtl = true;
         default:
           if (pc.startsWith("wantGen-")) {
             String code = pc.substring(8);
@@ -993,7 +1001,7 @@ public class PublisherIGLoader extends PublisherBase {
     for (PageFactory pf : pf.pageFactories) {
       pf.setContext(this.pf.context);
     }
-    pf.dr = new DataRenderer(pf.context);
+    pf.dr = new DataRenderer(pf.context, pf.rendererFactory);
     for (String s : conversionVersions) {
       loadConversionVersion(s);
     }
@@ -1099,7 +1107,7 @@ public class PublisherIGLoader extends PublisherBase {
     pf.inspector = new HTMLInspector(pf.context, pf.outputDir, pf.specMaps, pf.linkSpecMaps, this, pf.igpkp.getCanonical(), pf.packageId(), pf.sourceIg.getVersion(),
             pf.trackedFragments, pf.fileList, pf.module,
             settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD || settings.getMode() == PublisherUtils.IGBuildMode.WEBSERVER, settings.isTrackFragments() ? pf.fragmentUses : null,
-            pf.relatedIGs, noCIBuildIssues, allLangs());
+            pf.relatedIGs, noCIBuildIssues, allLangs(), pf.rendererFactory);
     pf.inspector.getManual().add("full-ig.zip");
     if (pf.historyPage != null) {
       pf.inspector.getManual().add(pf.historyPage);
@@ -1152,6 +1160,10 @@ public class PublisherIGLoader extends PublisherBase {
 
     for (String s : relatedIGParams) {
       loadRelatedIg(s);
+    }
+
+    for (String s : incubatorPackages) {
+      loadIncubatorPackage(s);
     }
 
     if (!VersionUtilities.isR5Plus(pf.context.getVersion())) {
@@ -1489,19 +1501,6 @@ public class PublisherIGLoader extends PublisherBase {
     if (pi == null) {
       throw new Error("Unable to load core package!");
     }
-    if (v.equals("current")) {
-      // currency of the current core package is a problem, since its not really version controlled.
-      // we'll check for a specified version...
-      logDebugMessage(LogCategory.INIT, "Checking hl7.fhir.core-"+v+" currency");
-      int cacheVersion = getBuildVersionForCorePackage(pi);
-      int lastAcceptableVersion = ToolsVersion.TOOLS_VERSION;
-      if (cacheVersion < lastAcceptableVersion) {
-        logDebugMessage(LogCategory.INIT, "Updating hl7.fhir.core-"+ pf.version +" package from source (too old - is "+cacheVersion+", must be "+lastAcceptableVersion);
-        pi = pf.pcm.addPackageToCache("hl7.fhir.core", "current", fetchFromSource("hl7.fhir.core-"+v, getMasterSource()), getMasterSource());
-      } else {
-        logDebugMessage(LogCategory.INIT, "   ...  ok: is "+cacheVersion+", must be "+lastAcceptableVersion);
-      }
-    }
     logDebugMessage(LogCategory.INIT, "Load hl7.fhir.core-"+v+" package from "+pi.summary());
     pf.npmList.add(pi);
 
@@ -1521,13 +1520,6 @@ public class PublisherIGLoader extends PublisherBase {
     }
     return sp;
   }
-
-  private int getBuildVersionForCorePackage(NpmPackage pi) throws IOException {
-    if (!pi.getNpm().has("tools-version"))
-      return 0;
-    return pi.getNpm().asInteger("tools-version");
-  }
-
 
   private Parameters makeExpProfile() {
     Parameters ep  = new Parameters();
@@ -1717,6 +1709,53 @@ public class PublisherIGLoader extends PublisherBase {
 
   }
 
+  /**
+   * Incubator IGs define candidate resources for a future version of FHIR (as additional resources), 
+   * and java code has been generated for them into the core library (org.hl7.fhir.r5.igs.*). The 
+   * incubator-ig parameter (which can repeat) takes a code from the list of incubator IGs that code 
+   * has been prepared for. For each such IG this registers the generated parsers with the core 
+   * parsers (overriding the base-specification definitions), collects the definition package(s) to 
+   * load into the context (see loadIncubatorPackage), and registers the IG's hand-written renderers 
+   * on the publisher's RendererFactory - so that the publisher parses, resolves and renders the 
+   * incubator version of the resources rather than the base specification version.
+   * 
+   * Codes currently supported: 
+   *   hl7.fhir.uv.testing - the FHIR Testing IG (TestPlan, TestScript, TestReport)
+   */
+  private void registerIncubatorIG(String code, List<String> packages) throws Exception {
+    switch (code) {
+    case "hl7.fhir.uv.testing":
+      org.hl7.fhir.r5.igs.testing.TestingParser.register(true);
+      packages.addAll(Arrays.asList(org.hl7.fhir.r5.igs.testing.TestingParser.packages()));
+      org.hl7.fhir.r5.igs.testing.renderers.TestingRenderers.register(pf.rendererFactory);
+      pf.versionConvertorRegistry.register(new TestingR4Convertor());
+      pf.versionConvertorRegistry.register(new TestingR5Convertor());
+      break;
+    default:
+      throw new Exception("Unknown value '"+code+"' for parameter incubator-ig: no code has been generated for that IG (see documentation at https://build.fhir.org/ig/FHIR/fhir-tools-ig/CodeSystem-ig-parameters.html)");
+    }
+  }
+
+  /**
+   * As well as registering the generated code for an incubator IG (see registerIncubatorIG), the 
+   * package that contains the definitions that the code was generated from is loaded into the 
+   * context (once it exists), so that the definitions in the context agree with the generated code
+   */
+  private void loadIncubatorPackage(String pid) throws Exception {
+    log("Load Incubator IG package "+pid);
+    NpmPackage npm = pf.pcm.loadPackage(pid);
+    IContextResourceLoader loader;
+    if (npm.hasFile("other", "spec.internals")) {
+      SpecMapManager spm = loadSpecDetails(FileUtilities.streamToBytes(npm.load("other", "spec.internals")), "incubator-"+npm.name(), npm, npm.getWebLocation());
+      loader = ValidatorUtils.loaderForVersion(npm.fhirVersion(), new PatchLoaderKnowledgeProvider(npm, spm));
+    } else {
+      loader = ValidatorUtils.loaderForVersion(npm.fhirVersion(), new org.hl7.fhir.convertors.loaders.loaderR5.NullLoaderKnowledgeProviderR5());
+    }
+    // the package is loaded as a "master" package: its definitions override the definitions
+    // in the base specification for version-less fetches (that's the point of an incubator IG)
+    pf.context.loadFromPackage(npm, loader, true);
+  }
+
   private void loadIg(String name, String packageId, String igver, String uri, int index, boolean loadDeps, boolean internal) throws Exception {
     String canonical = determineCanonical(uri, "ImplementationGuide.dependency["+index+"].url");
     if (Utilities.noString(canonical) && !Utilities.noString(packageId))
@@ -1754,7 +1793,7 @@ public class PublisherIGLoader extends PublisherBase {
     igm.setBase2(PackageHacker.fixPackageUrl(pi.url()));
     igm.setNpm(pi);
     pf.specMaps.add(igm);
-    if (!VersionUtilities.versionMatches(pi.fhirVersion(), pf.version)) {
+    if (!VersionUtilities.versionMatches(pi.fhirVersion(), pf.version) && !(VersionUtilities.isR5Ver(pi.fhirVersion()) && VersionUtilities.isR6Ver(pf.version))) {
       if (!pi.isWarned()) {
         pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE, pf.sourceIg.fhirType()+"/"+ pf.sourceIg.getId(), "This IG is version "+ pf.version +", while the IG '"+pi.name()+"' is from version "+pi.fhirVersion(), ValidationMessage.IssueSeverity.ERROR));
         log("Version mismatch. This IG is version "+ pf.version +", while the IG '"+pi.name()+"' is from version "+pi.fhirVersion()+" (will try to run anyway)");
@@ -1813,7 +1852,7 @@ public class PublisherIGLoader extends PublisherBase {
               logDebugMessage(LogCategory.CONTEXT, "Unable to find package dependency "+fdep+". Will proceed, but likely to be be errors in qa.html etc");
             } else {
               pf.npmList.add(dpi);
-              if (!VersionUtilities.versionMatches(pi.fhirVersion(), pf.version)) {
+              if (!VersionUtilities.versionMatches(pi.fhirVersion(), pf.version) && !VersionUtilities.isR5Ver(pi.fhirVersion()) && !VersionUtilities.isR6Ver(pf.version)) {
                 if (!pi.isWarned()) {
                   pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE, pf.sourceIg.fhirType()+"/"+ pf.sourceIg.getId(), "This IG is for FHIR version "+ pf.version +", while the package '"+pi.name()+"#"+pi.version()+"' is for FHIR version "+pi.fhirVersion(), ValidationMessage.IssueSeverity.ERROR));
                   log("Version mismatch. This IG is for FHIR version "+ pf.version +", while the package '"+pi.name()+"#"+pi.version()+"' is for FHIR version "+pi.fhirVersion()+" (will ignore that and try to run anyway)");
@@ -2005,15 +2044,6 @@ public class PublisherIGLoader extends PublisherBase {
     map.setName(name);
     pf.specMaps.add(map);
     return map;
-  }
-
-  private String getMasterSource() {
-    if (VersionUtilities.isR2Ver(pf.version)) return "http://hl7.org/fhir/DSTU2/hl7.fhir.r2.core.tgz";
-    if (VersionUtilities.isR2BVer(pf.version)) return "http://hl7.org/fhir/2016May/hl7.fhir.r2b.core.tgz";
-    if (VersionUtilities.isR3Ver(pf.version)) return "http://hl7.org/fhir/STU3/hl7.fhir.r3.core.tgz";
-    if (VersionUtilities.isR4Ver(pf.version)) return "http://hl7.org/fhir/R4/hl7.fhir.r4.core.tgz";
-    if (Constants.VERSION.equals(pf.version)) return "http://hl7.org/fhir/R5/hl7.fhir.r5.core.tgz";
-    throw new Error("unknown version "+ pf.version);
   }
 
   private InputStream fetchFromSource(String id, String source) throws IOException {
@@ -2412,7 +2442,7 @@ public class PublisherIGLoader extends PublisherBase {
       }
     }
 
-    pf.rc = new RenderingContext(pf.context, pf.markdownEngine, ValidationOptions.defaults(), checkAppendSlash(pf.specPath), "", locale, RenderingContext.ResourceRendererMode.TECHNICAL, RenderingContext.GenerationRules.IG_PUBLISHER);
+    pf.rc = new RenderingContext(pf.context, pf.rendererFactory, pf.markdownEngine, ValidationOptions.defaults(), checkAppendSlash(pf.specPath), "", locale, RenderingContext.ResourceRendererMode.TECHNICAL, RenderingContext.GenerationRules.IG_PUBLISHER);
     pf.rc.setTemplateProvider(pf.templateProvider);
     pf.rc.setServices(pf.validator.getExternalHostServices());
     pf.rc.setDestDir(Utilities.path(pf.tempDir));
@@ -4120,7 +4150,9 @@ public class PublisherIGLoader extends PublisherBase {
       if (pf.customResourceNames.contains(r.fhirType())) {
         // we're automatically an example
         res.setIsExample(true);
-        res.addProfile("http://hl7.org/fhir/StructureDefinition/"+r.fhirType());
+        String url = "http://hl7.org/fhir/StructureDefinition/"+r.fhirType();
+        StructureDefinition sd = pf.context.fetchResource(StructureDefinition.class, url);
+        res.addProfile(sd.getVersionedUrl());
       }
     }
     return changed;

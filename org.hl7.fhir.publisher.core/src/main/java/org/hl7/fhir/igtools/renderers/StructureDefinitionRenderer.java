@@ -364,7 +364,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder();
     for (ElementDefinitionSlicingDiscriminatorComponent d : slicing.getDiscriminator())
       b.append(d.getType().toCode() + ":" + d.getPath());
-    return "<li>" + gen.formatMessagePlural(slicing.getDiscriminator().size(), RenderingContext.SD_SUMMARY_SLICE, path, b.toString()) + s + "</li>\r\n";
+    return "<li>" + gen.formatMessagePlural(slicing.getDiscriminator().size(), RenderingI18nContext.SD_SUMMARY_SLICE, path, b.toString()) + s + "</li>\r\n";
   }
 
   private void tryAdd(List<String> ext, String s) {
@@ -1087,7 +1087,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     String actualVersion = vs == null ? null : vs.getVersion();
     boolean fromPackages = vs == null ? false : vs.hasSourcePackage();
     boolean fromThisPackage = vs == null ? false : !Utilities.isAbsoluteUrlLinkable(vs.getWebPath());
-    ResourceRenderer.renderVersionReference(gen, vs, statedVersion, resolutionMethod, actualVersion, fromPackages, td, fromThisPackage, gen.formatPhrase(RenderingContext.GENERAL_VALUESET), RenderingI18nContext.VS_VERSION_NOTHING_TEXT);
+    ResourceRenderer.renderVersionReference(gen, vs, statedVersion, resolutionMethod, actualVersion, fromPackages, td, fromThisPackage, gen.formatPhrase(RenderingI18nContext.GENERAL_VALUESET), RenderingI18nContext.VS_VERSION_NOTHING_TEXT);
   }
 
   private String opacityStr(boolean inherited) {

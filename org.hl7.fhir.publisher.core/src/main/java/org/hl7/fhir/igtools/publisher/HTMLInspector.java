@@ -54,6 +54,7 @@ import org.hl7.fhir.r5.formats.JsonCreator;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CodeType;
 import org.hl7.fhir.r5.model.ImplementationGuide;
+import org.hl7.fhir.r5.renderers.RendererFactory;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
@@ -275,7 +276,7 @@ public class HTMLInspector {
 
   public HTMLInspector(IWorkerContext context, String rootFolder, List<SpecMapManager> specs, List<LinkedSpecification> linkSpecs, ILoggingService log,
                        String canonical, String packageId, String version, Map<String, List<String>> trackedFragments, List<FetchedFile> sources, IPublisherModule module, boolean isCIBuild,
-                       Map<String, PublisherBase.FragmentUseRecord> fragmentUses, List<RelatedIG> relatedIGs, boolean noCIBuildIssues, List<String> langList) throws IOException {
+                       Map<String, PublisherBase.FragmentUseRecord> fragmentUses, List<RelatedIG> relatedIGs, boolean noCIBuildIssues, List<String> langList, RendererFactory rendererFactory) throws IOException {
     this.rootFolder = rootFolder.replace("/", File.separator);
     this.specs = specs;
     this.linkSpecs = linkSpecs;
@@ -293,7 +294,7 @@ public class HTMLInspector {
     this.version = version;
     requirePublishBox = Utilities.startsWithInList(packageId, "hl7.");
     this.context = context;
-    this.csHandler = new ConformanceStatementHandler(this, context, log, langList, forHL7);
+    this.csHandler = new ConformanceStatementHandler(this, context, log, langList, forHL7, rendererFactory);
   }
 
   public void setAltRootFolder(String altRootFolder) throws IOException {

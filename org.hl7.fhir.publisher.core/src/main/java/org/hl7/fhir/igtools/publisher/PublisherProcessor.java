@@ -1252,7 +1252,7 @@ public class PublisherProcessor extends PublisherBase  {
                     first = false;
                     if (r.getResource() instanceof DomainResource && (langs.size() > 1 || !(((DomainResource) r.getResource()).hasText() && ((DomainResource) r.getResource()).getText().hasDiv()))) {
                       regen = true;
-                      ResourceRenderer rr = RendererFactory.factory(r.getResource(), lrc);
+                      ResourceRenderer rr = pf.rendererFactory.factory(r.getResource(), lrc);
                       if (rr.renderingUsesValidation()) {
                         r.setRegenAfterValidation(true);
                         this.pf.needsRegen = true;
@@ -1289,7 +1289,7 @@ public class PublisherProcessor extends PublisherBase  {
                     first = false;
                     if (isDomainResource(r) && (isRegen || langs.size() > 1 || !hasNarrative(r.getElement()))) {
                       ResourceWrapper rw = ResourceWrapper.forResource(lrc, r.getElement());
-                      ResourceRenderer rr = RendererFactory.factory(rw, lrc);
+                      ResourceRenderer rr = pf.rendererFactory.factory(rw, lrc);
                       if (rr.renderingUsesValidation()) {
                         r.setRegenAfterValidation(true);
                         this.pf.needsRegen = true;
@@ -1302,7 +1302,7 @@ public class PublisherProcessor extends PublisherBase  {
                         Element res = e.getNamedChild("resource");
                         if (res!=null && isDomainResource(res.getProperty().getStructure())) {
                           ResourceWrapper rw = ResourceWrapper.forResource(lrc, res);
-                          ResourceRenderer rr = RendererFactory.factory(rw, lrc);
+                          ResourceRenderer rr = pf.rendererFactory.factory(rw, lrc);
                           if (rr.renderingUsesValidation()) {
                             r.setRegenAfterValidation(true);
                             this.pf.needsRegen = true;
@@ -1979,7 +1979,32 @@ public class PublisherProcessor extends PublisherBase  {
             if (!r.isValidated()) {
               validate(f, r, false);
             }
-            if (SpecialTypeHandler.handlesType(r.fhirType(), this.pf.context.getVersion()) && !VersionUtilities.isR5Plus(this.pf.version)) {
+            // there's two kinds of categories of special handling here
+            if (isAdditionalResource(r)) {
+              // we validated the resource as it was supplied/defined as an additional resource, but now we need to
+              // switch it for the correct representation in the underlying version
+              byte[] cnt = null;
+              if (VersionUtilities.isR3Ver(this.pf.version)) {
+                org.hl7.fhir.dstu3.model.Resource res = pf.versionConvertorRegistry.convertToR3(r.getResource());
+                cnt = new org.hl7.fhir.dstu3.formats.JsonParser().setOutputStyle(org.hl7.fhir.dstu3.formats.IParser.OutputStyle.PRETTY).composeBytes(res);
+              } else if (VersionUtilities.isR4Ver(this.pf.version)) {
+                org.hl7.fhir.r4.model.Resource res = pf.versionConvertorRegistry.convertToR4(r.getResource());
+                cnt = new org.hl7.fhir.r4.formats.JsonParser().setOutputStyle(org.hl7.fhir.r4.formats.IParser.OutputStyle.PRETTY).composeBytes(res);
+              } else if (VersionUtilities.isR4BVer(this.pf.version)) {
+                // same as R4 (for now?)
+                org.hl7.fhir.r4.model.Resource res = pf.versionConvertorRegistry.convertToR4(r.getResource());
+                cnt = new org.hl7.fhir.r4.formats.JsonParser().setOutputStyle(org.hl7.fhir.r4.formats.IParser.OutputStyle.PRETTY).composeBytes(res);
+              } else if (VersionUtilities.isR5Ver(this.pf.version)) {
+                org.hl7.fhir.r5.model.Resource res = pf.versionConvertorRegistry.convertToR5(r.getResource());
+                cnt = new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(org.hl7.fhir.r5.formats.IParser.OutputStyle.PRETTY).composeBytes(res);
+              } else {
+                throw new Error("Cannot use resources of type "+r.fhirType()+" in a IG with version "+ this.pf.version);
+              }
+              Element e = new org.hl7.fhir.r5.elementmodel.JsonParser(this.pf.context).parseSingle(new ByteArrayInputStream(cnt), null);
+              e.copyUserData(r.getElement());
+              r.setElement(e);
+
+            } else if (SpecialTypeHandler.handlesType(r.fhirType(), this.pf.context.getVersion()) && !VersionUtilities.isR5Plus(this.pf.version)) {
               // we validated the resource as it was supplied, but now we need to
               // switch it for the correct representation in the underlying version
               byte[] cnt = null;
@@ -2006,6 +2031,7 @@ public class PublisherProcessor extends PublisherBase  {
       }
     }
   }
+
 
 
   /**

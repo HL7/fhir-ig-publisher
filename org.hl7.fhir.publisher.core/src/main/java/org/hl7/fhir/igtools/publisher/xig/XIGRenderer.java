@@ -65,7 +65,7 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
     super();
     this.info = info;
     this.target = target;
-    this.rc = new RenderingContext(info.getCtxt(), new MarkDownProcessor(Dialect.COMMON_MARK), 
+    this.rc = new RenderingContext(info.getCtxt(), new RendererFactory(), new MarkDownProcessor(Dialect.COMMON_MARK),
         new ValidationOptions(FhirPublication.R5, "en"), "http://hl7.org/fhir", "", new Locale("en"), ResourceRendererMode.TECHNICAL, GenerationRules.IG_PUBLISHER);
     this.rc.setDestDir(target);
     this.rc.setPkp(this);
@@ -322,7 +322,7 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
   }
 
   private void renderResource(String pid, CanonicalResource cr) throws FHIRException, IOException, EOperationOutcome {
-    RendererFactory.factory(cr, rc).renderResource(ResourceWrapper.forResource(rc.getContextUtilities(), cr));
+    new RendererFactory().factory(cr, rc).renderResource(ResourceWrapper.forResource(rc.getContextUtilities(), cr));
     String s = new XhtmlComposer(false, true).compose(cr.getText().getDiv());
     new JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(target, cr.getUserString("filebase")+".json")), cr);
     //    new XmlParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(target, cr.getUserString("filebase")+".xml")), cr);

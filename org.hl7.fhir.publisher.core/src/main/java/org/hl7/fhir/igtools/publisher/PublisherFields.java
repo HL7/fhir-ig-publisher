@@ -2,6 +2,7 @@ package org.hl7.fhir.igtools.publisher;
 
 import lombok.Getter;
 import lombok.Setter;
+import org.hl7.fhir.convertors.registry.VersionConvertorRegistry;
 import org.hl7.fhir.igtools.publisher.comparators.IpaComparator;
 import org.hl7.fhir.igtools.publisher.comparators.IpsComparator;
 import org.hl7.fhir.igtools.publisher.comparators.PreviousVersionComparator;
@@ -22,6 +23,7 @@ import org.hl7.fhir.r5.extensions.ExtensionUtilities;
 import org.hl7.fhir.r5.model.*;
 import org.hl7.fhir.r5.model.Enumeration;
 import org.hl7.fhir.r5.renderers.DataRenderer;
+import org.hl7.fhir.r5.renderers.RendererFactory;
 import org.hl7.fhir.r5.renderers.spreadsheets.StructureDefinitionSpreadsheetGenerator;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.renderers.utils.Resolver;
@@ -321,6 +323,10 @@ public class PublisherFields {
     List<String> suppressedMappings = new ArrayList<>();
 
     PublisherSigner signer;
+    RendererFactory rendererFactory = new RendererFactory();
+    VersionConvertorRegistry versionConvertorRegistry = new VersionConvertorRegistry() ;
+
+    public boolean excludeTtl;
 
     public boolean hasCheckedDependencies;
     public boolean saveExpansionParams;

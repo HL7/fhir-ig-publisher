@@ -86,7 +86,7 @@ public class StructureMapRenderer extends CanonicalRenderer {
       return StructureMapUtilities.render(map);
     } else {
       XhtmlNode node = new XhtmlNode(NodeType.Element, "div");
-      RendererFactory.factory(map, gen).buildNarrative(new RenderingStatus(), node, ResourceWrapper.forResource(gen.getContextUtilities(), map));
+      gen.getRendererFactory().factory(map, gen).buildNarrative(new RenderingStatus(), node, ResourceWrapper.forResource(gen.getContextUtilities(), map));
       return new XhtmlComposer(false, false).compose(node);
     }
   }

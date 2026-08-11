@@ -30,7 +30,6 @@ import org.hl7.fhir.r5.conformance.ConstraintJavaGenerator;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.context.ExpansionOptions;
-import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.elementmodel.Manager;
 import org.hl7.fhir.r5.elementmodel.ObjectConverter;
@@ -672,7 +671,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       return true;
     if (s.startsWith("icon"))
       return true;
-    if (Utilities.existsInList(s, "modifier.png", "alert.jpg", "tree-filter.png", "mustsupport.png", "information.png", "summary.png", "new.png", "lock.png", "external.png", "cc0.png", "target.png", "link.svg"))
+    if (Utilities.existsInList(s, "modifier.png", "alert.jpg", "tree-filter.png", "mustsupport.png", "information.png", "summary.png", "help.png", "new.png", "lock.png", "external.png", "cc0.png", "target.png", "link.svg"))
       return true;
 
     return false;
@@ -844,7 +843,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           for (int i = 0; i < containedResources.size(); i++ ) {
             Element containedElement = containedElements.get(i);
             Resource containedResource = containedResources.get(i);
-            if (RendererFactory.hasSpecificRenderer(containedElement.fhirType())) {
+            if (pf.rendererFactory.hasSpecificRenderer(containedElement.fhirType())) {
               if (containedElement.fhirType().equals(containedResource.fhirType())) {
                 String prefixForContained = r.getResource().getId()+"_";
                 makeTemplatesContained(f, r, containedResource, vars, prefixForContained, lang);
@@ -1198,7 +1197,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           String logicalType = rX.getLogicalElement() != null ? rX.getLogicalElement().fhirTypeRoot() : rX.getElement().fhirType();
           RenderingContext xlrc = lrc.copy(false);
           xlrc.setRules(RenderingContext.GenerationRules.IG_PUBLISHER);
-          ResourceRenderer rr = RendererFactory.factory(logicalType, xlrc);
+          ResourceRenderer rr = pf.rendererFactory.factory(logicalType, xlrc);
 
           if (!(rr instanceof ProfileDrivenRenderer)) {
             // Has specialised renderer - try to use it.
@@ -1265,7 +1264,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         if (xhtml == null || rX.isGeneratedNarrative()) {
           RenderingContext xlrc = lrc.copy(false);
           xlrc.setRules(RenderingContext.GenerationRules.IG_PUBLISHER);
-          ResourceRenderer rr = RendererFactory.factory(rX.fhirType(), xlrc);
+          ResourceRenderer rr = pf.rendererFactory.factory(rX.fhirType(), xlrc);
           if (lr != null && lr instanceof DomainResource) {
 // Lloyd debug - getting here and dying
             xhtml = rr.buildNarrative(ResourceWrapper.forResource(xlrc, lr));
@@ -1330,7 +1329,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     if (ss == null)
       ss = StandardsStatus.TRIAL_USE;
     if (fmm != null) {
-      return pf.rcLangs.get(lang).formatPhrase(RenderingContext.FMM_TABLE, fmm, checkAppendSlash(pf.specPath), ss.toDisplay());
+      return pf.rcLangs.get(lang).formatPhrase(RenderingI18nContext.FMM_TABLE, fmm, checkAppendSlash(pf.specPath), ss.toDisplay());
     } else {
       return "";
     }
@@ -1519,7 +1518,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
 
     if (wantGen(fr, "xlsx")) {
-      CodeSystemSpreadsheetGenerator vsg = new CodeSystemSpreadsheetGenerator(this.pf.context);
+      CodeSystemSpreadsheetGenerator vsg = new CodeSystemSpreadsheetGenerator(this.pf.context, pf.rendererFactory);
       if (vsg.canGenerate(cs)) {
         String path = Utilities.path(this.pf.tempDir, "CodeSystem-"+prefixForContainer + cs.getId()+".xlsx");
         f.getOutputNames().add(path);
@@ -1586,11 +1585,11 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           RenderingContext elrc = lrc.withUniqueLocalPrefix("x").withMode(RenderingContext.ResourceRendererMode.END_USER);
           exp.getValueset().setCompose(null);
           exp.getValueset().setText(null);
-          RendererFactory.factory(exp.getValueset(), elrc).renderResource(ResourceWrapper.forResource(elrc, exp.getValueset()));
+          pf.rendererFactory.factory(exp.getValueset(), elrc).renderResource(ResourceWrapper.forResource(elrc, exp.getValueset()));
           String html = new XhtmlComposer(XhtmlComposer.XML).compose(exp.getValueset().getText().getDiv());
           fragment("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", html, f.getOutputNames(), r, vars, null, start, "expansion", "ValueSet", lang);
           elrc = elrc.withOids(true);
-          XhtmlNode node = RendererFactory.factory(exp.getValueset(), elrc).buildNarrative(ResourceWrapper.forResource(elrc, exp.getValueset()));
+          XhtmlNode node = pf.rendererFactory.factory(exp.getValueset(), elrc).buildNarrative(ResourceWrapper.forResource(elrc, exp.getValueset()));
           html = new XhtmlComposer(XhtmlComposer.XML).compose(node);
           fragment("ValueSet-"+prefixForContainer+vs.getId()+"-expansion-oids", html, f.getOutputNames(), r, vars, null, start, "expansion", "ValueSet", lang);
           if (ValueSetUtilities.isIncompleteExpansion(exp.getValueset())) {
@@ -1629,7 +1628,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       }
     }
     if (wantGen(r, "xlsx")) {
-      ValueSetSpreadsheetGenerator vsg = new ValueSetSpreadsheetGenerator(this.pf.context);
+      ValueSetSpreadsheetGenerator vsg = new ValueSetSpreadsheetGenerator(this.pf.context, pf.rendererFactory);
       if (vsg.canGenerate(vs)) {
         String path = Utilities.path(this.pf.tempDir, "ValueSet-"+prefixForContainer + r.getId()+".xlsx");
         f.getOutputNames().add(path);
@@ -1686,7 +1685,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       long start = System.currentTimeMillis();
       fragment("ConceptMap-"+prefixForContainer+cm.getId()+"-sheet", p.genSheet(cm), f.getOutputNames(), r, vars, null, start, "sheet", "ConceptMap", lang);
     }
-    ConceptMapSpreadsheetGenerator cmg = new ConceptMapSpreadsheetGenerator(this.pf.context);
+    ConceptMapSpreadsheetGenerator cmg = new ConceptMapSpreadsheetGenerator(this.pf.context, pf.rendererFactory);
     if (wantGen(r, "xlsx") && cmg.canGenerate(cm)) {
       String path = Utilities.path(this.pf.tempDir, prefixForContainer + r.getId()+".xlsx");
       f.getOutputNames().add(path);
@@ -1798,12 +1797,12 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       lapsed(null);
       String path = Utilities.path(this.pf.tempDir, sdPrefix + r.getId()+".xlsx");
       f.getOutputNames().add(path);
-      StructureDefinitionSpreadsheetGenerator sdg = new StructureDefinitionSpreadsheetGenerator(this.pf.context, true, anyMustSupport(sd));
+      StructureDefinitionSpreadsheetGenerator sdg = new StructureDefinitionSpreadsheetGenerator(this.pf.context, true, anyMustSupport(sd), pf.rendererFactory);
       sdg.renderStructureDefinition(sd, false);
       sdg.finish(new FileOutputStream(path));
       lapsed("xslx");
       if (this.pf.allProfilesXlsx == null) {
-        this.pf.allProfilesXlsx = new StructureDefinitionSpreadsheetGenerator(this.pf.context, true, false);
+        this.pf.allProfilesXlsx = new StructureDefinitionSpreadsheetGenerator(this.pf.context, true, false, pf.rendererFactory);
       }
       this.pf.allProfilesXlsx.renderStructureDefinition(sd, true);
       lapsed("all-xslx");
@@ -2430,7 +2429,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       return new ParametersRenderer(this.pf.rc).buildNarrative(ResourceWrapper.forResource(this.pf.rc, p));
     }
     RenderingContext lrc = this.pf.rc.copy(false).setParser(getTypeLoader(f, r));
-    return RendererFactory.factory(resource, lrc).buildNarrative(ResourceWrapper.forResource(this.pf.rc, resource));
+    return pf.rendererFactory.factory(resource, lrc).buildNarrative(ResourceWrapper.forResource(this.pf.rc, resource));
   }
 
 
@@ -2830,7 +2829,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     start = System.currentTimeMillis();
     fragment("summary-observations", cvr.getObservationSummary(), pf.otherFilesRun, start, "summary-observations", "Cross", lang);
     String path = Utilities.path(pf.tempDir, "observations-summary.xlsx");
-    ObservationSummarySpreadsheetGenerator vsg = new ObservationSummarySpreadsheetGenerator(pf.context);
+    ObservationSummarySpreadsheetGenerator vsg = new ObservationSummarySpreadsheetGenerator(pf.context, pf.rendererFactory);
     pf.otherFilesRun.add(path);
     vsg.generate(cvr.getObservations());
     vsg.finish(new FileOutputStream(path));
@@ -4109,7 +4108,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     if (generateExampleZip(Manager.FhirFormat.JSON)) {
       generateDefinitions(Manager.FhirFormat.JSON, df.getCanonicalPath());
     }
-    if (supportsTurtle() && generateExampleZip(Manager.FhirFormat.TURTLE)) {
+    if (!pf.excludeTtl && supportsTurtle() && generateExampleZip(Manager.FhirFormat.TURTLE)) {
       generateDefinitions(Manager.FhirFormat.TURTLE, df.getCanonicalPath());
     }
     generateExpansions();
@@ -4346,7 +4345,23 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       f.start("generateValidationPack");
       try {
         for (FetchedResource r : f.getResources()) {
-          if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
+          if (isAdditionalResource(r)) {
+            ByteArrayOutputStream bs = new ByteArrayOutputStream();
+            if (VersionUtilities.isR3Ver(this.pf.version)) {
+              new org.hl7.fhir.dstu3.formats.JsonParser().compose(bs, pf.versionConvertorRegistry.convertToR3(r.getResource()));
+            } else if (VersionUtilities.isR4Ver(this.pf.version)) {
+              new org.hl7.fhir.r4.formats.JsonParser().compose(bs, pf.versionConvertorRegistry.convertToR4(r.getResource()));
+            } else if (VersionUtilities.isR4BVer(this.pf.version)) {
+              // same as R4 - for now?
+              new org.hl7.fhir.r4.formats.JsonParser().compose(bs, pf.versionConvertorRegistry.convertToR4(r.getResource()));
+            } else if (VersionUtilities.isR5Plus(this.pf.version)) {
+              new org.hl7.fhir.r5.formats.JsonParser().compose(bs, pf.versionConvertorRegistry.convertToR5(r.getResource()));
+            } else {
+              throw new Exception("Unsupported version "+ this.pf.version);
+            }
+            zip.addBytes(r.fhirType()+"-"+r.getId()+".json", bs.toByteArray(), false);
+
+          } else if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
             ByteArrayOutputStream bs = new ByteArrayOutputStream();
             if (VersionUtilities.isR3Ver(this.pf.version)) {
               new org.hl7.fhir.dstu3.formats.JsonParser().compose(bs, VersionConvertorFactory_30_50.convertResource(r.getResource()));
