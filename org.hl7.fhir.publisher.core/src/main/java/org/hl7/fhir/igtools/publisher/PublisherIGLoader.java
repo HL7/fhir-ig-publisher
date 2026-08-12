@@ -1056,7 +1056,7 @@ public class PublisherIGLoader extends PublisherBase {
     boolean rawHadUTG = dependsOnUTG(pf.sourceIg.getDependsOn());
     boolean rawHadTooling = dependsOnTooling(pf.sourceIg.getDependsOn());
 
-    if (VersionUtilities.isR4Plus(pf.version) && !dependsOnExtensions(guardDeps) && !pf.packageId().contains("hl7.fhir.uv.extensions")) {
+    if (VersionUtilities.isR4Plus(pf.version) && !dependsOnExtensions(guardDeps) && !isExemptFromExtensions()) {
       ImplementationGuide.ImplementationGuideDependsOnComponent dep = new ImplementationGuide.ImplementationGuideDependsOnComponent();
       dep.setUserData(UserDataNames.pub_no_load_deps, "true");
       dep.setId("hl7ext");
@@ -1064,6 +1064,9 @@ public class PublisherIGLoader extends PublisherBase {
       dep.setUri("http://hl7.org/fhir/extensions/ImplementationGuide/hl7.fhir.uv.extensions");
       dep.setVersion(pf.pcm.getLatestVersion(dep.getPackageId(), true));
       dep.addExtension(ExtensionDefinitions.EXT_IGDEP_COMMENT, new MarkdownType(AUTO_DEP_COMMENT_EXTENSIONS));
+      if (pf.packageId().contains("hl7.terminology")) {
+        dep.addExtension(ExtensionDefinitions.EXT_IGDEP_NO_SAVE, new BooleanType(true));
+      }
       pf.sourceIg.getDependsOn().add(0, dep);
       if (multiVersion && rawHadExt) {
         pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.INFORMATIONAL, "ImplementationGuide.dependsOn",
@@ -1270,6 +1273,10 @@ public class PublisherIGLoader extends PublisherBase {
       pf.extensionTracker.setoptIn(!ini.getBooleanProperty("IG", "usage-stats-opt-out"));
 
     log("Initialization complete");
+  }
+
+  private boolean isExemptFromExtensions() {
+    return pf.packageId().contains("hl7.fhir.uv.extensions") ;
   }
 
   private DataSetInformation loadDataset(String t) throws IOException {
@@ -2425,6 +2432,11 @@ public class PublisherIGLoader extends PublisherBase {
     applyPerVersionDeps(baseVig, pf.version, pf.version);
     pf.effectiveBaseIg = baseVig;
     pf.npm = new NPMPackageGenerator(pf.packageId(), Utilities.path(pf.outputDir, "package.tgz"), pf.igpkp.getCanonical(), targetUrl(), PackageGenerator.PackageType.IG, baseVig, pf.getExecTime().getTime(), relatedIgMap(), !settings.isPublishing());
+
+    pf.publishedIg.getDependsOn().removeIf(d -> d.hasExtension(ExtensionDefinitions.EXT_IGDEP_NO_SAVE)); // work around for THO dependency issue
+    pf.sourceIg.getDependsOn().removeIf(d -> d.hasExtension(ExtensionDefinitions.EXT_IGDEP_NO_SAVE)); // work around for THO dependency issue
+    pf.effectiveBaseIg.getDependsOn().removeIf(d -> d.hasExtension(ExtensionDefinitions.EXT_IGDEP_NO_SAVE)); // work around for THO dependency issue
+
     for (String v : pf.generateVersions) {
       ImplementationGuide vig = pf.publishedIg.copy();
       preserveAliasUserData(pf.publishedIg, vig);

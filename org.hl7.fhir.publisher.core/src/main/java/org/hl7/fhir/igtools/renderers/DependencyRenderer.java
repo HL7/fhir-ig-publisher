@@ -708,8 +708,8 @@ public class DependencyRenderer {
     String comment = null;
     if (!id.equals(npmName)) {
       comment = "Expected Package Id is "+npmName;
-    } else if (id.startsWith("hl7") && !id.startsWith("hl7.cda.") && !id.startsWith("hl7.fhir.") && !id.startsWith("hl7.v2.") && !id.startsWith("hl7.ehrs.") && !id.startsWith("hl7.xprod.")) {
-      comment = "HL7 Packages must have an id that starts with hl7.cda., hl7.fhir., hl7.v2.,  hl7.xprod., or hl7.ehrs.";
+    } else if (id.startsWith("hl7") && !id.startsWith("hl7.cda.") && !id.startsWith("hl7.fhir.") && !id.startsWith("hl7.v2.") && !id.startsWith("hl7.ehrs.") && !id.startsWith("hl7.xprod.") && !id.startsWith("hl7.terminology")) {
+      comment = "HL7 Packages must have an id that starts with hl7.cda., hl7.fhir., hl7.v2.,  hl7.xprod., or hl7.ehrs, or hl7.terminology";
     }
     Row row = addRow(gen, model.getRows(), id,  ig.present(), ver, null, null, false, fver, false, canonical, web, comment, null, QA, hasDesc, true, false);
     if (QA && comment != null) {
