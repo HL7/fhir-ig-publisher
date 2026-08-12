@@ -11,5 +11,3 @@
 * Validator: revisit validation batch handling generally
 * Renderer: fix bugs in ConceptMap rendering - wrong URLs
 * Renderer: add TestPlan renderer for R6 TestPlan
-
-

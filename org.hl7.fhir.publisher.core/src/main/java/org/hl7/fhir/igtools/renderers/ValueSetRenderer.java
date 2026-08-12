@@ -177,7 +177,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
             first = false;
             b.append("<ul>\r\n");
           }
-          b.append(" <li>"+ (gen.formatPhrase(RenderingContext.VALUE_SET_INCLUDED_INTO)+" ")+"<a href=\""+vc.getWebPath()+"\">"+Utilities.escapeXml(gen.getTranslated(vc.getNameElement()))+"</a></li>\r\n");
+          b.append(" <li>"+ (gen.formatPhrase(RenderingContext.VALUE_SET_INCLUDED_INTO)+" ")+"<a href=\""+vc.getWebPath()+"\">"+Utilities.escapeXml(gen.getTranslated(vc.getTitleElement(), vc.getNameElement()))+"</a></li>\r\n");
           break;
         }
       }
@@ -189,7 +189,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
             first = false;
             b.append("<ul>\r\n");
           }
-          b.append(" <li>"+ (gen.formatPhrase(RenderingContext.VALUE_SET_EXCLUDED_FROM)+" ")+"<a href=\""+vc.getWebPath()+"\">"+Utilities.escapeXml(gen.getTranslated(vc.getNameElement()))+"</a></li>\r\n");
+          b.append(" <li>"+ (gen.formatPhrase(RenderingContext.VALUE_SET_EXCLUDED_FROM)+" ")+"<a href=\""+vc.getWebPath()+"\">"+Utilities.escapeXml(gen.getTranslated(vc.getTitleElement(), vc.getNameElement()))+"</a></li>\r\n");
           break;
         }
       }

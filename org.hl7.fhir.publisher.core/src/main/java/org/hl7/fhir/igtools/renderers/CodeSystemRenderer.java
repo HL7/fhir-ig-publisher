@@ -231,7 +231,7 @@ public class CodeSystemRenderer extends CanonicalRenderer {
         if (path == null) {
           System.out.println("No path for " + vc.getUrl());
         } else {
-          b.append(" <li><a href=\"" + path + "\">" + Utilities.escapeXml(gen.getTranslated(vc.getNameElement())) + "</a></li>\r\n");
+          b.append(" <li><a href=\"" + path + "\">" + Utilities.escapeXml(gen.getTranslated(vc.getTitleElement(), vc.getNameElement())) + "</a></li>\r\n");
         }
         processed.add(path);
       }
@@ -251,7 +251,7 @@ public class CodeSystemRenderer extends CanonicalRenderer {
         if (path == null) {
           System.out.println("No path for " + vc.getUrl());
         } else {
-          b.append(" <li><a href=\"" + path + "\">" + Utilities.escapeXml(gen.getTranslated(vc.getNameElement())) + "</a></li>\r\n");
+          b.append(" <li><a href=\"" + path + "\">" + Utilities.escapeXml(gen.getTranslated(vc.getTitleElement(), vc.getNameElement())) + "</a></li>\r\n");
         }
         processed.add(path);
       }
