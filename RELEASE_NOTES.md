@@ -1,4 +1,5 @@
 * General: Add support for R6 Testing Incubator 
+* General: Share the HTTP connection pool across ManagedHTTPClient instances
 * Loader: More R6 support to ballot5 (from ballot3)
 * Loader: support for additional resources
 * Loader: fix issue with THO depending on extensions
