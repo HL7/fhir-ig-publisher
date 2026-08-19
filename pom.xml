@@ -25,7 +25,7 @@
         <maven.compiler.testTarget>17</maven.compiler.testTarget>
         <logback.version>1.5.37</logback.version>
         <log4jVersion>2.26.1</log4jVersion>
-        <jackson_version>2.22.1</jackson_version>
+        <jackson_version>2.22.2</jackson_version>
         <jackson_annotations_version>2.22</jackson_annotations_version>
         <nedap-healthcare-archie.version>3.16.0</nedap-healthcare-archie.version>
     </properties>
@@ -367,7 +367,7 @@
         <dependency>
             <groupId>org.jetbrains.kotlin</groupId>
             <artifactId>kotlin-stdlib</artifactId>
-            <version>2.3.21</version>
+            <version>2.4.10</version>
         </dependency>
 
         <dependency>

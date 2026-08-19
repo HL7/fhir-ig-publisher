@@ -97,7 +97,7 @@
         <dependency>
             <groupId>com.fasterxml.jackson.module</groupId>
             <artifactId>jackson-module-jakarta-xmlbind-annotations</artifactId>
-            <version>2.21.6</version>
+            <version>${jackson_version}</version>
         </dependency>
         <dependency>
             <groupId>org.eclipse.persistence</groupId>
