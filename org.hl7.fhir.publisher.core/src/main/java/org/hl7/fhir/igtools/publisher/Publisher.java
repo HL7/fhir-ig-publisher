@@ -82,7 +82,7 @@ import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
 import org.hl7.fhir.r5.terminologies.client.TerminologyClientContext;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator;
-import org.hl7.fhir.r5.utils.UserDataNames;
+import org.hl7.fhir.utilities.UserDataNames;
 import org.hl7.fhir.r5.utils.xver.XVerExtensionManager;
 import org.hl7.fhir.r5.utils.validation.IValidationProfileUsageTracker;
 import org.hl7.fhir.r5.utils.xver.XVerExtensionManagerFactory;
@@ -433,7 +433,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       deleteDuplicateMessages();
       ValidationPresenter val = new ValidationPresenter(pf.version, workingVersion(), pf.igpkp, pf.childPublisher == null? null : pf.childPublisher.getIgpkp(), pf.rootDir, pf.npmName, pf.childPublisher == null? null : pf.childPublisher.pf.npmName,
           IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), pf.realmRules, pf.previousVersionComparator, pf.ipaComparator, pf.ipsComparator,
-          new DependencyRenderer(pf.pcm, pf.outputDir, pf.npmName, pf.templateManager, pf.dependencyList, pf.context, pf.markdownEngine, pf.rc, pf.specMaps).render(pf.getEffectiveBaseIg(), true, false, false), new HTAAnalysisRenderer(pf.context, pf.outputDir, pf.markdownEngine).render(pf.packageId(), pf.fileList, pf.publishedIg.present()),
+          new DependencyRenderer(pf.pcm, pf.outputDir, pf.npmName, pf.templateManager, pf.dependencyList, pf.context, pf.markdownEngine, pf.rc, pf.specMaps, pf.effectiveBaseIg).render(pf.getEffectiveBaseIg(), true, false, false), new HTAAnalysisRenderer(pf.context, pf.outputDir, pf.markdownEngine).render(pf.packageId(), pf.fileList, pf.publishedIg.present()),
           new PublicationChecker(pf.repoRoot, pf.historyPage, pf.markdownEngine, findReleaseLabelString(), pf.getEffectiveBaseIg(), pf.relatedIGs).check(), renderGlobals(), pf.copyrightYear, pf.context, scanForR5Extensions(), pf.modifierExtensions,
           generateDraftDependencies(), pf.noNarrativeResources, pf.noValidateResources, settings.isValidationOff(), settings.isGenerationOff(), pf.dependentIgFinder, pf.context.getTxClientManager(),
           fragments, makeLangInfo(), pf.relatedIGs);
@@ -580,10 +580,9 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   }
 
   private Set<String> scanForR5Extensions() {
-    XVerExtensionManager xver = XVerExtensionManagerFactory.createExtensionManager(pf.context);
     Set<String> set = new HashSet<>();
-    scanProfilesForR5(xver, set);
-    scanExamplesForR5(xver, set);
+    scanProfilesForR5(pf.xver, set);
+    scanExamplesForR5(pf.xver, set);
     return set;
   }
 
