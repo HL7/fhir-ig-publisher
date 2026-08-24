@@ -6,14 +6,19 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import kotlinx.io.Source;
+import kotlinx.io.Buffer;
+import kotlinx.io.files.Path;
+import kotlinx.io.files.PathsKt;
+import org.apache.commons.lang3.NotImplementedException;
 import org.cqframework.cql.cql2elm.*;
 import org.cqframework.cql.cql2elm.model.CompiledLibrary;
 import org.cqframework.cql.cql2elm.model.Model;
 import org.cqframework.cql.cql2elm.model.Version;
 import org.cqframework.cql.cql2elm.quick.FhirLibrarySourceProvider;
+import org.cqframework.cql.cql2elm.tracking.TrackBack;
 import org.cqframework.cql.elm.requirements.fhir.DataRequirementsProcessor;
 import org.cqframework.cql.elm.requirements.fhir.utilities.SpecificationLevel;
-import org.cqframework.cql.elm.tracking.TrackBack;
 import org.fhir.ucum.UcumService;
 import org.hl7.cql.model.*;
 import org.hl7.elm.r1.AccessModifier;
@@ -36,16 +41,18 @@ import org.hl7.elm.r1.ValueSetDef;
 import org.hl7.elm.r1.ValueSetRef;
 import org.hl7.elm.r1.VersionedIdentifier;
 import org.hl7.elm_modelinfo.r1.ModelInfo;
-import org.hl7.elm_modelinfo.r1.serializing.ModelInfoReaderFactory;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.r5.context.ILoggingService;
 import org.hl7.fhir.r5.model.*;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
+
+import static org.hl7.elm_modelinfo.r1.serializing.XmlModelInfoReaderKt.parseModelInfoXml;
 
 /**
  * What this system does
@@ -130,7 +137,7 @@ public class CqlSubSystem {
   public class NpmLibrarySourceProvider implements LibrarySourceProvider {
 
     @Override
-    public InputStream getLibrarySource(VersionedIdentifier identifier) {
+    public Source getLibrarySource(VersionedIdentifier identifier) {
       // VersionedIdentifier.id: Name of the library
       // VersionedIdentifier.system: Namespace for the library, as a URL
       // VersionedIdentifier.version: Version of the library
@@ -140,8 +147,15 @@ public class CqlSubSystem {
           if (s != null) {
             Library l = reader.readLibrary(s);
             for (org.hl7.fhir.r5.model.Attachment a : l.getContent()) {
-              if (a.getContentType() != null && a.getContentType().equals("text/cql")) {
-                return new ByteArrayInputStream(a.getData());
+              if (a.getContentType() != null) {
+                int pIndex = a.getContentType().indexOf(';');
+                String contentType = a.getContentType().substring(0, pIndex > -1 ? pIndex : a.getContentType().length() );
+                if (contentType.equals("text/cql")) {
+                  Buffer buffer = new Buffer();
+                  byte[] bytes = a.getData();
+                  buffer.write(bytes, 0, bytes.length);
+                  return buffer;
+                }
               }
             }
           }
@@ -181,7 +195,7 @@ public class CqlSubSystem {
                 //  modelIdentifier.setSystem(identifier.getSystem());
                 //}
                 InputStream is = new ByteArrayInputStream(a.getData());
-                ModelInfo mi = ModelInfoReaderFactory.getReader("application/xml").read(is);
+                ModelInfo mi = parseModelInfoXml(FileUtilities.streamToString(is));
                 // Set the URL to the model url
                 if (mi != null && mi.getUrl() != null && modelIdentifier.getSystem() == null) {
                   modelIdentifier.setSystem(mi.getUrl());
@@ -478,7 +492,7 @@ public class CqlSubSystem {
     CqlTranslatorOptions options = null;
     File file = new File(optionsFileName);
     if (file.exists()) {
-      options = CqlTranslatorOptionsMapper.fromFile(file.getAbsolutePath());
+      options = CqlTranslatorOptions.fromFile(new kotlinx.io.files.Path(file));
     }
     else {
       options = CqlTranslatorOptions.defaultOptions();
@@ -561,11 +575,11 @@ public class CqlSubSystem {
     // Construct FhirLibrarySourceProvider
     ModelManager modelManager = new ModelManager();
     modelManager.getModelInfoLoader().registerModelInfoProvider(new NpmModelInfoProvider());
-    modelManager.getModelInfoLoader().registerModelInfoProvider(new DefaultModelInfoProvider(Paths.get(folder)));
+    modelManager.getModelInfoLoader().registerModelInfoProvider(new DefaultModelInfoProvider(PathsKt.Path(folder)));
 
     LibraryManager libraryManager = new LibraryManager(modelManager, options.getCqlCompilerOptions());
     libraryManager.getLibrarySourceLoader().registerProvider(new NpmLibrarySourceProvider());
-    libraryManager.getLibrarySourceLoader().registerProvider(new DefaultLibrarySourceProvider(Paths.get(folder)));
+    libraryManager.getLibrarySourceLoader().registerProvider(new DefaultLibrarySourceProvider(PathsKt.Path(folder)));
     libraryManager.getLibrarySourceLoader().registerProvider(new FhirLibrarySourceProvider());
 
     loadNamespaces(libraryManager);
@@ -667,10 +681,13 @@ public class CqlSubSystem {
     try {
       ModelInfo mi = null;
       if (file.getName().toLowerCase().endsWith(".xml")) {
-        mi = ModelInfoReaderFactory.getReader("application/xml").read(file);
+        String miString = FileUtilities.fileToString(file);
+        mi = parseModelInfoXml(miString);
       }
       else if (file.getName().toLowerCase().endsWith(".json")) {
-        mi = ModelInfoReaderFactory.getReader("application/json").read(file);
+        String miString = FileUtilities.fileToString(file);
+        throw new NotImplementedException("JSON ModelInfo Support is not available in the publisher");
+        //mi = ModelInfoReaderFactory.getReader("application/json").read(file);
       }
       else {
         throw new IllegalArgumentException("Could not read model info from file.");
@@ -694,12 +711,13 @@ public class CqlSubSystem {
     currentInfo = result;
 
     try {
-      if (options.getCqlCompilerOptions().getValidateUnits()) {
-        libraryManager.setUcumService(ucumService);
-      }
+      // Since the underlying translator is providing its own ucum service, this shouldn't be necessary, just means there may be multiple ucum services in memory
+      //if (options.getCqlCompilerOptions().getValidateUnits()) {
+      //  libraryManager.setUcumService(ucumService);
+      //}
 
       // translate toXML
-      CqlTranslator translator = CqlTranslator.fromFile(namespaceInfo, file, libraryManager);
+      CqlTranslator translator = CqlTranslator.fromFile(namespaceInfo, String.valueOf(file), libraryManager);
 
       // record errors and warnings
       for (CqlCompilerException exception : translator.getExceptions()) {
