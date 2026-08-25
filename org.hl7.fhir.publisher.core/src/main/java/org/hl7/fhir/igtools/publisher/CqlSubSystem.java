@@ -1,14 +1,12 @@
 package org.hl7.fhir.igtools.publisher;
 
 import java.io.*;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kotlinx.io.Source;
 import kotlinx.io.Buffer;
-import kotlinx.io.files.Path;
 import kotlinx.io.files.PathsKt;
 import org.apache.commons.lang3.NotImplementedException;
 import org.cqframework.cql.cql2elm.*;
@@ -17,10 +15,12 @@ import org.cqframework.cql.cql2elm.model.Model;
 import org.cqframework.cql.cql2elm.model.Version;
 import org.cqframework.cql.cql2elm.quick.FhirLibrarySourceProvider;
 import org.cqframework.cql.cql2elm.tracking.TrackBack;
+import org.cqframework.cql.cql2elm.tracking.Trackable;
 import org.cqframework.cql.elm.requirements.fhir.DataRequirementsProcessor;
 import org.cqframework.cql.elm.requirements.fhir.utilities.SpecificationLevel;
 import org.fhir.ucum.UcumService;
 import org.hl7.cql.model.*;
+import org.hl7.cql.model.DataType;
 import org.hl7.elm.r1.AccessModifier;
 import org.hl7.elm.r1.Code;
 import org.hl7.elm.r1.CodeDef;
@@ -178,9 +178,11 @@ public class CqlSubSystem {
         try {
           VersionedIdentifier identifier = new VersionedIdentifier()
                   .withId(modelIdentifier.getId())
-                  .withVersion(modelIdentifier.getVersion())
-                  .withSystem(modelIdentifier.getSystem());
+                  .withVersion(modelIdentifier.getVersion());
+                  // Do not use the system for loading model info, model info names are globally scoped until CQL R2
+                  //.withSystem(modelIdentifier.getSystem());
 
+          // Assume the base canonical of the containing package
           if (identifier.getSystem() == null) {
             identifier.setSystem(p.canonical());
           }
@@ -731,12 +733,14 @@ public class CqlSubSystem {
       }
       else {
         try {
+          CompiledLibrary compiledLibrary = translator.getTranslatedLibrary();
+
           result.setOptions(options);
-          result.setIdentifier(translator.toELM().getIdentifier());
+          result.setIdentifier(compiledLibrary.getLibrary().getIdentifier());
 
           // Correct target model mapping based on publisher options
           if (publisherOptions.getCorrectModelUrls()) {
-            correctModelUrls(libraryManager, translator.toELM());
+            correctModelUrls(libraryManager, compiledLibrary.getLibrary());
           }
 
           // convert to base64 bytes
@@ -749,7 +753,6 @@ public class CqlSubSystem {
 
           // Add the translated library to the library manager (NOTE: This should be a "cacheLibrary" call on the LibraryManager, available in 1.5.3+)
           // Without this, the data requirements processor will try to load the current library, resulting in a re-translation
-          CompiledLibrary compiledLibrary = translator.getTranslatedLibrary();
           libraryManager.getCompiledLibraries().put(compiledLibrary.getIdentifier(), compiledLibrary);
 
           // TODO: Report context, requires 1.5 translator (ContextDef)
@@ -758,13 +761,14 @@ public class CqlSubSystem {
           // TODO: Report direct-reference codes
 
           // Extract relatedArtifact data (models, libraries, code systems, and value sets)
-          result.relatedArtifacts.addAll(extractRelatedArtifacts(translator.toELM()));
+          result.relatedArtifacts.addAll(extractRelatedArtifacts(compiledLibrary.getLibrary()));
 
           // Extract parameter data and validate result types are supported types
-          result.parameters.addAll(extractParameters(translator.toELM()));
+          result.parameters.addAll(extractParameters(compiledLibrary.getLibrary()));
 
           // Extract dataRequirement data
-          result.dataRequirements.addAll(extractDataRequirements(translator.toRetrieves(), translator.getTranslatedLibrary(), libraryManager));
+          //result.dataRequirements.addAll(extractDataRequirements(translator.toRetrieves(), compiledLibrary, libraryManager));
+          result.dataRequirements.addAll(extractDataRequirements(compiledLibrary, libraryManager, options));
 
           logger.logMessage("CQL translation completed successfully.");
         }
@@ -947,6 +951,25 @@ public class CqlSubSystem {
     return result;
   }
 
+  private List<DataRequirement> extractDataRequirements(CompiledLibrary library, LibraryManager libraryManager, CqlTranslatorOptions options) {
+    DataRequirementsProcessor drp = new DataRequirementsProcessor();
+    drp.setSpecificationLevel(SpecificationLevel.QM_STU_1);
+
+    // TODO: Consider whether we want to add logic definitions to the library?
+    // TODO: Consider whether library processing should be done in the same way as all other artifact processing now that that code path exists?
+    boolean annotationsEnabled = options.getCqlCompilerOptions().getOptions().contains(CqlCompilerOptions.Options.EnableAnnotations);
+    Library moduleDefinitionLibrary = drp.gatherDataRequirements(
+        libraryManager,
+        library,
+        options.getCqlCompilerOptions(),
+        null,
+        annotationsEnabled,
+        false
+    );
+
+    return moduleDefinitionLibrary.getDataRequirement();
+  }
+
   private List<DataRequirement> extractDataRequirements(List<org.hl7.elm.r1.Retrieve> retrieves, CompiledLibrary library, LibraryManager libraryManager) {
     List<DataRequirement> result = new ArrayList<>();
 
@@ -1022,7 +1045,8 @@ public class CqlSubSystem {
   }
 
   private ParameterDefinition toParameterDefinition(ParameterDef def) {
-    org.hl7.cql.model.DataType parameterType = def.getResultType() instanceof ListType ? ((ListType)def.getResultType()).getElementType() : def.getResultType();
+    DataType resultType = Trackable.INSTANCE.getResultType(def);
+    org.hl7.cql.model.DataType parameterType = resultType instanceof ListType ? ((ListType)resultType).getElementType() : resultType;
 
     AtomicBoolean isList = new AtomicBoolean(false);
     Enumerations.FHIRTypes typeCode = Enumerations.FHIRTypes.fromCode(toFHIRParameterTypeCode(parameterType, def.getName(), isList));
@@ -1037,7 +1061,8 @@ public class CqlSubSystem {
 
   private ParameterDefinition toOutputParameterDefinition(ExpressionDef def) {
     AtomicBoolean isList = new AtomicBoolean(false);
-    Enumerations.FHIRTypes typeCode = Enumerations.FHIRTypes.fromCode(toFHIRResultTypeCode(def.getResultType(), def.getName(), isList));
+    DataType resultType = Trackable.INSTANCE.getResultType(def);
+    Enumerations.FHIRTypes typeCode = Enumerations.FHIRTypes.fromCode(toFHIRResultTypeCode(resultType, def.getName(), isList));
 
     return new ParameterDefinition()
             .setName(def.getName())
