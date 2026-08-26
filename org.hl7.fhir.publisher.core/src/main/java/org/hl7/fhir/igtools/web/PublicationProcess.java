@@ -49,6 +49,20 @@ public class PublicationProcess {
  
   private int exitCode = 1;
 
+  /**
+   * GitHub refuses any file over 100MB at the pre-receive hook, and the rejection takes down the
+   * whole push, not just the offending file. A technical correction archive is a zip of an entire
+   * published version folder, so it can easily run past this.
+   */
+  private static final long GITHUB_MAX_FILE_SIZE = 100 * 1024 * 1024L;
+
+  /**
+   * Files not worth carrying inside a technical correction archive: full-ig.zip (fhir-spec.zip for
+   * the core spec) is itself a zip of the very folder being archived, so including it roughly
+   * doubles the size of the archive for no additional content.
+   */
+  private static final String[] TC_ARCHIVE_EXCLUDES = {"full-ig.zip", "fhir-spec.zip"};
+
   /*
    * checks that must be run prior to runing this:
    *  
@@ -653,7 +667,9 @@ public class PublicationProcess {
         if (mode == PublicationProcessMode.TECHNICAL_CORRECTION) {
 
           System.out.println("This is a technical correction - publish v" + npm.version() + " to " + destination + " but archive to " + tcName + " first");
-          produceArchive(tcPath, Utilities.path(igSrc, tcName));
+          String tcArchive = Utilities.path(igSrc, tcName);
+          produceArchive(tcPath, tcArchive, TC_ARCHIVE_EXCLUDES);
+          relocateOversizedArchive(pubSetup, tcArchive, tcName, igBuildZipDir);
         } else if (mode == PublicationProcessMode.WORKING) {
           System.out.println("This is a working release - publish v"+npm.version()+" to "+destination+". Now update past versions");
         } else {
@@ -863,28 +879,55 @@ public class PublicationProcess {
     return list;
   }
 
-  private void produceArchive(String source, String dest) throws IOException {
+  private void produceArchive(String source, String dest, String[] excludes) throws IOException {
     System.out.println("Zipping "+source+" to "+dest);
     if (new File(dest).exists()) {
       System.out.println(" "+dest+": already exists");
       return;
     }
     ZipGenerator zip = new ZipGenerator(dest);
-    addFolderToZip(zip, new File(source), source.length()+1);
-    zip.close();    
+    addFolderToZip(zip, new File(source), source.length()+1, excludes);
+    zip.close();
   }
 
-  private int addFolderToZip(ZipGenerator zip, File folder, int offset) throws FileNotFoundException, IOException {
+  private int addFolderToZip(ZipGenerator zip, File folder, int offset, String[] excludes) throws FileNotFoundException, IOException {
     int c = 0;
     for (File f : folder.listFiles()) {
       if (f.isDirectory()) {
-        c = c + addFolderToZip(zip, f, offset);
+        c = c + addFolderToZip(zip, f, offset, excludes);
+      } else if (excludes != null && Utilities.existsInList(f.getName(), excludes)) {
+        System.out.println(" not archiving "+f.getAbsolutePath().substring(offset)+" ("+describeMB(f.length())+")");
       } else {
         zip.addBytes(f.getAbsolutePath().substring(offset), FileUtilities.fileToBytes(f), false);
         c++;
       }
     }
     return c;
+  }
+
+  /**
+   * A technical correction archive is a zip of an entire published version folder, and can run to
+   * hundreds of MB. If the web root is kept in a GitHub repository ($.website.github in
+   * publish-setup.json), anything over 100MB is refused by GitHub and takes the entire publication
+   * push down with it, so the archive is moved out of the web tree and left with the build zips.
+   */
+  private void relocateOversizedArchive(JsonObject pubSetup, String archive, String name, File igBuildZipDir) throws IOException {
+    File f = new File(archive);
+    if (!f.exists() || !pubSetup.getJsonObject("website").asBoolean("github") || f.length() <= GITHUB_MAX_FILE_SIZE) {
+      return;
+    }
+    File dest = new File(Utilities.path(igBuildZipDir.getAbsolutePath(), name));
+    if (dest.exists()) {
+      dest.delete();
+    }
+    FileUtils.moveFile(f, dest);
+    System.out.println("Note: "+name+" is "+describeMB(dest.length())+", which is more than GitHub accepts in a repository (100MB),");
+    System.out.println("  so it has been left at "+dest.getAbsolutePath()+" instead of being published to the web site.");
+    System.out.println("  package-list.json still records the technical correction at its web path - copy the archive there by hand if that link matters.");
+  }
+
+  private String describeMB(long size) {
+    return (size / (1024 * 1024))+"MB";
   }
 
   private String genDateS(Date genDate) {

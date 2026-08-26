@@ -51,7 +51,8 @@ import org.hl7.fhir.r5.tools.ExtensionConstants;
 import org.hl7.fhir.r5.utils.MappingSheetParser;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator;
 import org.hl7.fhir.r5.utils.ResourceUtilities;
-import org.hl7.fhir.r5.utils.UserDataNames;
+import org.hl7.fhir.r5.utils.xver.XVerExtensionManagerFactory;
+import org.hl7.fhir.utilities.UserDataNames;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.r5.utils.validation.ValidatorSession;
 import org.hl7.fhir.utilities.*;
@@ -856,7 +857,7 @@ public class PublisherIGLoader extends PublisherBase {
         case "wcag-conformant":
           pf.setWcagConformant("true".equals(p.getValue()));
         case "excludettl":
-          pf.excludeTtl = true;
+          pf.excludeTtl = "true".equals(p.getValue());
         default:
           if (pc.startsWith("wantGen-")) {
             String code = pc.substring(8);
@@ -955,6 +956,7 @@ public class PublisherIGLoader extends PublisherBase {
         missingDirs.add(s);
     }
     pf.pagesDirs.removeAll(missingDirs);
+    checkPageResourceDirOverlap();
 
     logDebugMessage(LogCategory.INIT, "Output: "+ pf.outputDir);
     forceDir(pf.outputDir);
@@ -1036,9 +1038,11 @@ public class PublisherIGLoader extends PublisherBase {
     if (!pf.sourceIg.hasUrl()) {
       throw new FHIRException("Unable to publish an IG without a URL");
     }
+    pf.xver = XVerExtensionManagerFactory.createExtensionManager(pf.context);
     settings.setNewMultiLangTemplateFormat(pf.template.config().asBoolean("multilanguage-format"));
     loadPubPack();
-    pf.igpkp = new IGKnowledgeProvider(pf.context, checkAppendSlash(pf.specPath), determineCanonical(pf.sourceIg.getUrl(), "ImplementationGuide.url"), pf.template.config(), pf.errors, VersionUtilities.isR2Ver(pf.version), pf.template, pf.listedURLExemptions, pf.altCanonical, pf.fileList, pf.module);
+    pf.igpkp = new IGKnowledgeProvider(pf.context, checkAppendSlash(pf.specPath), determineCanonical(pf.sourceIg.getUrl(), "ImplementationGuide.url"), pf.template.config(), pf.errors,
+            VersionUtilities.isR2Ver(pf.version), pf.template, pf.listedURLExemptions, pf.altCanonical, pf.fileList, pf.module, pf.xver);
     if (pf.autoLoad) {
       pf.igpkp.setAutoPath(true);
     }
@@ -1732,8 +1736,8 @@ public class PublisherIGLoader extends PublisherBase {
   private void registerIncubatorIG(String code, List<String> packages) throws Exception {
     switch (code) {
     case "hl7.fhir.uv.testing":
-      org.hl7.fhir.r5.igs.testing.TestingParser.register(true);
-      packages.addAll(Arrays.asList(org.hl7.fhir.r5.igs.testing.TestingParser.packages()));
+      org.hl7.fhir.r5.igs.testing.TestingRegistration.register(true);
+      packages.addAll(Arrays.asList(org.hl7.fhir.r5.igs.testing.TestingRegistration.packages()));
       org.hl7.fhir.r5.igs.testing.renderers.TestingRenderers.register(pf.rendererFactory);
       pf.versionConvertorRegistry.register(new TestingR4Convertor());
       pf.versionConvertorRegistry.register(new TestingR5Convertor());
@@ -2115,6 +2119,7 @@ public class PublisherIGLoader extends PublisherBase {
     pf.fileList.clear();
     pf.changeList.clear();
     pf.bndIds.clear();
+    pf.resourceFileNames.clear();
 
     FetchedFile igf = pf.fetcher.fetch(pf.igName);
     noteFile(IG_NAME, igf);
@@ -2459,6 +2464,7 @@ public class PublisherIGLoader extends PublisherBase {
     pf.rc.setServices(pf.validator.getExternalHostServices());
     pf.rc.setDestDir(Utilities.path(pf.tempDir));
     pf.rc.setProfileUtilities(new ProfileUtilities(pf.context, new ArrayList<ValidationMessage>(), pf.igpkp));
+    pf.rc.getProfileUtilities().setXver(pf.xver);
     pf.rc.setQuestionnaireMode(RenderingContext.QuestionnaireRendererMode.TREE);
     pf.rc.getCodeSystemPropList().addAll(pf.codeSystemProps);
     pf.rc.setParser(getTypeLoader(pf.version));
@@ -2679,6 +2685,7 @@ public class PublisherIGLoader extends PublisherBase {
   }
 
   private boolean noteFile(String key, FetchedFile file) {
+    pf.resourceFileNames.add(file.getPath()); // whether or not it's changed, this file is a resource, and is not also a page
     FetchedFile existing = pf.altMap.get(key);
     if (existing == null || existing.getTime() != file.getTime() || existing.getHash() != file.getHash()) {
       pf.fileList.add(file);
@@ -3710,7 +3717,7 @@ public class PublisherIGLoader extends PublisherBase {
             String nameForParam = Utilities.makeNameFromCode(code);
             String idForParam = Utilities.makeId(code);
             res.forceElement("id").setValue(baseName+"-"+idForParam);
-            res.forceElement("url").setValue("http://hl7.org/fhir/SearchParameter/"+baseName+"-"+idForParam);
+            res.forceElement("url").setValue(getIgpkp().getCanonical()+"/SearchParameter/"+baseName+"-"+idForParam);
             res.forceElement("name").setValue(baseName+Utilities.capitalize(nameForParam)+"SearchParam");
             res.forceElement("title").setValue(baseName+" "+Utilities.capitalize(code)+" Search Parameter");
           }
@@ -4096,6 +4103,24 @@ public class PublisherIGLoader extends PublisherBase {
   }
 
   private boolean loadPage(FetchedFile file) {
+    if (pf.resourceFileNames.contains(file.getPath())) {
+      // the file has already been loaded as a resource, because this folder is both a path-resource folder and a
+      // path-pages folder. If we loaded it as a page as well, it would be in pf.fileList twice, and the page copy
+      // would be copied to the output as-is, overwriting the representation of the resource that the publisher
+      // generates. See checkPageResourceDirOverlap(), which warns the user about the underlying configuration
+      logDebugMessage(LogCategory.INIT, "Not loading "+file.getPath()+" as a page because it is already loaded as a resource");
+      return false;
+    }
+    FetchedFile pre = pf.altMap.get("pre-page/"+file.getPath());
+    if (pre != null) {
+      // the file is in a folder that is both a template pre-process folder and a path-pages folder, so it's copied
+      // to the temp directory twice: once under _includes (so it can be the target of a jekyll include) and once in
+      // the root (so jekyll renders it as a page). Rather than loading the file a second time, which would put it in
+      // pf.fileList twice, we register the page copy as an additional output on the file we already have
+      pre.addOutput(file.getRelativePath(), FetchedFile.PROCESS_NONE, null);
+      pf.altMap.put("page/"+file.getPath(), pre);
+      return false;
+    }
     FetchedFile existing = pf.altMap.get("page/"+file.getPath());
     if (existing == null || existing.getTime() != file.getTime() || existing.getHash() != file.getHash()) {
       file.setProcessMode(FetchedFile.PROCESS_NONE);
@@ -4104,6 +4129,35 @@ public class PublisherIGLoader extends PublisherBase {
       return true;
     } else {
       return false;
+    }
+  }
+
+  /**
+   * A folder that is both a path-resource folder and a path-pages folder has all its files loaded twice: once as
+   * resources, and once as pages. loadPage() suppresses the page copy for the files that are resources (if it didn't,
+   * the raw source file would be copied over the publisher's own generated representation of the resource in the
+   * output), but the configuration is still a mistake, and the author has no other way to find out that the files
+   * they expected to be published as pages are not all being published.
+   */
+  private void checkPageResourceDirOverlap() {
+    for (String p : pf.pagesDirs) {
+      for (String r : pf.resourceDirs) {
+        if (p.equals(r) || p.startsWith(r + File.separator) || r.startsWith(p + File.separator)) {
+          String msg = "The folder "+relativeDir(p)+" is a page folder (path-pages), and "+relativeDir(r)+" is a resource folder (path-resource). "+
+             "Files that are loaded as resources will not also be published as pages; if there are files in the folder that are not resources, and that need to be published, move them to a folder that is not a resource folder";
+          log(msg);
+          pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE,
+              "ImplementationGuide.definition.parameter", msg, ValidationMessage.IssueSeverity.WARNING));
+        }
+      }
+    }
+  }
+
+  private String relativeDir(String dir) {
+    if (pf.rootDir != null && dir.length() > pf.rootDir.length() && dir.startsWith(pf.rootDir)) {
+      return dir.substring(pf.rootDir.length()+1);
+    } else {
+      return dir;
     }
   }
 
@@ -4433,6 +4487,7 @@ public class PublisherIGLoader extends PublisherBase {
 
 
   private boolean noteFile(ImplementationGuide.ImplementationGuideDefinitionResourceComponent key, FetchedFile file) {
+    pf.resourceFileNames.add(file.getPath()); // whether or not it's changed, this file is a resource, and is not also a page
     FetchedFile existing = pf.fileMap.get(key);
     if (existing == null || existing.getTime() != file.getTime() || existing.getHash() != file.getHash()) {
       pf.fileList.add(file);

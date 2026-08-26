@@ -136,7 +136,7 @@ public class DependencyRenderer {
   private Map<String, PackageInfo> packagesByName;
   
   public DependencyRenderer(BasePackageCacheManager pcm, String dstFolder, String npmName, TemplateManager templateManager,
-      List<DependencyAnalyser.ArtifactDependency> dependencies, IWorkerContext context, MarkDownProcessor mdEngine, RenderingContext rc, List<SpecMapManager> specMaps) {
+      List<DependencyAnalyser.ArtifactDependency> dependencies, IWorkerContext context, MarkDownProcessor mdEngine, RenderingContext rc, List<SpecMapManager> specMaps, ImplementationGuide ig) {
     super();
     this.pcm = pcm;
     this.dstFolder = dstFolder;
@@ -147,6 +147,11 @@ public class DependencyRenderer {
     this.mdEngine = mdEngine;
     this.rc = rc;
     this.specMaps = specMaps;
+
+    for (Extension ext : ig.getDefinition().getExtensionsByUrl(ExtensionConstants.EXT_IGINTERNAL_DEPENDENCY)) {
+      String pidv = ext.getValue().primitiveValue();
+      globalPackages.add(pidv); // exempt from looking for globals
+    }
   }
 
   private class PackageVersionInfo {
@@ -615,7 +620,8 @@ public class DependencyRenderer {
 
   private void checkGlobals(ImplementationGuide ig, NpmPackage npm) {
     String key = ig.getVersionedUrl();
-    if (!globalPackages.contains(key)) {
+    String pid = npm == null ? null : npm.vid();
+    if (!globalPackages.contains(key) && !globalPackages.contains(pid)) {
       globalPackages.add(key);
       for (ImplementationGuideGlobalComponent g : ig.getGlobal()) {
         StructureDefinition sd = context.fetchResource(StructureDefinition.class, g.getProfile(), ExtensionUtilities.getVersionResolutionRules(g.getProfileElement()));
@@ -851,7 +857,7 @@ public class DependencyRenderer {
       return "<p><i>There are no Global profiles defined</i></p>\r\n";
     } else {
       StringBuilder b = new StringBuilder();
-      b.append("<p>Global Profiles:</p>\r\n<table class=\"none\">\r\n<tr><td><b>Type</b></td><td><b>Source</b></td><td><b>Profile</b></td></tr>\r\n");
+        b.append("<p>Global Profiles:</p>\r\n<table class=\"none\">\r\n<tr><td><b>Type</b></td><td><b>Source</b></td><td><b>Profile</b></td></tr>\r\n");
       Collections.sort(globals, new GlobalProfileSorter());
       for (GlobalProfile gp : globals) {
         b.append("<tr><td>");
