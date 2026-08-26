@@ -48,6 +48,36 @@ public class FetchedFile {
   public enum FetchedBundleType {
     NATIVE, SPREADSHEET
   }
+
+  /**
+   * One of the places in the temp directory that this file is copied to. Most files have exactly one output, but a
+   * file that is in a folder that is both a template pre-process folder and a path-pages folder has two: one under
+   * _includes (so that it can be the target of a jekyll include) and one in the root (so that jekyll renders it as
+   * a page). See PublisherIGLoader.loadPage()
+   */
+  public static class Output {
+    private final String relativePath;
+    private final int processMode;
+    private final byte[] xslt;
+
+    public Output(String relativePath, int processMode, byte[] xslt) {
+      this.relativePath = relativePath;
+      this.processMode = processMode;
+      this.xslt = xslt;
+    }
+
+    public String getRelativePath() {
+      return relativePath;
+    }
+
+    public int getProcessMode() {
+      return processMode;
+    }
+
+    public byte[] getXslt() {
+      return xslt;
+    }
+  }
   public final static int PROCESS_RESOURCE = 0;
   public final static int PROCESS_XSLT = 1;
   public final static int PROCESS_NONE = 2;
@@ -73,6 +103,7 @@ public class FetchedFile {
   private boolean folder;
   private List<String> files; // if it's a folder
   private int processMode;
+  private List<Output> additionalOutputs = new ArrayList<Output>();
   private Set<String> outputNames = new HashSet<String>();
   private String statedPath;  
   private List<String> additionalPaths;  
@@ -117,6 +148,34 @@ public class FetchedFile {
   }
   public void setXslt(byte[] xslt) {
     this.xslt = xslt;
+  }
+
+  /**
+   * All the outputs this file is copied to: the primary one (relativePath / processMode / xslt), followed by any
+   * additional outputs registered by addOutput()
+   */
+  public List<Output> getOutputs() {
+    List<Output> res = new ArrayList<Output>();
+    res.add(new Output(relativePath, processMode, xslt));
+    res.addAll(additionalOutputs);
+    return res;
+  }
+
+  /**
+   * Register another place this file is copied to. Does nothing if the file is already being copied to that
+   * relative path, so that it's safe to call repeatedly (e.g. on each pass in watch mode)
+   */
+  public void addOutput(String relativePath, int processMode, byte[] xslt) {
+    for (Output o : getOutputs()) {
+      if (o.getRelativePath() != null && o.getRelativePath().equals(relativePath)) {
+        return;
+      }
+    }
+    additionalOutputs.add(new Output(relativePath, processMode, xslt));
+  }
+
+  public boolean hasAdditionalOutputs() {
+    return !additionalOutputs.isEmpty();
   }
 
   public long getTime() {

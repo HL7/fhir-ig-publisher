@@ -32,6 +32,7 @@ import org.hl7.fhir.r5.utils.NPMPackageGenerator;
 import org.hl7.fhir.r5.utils.client.FHIRToolingClient;
 import org.hl7.fhir.r5.utils.formats.CSVWriter;
 import org.hl7.fhir.r5.utils.validation.ValidatorSession;
+import org.hl7.fhir.r5.utils.xver.XVerExtensionManager;
 import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.i18n.subtag.LanguageSubtagRegistry;
 import org.hl7.fhir.utilities.json.model.JsonObject;
@@ -91,6 +92,7 @@ public class PublisherFields {
     boolean tabbedSnapshots = false;
     String igName;
     SimpleFetcher fetcher = new SimpleFetcher(null);
+    XVerExtensionManager xver;
 
     @Getter
     SimpleWorkerContext context; //
@@ -109,6 +111,10 @@ public class PublisherFields {
     List<FetchedFile> fileList = new ArrayList<FetchedFile>();
     List<FetchedFile> changeList = new ArrayList<FetchedFile>();
     List<String> fileNames = new ArrayList<String>();
+    /** The paths of all the files that have been loaded as resources (populated in PublisherIGLoader.noteFile()).
+     *  Used to stop a file in a folder that is both a path-resource folder and a path-pages folder being loaded a
+     *  second time as a page - see PublisherIGLoader.loadPage() */
+    Set<String> resourceFileNames = new HashSet<String>();
     Map<String, FetchedFile> relativeNames = new HashMap<String, FetchedFile>();
     Set<String> bndIds = new HashSet<String>();
     List<Resource> loaded = new ArrayList<Resource>();
