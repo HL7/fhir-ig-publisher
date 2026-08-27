@@ -16,7 +16,7 @@
     <properties>
         <!-- GraalVM uses the JDK numbering scheme. These should always be LTS versions (17, 21, etc). -->
         <graalvm.version>21.3.18</graalvm.version>
-        <info_cqframework_version>3.29.0</info_cqframework_version>
+        <info_cqframework_version>4.9.0</info_cqframework_version>
     </properties>
 
     <dependencies>
@@ -27,48 +27,23 @@
 
     <!-- CQL-to-ELM -->
         <dependency>
-            <groupId>info.cqframework</groupId>
-            <artifactId>cql</artifactId>
-            <version>${info_cqframework_version}</version>
-        </dependency>
-        <dependency>
-            <groupId>info.cqframework</groupId>
-            <artifactId>model</artifactId>
-            <version>${info_cqframework_version}</version>
-        </dependency>
-        <dependency>
-            <groupId>info.cqframework</groupId>
-            <artifactId>model-jaxb</artifactId>
-            <version>${info_cqframework_version}</version>
-        </dependency>
-        <dependency>
-            <groupId>info.cqframework</groupId>
-            <artifactId>elm</artifactId>
-            <version>${info_cqframework_version}</version>
-        </dependency>
-        <dependency>
-            <groupId>info.cqframework</groupId>
+            <groupId>org.cqframework</groupId>
             <artifactId>elm-fhir</artifactId>
             <version>${info_cqframework_version}</version>
         </dependency>
         <dependency>
-            <groupId>info.cqframework</groupId>
-            <artifactId>elm-jaxb</artifactId>
+            <groupId>org.cqframework</groupId>
+            <artifactId>cql-to-elm-jvm</artifactId>
             <version>${info_cqframework_version}</version>
         </dependency>
         <dependency>
-            <groupId>info.cqframework</groupId>
-            <artifactId>cql-to-elm</artifactId>
-            <version>${info_cqframework_version}</version>
-        </dependency>
-        <dependency>
-            <groupId>info.cqframework</groupId>
+            <groupId>org.cqframework</groupId>
             <artifactId>quick</artifactId>
             <version>${info_cqframework_version}</version>
         </dependency>
-        <!-- 3.20.0 does not seem to have a qdm? Should be able to do this, but not critical for now -->
+        <!-- 4.9.0 does not seem to have a qdm? Should be able to do this, but not critical for now -->
         <!--dependency>
-            <groupId>info.cqframework</groupId>
+            <groupId>org.cqframework</groupId>
             <artifactId>qdm</artifactId>
             <version>${info_cqframework_version}</version>
         </dependency-->
