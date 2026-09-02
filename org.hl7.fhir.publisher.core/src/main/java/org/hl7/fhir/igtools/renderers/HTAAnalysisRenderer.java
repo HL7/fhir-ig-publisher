@@ -283,6 +283,9 @@ public class HTAAnalysisRenderer {
     if ("http://standardterms.edqm.eu".equals(url)) {
       res.add("This artifact includes content from EDQM Standard Terms. EDQM Standard Terms are copyright European Directorate for the Quality of Medicines. Terms & Conditions in https://www.edqm.eu/en/standard-terms-database");
     }
+    if ("http://nucc.org/provider-taxonomy".equals(url)) {
+      res.add("National Uniform Claim Committee (NUCC) Copyright 2026 American Medical Association. The National Uniform Claim Committee (NUCC) maintains the Health Insurance Claim Form (1500 Claim Form), the 1500 Health Insurance Claim Form Reference Instruction Manual (NUCC 1500 Instruction Manual) and two NUCC Data Sets, the Health Care Provider Taxonomy Code Set and the Provider Characteristics and Resources code set. As the NUCC Secretariat, the AMA holds the intellectual property on behalf of the NUCC and maintains the copyright of materials developed by the NUCC. For commercial use, including sales and redistribution, a license must be obtained.");
+    }
     return res;
   }
 

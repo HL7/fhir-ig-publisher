@@ -36,13 +36,11 @@ import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.elementmodel.ParserBase;
 import org.hl7.fhir.r5.elementmodel.Property;
 import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.formats.FormatUtilities;
 import org.hl7.fhir.r5.model.*;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
-import org.hl7.fhir.r5.utils.UserDataNames;
-import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
+import org.hl7.fhir.utilities.UserDataNames;
 import org.hl7.fhir.r5.utils.xver.XVerExtensionManager;
 import org.hl7.fhir.r5.utils.xver.XVerExtensionManagerFactory;
 import org.hl7.fhir.utilities.LoincLinker;
@@ -82,7 +80,8 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   private Map<String, List<ExtensionUsage>> coreExtensionMap;
   private ContextUtilities contextUtilities;
   
-  public IGKnowledgeProvider(IWorkerContext context, String pathToSpec, String canonical, JsonObject igs, List<ValidationMessage> errors, boolean noXhtml, Template template, List<String> listedURLExemptions, String altCanonical, List<FetchedFile> files, IPublisherModule module) throws Exception {
+  public IGKnowledgeProvider(IWorkerContext context, String pathToSpec, String canonical, JsonObject igs, List<ValidationMessage> errors, boolean noXhtml, Template template, List<String> listedURLExemptions, String altCanonical, List<FetchedFile> files,
+                             IPublisherModule module, XVerExtensionManager xver) throws Exception {
     super();
     this.context = context;
     this.pathToSpec = pathToSpec;
@@ -98,7 +97,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     if (igs != null) {
       loadPaths(igs);
     }
-    this.xver = XVerExtensionManagerFactory.createExtensionManager(context);
+    this.xver = xver;
     this.module = module;
     contextUtilities = new ContextUtilities(context);
   }

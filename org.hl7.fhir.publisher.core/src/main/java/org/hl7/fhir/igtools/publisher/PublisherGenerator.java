@@ -719,8 +719,28 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     if (this.settings.isGenerationOff()) {
       return;
     }
-    if (f.getProcessMode() == FetchedFile.PROCESS_NONE) {
-      String dst = Utilities.path(this.pf.tempDir, f.getRelativePath());
+    if (f.getProcessMode() == FetchedFile.PROCESS_NONE || f.getProcessMode() == FetchedFile.PROCESS_XSLT) {
+      // the file is copied to the temp directory as it is (or transformed by an xslt). Usually there's exactly one
+      // output, but a file that is in a folder that is both a template pre-process folder and a path-pages folder
+      // has one output under _includes and one in the root - see PublisherIGLoader.loadPage()
+      for (FetchedFile.Output o : f.getOutputs()) {
+        generateFileOutput(f, o, db, lang);
+      }
+    } else {
+      if (isNewML()) {
+        generateHtmlOutputsInner(f, regen, db, null, this.pf.rc);
+        for (String l : allLangs()) {
+          generateHtmlOutputsInner(f, regen, db, l, this.pf.rcLangs.get(l));
+        }
+      } else {
+        generateHtmlOutputsInner(f, regen, db, null, this.pf.rc);
+      }
+    }
+  }
+
+  private void generateFileOutput(FetchedFile f, FetchedFile.Output o, DBBuilder db, String lang) throws Exception {
+    if (o.getProcessMode() == FetchedFile.PROCESS_NONE) {
+      String dst = Utilities.path(this.pf.tempDir, o.getRelativePath());
       try {
         if (f.isFolder()) {
           f.getOutputNames().add(dst);
@@ -728,10 +748,10 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         } else {
           if (isNewML() && !f.getStatedPath().contains(File.separator+"template"+File.separator)) {
             for (String l : allLangs()) {
-              if (f.getRelativePath().startsWith("_includes"+File.separator)) {
-                dst = Utilities.path(this.pf.tempDir, addLangFolderToFilename(f.getRelativePath(), l));
+              if (o.getRelativePath().startsWith("_includes"+File.separator)) {
+                dst = Utilities.path(this.pf.tempDir, addLangFolderToFilename(o.getRelativePath(), l));
               } else {
-                dst = Utilities.path(this.pf.tempDir, l, f.getRelativePath());
+                dst = Utilities.path(this.pf.tempDir, l, o.getRelativePath());
               }
               byte[] src = loadTranslationSource(f, l);
               if (f.getPath().endsWith(".md")) {
@@ -740,7 +760,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
                 checkMakeFile(processCustomLiquid(db, src, f, lang), dst, f.getOutputNames());
               }
             }
-            dst = Utilities.path(this.pf.tempDir, f.getRelativePath());
+            dst = Utilities.path(this.pf.tempDir, o.getRelativePath());
             if (f.getPath().endsWith(".md")) {
               checkMakeFile(processCustomLiquid(db, stripFrontMatter(f.getSource()), f, lang), dst, f.getOutputNames());
             } else {
@@ -755,11 +775,11 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           }
         }
       } catch (IOException e) {
-        log("Exception generating page "+dst+" for "+f.getRelativePath()+" in "+ this.pf.tempDir +": "+e.getMessage());
+        log("Exception generating page "+dst+" for "+o.getRelativePath()+" in "+ this.pf.tempDir +": "+e.getMessage());
 
       }
-    } else if (f.getProcessMode() == FetchedFile.PROCESS_XSLT) {
-      String dst = Utilities.path(this.pf.tempDir, f.getRelativePath());
+    } else if (o.getProcessMode() == FetchedFile.PROCESS_XSLT) {
+      String dst = Utilities.path(this.pf.tempDir, o.getRelativePath());
       try {
         if (f.isFolder()) {
           f.getOutputNames().add(dst);
@@ -767,29 +787,20 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         } else {
           if (isNewML() && !f.getStatedPath().contains(File.separator+"template"+File.separator)) {
             for (String l : allLangs()) {
-              if (f.getRelativePath().startsWith("_includes"+File.separator)) {
-                dst = Utilities.path(this.pf.tempDir, addLangFolderToFilename(f.getRelativePath(), l));
+              if (o.getRelativePath().startsWith("_includes"+File.separator)) {
+                dst = Utilities.path(this.pf.tempDir, addLangFolderToFilename(o.getRelativePath(), l));
               } else {
-                dst = Utilities.path(this.pf.tempDir, l, f.getRelativePath());
+                dst = Utilities.path(this.pf.tempDir, l, o.getRelativePath());
               }
               byte[] src = loadTranslationSource(f, l);
-              checkMakeFile(processCustomLiquid(db, new XSLTransformer(this.settings.isDebug()).transform(src, f.getXslt()), f, lang), dst, f.getOutputNames());
+              checkMakeFile(processCustomLiquid(db, new XSLTransformer(this.settings.isDebug()).transform(src, o.getXslt()), f, lang), dst, f.getOutputNames());
             }
           } else {
-            checkMakeFile(processCustomLiquid(db, new XSLTransformer(this.settings.isDebug()).transform(f.getSource(), f.getXslt()), f, lang), dst, f.getOutputNames());
+            checkMakeFile(processCustomLiquid(db, new XSLTransformer(this.settings.isDebug()).transform(f.getSource(), o.getXslt()), f, lang), dst, f.getOutputNames());
           }
         }
       } catch (Exception e) {
-        log("Exception generating xslt page "+dst+" for "+f.getRelativePath()+" in "+ this.pf.tempDir +": "+e.getMessage());
-      }
-    } else {
-      if (isNewML()) {
-        generateHtmlOutputsInner(f, regen, db, null, this.pf.rc);
-        for (String l : allLangs()) {
-          generateHtmlOutputsInner(f, regen, db, l, this.pf.rcLangs.get(l));
-        }
-      } else {
-        generateHtmlOutputsInner(f, regen, db, null, this.pf.rc);
+        log("Exception generating xslt page "+dst+" for "+o.getRelativePath()+" in "+ this.pf.tempDir +": "+e.getMessage());
       }
     }
   }
@@ -1573,7 +1584,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
         fragment("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", html, f.getOutputNames(), r, vars, null, start, "expansion", "ValueSet", lang);
       } else {
-        ValueSetExpansionOutcome exp = this.pf.context.expandVS(ExpansionOptions.cacheNoHeirarchy().withLanguage(lrc.getLocale().getLanguage()).withIncompleteOk(true), vs);
+        ValueSetExpansionOutcome exp = this.pf.context.expandVS(new ExpansionOptions().withHierarchical(true).withLanguage(lrc.getLocale().getLanguage()).withIncompleteOk(true), vs);
 
         if (db != null) {
           db.recordExpansion(vs, exp);
@@ -2926,7 +2937,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       start = System.currentTimeMillis();
       fragment("cross-version-analysis-inline", pf.r4tor4b.generate(pf.npmName, true), pf.otherFilesRun, start, "cross-version-analysis-inline", "Cross", lang);
     }
-    DependencyRenderer depr = new DependencyRenderer(pf.pcm, pf.tempDir, pf.npmName, pf.templateManager, makeDependencies(), pf.context, pf.markdownEngine, rc, pf.specMaps);
+    DependencyRenderer depr = new DependencyRenderer(pf.pcm, pf.tempDir, pf.npmName, pf.templateManager, makeDependencies(), pf.context, pf.markdownEngine, rc, pf.specMaps, pf.effectiveBaseIg);
     start = System.currentTimeMillis();
     trackedFragment("3", "dependency-table", depr.render(pf.getEffectiveBaseIg(), false, true, true), pf.otherFilesRun, start, "dependency-table", "Cross", lang);
     start = System.currentTimeMillis();

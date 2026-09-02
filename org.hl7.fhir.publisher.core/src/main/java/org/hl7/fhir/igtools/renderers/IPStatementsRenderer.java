@@ -224,6 +224,10 @@ public class IPStatementsRenderer {
       system.desc = ctxt.formatMessage(I18nConstants.HTA_LOINC_DESC);
       return ctxt.formatMessage(I18nConstants.HTA_LOINC_MESSAGE);
     }
+    if ("http://nucc.org/provider-taxonomy".equals(system.system)) {
+      return "National Uniform Claim Committee (NUCC) Copyright 2026 American Medical Association. The National Uniform Claim Committee (NUCC) maintains the Health Insurance Claim Form (1500 Claim Form), the 1500 Health Insurance Claim Form Reference Instruction Manual (NUCC 1500 Instruction Manual) and two NUCC Data Sets, the Health Care Provider Taxonomy Code Set and the Provider Characteristics and Resources code set. As the NUCC Secretariat, the AMA holds the intellectual property on behalf of the NUCC and maintains the copyright of materials developed by the NUCC. For commercial use, including sales and redistribution, a license must be obtained.";
+    }
+
     if (system.cs != null) {
       system.desc = system.cs.present();
       if (system.cs.hasCopyright()) {
@@ -234,6 +238,18 @@ public class IPStatementsRenderer {
           return new XhtmlComposer(false, true).setAutoLinks(true).compose(xl);
         }
       }
+    }
+    if ("http://www.ama-assn.org/go/cpt".equals(system.system)) {
+      return "Current Procedural Terminology (CPT) is copyright 2020 American Medical Association. All rights reserved";
+    }
+    if ("http://www.whocc.no/atc".equals(system.system)) {
+      return "This artifact includes content from Anatomical Therapeutic Chemical (ATC) classification system. ATC codes are copyright World Health Organization (WHO) Collaborating Centre for Drug Statistics Methodology. Terms & Conditions in https://www.whocc.no/use_of_atc_ddd/";
+    }
+    if ("urn:oid:2.16.840.1.113883.2.9.6.2.7".equals(system.system)) {
+      return "This artifact includes content from International Standard Classification of Occupations (ISCO). ISCO is copyright International Labour Organization (ILO). Terms & Conditions in http://www.ilo.org/global/copyright/lang--en/index.htm";
+    }
+    if ("http://standardterms.edqm.eu".equals(system.system)) {
+      return "This artifact includes content from EDQM Standard Terms. EDQM Standard Terms are copyright European Directorate for the Quality of Medicines. Terms & Conditions in https://www.edqm.eu/en/standard-terms-database";
     }
     return null;
   }
