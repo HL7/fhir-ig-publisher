@@ -2,6 +2,7 @@ package org.hl7.fhir.igtools.publisher;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
 import java.security.PrivateKey;
@@ -23,6 +24,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.apache.commons.codec.binary.Base64;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
@@ -32,10 +35,7 @@ import org.hl7.fhir.r5.elementmodel.Manager.FhirFormat;
 import org.hl7.fhir.r5.elementmodel.ParserBase;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
 import org.hl7.fhir.r5.terminologies.utilities.ValidationResult;
-import org.hl7.fhir.utilities.FileUtilities;
-import org.hl7.fhir.utilities.MimeType;
-import org.hl7.fhir.utilities.OIDUtilities;
-import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.validation.ValidationOptions;
 import org.hl7.fhir.validation.instance.utils.DigitalSignatureSupport;
 import org.hl7.fhir.validation.instance.utils.DigitalSignatureSupport.SignedInfo;
@@ -60,7 +60,7 @@ public class PublisherSigner {
 
   public enum SignatureType { JOSE, DIGSIG };
 
-  // this is the default key, 
+  // this is the default key, used for testing
   // when the ig is built for release, either on the ci-build or -go-publish, an actual 
   // private key will be used that overrrides this one
 
@@ -121,7 +121,6 @@ public class PublisherSigner {
 
   private X509Certificate certificate;
   private JWK jwk;
-
   private ValidationOptions validationOptions;
 
   public PublisherSigner(IWorkerContext context, String rootDir, ValidationOptions validationOptions) throws Exception {
@@ -270,7 +269,84 @@ public class PublisherSigner {
     return Instant.ofEpochMilli(roundedMillis);
   }
 
-  public void signBundle(Element bnd, Element sig, SignatureType sigType) throws Exception {
+  public void signBundleR6(Element bnd, List<Element> entriesToIgnore, Element sig, SignatureType sigType) throws Exception {
+    boolean xml = false;
+    String canon = null;
+    if (sig.hasChild("targetFormat")) {
+      MimeType mt = new MimeType(sig.getNamedChildValue("targetFormat"));
+      xml = mt.getBase().contains("xml");
+      canon = mt.getParams().get("canonicalization");
+    }
+    if (canon == null) {
+      canon = xml ? "http://hl7.org/fhir/canonicalization/xml" : "http://hl7.org/fhir/canonicalization/json";
+      if ("document".equals(bnd.getNamedChildValue("type"))) {
+        canon += "#document";
+      }
+    }
+    Instant instant = roundToNearestSecond(Instant.now());
+    if (xml) {
+      sig.setChildValue("targetFormat", "application/fhir+xml;canonicalization="+canon);
+    } else {
+      sig.setChildValue("targetFormat", "application/fhir+json;canonicalization="+canon);
+    }
+    String when = DateTimeFormatter.ISO_INSTANT.format(instant);
+    sig.setChildValue("when", when);
+    Element who = sig.getNamedChild("who");
+    if (who != null) {
+      sig.removeChild(who);
+    }
+    who = sig.addElement("who");
+    Element id = who.addElement("identifier");
+    id.setChildValue("system", "http://example.org/certificates");
+    id.setChildValue("value", certificate.getSubjectX500Principal().getName());
+
+    String purpose = null;
+    String purposeDesc = null;
+    List<Element> types = sig.getChildren("type");
+    if (!types.isEmpty()) {
+      Element type = types.get(0);
+      String system = type.getNamedChildValue("system");
+      String code = type.getNamedChildValue("code");
+      if (OIDUtilities.isValidOID(code)) {
+        purpose = "urn:oid:"+code;
+      } else {
+        purpose = system+"#"+code;
+      }
+      purposeDesc = type.getNamedChildValue("display");
+      if (purposeDesc == null) {
+        ValidationResult vr = context.validateCode(validationOptions, system, null, code, null);
+        if (vr.isOk()) {
+          purposeDesc = vr.getDisplay();
+        }
+      }
+    }
+
+
+
+    ByteArrayOutputStream ba = new ByteArrayOutputStream();
+    ParserBase p = Manager.makeParser(context, xml ? FhirFormat.XML : FhirFormat.JSON);
+
+    if (canon.endsWith("#document")) {
+      p.setCanonicalFilter("Bundle.id", "Bundle.meta", "Bundle.signature");
+    } else {
+      p.setCanonicalFilter("Bundle.signature");
+    }
+    p.getElementsToIgnore().clear();
+    p.getElementsToIgnore().addAll(entriesToIgnore);
+    p.compose(bnd, ba, OutputStyle.CANONICAL, null);
+    byte[] toSign = ba.toByteArray();
+
+    if (sigType == SignatureType.JOSE) {
+      sig.setChildValue("sigFormat", "application/jose");
+      sig.setChildValue("data", Base64.encodeBase64String(removePayload(createJWS(toSign, canon, when, purpose, purposeDesc)).getBytes(StandardCharsets.US_ASCII)));
+    } else {
+      sig.setChildValue("sigFormat", "application/pkcs7-signature");
+      sig.setChildValue("data", Base64.encodeBase64String(generateXMLDetachedSignature(toSign, instant, canon, purpose, purposeDesc)));
+    }
+  }
+
+
+  public void signBundleR5(Element bnd, Element sig, SignatureType sigType) throws Exception {
     boolean xml = false;
     String canon = null;
     if (sig.hasChild("targetFormat")) { 

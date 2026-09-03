@@ -12,6 +12,7 @@ import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.context.IContextResourceLoader;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
+import org.hl7.fhir.r5.elementmodel.ElementUtilities;
 import org.hl7.fhir.r5.elementmodel.Manager;
 import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
 import org.hl7.fhir.r5.extensions.ExtensionUtilities;
@@ -1897,18 +1898,37 @@ public class PublisherProcessor extends PublisherBase  {
     for (FetchedFile f : pf.changeList) {
       for (FetchedResource r : f.getResources()) {
         if ("Bundle".equals(r.fhirType())) {
-          Element sig = r.getElement().getNamedChild("signature");
-          if (sig != null && !sig.hasChild("data") && "application/jose".equals(sig.getNamedChildValue("sigFormat"))) {
-            this.pf.signer.signBundle(r.getElement(), sig, PublisherSigner.SignatureType.JOSE);
-          }
-          if (sig != null && !sig.hasChild("data") && "application/pkcs7-signature".equals(sig.getNamedChildValue("sigFormat"))) {
-            this.pf.signer.signBundle(r.getElement(), sig, PublisherSigner.SignatureType.DIGSIG);
+          if (pf.isSignatureAsR6()) {
+            // we're going to iterate all the provenances looking for a provenance with target #/, and a single signature element, and an appropriate type
+            List<Element> signatureProvenances = new ArrayList<>();
+            ElementUtilities.findSignatures(r.getElement(), signatureProvenances);
+            if (signatureProvenances.size() == 1) {
+              for (Element resource : signatureProvenances) {
+                List<Element> sigs = resource.getChildrenByName("signature");
+                if (sigs.size() == 1) {
+                  Element sig = sigs.get(0);
+                  if (!sig.hasChild("data") && "application/jose".equals(sig.getNamedChildValue("sigFormat"))) {
+                    this.pf.signer.signBundleR6(r.getElement(), signatureProvenances, sig, PublisherSigner.SignatureType.JOSE);
+                  }
+                  if (!sig.hasChild("data") && "application/pkcs7-signature".equals(sig.getNamedChildValue("sigFormat"))) {
+                    this.pf.signer.signBundleR6(r.getElement(), signatureProvenances, sig, PublisherSigner.SignatureType.DIGSIG);
+                  }
+                }
+              }
+            }
+          } else {
+            Element sig = r.getElement().getNamedChild("signature");
+            if (sig != null && !sig.hasChild("data") && "application/jose".equals(sig.getNamedChildValue("sigFormat"))) {
+              this.pf.signer.signBundleR5(r.getElement(), sig, PublisherSigner.SignatureType.JOSE);
+            }
+            if (sig != null && !sig.hasChild("data") && "application/pkcs7-signature".equals(sig.getNamedChildValue("sigFormat"))) {
+              this.pf.signer.signBundleR5(r.getElement(), sig, PublisherSigner.SignatureType.DIGSIG);
+            }
           }
         }
       }
     }
   }
-
 
   public void processProvenanceDetails() throws Exception {
     for (FetchedFile f : pf.changeList) {

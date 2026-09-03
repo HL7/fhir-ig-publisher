@@ -1950,6 +1950,17 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       long start = System.currentTimeMillis();
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-obligations", sdr.obligations(this.pf.igpkp.getDefinitionsName(r), this.pf.otherFilesRun, this.pf.tabbedSnapshots, RenderingContext.StructureDefinitionRendererMode.OBLIGATIONS, false), f.getOutputNames(), r, vars, null, start, "diff-obligations", "StructureDefinition", lang);
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-obligations-all", sdr.obligations(this.pf.igpkp.getDefinitionsName(r), this.pf.otherFilesRun, this.pf.tabbedSnapshots, RenderingContext.StructureDefinitionRendererMode.OBLIGATIONS, true), f.getOutputNames(), r, vars, null, start, "diff-obligations", "StructureDefinition", lang);
+      // as well as the whole set, generate a fragment per actor, showing only the obligations that apply to that actor
+      List<ActorDefinition> obligationActors = sdr.getObligationActors();
+      for (int i = 0; i < obligationActors.size(); i++) {
+        ActorDefinition actor = obligationActors.get(i);
+        String actorId = StructureDefinitionRenderer.actorId(actor);
+        if (!Utilities.noString(actorId)) {
+          long astart = System.currentTimeMillis();
+          fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-obligations-actor-"+actorId, sdr.obligationsForActor(this.pf.igpkp.getDefinitionsName(r), this.pf.otherFilesRun, this.pf.tabbedSnapshots, RenderingContext.StructureDefinitionRendererMode.OBLIGATIONS, false, actor, i), f.getOutputNames(), r, vars, null, astart, "obligations-actor", "StructureDefinition", lang);
+          fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-obligations-actor-"+actorId+"-all", sdr.obligationsForActor(this.pf.igpkp.getDefinitionsName(r), this.pf.otherFilesRun, this.pf.tabbedSnapshots, RenderingContext.StructureDefinitionRendererMode.OBLIGATIONS, true, actor, i), f.getOutputNames(), r, vars, null, astart, "obligations-actor", "StructureDefinition", lang);
+        }
+      }
     }
     if (wantGen(r, "snapshot-by-key-obligations")) {
       long start = System.currentTimeMillis();
