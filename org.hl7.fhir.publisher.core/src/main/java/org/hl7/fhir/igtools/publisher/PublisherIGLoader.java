@@ -344,6 +344,7 @@ public class PublisherIGLoader extends PublisherBase {
     pf.tempDir = Utilities.path(pf.rootDir, "temp");
     pf.tempLangDir = Utilities.path(pf.rootDir, "translations");
     pf.outputDir = Utilities.path(pf.rootDir, "output");
+    pf.setSignatureAsR6(VersionUtilities.isR6Plus(pf.version));
     List<String> relatedIGParams = new ArrayList<>();
     ValidationOptions.R5BundleRelativeReferencePolicy r5BundleRelativeReferencePolicy = ValidationOptions.R5BundleRelativeReferencePolicy.DEFAULT;
 
@@ -854,10 +855,19 @@ public class PublisherIGLoader extends PublisherBase {
           break;
         case "lang-pack":
           pf.setLanguagePack("true".equals(p.getValue()));
+          break;
         case "wcag-conformant":
           pf.setWcagConformant("true".equals(p.getValue()));
+          break;
         case "excludettl":
           pf.excludeTtl = "true".equals(p.getValue());
+          break;
+        case "signatures-using-r6-method":
+          pf.setSignatureAsR6("true".equals(p.getValue()));
+          if (VersionUtilities.isR6Plus(pf.version) && !pf.isSignatureAsR6()) {
+            throw new Error("Cannot set signatures-using-r6-method to false with version "+pf.version);
+          }
+          break;
         default:
           if (pc.startsWith("wantGen-")) {
             String code = pc.substring(8);

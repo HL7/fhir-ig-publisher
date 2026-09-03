@@ -340,6 +340,7 @@ public class PublisherFields {
     Resolver.IReferenceResolver resolver;
     @Getter @Setter private boolean languagePack;
     @Getter @Setter private boolean wcagConformant;
+    @Getter @Setter private boolean signatureAsR6;
 
     public String packageId() {
         var ig = publishedIg == null ? sourceIg : publishedIg;
