@@ -98,6 +98,27 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
   private List<PublisherUtils.LinkedSpecification> linkSpecMaps;
   private IPublisherModule module;
   private static boolean nsFailHasFailed = false; // work around for an THO 6.0.0 problem
+
+  /**
+   * The urls that the resources in this IG have in the IG's own canonical space, mapped to the resource types
+   * that claim them (the type matters because a caller asking about a canonical reference only accepts a
+   * canonical resource). Resolving a reference into that space used to mean walking every resource in every
+   * file, building a url for each and asking isCanonicalResource() about it - once per reference, and the
+   * validator asks once per profile per reference, so it is the same walk over and over.
+   * <p>
+   * The index is rebuilt when the resource population changes. It mostly doesn't: loading fills the file list
+   * and nothing removes from it. But loadConformance2() validates the conformance resources and only then adds
+   * the logical maps, the additional examples and the transform outputs, so an index built during that first
+   * validation would be missing them by the time the resources are validated
+   */
+  private Map<String, Set<String>> igUrls;
+  private int igUrlsBuiltFrom = -1;
+
+  /**
+   * isCanonicalResource walks up the base definitions for anything that isn't a known canonical resource name,
+   * and the answer only depends on the type name
+   */
+  private Map<String, Boolean> canonicalResourceTypes = new HashMap<>();
   @Getter @Setter boolean ignoreIdCardinalityError;
 
   public ValidationServices(IWorkerContext context, IGKnowledgeProvider ipg, ImplementationGuide ig, List<FetchedFile> files, List<NpmPackage> packages,
@@ -367,22 +388,14 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
     }
 
     if (url.startsWith(ipg.getCanonical())) {
-      for (FetchedFile f : files) {
-        for (FetchedResource r: f.getResources()) {
-          if (Utilities.pathURL(ipg.getCanonical(), r.fhirType(), r.getId()).equals(url) && (!canonical || isCanonicalResource(r.fhirType()))) {
+      Set<String> types = igUrls().get(url);
+      if (types != null) {
+        if (!canonical) {
+          return true;
+        }
+        for (String resourceType : types) {
+          if (isCanonicalResource(resourceType)) {
             return true;
-          }
-          if (f.getLogical() != null && f.getResources().size() == 1) {
-            StructureDefinition sd = context.fetchResource(StructureDefinition.class, f.getLogical(), IWorkerContext.VersionResolutionRules.defaultRule());
-            if (sd != null) {
-              String t = sd.getType();
-              if (Utilities.isAbsoluteUrl(t)) {
-                t = Utilities.urlTail(t);
-              }
-              if (Utilities.pathURL(ipg.getCanonical(), t, r.getId()).equals(url) && (!canonical || isCanonicalResource(sd.getType()))) {
-                return true;
-              }
-            }
           }
         }
       }
@@ -474,7 +487,66 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
     return false;
   }
 
+  /**
+   * @return every url the resources in this IG have in the IG's canonical space, mapped to the types that claim them
+   */
+  private Map<String, Set<String>> igUrls() {
+    int builtFrom = resourceCount();
+    if (igUrls == null || builtFrom != igUrlsBuiltFrom) {
+      Map<String, Set<String>> res = new HashMap<>();
+      for (FetchedFile f : files) {
+        // a file with a logical model, and exactly one resource in it, also claims the url for the logical type
+        StructureDefinition logical = f.getLogical() == null || f.getResources().size() != 1 ? null
+            : context.fetchResource(StructureDefinition.class, f.getLogical(), IWorkerContext.VersionResolutionRules.defaultRule());
+        for (FetchedResource r : f.getResources()) {
+          addIgUrl(res, Utilities.pathURL(ipg.getCanonical(), r.fhirType(), r.getId()), r.fhirType());
+          if (logical != null) {
+            String t = logical.getType();
+            if (Utilities.isAbsoluteUrl(t)) {
+              t = Utilities.urlTail(t);
+            }
+            addIgUrl(res, Utilities.pathURL(ipg.getCanonical(), t, r.getId()), logical.getType());
+          }
+        }
+      }
+      igUrls = res;
+      igUrlsBuiltFrom = builtFrom;
+    }
+    return igUrls;
+  }
+
+  private void addIgUrl(Map<String, Set<String>> map, String url, String type) {
+    Set<String> types = map.get(url);
+    if (types == null) {
+      types = new HashSet<>();
+      map.put(url, types);
+    }
+    types.add(type);
+  }
+
+  /**
+   * cheap enough to check on every lookup, and resources are only ever added, never removed, so this only
+   * fails to notice a change if something added and removed the same number in between - which nothing does
+   */
+  private int resourceCount() {
+    int res = 0;
+    for (FetchedFile f : files) {
+      res = res + f.getResources().size();
+    }
+    return res;
+  }
+
   private boolean isCanonicalResource(String type) {
+    Boolean known = canonicalResourceTypes.get(type);
+    if (known != null) {
+      return known;
+    }
+    boolean res = isCanonicalResourceType(type);
+    canonicalResourceTypes.put(type, res);
+    return res;
+  }
+
+  private boolean isCanonicalResourceType(String type) {
     if (VersionUtilities.getCanonicalResourceNames(context.getVersion()).contains(type)) {
       return true;
     }
