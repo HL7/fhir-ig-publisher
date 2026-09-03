@@ -271,6 +271,9 @@ public class HTAAnalysisRenderer {
     if ("http://loinc.org".equals(url)) {
       res.add("This material contains content from LOINC (http://loinc.org). LOINC is copyright © 1995-2020, Regenstrief Institute, Inc. and the Logical Observation Identifiers Names and Codes (LOINC) Committee and is available at no cost under the license at http://loinc.org/license. LOINC® is a registered United States trademark of Regenstrief Institute, Inc");
     }
+    if (Utilities.existsInList(url, "http://terminology.hl7.org/CodeSystem/ADAToothSurfaceCodes", "http://terminology.hl7.org/CodeSystem/ADAToothSurfaceCodes", "http://terminology.hl7.org/CodeSystem/ADAAreaOralCavitySystem", "http://www.ada.org/cdt", "http://www.ada.org/snodent")) {
+      res.add("This artifact incorporates content from ANSI/ADA Standard No. 218, Dentistry—Designation Systems for Teeth and Areas of the Oral Cavity, the ADA Dental Claim Form (Version 2024), and the Code on Dental Procedures and Nomenclature (CDT Code), all of which are copyrighted works of, and owned exclusively by, the American Dental Association (ADA). Implementers and users of this artifact assume full responsibility for obtaining and maintaining all necessary rights and licenses from the ADA for any use of ADA-proprietary content. For licensing information, refer to: https://www.ada.org/en/publications/ada-catalog/cdt-products/licensing-for-commercial-users");
+    }
     if ("http://www.ama-assn.org/go/cpt".equals(url)) {
       res.add("Current Procedural Terminology (CPT) is copyright 2020 American Medical Association. All rights reserved");
     }
