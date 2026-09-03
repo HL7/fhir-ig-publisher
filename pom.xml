@@ -23,11 +23,11 @@
         <maven.compiler.testRelease>17</maven.compiler.testRelease>
         <maven.compiler.testSource>17</maven.compiler.testSource>
         <maven.compiler.testTarget>17</maven.compiler.testTarget>
-        <logback.version>1.5.37</logback.version>
+        <logback.version>1.6.3</logback.version>
         <log4jVersion>2.26.1</log4jVersion>
         <jackson_version>2.22.2</jackson_version>
         <jackson_annotations_version>2.22</jackson_annotations_version>
-        <nedap-healthcare-archie.version>3.16.0</nedap-healthcare-archie.version>
+        <nedap-healthcare-archie.version>3.19.0</nedap-healthcare-archie.version>
     </properties>
 
     <name>HL7 FHIR IG Publisher</name>
