@@ -15,7 +15,7 @@
         <commons_text_version>1.15.0</commons_text_version>
         <lombok_version>1.18.38</lombok_version>
         <okhttp.version>5.3.2</okhttp.version>
-        <okio.version>3.16.4</okio.version>
+        <okio.version>3.18.1</okio.version>
         <junit_jupiter_version>5.7.1</junit_jupiter_version>
         <maven.compiler.release>17</maven.compiler.release>
         <maven.compiler.source>17</maven.compiler.source>
@@ -23,11 +23,11 @@
         <maven.compiler.testRelease>17</maven.compiler.testRelease>
         <maven.compiler.testSource>17</maven.compiler.testSource>
         <maven.compiler.testTarget>17</maven.compiler.testTarget>
-        <logback.version>1.5.37</logback.version>
+        <logback.version>1.6.3</logback.version>
         <log4jVersion>2.26.1</log4jVersion>
-        <jackson_version>2.22.1</jackson_version>
+        <jackson_version>2.22.2</jackson_version>
         <jackson_annotations_version>2.22</jackson_annotations_version>
-        <nedap-healthcare-archie.version>3.16.0</nedap-healthcare-archie.version>
+        <nedap-healthcare-archie.version>3.19.0</nedap-healthcare-archie.version>
     </properties>
 
     <name>HL7 FHIR IG Publisher</name>
@@ -171,7 +171,7 @@
             <dependency>
                 <groupId>org.apache.thrift</groupId>
                 <artifactId>libthrift</artifactId>
-                <version>0.23.0</version>
+                <version>0.24.0</version>
             </dependency>
             <dependency>
                 <groupId>io.opentelemetry</groupId>
@@ -367,7 +367,7 @@
         <dependency>
             <groupId>org.jetbrains.kotlin</groupId>
             <artifactId>kotlin-stdlib</artifactId>
-            <version>2.2.21</version>
+            <version>2.4.10</version>
         </dependency>
 
         <dependency>
