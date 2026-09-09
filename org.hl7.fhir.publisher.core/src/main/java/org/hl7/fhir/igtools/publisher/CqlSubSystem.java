@@ -1,21 +1,26 @@
 package org.hl7.fhir.igtools.publisher;
 
 import java.io.*;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import kotlinx.io.Source;
+import kotlinx.io.Buffer;
+import kotlinx.io.files.PathsKt;
+import org.apache.commons.lang3.NotImplementedException;
 import org.cqframework.cql.cql2elm.*;
 import org.cqframework.cql.cql2elm.model.CompiledLibrary;
 import org.cqframework.cql.cql2elm.model.Model;
 import org.cqframework.cql.cql2elm.model.Version;
 import org.cqframework.cql.cql2elm.quick.FhirLibrarySourceProvider;
+import org.cqframework.cql.cql2elm.tracking.TrackBack;
+import org.cqframework.cql.cql2elm.tracking.Trackable;
 import org.cqframework.cql.elm.requirements.fhir.DataRequirementsProcessor;
 import org.cqframework.cql.elm.requirements.fhir.utilities.SpecificationLevel;
-import org.cqframework.cql.elm.tracking.TrackBack;
 import org.fhir.ucum.UcumService;
 import org.hl7.cql.model.*;
+import org.hl7.cql.model.DataType;
 import org.hl7.elm.r1.AccessModifier;
 import org.hl7.elm.r1.Code;
 import org.hl7.elm.r1.CodeDef;
@@ -36,16 +41,18 @@ import org.hl7.elm.r1.ValueSetDef;
 import org.hl7.elm.r1.ValueSetRef;
 import org.hl7.elm.r1.VersionedIdentifier;
 import org.hl7.elm_modelinfo.r1.ModelInfo;
-import org.hl7.elm_modelinfo.r1.serializing.ModelInfoReaderFactory;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.r5.context.ILoggingService;
 import org.hl7.fhir.r5.model.*;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
+
+import static org.hl7.elm_modelinfo.r1.serializing.XmlModelInfoReaderKt.parseModelInfoXml;
 
 /**
  * What this system does
@@ -130,7 +137,7 @@ public class CqlSubSystem {
   public class NpmLibrarySourceProvider implements LibrarySourceProvider {
 
     @Override
-    public InputStream getLibrarySource(VersionedIdentifier identifier) {
+    public Source getLibrarySource(VersionedIdentifier identifier) {
       // VersionedIdentifier.id: Name of the library
       // VersionedIdentifier.system: Namespace for the library, as a URL
       // VersionedIdentifier.version: Version of the library
@@ -140,8 +147,15 @@ public class CqlSubSystem {
           if (s != null) {
             Library l = reader.readLibrary(s);
             for (org.hl7.fhir.r5.model.Attachment a : l.getContent()) {
-              if (a.getContentType() != null && a.getContentType().equals("text/cql")) {
-                return new ByteArrayInputStream(a.getData());
+              if (a.getContentType() != null) {
+                int pIndex = a.getContentType().indexOf(';');
+                String contentType = a.getContentType().substring(0, pIndex > -1 ? pIndex : a.getContentType().length() );
+                if (contentType.equals("text/cql")) {
+                  Buffer buffer = new Buffer();
+                  byte[] bytes = a.getData();
+                  buffer.write(bytes, 0, bytes.length);
+                  return buffer;
+                }
               }
             }
           }
@@ -164,9 +178,11 @@ public class CqlSubSystem {
         try {
           VersionedIdentifier identifier = new VersionedIdentifier()
                   .withId(modelIdentifier.getId())
-                  .withVersion(modelIdentifier.getVersion())
-                  .withSystem(modelIdentifier.getSystem());
+                  .withVersion(modelIdentifier.getVersion());
+                  // Do not use the system for loading model info, model info names are globally scoped until CQL R2
+                  //.withSystem(modelIdentifier.getSystem());
 
+          // Assume the base canonical of the containing package
           if (identifier.getSystem() == null) {
             identifier.setSystem(p.canonical());
           }
@@ -181,7 +197,7 @@ public class CqlSubSystem {
                 //  modelIdentifier.setSystem(identifier.getSystem());
                 //}
                 InputStream is = new ByteArrayInputStream(a.getData());
-                ModelInfo mi = ModelInfoReaderFactory.getReader("application/xml").read(is);
+                ModelInfo mi = parseModelInfoXml(FileUtilities.streamToString(is));
                 // Set the URL to the model url
                 if (mi != null && mi.getUrl() != null && modelIdentifier.getSystem() == null) {
                   modelIdentifier.setSystem(mi.getUrl());
@@ -478,7 +494,7 @@ public class CqlSubSystem {
     CqlTranslatorOptions options = null;
     File file = new File(optionsFileName);
     if (file.exists()) {
-      options = CqlTranslatorOptionsMapper.fromFile(file.getAbsolutePath());
+      options = CqlTranslatorOptions.fromFile(new kotlinx.io.files.Path(file));
     }
     else {
       options = CqlTranslatorOptions.defaultOptions();
@@ -561,11 +577,11 @@ public class CqlSubSystem {
     // Construct FhirLibrarySourceProvider
     ModelManager modelManager = new ModelManager();
     modelManager.getModelInfoLoader().registerModelInfoProvider(new NpmModelInfoProvider());
-    modelManager.getModelInfoLoader().registerModelInfoProvider(new DefaultModelInfoProvider(Paths.get(folder)));
+    modelManager.getModelInfoLoader().registerModelInfoProvider(new DefaultModelInfoProvider(PathsKt.Path(folder)));
 
     LibraryManager libraryManager = new LibraryManager(modelManager, options.getCqlCompilerOptions());
     libraryManager.getLibrarySourceLoader().registerProvider(new NpmLibrarySourceProvider());
-    libraryManager.getLibrarySourceLoader().registerProvider(new DefaultLibrarySourceProvider(Paths.get(folder)));
+    libraryManager.getLibrarySourceLoader().registerProvider(new DefaultLibrarySourceProvider(PathsKt.Path(folder)));
     libraryManager.getLibrarySourceLoader().registerProvider(new FhirLibrarySourceProvider());
 
     loadNamespaces(libraryManager);
@@ -667,10 +683,13 @@ public class CqlSubSystem {
     try {
       ModelInfo mi = null;
       if (file.getName().toLowerCase().endsWith(".xml")) {
-        mi = ModelInfoReaderFactory.getReader("application/xml").read(file);
+        String miString = FileUtilities.fileToString(file);
+        mi = parseModelInfoXml(miString);
       }
       else if (file.getName().toLowerCase().endsWith(".json")) {
-        mi = ModelInfoReaderFactory.getReader("application/json").read(file);
+        String miString = FileUtilities.fileToString(file);
+        throw new NotImplementedException("JSON ModelInfo Support is not available in the publisher");
+        //mi = ModelInfoReaderFactory.getReader("application/json").read(file);
       }
       else {
         throw new IllegalArgumentException("Could not read model info from file.");
@@ -694,12 +713,13 @@ public class CqlSubSystem {
     currentInfo = result;
 
     try {
-      if (options.getCqlCompilerOptions().getValidateUnits()) {
-        libraryManager.setUcumService(ucumService);
-      }
+      // Since the underlying translator is providing its own ucum service, this shouldn't be necessary, just means there may be multiple ucum services in memory
+      //if (options.getCqlCompilerOptions().getValidateUnits()) {
+      //  libraryManager.setUcumService(ucumService);
+      //}
 
       // translate toXML
-      CqlTranslator translator = CqlTranslator.fromFile(namespaceInfo, file, libraryManager);
+      CqlTranslator translator = CqlTranslator.fromFile(namespaceInfo, String.valueOf(file), libraryManager);
 
       // record errors and warnings
       for (CqlCompilerException exception : translator.getExceptions()) {
@@ -713,12 +733,14 @@ public class CqlSubSystem {
       }
       else {
         try {
+          CompiledLibrary compiledLibrary = translator.getTranslatedLibrary();
+
           result.setOptions(options);
-          result.setIdentifier(translator.toELM().getIdentifier());
+          result.setIdentifier(compiledLibrary.getLibrary().getIdentifier());
 
           // Correct target model mapping based on publisher options
           if (publisherOptions.getCorrectModelUrls()) {
-            correctModelUrls(libraryManager, translator.toELM());
+            correctModelUrls(libraryManager, compiledLibrary.getLibrary());
           }
 
           // convert to base64 bytes
@@ -731,7 +753,6 @@ public class CqlSubSystem {
 
           // Add the translated library to the library manager (NOTE: This should be a "cacheLibrary" call on the LibraryManager, available in 1.5.3+)
           // Without this, the data requirements processor will try to load the current library, resulting in a re-translation
-          CompiledLibrary compiledLibrary = translator.getTranslatedLibrary();
           libraryManager.getCompiledLibraries().put(compiledLibrary.getIdentifier(), compiledLibrary);
 
           // TODO: Report context, requires 1.5 translator (ContextDef)
@@ -740,13 +761,14 @@ public class CqlSubSystem {
           // TODO: Report direct-reference codes
 
           // Extract relatedArtifact data (models, libraries, code systems, and value sets)
-          result.relatedArtifacts.addAll(extractRelatedArtifacts(translator.toELM()));
+          result.relatedArtifacts.addAll(extractRelatedArtifacts(compiledLibrary.getLibrary()));
 
           // Extract parameter data and validate result types are supported types
-          result.parameters.addAll(extractParameters(translator.toELM()));
+          result.parameters.addAll(extractParameters(compiledLibrary.getLibrary()));
 
           // Extract dataRequirement data
-          result.dataRequirements.addAll(extractDataRequirements(translator.toRetrieves(), translator.getTranslatedLibrary(), libraryManager));
+          //result.dataRequirements.addAll(extractDataRequirements(translator.toRetrieves(), compiledLibrary, libraryManager));
+          result.dataRequirements.addAll(extractDataRequirements(compiledLibrary, libraryManager, options));
 
           logger.logMessage("CQL translation completed successfully.");
         }
@@ -929,6 +951,25 @@ public class CqlSubSystem {
     return result;
   }
 
+  private List<DataRequirement> extractDataRequirements(CompiledLibrary library, LibraryManager libraryManager, CqlTranslatorOptions options) {
+    DataRequirementsProcessor drp = new DataRequirementsProcessor();
+    drp.setSpecificationLevel(SpecificationLevel.QM_STU_1);
+
+    // TODO: Consider whether we want to add logic definitions to the library?
+    // TODO: Consider whether library processing should be done in the same way as all other artifact processing now that that code path exists?
+    boolean annotationsEnabled = options.getCqlCompilerOptions().getOptions().contains(CqlCompilerOptions.Options.EnableAnnotations);
+    Library moduleDefinitionLibrary = drp.gatherDataRequirements(
+        libraryManager,
+        library,
+        options.getCqlCompilerOptions(),
+        null,
+        annotationsEnabled,
+        false
+    );
+
+    return moduleDefinitionLibrary.getDataRequirement();
+  }
+
   private List<DataRequirement> extractDataRequirements(List<org.hl7.elm.r1.Retrieve> retrieves, CompiledLibrary library, LibraryManager libraryManager) {
     List<DataRequirement> result = new ArrayList<>();
 
@@ -1004,7 +1045,8 @@ public class CqlSubSystem {
   }
 
   private ParameterDefinition toParameterDefinition(ParameterDef def) {
-    org.hl7.cql.model.DataType parameterType = def.getResultType() instanceof ListType ? ((ListType)def.getResultType()).getElementType() : def.getResultType();
+    DataType resultType = Trackable.INSTANCE.getResultType(def);
+    org.hl7.cql.model.DataType parameterType = resultType instanceof ListType ? ((ListType)resultType).getElementType() : resultType;
 
     AtomicBoolean isList = new AtomicBoolean(false);
     Enumerations.FHIRTypes typeCode = Enumerations.FHIRTypes.fromCode(toFHIRParameterTypeCode(parameterType, def.getName(), isList));
@@ -1019,7 +1061,8 @@ public class CqlSubSystem {
 
   private ParameterDefinition toOutputParameterDefinition(ExpressionDef def) {
     AtomicBoolean isList = new AtomicBoolean(false);
-    Enumerations.FHIRTypes typeCode = Enumerations.FHIRTypes.fromCode(toFHIRResultTypeCode(def.getResultType(), def.getName(), isList));
+    DataType resultType = Trackable.INSTANCE.getResultType(def);
+    Enumerations.FHIRTypes typeCode = Enumerations.FHIRTypes.fromCode(toFHIRResultTypeCode(resultType, def.getName(), isList));
 
     return new ParameterDefinition()
             .setName(def.getName())
