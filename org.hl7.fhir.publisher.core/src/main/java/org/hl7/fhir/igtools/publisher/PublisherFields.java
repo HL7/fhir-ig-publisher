@@ -268,6 +268,20 @@ public class PublisherFields {
     List<String> usedLangFiles = new ArrayList<String>();
     List<String> viewDefinitions = new ArrayList<String>();
     int validationLogTime = 0;
+    /**
+     * The heading level a resource's narrative is seated at when it is composed into a page
+     * (see PublisherGenerator.seatNarrative). 3 suits the stock templates, whose page title is an
+     * h2; a template that titles its pages differently overrides it with the IG parameter
+     * 'narrative-heading-level'.
+     */
+    int narrativeHeadingLevel = 3;
+    /**
+     * The level the top heading on every page is moved to, from the IG parameter
+     * 'page-heading-level'. 0 means the IG did not set it, and HTMLInspector leaves heading levels
+     * exactly as generated - which is the default, because re-levelling breaks the section
+     * numbering of any template whose CSS counters are still keyed to h2/h3/h4.
+     */
+    int pageHeadingLevel = 0;
     long maxMemory = 0;
     String oidRoot;
     IniFile oidIni;

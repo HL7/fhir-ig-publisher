@@ -1433,21 +1433,21 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     } else {
       StringBuilder b = new StringBuilder();
       
-      b.append("<h4>Mappings to Structures in this Implementation Guide</h4>\r\n");
+      b.append("<h3>Mappings to Structures in this Implementation Guide</h3>\r\n");
       if (intTable == null) {
         b.append("<p>No Mappings Found</p>\r\n");                
       } else {
         b.append(new XhtmlComposer(false, false).compose(intTable));        
       }
       
-      b.append("<h4>Mappings to other Structures</h4>\r\n");
+      b.append("<h3>Mappings to other Structures</h3>\r\n");
       if (extTable == null) {
         b.append("<p>No Mappings Found</p>\r\n");                
       } else {
         b.append(new XhtmlComposer(false, false).compose(extTable));        
       }
 
-      b.append("<h4>Other Mappings</h4>\r\n");
+      b.append("<h3>Other Mappings</h3>\r\n");
       if (otherTable == null) {
         b.append("<p>No Mappings Found</p>\r\n");                
       } else {
