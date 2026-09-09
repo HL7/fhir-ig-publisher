@@ -3,11 +3,14 @@ package org.hl7.fhir.igtools.publisher;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Date;
 
+import org.hl7.fhir.r5.elementmodel.LanguageUtils;
 import org.hl7.fhir.r5.model.Base;
 import org.hl7.fhir.r5.model.Enumeration;
 import org.hl7.fhir.r5.model.Enumerations;
@@ -17,6 +20,7 @@ import org.hl7.fhir.r5.utils.NPMPackageGenerator;
 import org.hl7.fhir.utilities.UserDataNames;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.npm.PackageGenerator.PackageType;
+import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -121,6 +125,54 @@ class BasePackageAliasTest {
     assertEquals("1.0.0", deps.asString("alias@npm:real.package"),
         "a copy through preserveAliasUserData re-emits the npm-alias form");
     assertFalse(deps.has("real.package"), "the bare packageId form is not emitted after preservation");
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // the language packages (isNewML) take their copy through LanguageUtils, not ImplementationGuide.copy()
+  // ---------------------------------------------------------------------------------------------
+
+  /**
+   * The language-variant packages are built on {@code langUtils.copyToLanguage(publishedIg, ...)},
+   * which copies the resource internally - so it drops the marker exactly like a plain copy does,
+   * and needs the same restore.
+   */
+  @Test
+  void languageCopy_dropsAliasMarker_preserveRestoresIt() {
+    ImplementationGuide ig = igWithAliasedDep();
+    ImplementationGuide lig = (ImplementationGuide) new LanguageUtils(null).copyToLanguage(ig, "nl", true, "en", new ArrayList<ValidationMessage>());
+    assertFalse(marker(lig, 0), "copyToLanguage() loses the transient IG_DEP_ALIASED marker");
+
+    PublisherIGLoader.preserveAliasUserData(ig, lig);
+    assertTrue(marker(lig, 0), "preserveAliasUserData restores the marker onto the language copy");
+  }
+
+  /**
+   * The user-visible failure (mvdzel dummy IG): two dependsOn entries on the same package, one of
+   * them aliased. Without the marker both entries want the same {@code dependencies} key and the
+   * manifest build dies with "Name '...' already exists"; with it, they are distinct keys.
+   */
+  @Test
+  void twoVersionsOfSamePackage_needTheMarkerToBuildAManifest(@TempDir File tempDir) throws Exception {
+    ImplementationGuide ig = new ImplementationGuide();
+    ig.setId("example");
+    ig.setUrl("http://example.org/fhir/ImplementationGuide/example");
+    ig.setName("Example");
+    ig.setPackageId("example.test");
+    ig.setVersion("0.1.0");
+    ig.getFhirVersion().add(new Enumeration<>(new Enumerations.FHIRVersionEnumFactory(), "5.0.0"));
+    addDep(ig, "uscore5", "real.package", "5.0.1", false);
+    addDep(ig, "uscore6", "real.package", "6.1.0", true);
+
+    ImplementationGuide lig = (ImplementationGuide) new LanguageUtils(null).copyToLanguage(ig, "nl", true, "en", new ArrayList<ValidationMessage>());
+    Exception e = assertThrows(Exception.class, () -> dependenciesOf(lig, tempDir),
+        "without the marker both entries collide on the bare packageId");
+    assertTrue(e.getMessage().contains("Name 'real.package' already exists"),
+        "the collision is the reported failure, not some other error: " + e.getMessage());
+
+    PublisherIGLoader.preserveAliasUserData(ig, lig);
+    JsonObject deps = dependenciesOf(lig, tempDir);
+    assertEquals("5.0.1", deps.asString("real.package"), "the un-aliased entry keeps the bare packageId");
+    assertEquals("6.1.0", deps.asString("uscore6@npm:real.package"), "the aliased entry gets its own npm-alias key");
   }
 
   // ---------------------------------------------------------------------------------------------
