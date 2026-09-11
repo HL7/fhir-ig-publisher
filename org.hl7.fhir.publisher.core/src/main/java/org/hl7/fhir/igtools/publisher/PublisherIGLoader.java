@@ -747,6 +747,18 @@ public class PublisherIGLoader extends PublisherBase {
         case "validation-duration-report-cutoff":
           pf.validationLogTime = Utilities.parseInt(p.getValue(), 0) * 1000;
           break;
+        case "narrative-heading-level":
+          pf.narrativeHeadingLevel = Utilities.parseInt(p.getValue(), -1);
+          if (pf.narrativeHeadingLevel < 1 || pf.narrativeHeadingLevel > 6) {
+            throw new FHIRException("Unknown value for 'narrative-heading-level' of '"+p.getValue()+"': it must be a heading level from 1 to 6");
+          }
+          break;
+        case "page-heading-level":
+          pf.pageHeadingLevel = Utilities.parseInt(p.getValue(), -1);
+          if (pf.pageHeadingLevel < 1 || pf.pageHeadingLevel > 6) {
+            throw new FHIRException("Unknown value for 'page-heading-level' of '"+p.getValue()+"': it must be a heading level from 1 to 6");
+          }
+          break;
         case "viewDefinition":
           pf.viewDefinitions.add(p.getValue());
           break;
@@ -1134,6 +1146,7 @@ public class PublisherIGLoader extends PublisherBase {
     pf.inspector.getManual().add("qa-tx.html");
     pf.inspector.getManual().add("qa-ipreview.html");
     pf.inspector.setExemptHtmlPatterns(pf.getExemptHtmlPatterns());
+    pf.inspector.setPageHeadingLevel(pf.pageHeadingLevel);
     pf.inspector.setPcm(pf.pcm);
 
     for (String name : pf.customResourceNames) {
@@ -2464,6 +2477,7 @@ public class PublisherIGLoader extends PublisherBase {
     if (isNewML()) {
       for (String l : allLangs()) {
         ImplementationGuide vig = (ImplementationGuide) pf.langUtils.copyToLanguage(pf.publishedIg, l, true, pf.defaultTranslationLang, igf.getErrors());
+        preserveAliasUserData(pf.publishedIg, vig); // copyToLanguage() copies the resource, which drops the transient npm-alias marker
         pf.lnpms.put(l, new NPMPackageGenerator(pf.packageId()+"."+l, Utilities.path(pf.outputDir, pf.basePackageId()+"."+l+".tgz"),
                 pf.igpkp.getCanonical(), targetUrl(), PackageGenerator.PackageType.IG, vig, pf.getExecTime().getTime(), relatedIgMap(), !settings.isPublishing(), pf.context.getVersion()));
       }

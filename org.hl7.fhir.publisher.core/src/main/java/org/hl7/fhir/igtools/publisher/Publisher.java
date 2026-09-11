@@ -406,6 +406,10 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
           throw(ex);
         }
         pf.validatorSession.close();
+        // Validation is where the overwhelming majority of terminology work happens, and
+        // generation below can run for a long time afterwards, so bank it now rather than
+        // waiting for the end of the build.
+        saveTerminologyCache();
       }
       if (pf.needsRegen) {
         log("Regenerating Narratives");
@@ -459,6 +463,25 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         ex.printStackTrace();
       }
       throw e;
+    } finally {
+      // Generation asks the terminology server plenty of its own (expansions for rendering),
+      // so flush again on the way out. In a finally because a build that fell over at hour
+      // three still earned everything it learned up to that point, and there is no reason to
+      // make the next attempt ask for all of it again.
+      saveTerminologyCache();
+    }
+  }
+
+  /**
+   * Write any terminology answers this build has picked up but not yet flushed.
+   *
+   * <p>The terminology cache coalesces its writes over a long window, so it relies on callers
+   * marking the points where a chunk of work is finished. Cheap when nothing is pending, and
+   * safe to call as often as you like.
+   */
+  private void saveTerminologyCache() {
+    if (pf.context != null && pf.context.getTxCache() != null) {
+      pf.context.getTxCache().save();
     }
   }
 

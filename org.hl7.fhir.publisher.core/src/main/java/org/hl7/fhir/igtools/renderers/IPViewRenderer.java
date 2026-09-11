@@ -46,6 +46,7 @@ public class IPViewRenderer {
     head.addTag("title").tx("IP Review");
     head.link("stylesheet", "fhir.css");
     XhtmlNode body = html.addTag("body");
+    body.h1().tx("IP Review"); // the sections below are h2, so the page needs a single h1 above them
     body.h2().tx("Unattributed Code Systems");
     XhtmlNode ul = body.ul();
     for (String s : Utilities.sorted(csList.keySet())) {
