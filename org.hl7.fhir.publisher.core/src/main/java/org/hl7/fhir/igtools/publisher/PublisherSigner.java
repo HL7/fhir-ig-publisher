@@ -285,9 +285,9 @@ public class PublisherSigner {
     }
     Instant instant = roundToNearestSecond(Instant.now());
     if (xml) {
-      sig.setChildValue("targetFormat", "application/fhir+xml;canonicalization="+canon);
+      sig.setChildValue("targetFormat", "application/fhir+xml; canonicalization="+canon);
     } else {
-      sig.setChildValue("targetFormat", "application/fhir+json;canonicalization="+canon);
+      sig.setChildValue("targetFormat", "application/fhir+json; canonicalization="+canon);
     }
     String when = DateTimeFormatter.ISO_INSTANT.format(instant);
     sig.setChildValue("when", when);
@@ -362,9 +362,9 @@ public class PublisherSigner {
     }
     Instant instant = roundToNearestSecond(Instant.now());
     if (xml) {
-      sig.setChildValue("targetFormat", "application/fhir+xml;canonicalization="+canon);
+      sig.setChildValue("targetFormat", "application/fhir+xml; canonicalization="+canon);
     } else {
-      sig.setChildValue("targetFormat", "application/fhir+json;canonicalization="+canon);      
+      sig.setChildValue("targetFormat", "application/fhir+json; canonicalization="+canon);      
     }
     String when = DateTimeFormatter.ISO_INSTANT.format(instant);
     sig.setChildValue("when", when);

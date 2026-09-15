@@ -1193,7 +1193,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         RenderingContext ctxt = lrc.copy(false).setParser(getTypeLoader(f, rX));
         List<ProvenanceDetails> entries = loadProvenanceForBundle(this.pf.igpkp.getLinkFor(rX, true), le, f);
         xhtml = new HistoryGenerator(ctxt).generateForBundle(entries);
-        fragment(rX.fhirType()+"-"+rX.getId()+"-html", xc.compose(xhtml), f.getOutputNames(), rX, vars, null, start, "html", "Resource", lang);
+        fragment(rX.fhirType()+"-"+rX.getId()+"-html", xc.compose(seatNarrative(xhtml, rX)), f.getOutputNames(), rX, vars, null, start, "html", "Resource", lang);
       } else if (rX.fhirType().equals("Binary")) {
         String pfx = "";
         if (rX.getExampleUri() != null) {
@@ -1289,9 +1289,39 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
             }
           }
         }
-        String html = xhtml == null ? "" : xc.compose(xhtml);
+        String html = xhtml == null ? "" : xc.compose(seatNarrative(xhtml, rX));
         fragment(rX.fhirType()+"-"+rX.getId()+"-html", html, f.getOutputNames(), rX, vars, null, start, "html", "Resource", lang);
       }
+    }
+  }
+
+  /**
+   * Sit a narrative fragment at the depth the page will include it at.
+   *
+   * <p>Narrative arrives with whatever heading levels its author or its renderer chose, and neither
+   * knows where on the page it lands - an example's narrative commonly opens with an h1, and the
+   * generated renderers emit h2. Either way it competes with the page's own h2 title, which is a
+   * WCAG heading structure failure and is reported as one by {@link HTMLInspector}.
+   *
+   * <p>The depth comes from {@code pf.narrativeHeadingLevel}: h3 by default, because the stock
+   * templates title a page with an h2. A template that titles its pages at some other level sets
+   * the IG parameter 'narrative-heading-level' to match.
+   *
+   * <p>Works on a copy: narrative read off a resource shares its nodes with the resource, so
+   * shifting in place would change the narrative published in the .json and .xml as well.
+   *
+   * <p>Narrative too deeply nested to shift is left exactly as it is rather than failing the build
+   * over it - the inspector will report the page, which is the right outcome for content nobody can
+   * mechanically fix.
+   */
+  private XhtmlNode seatNarrative(XhtmlNode xhtml, FetchedResource r) {
+    XhtmlNode res = xhtml.copy();
+    try {
+      res.ensureTopHeadingIs(pf.narrativeHeadingLevel);
+      return res;
+    } catch (FHIRException e) {
+      log("Note: the narrative for "+r.fhirType()+"/"+r.getId()+" could not be fitted under the page heading: "+e.getMessage());
+      return xhtml;
     }
   }
 

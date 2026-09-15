@@ -77,9 +77,9 @@ public class PublicationChecker {
           style = " style=\"background-color: #ffe6cc;\"";
         }
         if ("descmd".equals(name)) {
-          bs.append(" <tr"+style+"><td>"+Utilities.escapeXml(name)+"</d><td>"+p.getValue()+"</td></tr>\r\n");
+          bs.append(" <tr"+style+"><td>"+Utilities.escapeXml(name)+"</td><td>"+p.getValue()+"</td></tr>\r\n");
         } else {
-          bs.append(" <tr"+style+"><td>"+Utilities.escapeXml(name)+"</d><td>"+Utilities.escapeXml(p.getValue())+"</td></tr>\r\n");
+          bs.append(" <tr"+style+"><td>"+Utilities.escapeXml(name)+"</td><td>"+Utilities.escapeXml(p.getValue())+"</td></tr>\r\n");
         }
       }      
       bs.append("</table>\r\n");
