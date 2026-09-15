@@ -23,6 +23,7 @@ import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.http.ManagedWebAccess;
 import org.hl7.fhir.utilities.i18n.RenderingI18nContext;
+import org.hl7.fhir.utilities.logging.ILoggingService;
 import org.hl7.fhir.utilities.npm.BasePackageCacheManager;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
@@ -33,7 +34,6 @@ import org.hl7.fhir.model.core.*;
 import org.hl7.fhir.services.comparison.ComparisonRenderer;
 import org.hl7.fhir.services.comparison.ComparisonSession;
 import org.hl7.fhir.services.conformance.profile.ProfileKnowledgeProvider;
-import org.hl7.fhir.services.context.ILoggingService;
 import org.hl7.fhir.standalone.context.SimpleWorkerContext;
 
 public class ImposesComparator {

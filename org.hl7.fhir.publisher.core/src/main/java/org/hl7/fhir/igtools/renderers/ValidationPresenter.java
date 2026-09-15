@@ -498,7 +498,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     
     List<ValidationMessage> linkErrors = filterMessages(null, allErrors, true, filteredMessages); 
     for (ValidationMessage vm : linkErrors) {
-      if (vm.getSource() == Source.LinkChecker) {
+      if (vm.getSource() == Source.HtmlChecker) {
         link++;
       } else if (vm.getLevel() == null) {
         err++;
@@ -518,7 +518,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     OperationOutcome oo = new OperationOutcome();
     validationBundle.addEntry(new BundleEntryComponent().setResource(oo));
     for (ValidationMessage vm : linkErrors) {
-      if (vm.getSource() != Source.LinkChecker && vm.getLocation()!=null) {
+      if (vm.getSource() != Source.HtmlChecker && vm.getLocation()!=null) {
         FHIRPathEngine fpe = new FHIRPathEngine(provider.getContext());
         try {
           fpe.parse(vm.getLocation());

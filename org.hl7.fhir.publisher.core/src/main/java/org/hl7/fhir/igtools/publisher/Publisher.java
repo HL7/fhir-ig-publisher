@@ -95,6 +95,7 @@ import org.hl7.fhir.utilities.json.model.JsonBoolean;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.model.JsonPrimitive;
 import org.hl7.fhir.utilities.json.model.JsonString;
+import org.hl7.fhir.utilities.logging.ILoggingService;
 import org.hl7.fhir.utilities.npm.*;
 import org.hl7.fhir.utilities.npm.NpmPackage.PackageResourceInformation;
 import org.hl7.fhir.utilities.settings.FhirSettings;

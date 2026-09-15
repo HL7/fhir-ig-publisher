@@ -34,8 +34,6 @@ import java.util.List;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.openehr.ArchetypeImporter;
 import org.hl7.fhir.services.conformance.profile.ProfileUtilities;
-import org.hl7.fhir.services.context.ILoggingService;
-import org.hl7.fhir.services.context.ILoggingService.LogCategory;
 import org.hl7.fhir.services.context.IWorkerContext;
 import org.hl7.fhir.services.elementmodel.FmlParser;
 import org.hl7.fhir.services.elementmodel.JsonParser.ILogicalModelResolver;
@@ -52,6 +50,7 @@ import org.hl7.fhir.model.core.UriType;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
+import org.hl7.fhir.utilities.logging.ILoggingService;
 import org.hl7.fhir.utilities.regex.RegexConstants;
 
 public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
@@ -448,7 +447,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
           }
         }
       }
-      log.logDebugMessage(LogCategory.PROGRESS, "Loaded "+Integer.toString(count)+" files from "+s);
+      log.logDebugMessage(ILoggingService.LogCategory.PROGRESS, "Loaded "+Integer.toString(count)+" files from "+s);
     }
     Collections.sort(res, new FetchedFileSorter());
     return res;
