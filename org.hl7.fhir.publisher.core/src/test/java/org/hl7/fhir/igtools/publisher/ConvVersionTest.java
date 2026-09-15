@@ -7,16 +7,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.ByteArrayInputStream;
 import java.util.Arrays;
 
-import org.hl7.fhir.r5.model.CodeSystem;
-import org.hl7.fhir.r5.model.Enumeration;
-import org.hl7.fhir.r5.model.Enumerations;
-import org.hl7.fhir.r5.model.ImplementationGuide;
-import org.hl7.fhir.r5.model.StructureDefinition;
+import org.hl7.fhir.model.ModelContext;
+import org.hl7.fhir.model.core.CodeSystem;
+import org.hl7.fhir.model.core.Enumeration;
+import org.hl7.fhir.model.core.Enumerations;
+import org.hl7.fhir.model.core.ImplementationGuide;
+import org.hl7.fhir.model.core.StructureDefinition;
 import org.junit.jupiter.api.Test;
 
 /**
  * Pins the per-version serialization dispatch extracted into
- * {@link PublisherBase#serializeForVersion(org.hl7.fhir.r5.model.Resource, String, String, String)}.
+ * {@link PublisherBase#serializeForVersion(org.hl7.fhir.model.core.Resource, String, String, String)}.
  * <p>
  * In particular it guards the R4 ({@code VersionConvertorFactory_40_50}) vs R4B
  * ({@code VersionConvertorFactory_43_50}) split: before this fix, an R4B target was
@@ -31,7 +32,7 @@ class ConvVersionTest {
   private static final String BASE_PACKAGE_ID = "example.test";
 
   private StructureDefinition sampleProfile() {
-    StructureDefinition sd = new StructureDefinition("http://example.org/fhir/StructureDefinition/test-profile",
+    StructureDefinition sd = new StructureDefinition(null, "http://example.org/fhir/StructureDefinition/test-profile",
         "TestProfile", Enumerations.PublicationStatus.ACTIVE, StructureDefinition.StructureDefinitionKind.RESOURCE,
         false, "Patient");
     sd.setBaseDefinition("http://hl7.org/fhir/StructureDefinition/Patient");
@@ -43,7 +44,7 @@ class ConvVersionTest {
    *  with no R4/R4B equivalent, so a genuine downgrade must drop it (a mere relabel would keep it). */
   private StructureDefinition profileWithVersionAlgorithm() {
     StructureDefinition sd = sampleProfile();
-    sd.setVersionAlgorithm(new org.hl7.fhir.r5.model.StringType("semver"));
+    sd.setVersionAlgorithm(new org.hl7.fhir.model.core.StringType("semver"));
     return sd;
   }
 
@@ -54,7 +55,7 @@ class ConvVersionTest {
     ig.setPackageId("example.test");
     ig.setVersion("0.1.0");
     ig.setStatus(Enumerations.PublicationStatus.ACTIVE);
-    ig.getFhirVersion().add(new Enumeration<>(new Enumerations.FHIRVersionEnumFactory(), "5.0.0"));
+    ig.getFhirVersionList().add(new Enumeration<>(new Enumerations.FHIRVersionEnumFactory(), "5.0.0"));
     return ig;
   }
 
@@ -72,8 +73,8 @@ class ConvVersionTest {
 
   @Test
   void structureDefinition_serializesAsGenuineR4AndR4B() throws Exception {
-    byte[] r4Bytes = PublisherBase.serializeForVersion(sampleProfile(), "4.0.1", SOURCE_VERSION, BASE_PACKAGE_ID);
-    byte[] r4bBytes = PublisherBase.serializeForVersion(sampleProfile(), "4.3.0", SOURCE_VERSION, BASE_PACKAGE_ID);
+    byte[] r4Bytes = PublisherBase.serializeForVersion(ModelContext.fullCoreContext(), sampleProfile(), "4.0.1", SOURCE_VERSION, BASE_PACKAGE_ID);
+    byte[] r4bBytes = PublisherBase.serializeForVersion(ModelContext.fullCoreContext(), sampleProfile(), "4.3.0", SOURCE_VERSION, BASE_PACKAGE_ID);
 
     org.hl7.fhir.r4.model.Resource r4res = new org.hl7.fhir.r4.formats.JsonParser().parse(new ByteArrayInputStream(r4Bytes));
     org.hl7.fhir.r4b.model.Resource r4bres = new org.hl7.fhir.r4b.formats.JsonParser().parse(new ByteArrayInputStream(r4bBytes));
@@ -97,9 +98,9 @@ class ConvVersionTest {
     // Genuine downgrade (not R5 relabeled): an R5-only element (versionAlgorithm[x]) must survive R5
     // serialization but be dropped by the R4/R4B conversion, and the result must still parse as an
     // R4/R4B StructureDefinition.
-    byte[] r5Bytes = PublisherBase.serializeForVersion(profileWithVersionAlgorithm(), "5.0.0", SOURCE_VERSION, BASE_PACKAGE_ID);
-    byte[] r4Bytes = PublisherBase.serializeForVersion(profileWithVersionAlgorithm(), "4.0.1", SOURCE_VERSION, BASE_PACKAGE_ID);
-    byte[] r4bBytes = PublisherBase.serializeForVersion(profileWithVersionAlgorithm(), "4.3.0", SOURCE_VERSION, BASE_PACKAGE_ID);
+    byte[] r5Bytes = PublisherBase.serializeForVersion(ModelContext.fullCoreContext(), profileWithVersionAlgorithm(), "5.0.0", SOURCE_VERSION, BASE_PACKAGE_ID);
+    byte[] r4Bytes = PublisherBase.serializeForVersion(ModelContext.fullCoreContext(), profileWithVersionAlgorithm(), "4.0.1", SOURCE_VERSION, BASE_PACKAGE_ID);
+    byte[] r4bBytes = PublisherBase.serializeForVersion(ModelContext.fullCoreContext(), profileWithVersionAlgorithm(), "4.3.0", SOURCE_VERSION, BASE_PACKAGE_ID);
 
     String r5Json = new String(r5Bytes, java.nio.charset.StandardCharsets.UTF_8);
     String r4Json = new String(r4Bytes, java.nio.charset.StandardCharsets.UTF_8);
@@ -121,8 +122,8 @@ class ConvVersionTest {
     // Short numeric tokens (4.0/4.3) must stamp the canonical full version (4.0.1/4.3.0) on the
     // serialized StructureDefinition, matching the symbolic/full spellings - not the raw short
     // form (formerly stamped as non-canonical 4.0/4.3) (M2).
-    byte[] r4Bytes = PublisherBase.serializeForVersion(sampleProfile(), "4.0", SOURCE_VERSION, BASE_PACKAGE_ID);
-    byte[] r4bBytes = PublisherBase.serializeForVersion(sampleProfile(), "4.3", SOURCE_VERSION, BASE_PACKAGE_ID);
+    byte[] r4Bytes = PublisherBase.serializeForVersion(ModelContext.fullCoreContext(), sampleProfile(), "4.0", SOURCE_VERSION, BASE_PACKAGE_ID);
+    byte[] r4bBytes = PublisherBase.serializeForVersion(ModelContext.fullCoreContext(), sampleProfile(), "4.3", SOURCE_VERSION, BASE_PACKAGE_ID);
 
     org.hl7.fhir.r4.model.StructureDefinition r4sd = (org.hl7.fhir.r4.model.StructureDefinition)
         new org.hl7.fhir.r4.formats.JsonParser().parse(new ByteArrayInputStream(r4Bytes));
@@ -137,8 +138,8 @@ class ConvVersionTest {
   void implementationGuide_stampsTargetFhirVersionNotSource() throws Exception {
     // H3: the embedded IG must be stamped with the *target* FHIR version, not the base (source) R5,
     // and its packageId suffixed with the target family - matching the SD branch.
-    byte[] r4Bytes = PublisherBase.serializeForVersion(sampleIg(), "4.0.1", SOURCE_VERSION, BASE_PACKAGE_ID);
-    byte[] r4bBytes = PublisherBase.serializeForVersion(sampleIg(), "4.3.0", SOURCE_VERSION, BASE_PACKAGE_ID);
+    byte[] r4Bytes = PublisherBase.serializeForVersion(ModelContext.fullCoreContext(), sampleIg(), "4.0.1", SOURCE_VERSION, BASE_PACKAGE_ID);
+    byte[] r4bBytes = PublisherBase.serializeForVersion(ModelContext.fullCoreContext(), sampleIg(), "4.3.0", SOURCE_VERSION, BASE_PACKAGE_ID);
 
     org.hl7.fhir.r4.model.ImplementationGuide r4ig = (org.hl7.fhir.r4.model.ImplementationGuide)
         new org.hl7.fhir.r4.formats.JsonParser().parse(new ByteArrayInputStream(r4Bytes));
@@ -153,8 +154,8 @@ class ConvVersionTest {
 
   @Test
   void codeSystem_serializesParseablyForR4AndR4B() throws Exception {
-    byte[] r4Bytes = PublisherBase.serializeForVersion(sampleCodeSystem(), "4.0.1", SOURCE_VERSION, BASE_PACKAGE_ID);
-    byte[] r4bBytes = PublisherBase.serializeForVersion(sampleCodeSystem(), "4.3.0", SOURCE_VERSION, BASE_PACKAGE_ID);
+    byte[] r4Bytes = PublisherBase.serializeForVersion(ModelContext.fullCoreContext(), sampleCodeSystem(), "4.0.1", SOURCE_VERSION, BASE_PACKAGE_ID);
+    byte[] r4bBytes = PublisherBase.serializeForVersion(ModelContext.fullCoreContext(), sampleCodeSystem(), "4.3.0", SOURCE_VERSION, BASE_PACKAGE_ID);
 
     org.hl7.fhir.r4.model.Resource r4res = new org.hl7.fhir.r4.formats.JsonParser().parse(new ByteArrayInputStream(r4Bytes));
     org.hl7.fhir.r4b.model.Resource r4bres = new org.hl7.fhir.r4b.formats.JsonParser().parse(new ByteArrayInputStream(r4bBytes));

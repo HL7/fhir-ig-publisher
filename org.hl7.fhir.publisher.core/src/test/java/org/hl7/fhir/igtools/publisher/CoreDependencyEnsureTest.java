@@ -15,10 +15,10 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
-import org.hl7.fhir.r5.model.Enumeration;
-import org.hl7.fhir.r5.model.Enumerations;
-import org.hl7.fhir.r5.model.ImplementationGuide;
-import org.hl7.fhir.r5.utils.NPMPackageGenerator;
+import org.hl7.fhir.model.core.Enumeration;
+import org.hl7.fhir.model.core.Enumerations;
+import org.hl7.fhir.model.core.ImplementationGuide;
+import org.hl7.fhir.services.utilities.NPMPackageGenerator;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.model.JsonProperty;
 import org.hl7.fhir.utilities.npm.NpmPackage;
@@ -233,7 +233,7 @@ class CoreDependencyEnsureTest {
     ig.setName("Example");
     ig.setPackageId("example.test");
     ig.setVersion("0.1.0");
-    ig.getFhirVersion().add(new Enumeration<>(new Enumerations.FHIRVersionEnumFactory(), fhirVersion));
+    ig.getFhirVersionList().add(new Enumeration<>(new Enumerations.FHIRVersionEnumFactory(), fhirVersion));
     File out = new File(dir, name);
     return new NPMPackageGenerator("example.test", out.getAbsolutePath(), "http://example.org/fhir",
         "http://example.org/fhir", PackageType.IG, ig, new Date(), null, true);

@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import org.hl7.fhir.r5.model.CanonicalResource;
+import org.hl7.fhir.model.core.CanonicalResource;
 
 public class XIGGenericHandler extends XIGHandler {
 

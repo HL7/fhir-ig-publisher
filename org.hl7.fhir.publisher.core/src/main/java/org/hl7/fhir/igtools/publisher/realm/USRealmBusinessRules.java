@@ -8,26 +8,25 @@ import java.util.List;
 import java.util.Set;
 
 import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_30_50;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_50;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
+import org.hl7.fhir.convertors.factory.*;
 import org.hl7.fhir.exceptions.DefinitionException;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.PublisherMessageIds;
-import org.hl7.fhir.r5.comparison.ComparisonRenderer;
-import org.hl7.fhir.r5.comparison.ComparisonSession;
-import org.hl7.fhir.r5.conformance.profile.ProfileKnowledgeProvider;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.ImplementationGuide;
-import org.hl7.fhir.r5.model.PackageInformation;
-import org.hl7.fhir.r5.model.Parameters;
-import org.hl7.fhir.r5.model.Parameters.ParametersParameterComponent;
-import org.hl7.fhir.r5.model.Resource;
-import org.hl7.fhir.r5.model.StructureDefinition;
-import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
+import org.hl7.fhir.services.comparison.ComparisonRenderer;
+import org.hl7.fhir.services.comparison.ComparisonSession;
+import org.hl7.fhir.services.conformance.profile.ProfileKnowledgeProvider;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.model.core.CanonicalResource;
+import org.hl7.fhir.model.core.ImplementationGuide;
+import org.hl7.fhir.model.core.PackageInformation;
+import org.hl7.fhir.model.core.Parameters;
+import org.hl7.fhir.model.core.Parameters.ParametersParameterComponent;
+import org.hl7.fhir.model.core.Resource;
+import org.hl7.fhir.model.core.StructureDefinition;
+import org.hl7.fhir.model.core.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
@@ -286,11 +285,13 @@ public class USRealmBusinessRules extends RealmBusinessRules {
   private Resource loadResourceFromPackage(NpmPackage uscore, String filename) throws FHIRException, IOException {
     InputStream s = uscore.loadResource(filename);
     if (VersionUtilities.isR3Ver(uscore.fhirVersion())) {
-      return VersionConvertorFactory_30_50.convertResource(new org.hl7.fhir.dstu3.formats.JsonParser().parse(s), new BaseAdvisor_30_50(false));
+      return VersionConvertorFactory_30_N.convertResource(new org.hl7.fhir.dstu3.formats.JsonParser().parse(s), new BaseAdvisor_30_50(false));
     } else if (VersionUtilities.isR4Ver(uscore.fhirVersion())) {
-      return VersionConvertorFactory_40_50.convertResource(new org.hl7.fhir.r4.formats.JsonParser().parse(s));
+      return VersionConvertorFactory_40_N.convertResource(new org.hl7.fhir.r4.formats.JsonParser().parse(s));
     } else if (VersionUtilities.isR5Plus(uscore.fhirVersion())) {
-      return new org.hl7.fhir.r5.formats.JsonParser().parse(s);
+      return VersionConvertorFactory_50_N.convertResource(new org.hl7.fhir.r5.formats.JsonParser().parse(s));
+    } else if (VersionUtilities.isR6Plus(uscore.fhirVersion())) {
+      return new org.hl7.fhir.model.core.formats.JsonParser(context.getModelContext()).parse(s);
     } else {
       return null;
     }
@@ -396,7 +397,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
  
 
   private String getSnomedVersion(Parameters params) {
-    for (ParametersParameterComponent p : params.getParameter()) {
+    for (ParametersParameterComponent p : params.getParameterList()) {
       if ("system-version".equals(p.getName()) && p.hasValue() && p.getValue().hasPrimitiveValue() && p.getValue().primitiveValue().startsWith("http://snomed.info/sct|")) {
         return p.getValue().primitiveValue().substring("http://snomed.info/sct|".length());
       }

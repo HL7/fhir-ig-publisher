@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.hl7.fhir.igtools.publisher.HTMLInspector.ExternalReference;
-import org.hl7.fhir.r5.context.IWorkerContext;
+import org.hl7.fhir.services.context.IWorkerContext;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;

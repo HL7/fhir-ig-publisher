@@ -3,17 +3,19 @@ package org.hl7.fhir.igtools.publisher.loaders;
 import java.io.IOException;
 import java.util.Set;
 
-import org.hl7.fhir.convertors.loaders.loaderR5.*;
+import org.hl7.fhir.convertors.loaders.loaderRN.*;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.igtools.publisher.SpecMapManager.SpecialPackageType;
 import org.hl7.fhir.igtools.publisher.SpecialTypeHandler;
-import org.hl7.fhir.r5.context.IContextResourceLoader;
-import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.DomainResource;
-import org.hl7.fhir.r5.model.Resource;
+import org.hl7.fhir.model.IModelContext;
+import org.hl7.fhir.services.context.IContextResourceLoaderN;
+import org.hl7.fhir.model.extensions.ExtensionDefinitions;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.model.core.CanonicalResource;
+import org.hl7.fhir.model.core.DomainResource;
+import org.hl7.fhir.model.core.Resource;
+import org.hl7.fhir.services.context.IWorkerContext;
 import org.hl7.fhir.utilities.UserDataNames;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
@@ -21,18 +23,20 @@ import org.hl7.fhir.utilities.npm.NpmPackage;
 
 import com.google.gson.JsonSyntaxException;
 
-public class PublisherLoader extends LoaderUtils implements ILoaderKnowledgeProviderR5 {
+public class PublisherLoader extends LoaderUtils implements ILoaderKnowledgeProviderRN {
 
   private final boolean internalUseOnly;
   private IGKnowledgeProvider igpkp;
+  private final IModelContext context;
 
-  public PublisherLoader(NpmPackage npm, SpecMapManager spm, String pathToSpec, IGKnowledgeProvider igpkp, boolean internalUseOnly) {
+  public PublisherLoader(NpmPackage npm, SpecMapManager spm, String pathToSpec, IGKnowledgeProvider igpkp, boolean internalUseOnly, IModelContext context) {
     super(npm, spm, pathToSpec);
     this.igpkp = igpkp;
     this.internalUseOnly = internalUseOnly;
+    this.context = context;
   }
 
-  public IContextResourceLoader makeLoader() {
+  public IContextResourceLoaderN makeLoader() {
     // there's no penalty for listing resources that don't exist, so we just all the relevant possibilities for all versions 
     Set<String> types = Utilities.stringSet("CodeSystem", "ValueSet", "ConceptMap", "NamingSystem",
                                    "StructureDefinition", "StructureMap", 
@@ -45,19 +49,19 @@ public class PublisherLoader extends LoaderUtils implements ILoaderKnowledgeProv
       types.addAll(SpecialTypeHandler.SPECIAL_TYPES_OTHER);
     }
     if (VersionUtilities.isR2Ver(npm.fhirVersion())) {
-      return new R2ToR5Loader(types, this).addTag(internalUseOnly ? UserDataNames.RESOURCE_INTERNAL_USE_ONLY : null);
+      return new R2ToRNLoader(context, types, this).addTag(internalUseOnly ? UserDataNames.RESOURCE_INTERNAL_USE_ONLY : null);
     } else if (VersionUtilities.isR2BVer(npm.fhirVersion())) {
-      return new R2016MayToR5Loader(types, this).addTag(internalUseOnly ? UserDataNames.RESOURCE_INTERNAL_USE_ONLY : null);
+      return new R2016MayToRNLoader(context, types, this).addTag(internalUseOnly ? UserDataNames.RESOURCE_INTERNAL_USE_ONLY : null);
     } else if (VersionUtilities.isR3Ver(npm.fhirVersion())) {
-      return new R3ToR5Loader(types, this).addTag(internalUseOnly ? UserDataNames.RESOURCE_INTERNAL_USE_ONLY : null);
+      return new R3ToRNLoader(context, types, this).addTag(internalUseOnly ? UserDataNames.RESOURCE_INTERNAL_USE_ONLY : null);
     } else if (VersionUtilities.isR4Ver(npm.fhirVersion())) {
-      return new R4ToR5Loader(types, this, npm.fhirVersion()).addTag(internalUseOnly ? UserDataNames.RESOURCE_INTERNAL_USE_ONLY : null);
+      return new R4ToRNLoader(context, types, this, npm.fhirVersion()).addTag(internalUseOnly ? UserDataNames.RESOURCE_INTERNAL_USE_ONLY : null);
     } else if (VersionUtilities.isR4BVer(npm.fhirVersion())) {
-      return new R4BToR5Loader(types, this, npm.fhirVersion()).addTag(internalUseOnly ? UserDataNames.RESOURCE_INTERNAL_USE_ONLY : null);
-    } else if (VersionUtilities.isR6Ver(npm.fhirVersion())) {
-      return new R6ToR5Loader(types, this).addTag(internalUseOnly ? UserDataNames.RESOURCE_INTERNAL_USE_ONLY : null);
+      return new R4BToRNLoader(context, types, this, npm.fhirVersion()).addTag(internalUseOnly ? UserDataNames.RESOURCE_INTERNAL_USE_ONLY : null);
+    } else if (VersionUtilities.isR5Ver(npm.fhirVersion())) {
+      return new R5ToRNLoader(context, types, this).addTag(internalUseOnly ? UserDataNames.RESOURCE_INTERNAL_USE_ONLY : null);
     } else {
-      return new R5ToR5Loader(types, this).addTag(internalUseOnly ? UserDataNames.RESOURCE_INTERNAL_USE_ONLY : null);
+      return new RNToRNLoader(context, types, this).addTag(internalUseOnly ? UserDataNames.RESOURCE_INTERNAL_USE_ONLY : null);
     }
   }
   
@@ -149,8 +153,8 @@ public class PublisherLoader extends LoaderUtils implements ILoaderKnowledgeProv
   }
 
   @Override
-  public ILoaderKnowledgeProviderR5 forNewPackage(NpmPackage npm) throws JsonSyntaxException, IOException {
-    return new PublisherLoader(npm, SpecMapManager.fromPackage(npm), npm.getWebLocation(), igpkp, internalUseOnly);
+  public ILoaderKnowledgeProviderRN forNewPackage(NpmPackage npm) throws JsonSyntaxException, IOException {
+    return new PublisherLoader(npm, SpecMapManager.fromPackage(npm), npm.getWebLocation(), igpkp, internalUseOnly, context);
   }
 
   @Override

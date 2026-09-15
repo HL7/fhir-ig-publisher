@@ -5,9 +5,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.hl7.fhir.r5.model.BaseDateTimeType;
-import org.hl7.fhir.r5.model.Coding;
-import org.hl7.fhir.r5.model.Reference;
+import org.hl7.fhir.model.core.BaseDateTimeType;
+import org.hl7.fhir.model.core.Coding;
+import org.hl7.fhir.model.core.Reference;
 
 public class ProvenanceDetails {
 

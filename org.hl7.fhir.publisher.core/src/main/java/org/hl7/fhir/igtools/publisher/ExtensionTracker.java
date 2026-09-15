@@ -15,12 +15,12 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.impl.client.DefaultHttpClient;
-import org.hl7.fhir.r5.elementmodel.Element;
-import org.hl7.fhir.r5.model.ElementDefinition;
-import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
-import org.hl7.fhir.r5.model.ImplementationGuide;
-import org.hl7.fhir.r5.model.StructureDefinition;
-import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
+import org.hl7.fhir.services.elementmodel.Element;
+import org.hl7.fhir.model.core.ElementDefinition;
+import org.hl7.fhir.model.core.ElementDefinition.TypeRefComponent;
+import org.hl7.fhir.model.core.ImplementationGuide;
+import org.hl7.fhir.model.core.StructureDefinition;
+import org.hl7.fhir.model.core.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 
@@ -98,7 +98,7 @@ public class ExtensionTracker {
 
   public void scan(ImplementationGuide publishedIg) {
     version = publishedIg.getVersion();
-    fhirVersion = publishedIg.getFhirVersion().get(0).asStringValue();
+    fhirVersion = publishedIg.getFhirVersionList().get(0).asStringValue();
     jurisdiction = publishedIg.getJurisdictionFirstRep().getCodingFirstRep().getCode();
     packageId = publishedIg.getPackageId();
   }
@@ -111,9 +111,9 @@ public class ExtensionTracker {
     }
 
     //now, scan the definitions looking for references to extensions, and noting their context
-    for (ElementDefinition ed : sd.getSnapshot().getElement()) {
-      if (ed.getType().size() == 1 && "Extension".equals(ed.getTypeFirstRep().getWorkingCode()) && ed.getTypeFirstRep().hasProfile()) {
-        usages.add(new ExtensionUsage(true, ed.getTypeFirstRep().getProfile().get(0).asStringValue(), tail(ed.getPath())));
+    for (ElementDefinition ed : sd.getSnapshot().getElementList()) {
+      if (ed.getTypeList().size() == 1 && "Extension".equals(ed.getTypeFirstRep().getWorkingCode()) && ed.getTypeFirstRep().hasProfile()) {
+        usages.add(new ExtensionUsage(true, ed.getTypeFirstRep().getProfileList().get(0).asStringValue(), tail(ed.getPath())));
       }
     }
 
@@ -132,7 +132,7 @@ public class ExtensionTracker {
   }
 
   private void scan(String path, Element element, String origin) {
-    for (Element e : element.getChildren()) {
+    for (Element e : element.getChildList()) {
       if (Utilities.existsInList(e.getName(), "extension", "modifierExtension")) {
         String url = e.getChildValue("url");
         if (url != null) {
@@ -163,9 +163,9 @@ public class ExtensionTracker {
       ext.addProperty("url", sd.getUrl());
       ext.addProperty("title", sd.present());
       JsonArray types = new JsonArray();
-      for (ElementDefinition e : sd.getSnapshot().getElement()) {
+      for (ElementDefinition e : sd.getSnapshot().getElementList()) {
         if (e.getPath().contains(".value"))
-          for (TypeRefComponent t : e.getType())
+          for (TypeRefComponent t : e.getTypeList())
             types.add(t.getWorkingCode());
       }
       if (types.size() > 0)

@@ -34,16 +34,18 @@ import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
 import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_30_50;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_10_50;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_50;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_10_N;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_N;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_N;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_50_N;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.web.IGRegistryMaintainer.ImplementationGuideEntry;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.CodeableConcept;
-import org.hl7.fhir.r5.model.Coding;
-import org.hl7.fhir.r5.model.ImplementationGuide;
+import org.hl7.fhir.model.ModelContext;
+import org.hl7.fhir.model.core.CanonicalResource;
+import org.hl7.fhir.model.core.CodeableConcept;
+import org.hl7.fhir.model.core.Coding;
+import org.hl7.fhir.model.core.ImplementationGuide;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
@@ -438,8 +440,8 @@ public class IGReleaseUpdater {
       System.out.println("IG resource "+igf+": no Jurisdiction. Using "+inferred);
       return inferred;
     }
-    for (CodeableConcept cc : igr.getJurisdiction()) {
-      for (Coding c : cc.getCoding()) {
+    for (CodeableConcept cc : igr.getJurisdictionList()) {
+      for (Coding c : cc.getCodingList()) {
         String res = c.getSystem()+"#"+c.getCode();
         if (inferred != null && !inferred.equals(res)) {
           System.out.println("IG resource "+igs.toString()+": Jurisdiction mismatch. Found "+res+" but package implies "+inferred);          
@@ -455,16 +457,19 @@ public class IGReleaseUpdater {
     FileInputStream fs = new FileInputStream(igf);
     try {
       if (VersionUtilities.isR2Ver(fv)) {
-        return (ImplementationGuide) VersionConvertorFactory_10_50.convertResource(new org.hl7.fhir.dstu2.formats.XmlParser().parse(fs));
+        return (ImplementationGuide) VersionConvertorFactory_10_N.convertResource(new org.hl7.fhir.dstu2.formats.XmlParser().parse(fs));
       }
       if (VersionUtilities.isR3Ver(fv)) {
-        return (ImplementationGuide) VersionConvertorFactory_30_50.convertResource(new org.hl7.fhir.dstu3.formats.XmlParser().parse(fs), new BaseAdvisor_30_50(false));
+        return (ImplementationGuide) VersionConvertorFactory_30_N.convertResource(new org.hl7.fhir.dstu3.formats.XmlParser().parse(fs), new BaseAdvisor_30_50(false));
       }
-      if (VersionUtilities.isR4Ver(fv)) {
-        return (ImplementationGuide) VersionConvertorFactory_40_50.convertResource(new org.hl7.fhir.r4.formats.XmlParser().parse(fs));
-      }
+        if (VersionUtilities.isR4Ver(fv)) {
+            return (ImplementationGuide) VersionConvertorFactory_40_N.convertResource(new org.hl7.fhir.r4.formats.XmlParser().parse(fs));
+        }
+        if (VersionUtilities.isR5Ver(fv)) {
+            return (ImplementationGuide) VersionConvertorFactory_50_N.convertResource(new org.hl7.fhir.r5.formats.XmlParser().parse(fs));
+        }
       if (VersionUtilities.isR3Ver(fv)) {
-        return (ImplementationGuide) new org.hl7.fhir.r5.formats.XmlParser().parse(fs);
+        return (ImplementationGuide) new org.hl7.fhir.model.core.formats.XmlParser(ModelContext.fullCoreContext()).parse(fs);
       }
       return null;
     } finally {

@@ -10,7 +10,9 @@ import org.apache.commons.lang3.SystemUtils;
 import org.apache.commons.text.StringEscapeUtils;
 import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_10_50;
 import org.hl7.fhir.convertors.factory.*;
-import org.hl7.fhir.convertors.misc.NpmPackageVersionConverter;
+import org.hl7.fhir.model.utilities.*;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.standalone.utilities.NpmPackageVersionConverter;
 import org.hl7.fhir.convertors.misc.ProfileVersionAdaptor;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.comparators.PreviousVersionComparator;
@@ -25,46 +27,47 @@ import org.hl7.fhir.igtools.renderers.StructureMapRenderer;
 import org.hl7.fhir.igtools.renderers.ValueSetRenderer;
 import org.hl7.fhir.igtools.spreadsheets.ObservationSummarySpreadsheetGenerator;
 import org.hl7.fhir.igtools.web.IGReleaseVersionUpdater;
-import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
-import org.hl7.fhir.r5.conformance.ConstraintJavaGenerator;
-import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
-import org.hl7.fhir.r5.context.ContextUtilities;
-import org.hl7.fhir.r5.context.ExpansionOptions;
-import org.hl7.fhir.r5.elementmodel.Element;
-import org.hl7.fhir.r5.elementmodel.Manager;
-import org.hl7.fhir.r5.elementmodel.ObjectConverter;
-import org.hl7.fhir.r5.elementmodel.ParserBase;
-import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.fhirpath.FHIRPathEngine;
-import org.hl7.fhir.r5.formats.IParser;
-import org.hl7.fhir.r5.formats.JsonParser;
-import org.hl7.fhir.r5.formats.RdfParser;
-import org.hl7.fhir.r5.formats.XmlParser;
-import org.hl7.fhir.r5.liquid.BaseJsonWrapper;
-import org.hl7.fhir.r5.liquid.LiquidEngine;
-import org.hl7.fhir.r5.model.*;
-import org.hl7.fhir.r5.model.Enumeration;
-import org.hl7.fhir.r5.openapi.OpenApiGenerator;
-import org.hl7.fhir.r5.openapi.Writer;
-import org.hl7.fhir.r5.renderers.*;
-import org.hl7.fhir.r5.renderers.spreadsheets.CodeSystemSpreadsheetGenerator;
-import org.hl7.fhir.r5.renderers.spreadsheets.ConceptMapSpreadsheetGenerator;
-import org.hl7.fhir.r5.renderers.spreadsheets.StructureDefinitionSpreadsheetGenerator;
-import org.hl7.fhir.r5.renderers.spreadsheets.ValueSetSpreadsheetGenerator;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.renderers.utils.Resolver;
-import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
-import org.hl7.fhir.r5.terminologies.TerminologyUtilities;
-import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
-import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
-import org.hl7.fhir.r5.terminologies.utilities.TerminologyServiceErrorClass;
-import org.hl7.fhir.r5.terminologies.utilities.ValidationResult;
-import org.hl7.fhir.r5.utils.*;
-import org.hl7.fhir.r5.utils.formats.CSVWriter;
-import org.hl7.fhir.r5.utils.sql.Runner;
-import org.hl7.fhir.r5.utils.sql.StorageJson;
-import org.hl7.fhir.r5.utils.sql.StorageSqlite3;
+import org.hl7.fhir.model.Base;
+import org.hl7.fhir.model.fml.StructureMap;
+import org.hl7.fhir.model.utilities.formats.FhirFormat;
+import org.hl7.fhir.model.utilities.formats.OutputStyle;
+import org.hl7.fhir.services.conformance.ConstraintJavaGenerator;
+import org.hl7.fhir.services.conformance.profile.ProfileUtilities;
+import org.hl7.fhir.services.context.ContextUtilities;
+import org.hl7.fhir.services.elementmodel.Element;
+import org.hl7.fhir.services.elementmodel.Manager;
+import org.hl7.fhir.services.elementmodel.ObjectConverter;
+import org.hl7.fhir.services.elementmodel.ParserBase;
+import org.hl7.fhir.model.extensions.ExtensionDefinitions;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.services.fhirpath.FHIRPathEngine;
+import org.hl7.fhir.model.core.formats.JsonParser;
+import org.hl7.fhir.model.core.formats.RdfParser;
+import org.hl7.fhir.model.core.formats.XmlParser;
+import org.hl7.fhir.services.fml.StructureMapTools;
+import org.hl7.fhir.services.liquid.BaseJsonWrapper;
+import org.hl7.fhir.services.liquid.LiquidEngine;
+import org.hl7.fhir.model.core.*;
+import org.hl7.fhir.model.core.Enumeration;
+import org.hl7.fhir.services.openapi.OpenApiGenerator;
+import org.hl7.fhir.services.openapi.Writer;
+import org.hl7.fhir.services.renderers.*;
+import org.hl7.fhir.services.renderers.spreadsheets.CodeSystemSpreadsheetGenerator;
+import org.hl7.fhir.services.renderers.spreadsheets.ConceptMapSpreadsheetGenerator;
+import org.hl7.fhir.services.renderers.spreadsheets.StructureDefinitionSpreadsheetGenerator;
+import org.hl7.fhir.services.renderers.spreadsheets.ValueSetSpreadsheetGenerator;
+import org.hl7.fhir.services.renderers.utils.RenderingContext;
+import org.hl7.fhir.services.renderers.utils.Resolver;
+import org.hl7.fhir.services.renderers.utils.ResourceWrapper;
+import org.hl7.fhir.services.sql.Runner;
+import org.hl7.fhir.services.sql.StorageJson;
+import org.hl7.fhir.services.sql.StorageSqlite3;
+import org.hl7.fhir.services.terminology.ExpansionOptions;
+import org.hl7.fhir.services.terminology.ValidationResult;
+import org.hl7.fhir.services.terminology.ValueSetExpansionOutcome;
+import org.hl7.fhir.services.utilities.MappingSheetParser;
+import org.hl7.fhir.services.utilities.NPMPackageGenerator;
+import org.hl7.fhir.services.utilities.ResourceSorters;
 import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.i18n.LanguageTag;
 import org.hl7.fhir.utilities.i18n.RenderingI18nContext;
@@ -227,7 +230,6 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       }
     }
 
-    Base.setCopyUserData(true); // just keep all the user data when copying while rendering
     pf.bdr = new BaseRenderer(pf.context, checkAppendSlash(pf.specPath), pf.igpkp, pf.specMaps, pageTargets(), pf.markdownEngine, pf.packge, pf.rc, this);
 
     forceDir(pf.tempDir);
@@ -291,8 +293,8 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
     templateBeforeGenerate();
     if (pf.saveExpansionParams) {
-      new JsonParser().setOutputStyle(IParser.OutputStyle.NORMAL).compose(new FileOutputStream(Utilities.path(pf.tempDir, "parameters-expansion-parameters.json")), pf.context.getExpansionParameters());
-      new XmlParser().setOutputStyle(IParser.OutputStyle.NORMAL).compose(new FileOutputStream(Utilities.path(pf.tempDir, "parameters-expansion-parameters.xml")), pf.context.getExpansionParameters());
+      new JsonParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.NORMAL).compose(new FileOutputStream(Utilities.path(pf.tempDir, "parameters-expansion-parameters.json")), pf.context.getExpansionParameters());
+      new XmlParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.NORMAL).compose(new FileOutputStream(Utilities.path(pf.tempDir, "parameters-expansion-parameters.xml")), pf.context.getExpansionParameters());
     }
 
     logMessage("Generate HTML Outputs");
@@ -843,7 +845,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         generateResourceHtml(f, regen, r, r.getResource(), vars, "", db, lang, lrc);
         if (r.getResource() instanceof DomainResource) {
           DomainResource container = (DomainResource) r.getResource();
-          List<org.hl7.fhir.r5.elementmodel.Element> containedElements = r.getElement().getChildren("contained");
+          List<org.hl7.fhir.services.elementmodel.Element> containedElements = r.getElement().getChildren("contained");
           List<Resource> containedResources = container.getContained();
           if (containedResources.size() > containedElements.size()) {
             throw new Error("Error: containedResources.size ("+containedResources.size()+") > containedElements.size ("+containedElements.size()+")");
@@ -860,7 +862,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
                 makeTemplatesContained(f, r, containedResource, vars, prefixForContained, lang);
                 String fn = saveDirectResourceOutputsContained(f, r, containedResource, vars, prefixForContained, lang);
                 if (containedResource instanceof CanonicalResource) {
-                  CanonicalResource cr = ((CanonicalResource) containedResource).copy();
+                  CanonicalResource cr = ((CanonicalResource) containedResource).copy(Base.COPY_DATA);
                   cr.copyUserData(container);
                   if (!(container instanceof CanonicalResource)) {
                     if (!cr.hasUrl() || !cr.hasVersion()) {
@@ -949,11 +951,11 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       }
       f.getOutputNames().add(path);
       FileOutputStream stream = new FileOutputStream(path);
-      org.hl7.fhir.r5.elementmodel.XmlParser xp = new org.hl7.fhir.r5.elementmodel.XmlParser(this.pf.context);
+      org.hl7.fhir.services.elementmodel.XmlParser xp = new org.hl7.fhir.services.elementmodel.XmlParser(this.pf.context);
       if (suppressId(f, r)) {
         xp.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
       }
-      xp.compose(element, stream, IParser.OutputStyle.PRETTY, this.pf.igpkp.getCanonical());
+      xp.compose(element, stream, OutputStyle.PRETTY, this.pf.igpkp.getCanonical());
       stream.close();
     }
     if (wantGen(r, "json") || forHL7orFHIR()) {
@@ -964,11 +966,11 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       }
       f.getOutputNames().add(path);
       FileOutputStream stream = new FileOutputStream(path);
-      org.hl7.fhir.r5.elementmodel.JsonParser jp = new org.hl7.fhir.r5.elementmodel.JsonParser(this.pf.context);
+      org.hl7.fhir.services.elementmodel.JsonParser jp = new org.hl7.fhir.services.elementmodel.JsonParser(this.pf.context);
       if (suppressId(f, r)) {
         jp.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
       }
-      jp.compose(element, stream, IParser.OutputStyle.PRETTY, this.pf.igpkp.getCanonical());
+      jp.compose(element, stream, OutputStyle.PRETTY, this.pf.igpkp.getCanonical());
       stream.close();
     }
     if (wantGen(r, "ttl")) {
@@ -979,11 +981,11 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       }
       f.getOutputNames().add(path);
       FileOutputStream stream = new FileOutputStream(path);
-      org.hl7.fhir.r5.elementmodel.TurtleParser tp = new org.hl7.fhir.r5.elementmodel.TurtleParser(this.pf.context);
+      org.hl7.fhir.services.elementmodel.TurtleParser tp = new org.hl7.fhir.services.elementmodel.TurtleParser(this.pf.context);
       if (suppressId(f, r)) {
         tp.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
       }
-      tp.compose(element, stream, IParser.OutputStyle.PRETTY, this.pf.igpkp.getCanonical());
+      tp.compose(element, stream, OutputStyle.PRETTY, this.pf.igpkp.getCanonical());
       stream.close();
     }
   }
@@ -1105,24 +1107,24 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       genWrapper(null, r, template, this.pf.igpkp.getProperty(r, "format"), f.getOutputNames(), vars, "json", "", false, lang, lrc);
     }
     if (wantGen(r, "jekyll-data") && this.pf.produceJekyllData) {
-      org.hl7.fhir.r5.elementmodel.JsonParser jp = new org.hl7.fhir.r5.elementmodel.JsonParser(this.pf.context);
+      org.hl7.fhir.services.elementmodel.JsonParser jp = new org.hl7.fhir.services.elementmodel.JsonParser(this.pf.context);
       FileOutputStream bs = new FileOutputStream(Utilities.path(this.pf.tempDir, "_data", r.fhirType()+"-"+r.getId()+".json"));
-      jp.compose(langElement, bs, IParser.OutputStyle.NORMAL, null);
+      jp.compose(langElement, bs, OutputStyle.NORMAL, null);
       bs.close();
     }
     if (wantGen(r, "ttl")) {
       genWrapper(null, r, template, this.pf.igpkp.getProperty(r, "format"), f.getOutputNames(), vars, "ttl", "", false, lang, lrc);
     }
-    org.hl7.fhir.r5.elementmodel.XmlParser xp = new org.hl7.fhir.r5.elementmodel.XmlParser(this.pf.context);
+    org.hl7.fhir.services.elementmodel.XmlParser xp = new org.hl7.fhir.services.elementmodel.XmlParser(this.pf.context);
     ByteArrayOutputStream bs = new ByteArrayOutputStream();
-    xp.compose(langElement, bs, IParser.OutputStyle.NORMAL, null);
+    xp.compose(langElement, bs, OutputStyle.NORMAL, null);
     int size = bs.size();
 
     Element e = langElement;
-    if (SpecialTypeHandler.handlesType(r.fhirType(), this.pf.context.getVersion()) && !pf.customResourceNames.contains(r.fhirType())) {
+    if (SpecialTypeHandler.handlesType(r.fhirType(), this.pf.context.getFHIRVersion()) && !pf.customResourceNames.contains(r.fhirType())) {
       e = new ObjectConverter(this.pf.context).convert(r.getResource());
     } else if (this.pf.module.isNoNarrative() && e.hasChild("text")) {
-      e = (Element) e.copy();
+      e = (Element) e.copy(Base.COPY_DATA);
       e.removeChild("text");
     }
 
@@ -1142,7 +1144,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       long start = System.currentTimeMillis();
       JsonXhtmlRenderer j = new JsonXhtmlRenderer();
       j.setPrism(size < PRISM_SIZE_LIMIT);
-      org.hl7.fhir.r5.elementmodel.JsonParser jp = new org.hl7.fhir.r5.elementmodel.JsonParser(this.pf.context);
+      org.hl7.fhir.services.elementmodel.JsonParser jp = new org.hl7.fhir.services.elementmodel.JsonParser(this.pf.context);
       jp.setLinkResolver(this.pf.igpkp);
       jp.setAllowComments(true);
       if (suppressId(f, r)) {
@@ -1154,13 +1156,13 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
     if (wantGen(r, "ttl-html")) {
       long start = System.currentTimeMillis();
-      org.hl7.fhir.r5.elementmodel.TurtleParser ttl = new org.hl7.fhir.r5.elementmodel.TurtleParser(this.pf.context);
+      org.hl7.fhir.services.elementmodel.TurtleParser ttl = new org.hl7.fhir.services.elementmodel.TurtleParser(this.pf.context);
       ttl.setLinkResolver(this.pf.igpkp);
       Turtle rdf = new Turtle();
       if (suppressId(f, r)) {
         ttl.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
       }
-      ttl.setStyle(IParser.OutputStyle.PRETTY);
+      ttl.setStyle(OutputStyle.PRETTY);
       ttl.compose(e, rdf, "");
       fragment(r.fhirType()+"-"+r.getId()+"-ttl-html", rdf.asHtml(size < PRISM_SIZE_LIMIT), f.getOutputNames(), r, vars, "ttl", start, "ttl-html", "Resource", lang);
     }
@@ -1227,7 +1229,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
             // No specialised renderer or it failed - fall back to JSON/XML rendering.
             String rXContentType = rX.getElement().getNamedChildValueSingle("contentType");
             if (rXContentType.contains("xml")) {
-              org.hl7.fhir.r5.elementmodel.XmlParser xmlParser = new org.hl7.fhir.r5.elementmodel.XmlParser(this.pf.context);
+              org.hl7.fhir.services.elementmodel.XmlParser xmlParser = new org.hl7.fhir.services.elementmodel.XmlParser(this.pf.context);
               XmlXHtmlRenderer xmlXHtmlRenderer = new XmlXHtmlRenderer();
               xmlXHtmlRenderer.setPrism(true);
               xmlParser.setElideElements(true);
@@ -1242,7 +1244,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
             } else if (rXContentType.contains("json")) {
               JsonXhtmlRenderer jsonXhtmlRenderer = new JsonXhtmlRenderer();
               jsonXhtmlRenderer.setPrism(true);
-              org.hl7.fhir.r5.elementmodel.JsonParser jsonParser = new org.hl7.fhir.r5.elementmodel.JsonParser(this.pf.context);
+              org.hl7.fhir.services.elementmodel.JsonParser jsonParser = new org.hl7.fhir.services.elementmodel.JsonParser(this.pf.context);
               jsonParser.setLinkResolver(this.pf.igpkp);
               jsonParser.setAllowComments(true);
               jsonParser.setElideElements(true);
@@ -1744,7 +1746,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
     boolean hasInterestingParams = false;
     if (p != null) {
-      for (Parameters.ParametersParameterComponent pp : p.getParameter()) {
+      for (Parameters.ParametersParameterComponent pp : p.getParameterList()) {
         hasInterestingParams = hasInterestingParams || !Utilities.existsInList(pp.getName(), "x-system-cache-id", "defaultDisplayLanguage");
       }
     }
@@ -1756,7 +1758,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       XhtmlNode tr = tbl.tr();
       tr.th().tx("Parameter");
       tr.th().tx("Value");
-      for (Parameters.ParametersParameterComponent pp : p.getParameter()) {
+      for (Parameters.ParametersParameterComponent pp : p.getParameterList()) {
         if (!Utilities.existsInList(pp.getName(), "x-system-cache-id", "defaultDisplayLanguage")) {
           tr = tbl.tr();
           tr.td().tx(pp.getName());
@@ -1804,9 +1806,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
   private void generateOutputsCapabilityStatement(FetchedFile f, FetchedResource r, CapabilityStatement cpbs, Map<String, String> vars, String prefixForContainer, RenderingContext lrc, String lang) throws Exception {
     if (wantGen(r, "swagger") || wantGen(r, "openapi")) {
       String lp = isNewML() && lang != null && !lang.equals(this.pf.defaultTranslationLang) ? "-"+lang : "";
-      org.hl7.fhir.r5.openapi.Writer oa = null;
+      org.hl7.fhir.services.openapi.Writer oa = null;
       if (this.pf.openApiTemplate != null)
-        oa = new org.hl7.fhir.r5.openapi.Writer(new FileOutputStream(Utilities.path(this.pf.tempDir, cpbs.getId()+ lp+".openapi.json")), new FileInputStream(Utilities.path(FileUtilities.getDirectoryForFile(this.settings.getConfigFile()), this.pf.openApiTemplate)));
+        oa = new org.hl7.fhir.services.openapi.Writer(new FileOutputStream(Utilities.path(this.pf.tempDir, cpbs.getId()+ lp+".openapi.json")), new FileInputStream(Utilities.path(FileUtilities.getDirectoryForFile(this.settings.getConfigFile()), this.pf.openApiTemplate)));
       else
         oa = new Writer(new FileOutputStream(Utilities.path(this.pf.tempDir, cpbs.getId()+ lp+".openapi.json")));
       String lic = license();
@@ -1828,7 +1830,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       ProfileUtilities pu = new ProfileUtilities(this.pf.context, this.pf.errors, this.pf.igpkp);
       pu.generateCsv(new FileOutputStream(path), sd, true);
       if (this.pf.allProfilesCsv == null) {
-        this.pf.allProfilesCsv = new CSVWriter(new FileOutputStream(Utilities.path(this.pf.tempDir, "all-profiles.csv")), true);
+        this.pf.allProfilesCsv = new  org.hl7.fhir.services.utilities.CSVWriter(new FileOutputStream(Utilities.path(this.pf.tempDir, "all-profiles.csv")), true);
         this.pf.otherFilesRun.add(Utilities.path(this.pf.tempDir, "all-profiles.csv"));
 
       }
@@ -2226,7 +2228,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
   }
 
   private boolean anyMustSupport(StructureDefinition sd) {
-    for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+    for (ElementDefinition ed : sd.getSnapshot().getElementList()) {
       if (ed.getMustSupport()) {
         return true;
       }
@@ -2281,7 +2283,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
   private void generateOutputsLibrary(FetchedFile f, FetchedResource r, Library lib, Map<String,String> vars, String prefixForContainer, RenderingContext lrc, String lang) throws Exception {
     int counter = 0;
-    for (Attachment att : lib.getContent()) {
+    for (Attachment att : lib.getContentList()) {
       String extension = att.hasContentType() ? MimeType.getExtension(att.getContentType()) : null;
       if (extension != null && att.hasData()) {
         String filename = "Library-"+r.getId()+(counter == 0 ? "" : "-"+Integer.toString(counter))+"."+extension;
@@ -2417,7 +2419,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     if (t != null) {
       return t;
     }
-    for (ImplementationGuide.ImplementationGuideDefinitionResourceComponent res : this.pf.publishedIg.getDefinition().getResource()) {
+    for (ImplementationGuide.ImplementationGuideDefinitionResourceComponent res : this.pf.publishedIg.getDefinition().getResourceList()) {
       FetchedResource tr = (FetchedResource) res.getUserData(UserDataNames.pub_loaded_resource);
       if (tr != null && tr == r) {
         return res.getDescription();
@@ -2561,7 +2563,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     r.setResource(pf.publishedIg);
     r.setElement(convertToElement(r, pf.publishedIg));
 
-    for (ImplementationGuide.ImplementationGuideDefinitionResourceComponent res : pf.publishedIg.getDefinition().getResource()) {
+    for (ImplementationGuide.ImplementationGuideDefinitionResourceComponent res : pf.publishedIg.getDefinition().getResourceList()) {
       FetchedResource rt = null;
       for (FetchedFile tf : pf.fileList) {
         for (FetchedResource tr : tf.getResources()) {
@@ -2691,14 +2693,14 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     if (pf.publishedIg.hasContact()) {
       JsonArray jc = new JsonArray();
       ig.add("contact", jc);
-      for (ContactDetail c : pf.publishedIg.getContact()) {
+      for (ContactDetail c : pf.publishedIg.getContactList()) {
         JsonObject jco = new JsonObject();
         jc.add(jco);
         jco.add("name", c.getName());
         if (c.hasTelecom()) {
           JsonArray jct = new JsonArray();
           jco.add("telecom", jct);
-          for (ContactPoint cc : c.getTelecom()) {
+          for (ContactPoint cc : c.getTelecomList()) {
             jct.add(new JsonString(cc.getValue()));
           }
         }
@@ -2706,14 +2708,14 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       for (String l : allLangs()) {
         jc = new JsonArray();
         ig.add("contact"+l, jc);
-        for (ContactDetail c : pf.publishedIg.getContact()) {
+        for (ContactDetail c : pf.publishedIg.getContactList()) {
           JsonObject jco = new JsonObject();
           jc.add(jco);
           jco.add("name", pf.langUtils.getTranslationOrBase(c.getNameElement(), l));
           if (c.hasTelecom()) {
             JsonArray jct = new JsonArray();
             jco.add("telecom", jct);
-            for (ContactPoint cc : c.getTelecom()) {
+            for (ContactPoint cc : c.getTelecomList()) {
               jct.add(new JsonString(cc.getValue()));
             }
           }
@@ -2731,7 +2733,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     ig.add("copyright", pf.publishedIg.getCopyright());
     addTranslationsToJson(ig, "copyright", pf.publishedIg.getCopyrightElement(), false);
 
-    for (Enumeration<Enumerations.FHIRVersion> v : pf.publishedIg.getFhirVersion()) {
+    for (Enumeration<Enumerations.FHIRVersion> v : pf.publishedIg.getFhirVersionList()) {
       ig.add("fhirVersion", v.asStringValue());
       break;
     }
@@ -3060,7 +3062,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           if (sd.hasContext()) {
             JsonArray contexts = new JsonArray();
             item.add("contexts", contexts);
-            for (StructureDefinition.StructureDefinitionContextComponent ec : sd.getContext()) {
+            for (StructureDefinition.StructureDefinitionContextComponent ec : sd.getContextList()) {
               JsonObject citem = new JsonObject();
               contexts.add(citem);
               citem.add("type", ec.hasType() ? ec.getType().getDisplay() : "??");
@@ -3278,7 +3280,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         if (disp2 == null && vs != null) {
           ValueSet.ConceptReferenceComponent cc = getConceptReference(vs, "urn:ietf:bcp:47", code);
           ValueSet.ConceptReferenceDesignationComponent dd = null;
-          for (ValueSet.ConceptReferenceDesignationComponent t : cc.getDesignation()) {
+          for (ValueSet.ConceptReferenceDesignationComponent t : cc.getDesignationList()) {
             if (code2.equals(t.getLanguage())) {
               dd = t;
             }
@@ -3313,9 +3315,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
   }
 
   public ValueSet.ConceptReferenceComponent getConceptReference(ValueSet vs, String system, String code) {
-    for (ValueSet.ConceptSetComponent inc : vs.getCompose().getInclude()) {
+    for (ValueSet.ConceptSetComponent inc : vs.getCompose().getIncludeList()) {
       if (system.equals(inc.getSystem())) {
-        for (ValueSet.ConceptReferenceComponent cc : inc.getConcept()) {
+        for (ValueSet.ConceptReferenceComponent cc : inc.getConceptList()) {
           if (cc.getCode().equals(code)) {
             return cc;
           }
@@ -3537,7 +3539,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       }
     }
 
-    for (ImplementationGuide.ImplementationGuideDefinitionPageComponent childPage : page.getPage()) {
+    for (ImplementationGuide.ImplementationGuideDefinitionPageComponent childPage : page.getPageList()) {
       applyPageTemplate(htmlTemplate, mdTemplate, childPage);
     }
   }
@@ -3597,9 +3599,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       s = s + "<a title=\"" + Utilities.escapeXml(page.getTitle()) + "\"> " + label + " " + Utilities.escapeXml(page.getTitle()) + "</a></td></tr>";
     }
 
-    int total = page.getPage().size();
+    int total = page.getPageList().size();
     int i = 1;
-    for (ImplementationGuide.ImplementationGuideDefinitionPageComponent childPage : page.getPage()) {
+    for (ImplementationGuide.ImplementationGuideDefinitionPageComponent childPage : page.getPageList()) {
       String newIndents = indents;
       if (!label.equals("0")) {
         if (last)
@@ -3706,7 +3708,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
 
     int i = 1;
-    for (ImplementationGuide.ImplementationGuideDefinitionPageComponent childPage : page.getPage()) {
+    for (ImplementationGuide.ImplementationGuideDefinitionPageComponent childPage : page.getPageList()) {
       addPageData(pages, childPage, (label.equals("0") ? "" : label+".") + Integer.toString(i), breadcrumb + breadCrumbForPage(page, true), addToBreadcrumbs(breadcrumbs, page, true));
       i++;
     }
@@ -4154,14 +4156,14 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
   }
 
   private void generateZips(File df) throws Exception {
-    if (generateExampleZip(Manager.FhirFormat.XML)) {
-      generateDefinitions(Manager.FhirFormat.XML, df.getCanonicalPath());
+    if (generateExampleZip(FhirFormat.XML)) {
+      generateDefinitions(FhirFormat.XML, df.getCanonicalPath());
     }
-    if (generateExampleZip(Manager.FhirFormat.JSON)) {
-      generateDefinitions(Manager.FhirFormat.JSON, df.getCanonicalPath());
+    if (generateExampleZip(FhirFormat.JSON)) {
+      generateDefinitions(FhirFormat.JSON, df.getCanonicalPath());
     }
-    if (!pf.excludeTtl && supportsTurtle() && generateExampleZip(Manager.FhirFormat.TURTLE)) {
-      generateDefinitions(Manager.FhirFormat.TURTLE, df.getCanonicalPath());
+    if (!pf.excludeTtl && supportsTurtle() && generateExampleZip(FhirFormat.TURTLE)) {
+      generateDefinitions(FhirFormat.TURTLE, df.getCanonicalPath());
     }
     generateExpansions();
     generateValidationPack(df.getCanonicalPath());
@@ -4201,7 +4203,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     return true;
   }
 
-  private boolean generateExampleZip(Manager.FhirFormat fmt) throws Exception {
+  private boolean generateExampleZip(FhirFormat fmt) throws Exception {
     Set<String> files = new HashSet<String>();
     for (FetchedFile f : pf.fileList) {
       f.start("generateExampleZip");
@@ -4246,8 +4248,8 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         exp.addEntry().setResource(vs).setFullUrl(vs.getUrl());
       }
 
-      new JsonParser().setOutputStyle(IParser.OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(pf.outputDir, "expansions.json")), exp);
-      new XmlParser().setOutputStyle(IParser.OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(pf.outputDir, "expansions.xml")), exp);
+      new JsonParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(pf.outputDir, "expansions.json")), exp);
+      new XmlParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(pf.outputDir, "expansions.xml")), exp);
       ZipGenerator zip = new ZipGenerator(Utilities.path(pf.outputDir, "expansions.json.zip"));
       zip.addFileName("expansions.json", Utilities.path(pf.outputDir, "expansions.json"), false);
       zip.close();
@@ -4262,7 +4264,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     return pf.listedURLExemptions.contains(uc);
   }
 
-  private void generateDefinitions(Manager.FhirFormat fmt, String specFile)  throws Exception {
+  private void generateDefinitions(FhirFormat fmt, String specFile)  throws Exception {
     // public definitions
     Set<FetchedResource> files = new HashSet<FetchedResource>();
     for (FetchedFile f : pf.fileList) {
@@ -4277,58 +4279,58 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       for (FetchedResource r : files) {
         ByteArrayOutputStream bs = new ByteArrayOutputStream();
         if (VersionUtilities.isR3Ver(pf.version)) {
-          org.hl7.fhir.dstu3.model.Resource r3 = VersionConvertorFactory_30_50.convertResource(r.getResource());
-          if (fmt.equals(Manager.FhirFormat.JSON)) {
+          org.hl7.fhir.dstu3.model.Resource r3 = VersionConvertorFactory_30_N.convertResource(r.getResource());
+          if (fmt.equals(FhirFormat.JSON)) {
             new org.hl7.fhir.dstu3.formats.JsonParser().compose(bs, r3);
-          } else if (fmt.equals(Manager.FhirFormat.XML)) {
+          } else if (fmt.equals(FhirFormat.XML)) {
             new org.hl7.fhir.dstu3.formats.XmlParser().compose(bs, r3);
-          } else if (fmt.equals(Manager.FhirFormat.TURTLE)) {
+          } else if (fmt.equals(FhirFormat.TURTLE)) {
             new org.hl7.fhir.dstu3.formats.RdfParser().compose(bs, r3);
           }
         } else if (VersionUtilities.isR4Ver(pf.version)) {
-          org.hl7.fhir.r4.model.Resource r4 = VersionConvertorFactory_40_50.convertResource(r.getResource());
-          if (fmt.equals(Manager.FhirFormat.JSON)) {
+          org.hl7.fhir.r4.model.Resource r4 = VersionConvertorFactory_40_N.convertResource(r.getResource());
+          if (fmt.equals(FhirFormat.JSON)) {
             new org.hl7.fhir.r4.formats.JsonParser().compose(bs, r4);
-          } else if (fmt.equals(Manager.FhirFormat.XML)) {
+          } else if (fmt.equals(FhirFormat.XML)) {
             new org.hl7.fhir.r4.formats.XmlParser().compose(bs, r4);
-          } else if (fmt.equals(Manager.FhirFormat.TURTLE)) {
+          } else if (fmt.equals(FhirFormat.TURTLE)) {
             new org.hl7.fhir.r4.formats.RdfParser().compose(bs, r4);
           }
         } else if (VersionUtilities.isR4BVer(pf.version)) {
-          org.hl7.fhir.r4b.model.Resource r4b = VersionConvertorFactory_43_50.convertResource(r.getResource());
-          if (fmt.equals(Manager.FhirFormat.JSON)) {
+          org.hl7.fhir.r4b.model.Resource r4b = VersionConvertorFactory_43_N.convertResource(r.getResource());
+          if (fmt.equals(FhirFormat.JSON)) {
             new org.hl7.fhir.r4b.formats.JsonParser().compose(bs, r4b);
-          } else if (fmt.equals(Manager.FhirFormat.XML)) {
+          } else if (fmt.equals(FhirFormat.XML)) {
             new org.hl7.fhir.r4b.formats.XmlParser().compose(bs, r4b);
-          } else if (fmt.equals(Manager.FhirFormat.TURTLE)) {
+          } else if (fmt.equals(FhirFormat.TURTLE)) {
             new org.hl7.fhir.r4b.formats.RdfParser().compose(bs, r4b);
           }
         } else if (VersionUtilities.isR2BVer(pf.version)) {
-          org.hl7.fhir.dstu2016may.model.Resource r14 = VersionConvertorFactory_14_50.convertResource(r.getResource());
-          if (fmt.equals(Manager.FhirFormat.JSON)) {
+          org.hl7.fhir.dstu2016may.model.Resource r14 = VersionConvertorFactory_14_N.convertResource(r.getResource());
+          if (fmt.equals(FhirFormat.JSON)) {
             new org.hl7.fhir.dstu2016may.formats.JsonParser().compose(bs, r14);
-          } else if (fmt.equals(Manager.FhirFormat.XML)) {
+          } else if (fmt.equals(FhirFormat.XML)) {
             new org.hl7.fhir.dstu2016may.formats.XmlParser().compose(bs, r14);
-          } else if (fmt.equals(Manager.FhirFormat.TURTLE)) {
+          } else if (fmt.equals(FhirFormat.TURTLE)) {
             new org.hl7.fhir.dstu2016may.formats.RdfParser().compose(bs, r14);
           }
         } else if (VersionUtilities.isR2Ver(pf.version)) {
           BaseAdvisor_10_50 advisor = new IGR2ConvertorAdvisor5();
-          org.hl7.fhir.dstu2.model.Resource r14 = VersionConvertorFactory_10_50.convertResource(r.getResource(), advisor);
-          if (fmt.equals(Manager.FhirFormat.JSON)) {
+          org.hl7.fhir.dstu2.model.Resource r14 = VersionConvertorFactory_10_N.convertResource(r.getResource(), advisor);
+          if (fmt.equals(FhirFormat.JSON)) {
             new org.hl7.fhir.dstu2.formats.JsonParser().compose(bs, r14);
-          } else if (fmt.equals(Manager.FhirFormat.XML)) {
+          } else if (fmt.equals(FhirFormat.XML)) {
             new org.hl7.fhir.dstu2.formats.XmlParser().compose(bs, r14);
-          } else if (fmt.equals(Manager.FhirFormat.TURTLE)) {
+          } else if (fmt.equals(FhirFormat.TURTLE)) {
             throw new Exception("Turtle is not supported for releases < 3");
           }
         } else {
-          if (fmt.equals(Manager.FhirFormat.JSON)) {
-            new JsonParser().compose(bs, r.getResource());
-          } else if (fmt.equals(Manager.FhirFormat.XML)) {
-            new XmlParser().compose(bs, r.getResource());
-          } else if (fmt.equals(Manager.FhirFormat.TURTLE)) {
-            new RdfParser().compose(bs, r.getResource());
+          if (fmt.equals(FhirFormat.JSON)) {
+            new JsonParser(pf.context.getModelContext()).compose(bs, r.getResource());
+          } else if (fmt.equals(FhirFormat.XML)) {
+            new XmlParser(pf.context.getModelContext()).compose(bs, r.getResource());
+          } else if (fmt.equals(FhirFormat.TURTLE)) {
+            new RdfParser(pf.context.getModelContext()).compose(bs, r.getResource());
           }
         }
         zip.addBytes(r.fhirType()+"-"+r.getId()+"."+fmt.getExtension(), bs.toByteArray(), false);
@@ -4366,7 +4368,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
             try {
               ByteArrayOutputStream bs = new ByteArrayOutputStream();
-              org.hl7.fhir.dstu3.model.Resource r3 = VersionConvertorFactory_30_50.convertResource(r.getResource());
+              org.hl7.fhir.dstu3.model.Resource r3 = VersionConvertorFactory_30_N.convertResource(r.getResource());
               new org.hl7.fhir.dstu3.formats.JsonParser().compose(bs, r3);
               zip.addBytes(r.fhirType()+"-"+r.getId()+".json", bs.toByteArray(), false);
             } catch (Exception e) {
@@ -4416,18 +4418,18 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           } else if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
             ByteArrayOutputStream bs = new ByteArrayOutputStream();
             if (VersionUtilities.isR3Ver(this.pf.version)) {
-              new org.hl7.fhir.dstu3.formats.JsonParser().compose(bs, VersionConvertorFactory_30_50.convertResource(r.getResource()));
+              new org.hl7.fhir.dstu3.formats.JsonParser().compose(bs, VersionConvertorFactory_30_N.convertResource(r.getResource()));
             } else if (VersionUtilities.isR4Ver(this.pf.version)) {
-              new org.hl7.fhir.r4.formats.JsonParser().compose(bs, VersionConvertorFactory_40_50.convertResource(r.getResource()));
+              new org.hl7.fhir.r4.formats.JsonParser().compose(bs, VersionConvertorFactory_40_N.convertResource(r.getResource()));
             } else if (VersionUtilities.isR2BVer(this.pf.version)) {
-              new org.hl7.fhir.dstu2016may.formats.JsonParser().compose(bs, VersionConvertorFactory_14_50.convertResource(r.getResource()));
+              new org.hl7.fhir.dstu2016may.formats.JsonParser().compose(bs, VersionConvertorFactory_14_N.convertResource(r.getResource()));
             } else if (VersionUtilities.isR2Ver(this.pf.version)) {
               BaseAdvisor_10_50 advisor = new IGR2ConvertorAdvisor5();
-              new org.hl7.fhir.dstu2.formats.JsonParser().compose(bs, VersionConvertorFactory_10_50.convertResource(r.getResource(), advisor));
+              new org.hl7.fhir.dstu2.formats.JsonParser().compose(bs, VersionConvertorFactory_10_N.convertResource(r.getResource(), advisor));
             } else if (VersionUtilities.isR4BVer(this.pf.version)) {
-              new org.hl7.fhir.r4b.formats.JsonParser().compose(bs, VersionConvertorFactory_43_50.convertResource(r.getResource()));
+              new org.hl7.fhir.r4b.formats.JsonParser().compose(bs, VersionConvertorFactory_43_N.convertResource(r.getResource()));
             } else if (VersionUtilities.isR5Plus(this.pf.version)) {
-              new JsonParser().compose(bs, r.getResource());
+              new JsonParser(pf.context.getModelContext()).compose(bs, r.getResource());
             } else {
               throw new Exception("Unsupported version "+ this.pf.version);
             }
@@ -4491,7 +4493,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         }
       }
     }
-    return new JsonParser().composeBytes(bnd);
+    return new JsonParser(pf.context.getModelContext()).composeBytes(bnd);
   }
 
   private byte[] validationSummaryJson() throws UnsupportedEncodingException {
@@ -4617,7 +4619,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       }
       if (cr.hasIdentifier()) {
         List<String> ids = new ArrayList<String>();
-        for (Identifier id : cr.getIdentifier()) {
+        for (Identifier id : cr.getIdentifierList()) {
           if (id.hasValue()) {
             ids.add(pf.dr.displayDataType(id));
           }
@@ -4649,7 +4651,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       }
       if (cr.hasUseContext() && !containedCr) {
         List<String> contexts = new ArrayList<String>();
-        for (UsageContext uc : cr.getUseContext()) {
+        for (UsageContext uc : cr.getUseContextList()) {
           String label = pf.dr.displayDataType(uc.getCode());
           if (uc.hasValueCodeableConcept()) {
             String value = pf.dr.displayDataType(uc.getValueCodeableConcept());
@@ -4704,7 +4706,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         JsonArray jNodes = new JsonArray();
         item.add("jurisdictions", jNodes);
         ValueSet jvs = pf.context.fetchResource(ValueSet.class, "http://hl7.org/fhir/ValueSet/jurisdiction");
-        for (CodeableConcept cc : cr.getJurisdiction()) {
+        for (CodeableConcept cc : cr.getJurisdictionList()) {
           JsonObject jNode = new JsonObject();
           jNodes.add(jNode);
           ValidationResult vr = jvs==null ? null : pf.context.validateCode(new ValidationOptions(FhirPublication.R5, "en-US"),  cc, jvs);
@@ -4783,7 +4785,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       if (r.getResource() instanceof StructureDefinition) {
         StructureDefinition sd = (StructureDefinition)r.getResource();
         if (sd.hasKeyword()) {
-          for (Coding coding : sd.getKeyword()) {
+          for (Coding coding : sd.getKeywordList()) {
             String value = pf.dr.displayDataType(coding);
             if (value != null)
               keywords.add(value);
@@ -4869,7 +4871,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       }
       JsonArray oids = new JsonArray();
       JsonArray urls = new JsonArray();
-      for (Identifier id : cr.getIdentifier()) {
+      for (Identifier id : cr.getIdentifierList()) {
         if (id != null) {
           if("urn:ietf:rfc:3986".equals(id.getSystem()) && id.hasValue()) {
             if (id.getValue().startsWith("urn:oid:")) {
@@ -4905,7 +4907,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     for (CanonicalResource cr : crlist) {
       CommaSeparatedStringBuilder bu = new CommaSeparatedStringBuilder();
       CommaSeparatedStringBuilder bo = new CommaSeparatedStringBuilder();
-      for (Identifier id : cr.getIdentifier()) {
+      for (Identifier id : cr.getIdentifierList()) {
         if (id != null) {
           if ("urn:ietf:rfc:3986".equals(id.getSystem()) && id.hasValue()) {
             if (id.getValue().startsWith("urn:oid:")) {
@@ -5292,41 +5294,40 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
       // now, start generating resource type specific stuff
       switch (res.getResourceType()) {
-        case CodeSystem:
+        case "CodeSystem":
           generateOutputsCodeSystem(f, r, (CodeSystem) res, vars, prefixForContainer, lrc, lang);
           break;
-        case ValueSet:
+        case "ValueSet":
           generateOutputsValueSet(f, r, (ValueSet) res, vars, prefixForContainer, db, lrc, lang);
           break;
-        case ConceptMap:
+        case "ConceptMap":
           generateOutputsConceptMap(f, r, (ConceptMap) res, vars, prefixForContainer, lrc, lang);
           break;
-        case ImplementationGuide:
+        case "ImplementationGuide":
           generateOutputsImplementationGuide(f, r, (ImplementationGuide) res, vars, prefixForContainer, lrc, lang);
           break;
-        case List:
+        case "List":
           generateOutputsList(f, r, (ListResource) res, vars, prefixForContainer, lrc, lang);
           break;
-
-        case CapabilityStatement:
+        case "CapabilityStatement":
           generateOutputsCapabilityStatement(f, r, (CapabilityStatement) res, vars, prefixForContainer, lrc, lang);
           break;
-        case StructureDefinition:
+        case "StructureDefinition":
           generateOutputsStructureDefinition(f, r, (StructureDefinition) res, vars, regen, prefixForContainer, lrc, lang);
           break;
-        case OperationDefinition:
+        case "OperationDefinition":
           generateOutputsOperationDefinition(f, r, (OperationDefinition) res, vars, regen, prefixForContainer, lrc, lang);
           break;
-        case StructureMap:
+        case "StructureMap":
           generateOutputsStructureMap(f, r, (StructureMap) res, vars, prefixForContainer, lrc, lang);
           break;
-        case Questionnaire:
+        case "Questionnaire":
           generateOutputsQuestionnaire(f, r, (Questionnaire) res, vars, prefixForContainer, lrc, lang);
           break;
-        case Library:
+        case "Library":
           generateOutputsLibrary(f, r, (Library) res, vars, prefixForContainer, lrc, lang);
           break;
-        case ExampleScenario:
+        case "ExampleScenario":
           generateOutputsExampleScenario(f, r, (ExampleScenario) res, vars, prefixForContainer, lrc, lang);
           break;
         default:
@@ -5370,7 +5371,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 //      case CapabilityStatement:
 //        generateOutputsCapabilityStatement(f, r, (CapabilityStatement) res, vars, prefixForContainer, lrc, lang);
 //        break;
-        case StructureDefinition:
+        case "StructureDefinition":
           generateSpreadsheetsStructureDefinition(f, r, (StructureDefinition) res, vars, regen, prefixForContainer);
           break;
 //      case OperationDefinition:
@@ -5441,7 +5442,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
     List<ListItemEntry> list = new ArrayList<>();
 
-    for (ListResource.ListResourceEntryComponent li : resource.getEntry()) {
+    for (ListResource.ListResourceEntryComponent li : resource.getEntryList()) {
       if (!li.getDeleted() && li.hasItem() && li.getItem().hasReference()) {
         String ref = li.getItem().getReference();
         FetchedResource lr = getResourceForUri(f, ref);
@@ -5507,7 +5508,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       for (ListItemEntry i : list) {
         if (i.element != null) {
           ByteArrayOutputStream bs = new ByteArrayOutputStream();
-          new org.hl7.fhir.r5.elementmodel.JsonParser(this.pf.context).compose(i.element, bs, IParser.OutputStyle.NORMAL, this.pf.igpkp.getCanonical());
+          new org.hl7.fhir.services.elementmodel.JsonParser(this.pf.context).compose(i.element, bs, OutputStyle.NORMAL, this.pf.igpkp.getCanonical());
           gen.addFile(NPMPackageGenerator.Category.RESOURCE, i.element.fhirType()+"-"+i.element.getIdBase()+".json", bs.toByteArray());
         }
       }
@@ -5792,7 +5793,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     Map<String, String> map = new HashMap<String, String>();
     if (r.getResource() != null) {
       switch (r.getResource().getResourceType()) {
-        case StructureDefinition:
+        case "StructureDefinition":
           StructureDefinition sd = (StructureDefinition) r.getResource();
           String url = sd.getBaseDefinition();
           StructureDefinition base = pf.context.fetchResource(StructureDefinition.class, url);
@@ -5827,7 +5828,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
    */
   private byte[] saveNativeResourceOutputs(FetchedFile f, FetchedResource r) throws FHIRException, IOException {
     ByteArrayOutputStream bsj = new ByteArrayOutputStream();
-    org.hl7.fhir.r5.elementmodel.JsonParser jp = new org.hl7.fhir.r5.elementmodel.JsonParser(this.pf.context);
+    org.hl7.fhir.services.elementmodel.JsonParser jp = new org.hl7.fhir.services.elementmodel.JsonParser(this.pf.context);
     Element element = r.getElement();
     boolean embeddedIg = r.getResource() != null && r.getResource() == this.pf.publishedIg;
     Element baseElement = element;
@@ -5837,7 +5838,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       // generated IG POJO (narrative + generated extensions) with the same helpers as the variant
       // path, then converted back to an element for the compose / per-language paths below (mirrors
       // the updateImplementationGuide() convertToElement pattern).
-      ImplementationGuide baseIg = ((ImplementationGuide) r.getResource()).copy();
+      ImplementationGuide baseIg = ((ImplementationGuide) r.getResource()).copy(Base.COPY_DATA);
       applyEffectiveDependsOn(baseIg, this.pf.getEffectiveBaseIg());
       filterResourceMembership(baseIg, this.pf.version);
       try {
@@ -5847,7 +5848,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       }
     }
     Element eNN = baseElement;
-    jp.compose(baseElement, bsj, IParser.OutputStyle.NORMAL, this.pf.igpkp.getCanonical());
+    jp.compose(baseElement, bsj, OutputStyle.NORMAL, this.pf.igpkp.getCanonical());
     if (!r.isCustomResource()) {
       if (includedInVersion(r, this.pf.version)) {
         this.pf.npm.addFile(isExample(f,r ) ? NPMPackageGenerator.Category.EXAMPLE : NPMPackageGenerator.Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", bsj.toByteArray());
@@ -5855,7 +5856,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           for (String l : allLangs()) {
             Element le = this.pf.langUtils.copyToLanguage(baseElement, l, true, r.getElement().getChildValue("language"), pf.defaultTranslationLang, r.getErrors()); // todo: should we keep this?
             ByteArrayOutputStream bsjl = new ByteArrayOutputStream();
-            jp.compose(le, bsjl, IParser.OutputStyle.NORMAL, this.pf.igpkp.getCanonical());
+            jp.compose(le, bsjl, OutputStyle.NORMAL, this.pf.igpkp.getCanonical());
             this.pf.lnpms.get(l).addFile(isExample(f,r ) ? NPMPackageGenerator.Category.EXAMPLE : NPMPackageGenerator.Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", bsjl.toByteArray());
           }
         }
@@ -5874,7 +5875,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           // (from checkIgDeps) and a target-filtered definition.resource - built on the fully
           // generated IG so narrative/generated extensions survive; convVersion then stamps the
           // target fhirVersion and packageId suffix.
-          ImplementationGuide vig = ((ImplementationGuide) r.getResource()).copy();
+          ImplementationGuide vig = ((ImplementationGuide) r.getResource()).copy(Base.COPY_DATA);
           applyEffectiveDependsOn(vig, this.pf.effectiveVersionIgs.get(v));
           filterResourceMembership(vig, v);
           res = vig;
@@ -5884,7 +5885,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         if (res != null) {
           byte[] resVer = null;
           try {
-            resVer = convVersion(res.copy(), ver);
+            resVer = convVersion(res.copy(Base.COPY_DATA), ver);
           } catch (Exception e) {
             System.out.println("Unable to convert "+res.fhirType()+"/"+res.getId()+" to "+ver+": "+e.getMessage());
             if (this.pf.cvAnalyser != null) {
@@ -5904,27 +5905,27 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     } else  if ("StructureDefinition".equals(r.fhirType())) {
       // GG 20-Feb 2025 - how can you ever get to here?
       addFileToNpm(NPMPackageGenerator.Category.RESOURCE, element.fhirType()+"-"+r.getId()+".json", bsj.toByteArray());
-      StructureDefinition sdt = (StructureDefinition) r.getResource().copy();
+      StructureDefinition sdt = (StructureDefinition) r.getResource().copy(Base.COPY_DATA);
       sdt.setKind(StructureDefinition.StructureDefinitionKind.RESOURCE);
       bsj = new ByteArrayOutputStream();
-      new JsonParser().setOutputStyle(IParser.OutputStyle.NORMAL).compose(bsj, sdt);
+      new JsonParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.NORMAL).compose(bsj, sdt);
       addFileToNpm(NPMPackageGenerator.Category.CUSTOM, "StructureDefinition-"+r.getId()+".json", bsj.toByteArray());
     } else {
       addFileToNpm(NPMPackageGenerator.Category.CUSTOM, element.fhirType()+"-"+r.getId()+".json", bsj.toByteArray());
-      Binary bin = new Binary("application/fhir+json");
+      Binary bin = new Binary(pf.context.getModelContext(), "application/fhir+json");
       bin.setId(r.getId());
       bin.setContent(bsj.toByteArray());
       bsj = new ByteArrayOutputStream();
-      new JsonParser().setOutputStyle(IParser.OutputStyle.NORMAL).compose(bsj, bin);
+      new JsonParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.NORMAL).compose(bsj, bin);
       addFileToNpm(isExample(f,r ) ? NPMPackageGenerator.Category.EXAMPLE : NPMPackageGenerator.Category.RESOURCE, "Binary-"+r.getId()+".json", bsj.toByteArray());
     }
 
     if (this.pf.module.isNoNarrative()) {
       // we don't use the narrative in these resources in _includes, so we strip it - it slows Jekyll down greatly
-      eNN = (Element) baseElement.copy();
+      eNN = (Element) baseElement.copy(Base.COPY_DATA);
       eNN.removeChild("text");
       bsj = new ByteArrayOutputStream();
-      jp.compose(eNN, bsj, IParser.OutputStyle.PRETTY, this.pf.igpkp.getCanonical());
+      jp.compose(eNN, bsj, OutputStyle.PRETTY, this.pf.igpkp.getCanonical());
     }
     String path = Utilities.path(this.pf.tempDir, "_includes", r.fhirType()+"-"+r.getId()+".json");
     FileUtilities.bytesToFile(bsj.toByteArray(), path);
@@ -5933,7 +5934,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
     saveNativeResourceOutputFormats(f, r, element, "");
     for (String lang : allLangs()) {
-      Element e = (Element) element.copy();
+      Element e = (Element) element.copy(Base.COPY_DATA);
       if (this.pf.langUtils.switchLanguage(e, lang, true, r.getElement().getChildValue("language"), pf.defaultTranslationLang, r.getErrors())) {
         saveNativeResourceOutputFormats(f, r, e, lang);
       }
@@ -5988,7 +5989,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         String elideExceptExpr = elideExceptDetails.getExcept();
         boolean foundExclude = false;
         for (Base elideElement: baseElements) {
-          for (Element child: ((Element)elideElement).getChildren()) {
+          for (Element child: ((Element)elideElement).getChildList()) {
             child.setElided(true);
           }
           List<Base> elideExceptElements = fpe.evaluate(elideElement, elideExceptExpr);
@@ -6021,7 +6022,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
     try {
       if (syntax.equals("xml")) {
-        org.hl7.fhir.r5.elementmodel.XmlParser xp = new org.hl7.fhir.r5.elementmodel.XmlParser(this.pf.context);
+        org.hl7.fhir.services.elementmodel.XmlParser xp = new org.hl7.fhir.services.elementmodel.XmlParser(this.pf.context);
         XmlXHtmlRenderer x = new XmlXHtmlRenderer();
         x.setPrism(true);
         xp.setElideElements(true);
@@ -6036,7 +6037,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       } else if (syntax.equals("json")) {
         JsonXhtmlRenderer j = new JsonXhtmlRenderer();
         j.setPrism(true);
-        org.hl7.fhir.r5.elementmodel.JsonParser jp = new org.hl7.fhir.r5.elementmodel.JsonParser(this.pf.context);
+        org.hl7.fhir.services.elementmodel.JsonParser jp = new org.hl7.fhir.services.elementmodel.JsonParser(this.pf.context);
         jp.setLinkResolver(this.pf.igpkp);
         jp.setAllowComments(true);
         jp.setElideElements(true);
@@ -6049,18 +6050,18 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         return j.toString();
 
       } else if (syntax.equals("ttl")) {
-        org.hl7.fhir.r5.elementmodel.TurtleParser ttl = new org.hl7.fhir.r5.elementmodel.TurtleParser(this.pf.context);
+        org.hl7.fhir.services.elementmodel.TurtleParser ttl = new org.hl7.fhir.services.elementmodel.TurtleParser(this.pf.context);
         ttl.setLinkResolver(this.pf.igpkp);
         Turtle rdf = new Turtle();
         if (suppressId(f, r)) {
           ttl.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
         }
-        ttl.setStyle(IParser.OutputStyle.PRETTY);
+        ttl.setStyle(OutputStyle.PRETTY);
         ttl.compose(e, rdf, "");
         return rdf.toString();
         
       } else if (syntax.equals("fml")) {
-        return StructureMapUtilities.render((StructureMap)r.getResource()).trim();
+        return StructureMapTools.render((StructureMap)r.getResource()).trim();
       } else
         throw new FHIRException("Unrecognized syntax: " + syntax);
     } catch (Exception except) {
@@ -6072,7 +6073,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
    Recursively removes consecutive elided elements from children of the element
    */
   private Element trimElided(Element e, boolean asJson) {
-    Element trimmed = (Element)e.copy();
+    Element trimmed = (Element)e.copy(Base.COPY_DATA);
     trimElide(trimmed, asJson);
     return trimmed;
   }
@@ -6082,15 +6083,15 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       return;
 
     boolean inElided = false;
-    for (int i = 0; i < e.getChildren().size();) {
-      Element child = e.getChildren().get(i);
+    for (int i = 0; i < e.getChildList().size();) {
+      Element child = e.getChildList().get(i);
       if (child.isElided()) {
         if (inElided) {
           // Check to see if this an elided collection item where the previous item isn't in the collection and the following item is in the collection and isn't elided
-          if (asJson && i > 0 && i < e.getChildren().size()-1 && !e.getChildren().get(i-1).getName().equals(child.getName()) && !e.getChildren().get(i+1).isElided() && e.getChildren().get(i+1).getName().equals(child.getName())) {
+          if (asJson && i > 0 && i < e.getChildren().size()-1 && !e.getChildren().get(i-1).getName().equals(child.getName()) && !e.getChildList().get(i+1).isElided() && e.getChildList().get(i+1).getName().equals(child.getName())) {
             // Do nothing
           } else {
-            e.getChildren().remove(child);
+            e.getChildList().remove(child);
             continue;
           }
         } else
@@ -6246,7 +6247,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     String src = StringEscapeUtils.unescapeHtml4(content).trim();
     try {
       if (src.startsWith("{")) {
-        org.hl7.fhir.r5.elementmodel.JsonParser p = (org.hl7.fhir.r5.elementmodel.JsonParser) Manager.makeParser(pf.context, Manager.FhirFormat.JSON);
+        org.hl7.fhir.services.elementmodel.JsonParser p = (org.hl7.fhir.services.elementmodel.JsonParser) Manager.makeParser(pf.context, FhirFormat.JSON);
         p.setupValidation(ParserBase.ValidationPolicy.QUICK);
         p.parse(src, type, false);
       } else {
@@ -6257,7 +6258,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         InputSource is = new InputSource(new StringReader(src));
         Document doc = builder.parse(is);
         org.w3c.dom.Element base = doc.getDocumentElement();
-        org.hl7.fhir.r5.elementmodel.XmlParser p = (org.hl7.fhir.r5.elementmodel.XmlParser) Manager.makeParser(pf.context, Manager.FhirFormat.XML);
+        org.hl7.fhir.services.elementmodel.XmlParser p = (org.hl7.fhir.services.elementmodel.XmlParser) Manager.makeParser(pf.context, FhirFormat.XML);
         p.setupValidation(ParserBase.ValidationPolicy.QUICK);
         p.parse(null, XMLUtil.getFirstChild(base), type);
       }
@@ -6618,7 +6619,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     Provenance pv = (Provenance) convertFromElement(r);
     ProvenanceDetails pd = processProvenance(path, pv);
 
-    for (Reference entity : pv.getTarget()) {
+    for (Reference entity : pv.getTargetList()) {
       String ref = entity.getReference();
       FetchedResource target = getResourceForRef(f, ref);
       String p, d;
@@ -6743,6 +6744,24 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     pf.otherFilesRun.add(Utilities.path(pf.tempDir, name+".json"));
   }
 
+
+  public static Set<String> listVSSystems(IWorkerContext ctxt, ValueSet vs) {
+    Set<String> systems = new HashSet<>();
+    for (ValueSet.ConceptSetComponent inc : vs.getCompose().getIncludeList()) {
+      for (CanonicalType ct : inc.getValueSetList()) {
+        ValueSet vsr = ctxt.findTxResource(ValueSet.class, ct.asStringValue(), ExtensionUtilities.getVersionResolutionRules(ct), null, vs);
+        if (vsr != null) {
+          systems.addAll(listVSSystems(ctxt, vsr));
+        }
+      }
+      if (inc.hasSystem()) {
+        systems.add(inc.getSystem());
+      }
+    }
+    return systems;
+  }
+
+
   private void saveVSList(String name, List<ValueSet> vslist, DBBuilder db, int view) throws Exception {
     StringBuilder b = new StringBuilder();
     JsonObject json = new JsonObject();
@@ -6764,7 +6783,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       item.add("title", vs.getTitle());
       item.add("description", preProcessMarkdown(vs.getDescription()));
 
-      Set<String> used = ValueSetUtilities.listSystems(pf.context, vs);
+      Set<String> used = listVSSystems(pf.context, vs);
       if (!used.isEmpty()) {
         JsonArray sysdArr = new JsonArray();
         item.add("systems", sysdArr);
@@ -7195,7 +7214,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     pf.shortCountryCode = new HashMap<String, String>();
     pf.stateNameForCode = new HashMap<String, String>();
     pf.ignoreFlags = new ArrayList<String>();
-    JsonParser p = new org.hl7.fhir.r5.formats.JsonParser(false);
+    JsonParser p = new JsonParser(pf.context.getModelContext(), false);
     ValueSet char3 = (ValueSet)p.parse("{\"resourceType\":\"ValueSet\",\"url\":\"http://hl7.org/fhir/ValueSet/iso3166-1-3\",\"version\":\"4.0.1\",\"name\":\"Iso3166-1-3\",\"status\":\"active\",\"compose\":{\"include\":[{\"system\":\"urn:iso:std:iso:3166\",\"filter\":[{\"property\":\"code\",\"op\":\"regex\",\"value\":\"^[A-Z]{3}$\"}]}]}}");
     ValueSet char2 = (ValueSet)p.parse("{\"resourceType\":\"ValueSet\",\"url\":\"http://hl7.org/fhir/ValueSet/iso3166-1-2\",\"version\":\"4.0.1\",\"name\":\"Iso3166-1-2\",\"status\":\"active\",\"compose\":{\"include\":[{\"system\":\"urn:iso:std:iso:3166\",\"filter\":[{\"property\":\"code\",\"op\":\"regex\",\"value\":\"^[A-Z]{2}$\"}]}]}}");
     ValueSet num = (ValueSet)p.parse("{\"resourceType\":\"ValueSet\",\"url\":\"http://hl7.org/fhir/ValueSet/iso3166-1-N\",\"version\":\"4.0.1\",\"name\":\"Iso3166-1-N\",\"status\":\"active\",\"compose\":{\"include\":[{\"system\":\"urn:iso:std:iso:3166\",\"filter\":[{\"property\":\"code\",\"op\":\"regex\",\"value\":\"^[0-9]{3}$\"}]}]}}");
@@ -7215,7 +7234,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         System.out.println("Error expanding state & province codes: " + stateExpand.getError());
       throw new Exception("Error expanding ISO country-code & state value sets");
     }
-    for (ValueSet.ValueSetExpansionContainsComponent c: char3Expand.getValueset().getExpansion().getContains()) {
+    for (ValueSet.ValueSetExpansionContainsComponent c: char3Expand.getValueset().getExpansion().getContainsList()) {
       if (!c.hasDisplay())
         System.out.println("No display value for 3-character country code " + c.getCode());
       else {
@@ -7223,7 +7242,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         pf.countryNameForCode.put(c.getCode(), c.getDisplay());
       }
     }
-    for (ValueSet.ValueSetExpansionContainsComponent c: char2Expand.getValueset().getExpansion().getContains()) {
+    for (ValueSet.ValueSetExpansionContainsComponent c: char2Expand.getValueset().getExpansion().getContainsList()) {
       if (!c.hasDisplay())
         System.out.println("No display value for 2-character country code " + c.getCode());
       else {
@@ -7277,13 +7296,13 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         }
       }
     }
-    for (ValueSet.ValueSetExpansionContainsComponent c: numExpand.getValueset().getExpansion().getContains()) {
+    for (ValueSet.ValueSetExpansionContainsComponent c: numExpand.getValueset().getExpansion().getContainsList()) {
       String code = pf.countryCodeForName.get(c.getDisplay());
 //      if (code==null)
 //        throw new Exception("Unable to find 3-character code having same country code as ISO numeric code " + c.getCode() + " - " + c.getDisplay());
       pf.countryCodeForNumeric.put(c.getCode(), code);
     }
-    for (ValueSet.ValueSetExpansionContainsComponent c: stateExpand.getValueset().getExpansion().getContains()) {
+    for (ValueSet.ValueSetExpansionContainsComponent c: stateExpand.getValueset().getExpansion().getContainsList()) {
       if (c.getSystem().equals("urn:iso:std:iso:3166:-2"))
         pf.stateNameForCode.put(c.getCode(), c.getDisplay());
     }
@@ -7316,7 +7335,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     ExtensionUtilities.removeExtension(ig.getDefinition(), ExtensionDefinitions.EXT_IGP_SPREADSHEET);
     ExtensionUtilities.removeExtension(ig.getDefinition(), ExtensionDefinitions.EXT_IGP_BUNDLE);
     ExtensionUtilities.removeExtension(ig, ExtensionDefinitions.EXT_IGP_CONTAINED_RESOURCE_INFO); // - this is in contained resources somewhere, not the root of IG?
-    for (ImplementationGuide.ImplementationGuideDefinitionResourceComponent r : ig.getDefinition().getResource())
+    for (ImplementationGuide.ImplementationGuideDefinitionResourceComponent r : ig.getDefinition().getResourceList())
       ExtensionUtilities.removeExtension(r, ExtensionDefinitions.EXT_IGP_RESOURCE_INFO);
   }
 

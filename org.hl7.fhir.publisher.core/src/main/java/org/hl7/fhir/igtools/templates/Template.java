@@ -41,17 +41,22 @@ import org.apache.tools.ant.DefaultLogger;
 import org.apache.tools.ant.Project;
 import org.apache.tools.ant.ProjectHelper;
 import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_40_50;
+import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_40_N;
+import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_50_N;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_N;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_50_N;
 import org.hl7.fhir.exceptions.FHIRException;
-import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.formats.JsonParser;
-import org.hl7.fhir.r5.formats.XmlParser;
-import org.hl7.fhir.r5.model.ImplementationGuide;
-import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionResourceComponent;
-import org.hl7.fhir.r5.model.OperationOutcome;
-import org.hl7.fhir.r5.model.OperationOutcome.OperationOutcomeIssueComponent;
-import org.hl7.fhir.r5.model.Reference;
+import org.hl7.fhir.model.core.ImplementationGuide;
+import org.hl7.fhir.model.core.ImplementationGuide.*;
+import org.hl7.fhir.model.core.OperationOutcome;
+import org.hl7.fhir.model.core.OperationOutcome.*;
+import org.hl7.fhir.model.core.Reference;
+import org.hl7.fhir.model.core.formats.JsonParser;
+import org.hl7.fhir.model.core.formats.XmlParser;
+import org.hl7.fhir.model.extensions.ExtensionDefinitions;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.services.context.IWorkerContext;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.i18n.POObject;
@@ -102,6 +107,7 @@ public class Template {
   @Getter Map<String, TemplateFragmentTypeLoader.PrefixGroup> usedFragmentTypes;
   private boolean rapido;
   private boolean devMode;
+  private IWorkerContext context;
 
   /** unpack the template into /template 
    * 
@@ -111,7 +117,8 @@ public class Template {
    * 
    * @throws IOException - only if the path is incorrect or the disk runs out of space
    */
-  public Template(String rootDir, boolean canExecute, String templateThatCantExecute, String templateReason, boolean wantLog, boolean rapido, boolean devMode) throws IOException {
+  public Template(IWorkerContext context, String rootDir, boolean canExecute, String templateThatCantExecute, String templateReason, boolean wantLog, boolean rapido, boolean devMode) throws IOException {
+    this.context = context;
     root = rootDir;
     this.canExecute = canExecute;
     this.templateThatCantExecute = templateThatCantExecute;
@@ -386,10 +393,11 @@ public class Template {
       if (xmlIg.exists())
         xmlIg.delete();
       if (USE_R5_IG_FORMAT) {
-        new XmlParser().compose(new FileOutputStream(sfn+"xml"), ig);
-        new JsonParser().compose(new FileOutputStream(sfn+"json"), ig);
+        org.hl7.fhir.r5.model.ImplementationGuide ig5 = (org.hl7.fhir.r5.model.ImplementationGuide) VersionConvertorFactory_50_N.convertResource(ig, new BaseAdvisor_50_N(true, true));
+        new org.hl7.fhir.r5.formats.XmlParser().compose(new FileOutputStream(sfn+"xml"), ig5);
+        new org.hl7.fhir.r5.formats.JsonParser().compose(new FileOutputStream(sfn+"json"), ig5);
       } else {
-        org.hl7.fhir.r4.model.ImplementationGuide ig4 = (org.hl7.fhir.r4.model.ImplementationGuide) VersionConvertorFactory_40_50.convertResource(ig, new BaseAdvisor_40_50(true, true));
+        org.hl7.fhir.r4.model.ImplementationGuide ig4 = (org.hl7.fhir.r4.model.ImplementationGuide) VersionConvertorFactory_40_N.convertResource(ig, new BaseAdvisor_40_N(true, true));
         new org.hl7.fhir.r4.formats.XmlParser().compose(new FileOutputStream(sfn+"xml"), ig4);
         new org.hl7.fhir.r4.formats.JsonParser().compose(new FileOutputStream(sfn+"json"), ig4);
       }
@@ -405,9 +413,9 @@ public class Template {
       }
     }
     if (jsonOutcomes.exists()) {
-      loadValidationMessages((OperationOutcome) new JsonParser().parse(new FileInputStream(jsonOutcomes)), messages);
+      loadValidationMessages((OperationOutcome) new JsonParser(context.getModelContext()).parse(new FileInputStream(jsonOutcomes)), messages);
     } else if (xmlOutcomes.exists()) {
-      loadValidationMessages((OperationOutcome) new XmlParser().parse(new FileInputStream(xmlOutcomes)), messages);
+      loadValidationMessages((OperationOutcome) new XmlParser(context.getModelContext()).parse(new FileInputStream(xmlOutcomes)), messages);
     }
     if (ig != null) {
       String newXml = fn+"xml";
@@ -416,31 +424,31 @@ public class Template {
         case IG_ANY:
           if (new File(newXml).exists()) {
             if (USE_R5_IG_FORMAT) {
-              return (ImplementationGuide) new XmlParser().parse(new FileInputStream(newXml));
+              return (ImplementationGuide) VersionConvertorFactory_50_N.convertResource(new org.hl7.fhir.r5.formats.XmlParser().parse(new FileInputStream(newXml)));
             } else {
-              return (ImplementationGuide) VersionConvertorFactory_40_50.convertResource(new org.hl7.fhir.r4.formats.XmlParser().parse(new FileInputStream(newXml)));                
+              return (ImplementationGuide) VersionConvertorFactory_40_N.convertResource(new org.hl7.fhir.r4.formats.XmlParser().parse(new FileInputStream(newXml)));                
             }
           } else if (new File(newJson).exists()) {
             if (USE_R5_IG_FORMAT) {
-              return (ImplementationGuide) new JsonParser().parse(new FileInputStream(newJson));              
+              return (ImplementationGuide) VersionConvertorFactory_50_N.convertResource(new org.hl7.fhir.r5.formats.JsonParser().parse(new FileInputStream(newXml)));
             } else {
-              return (ImplementationGuide) VersionConvertorFactory_40_50.convertResource(new org.hl7.fhir.r4.formats.JsonParser().parse(new FileInputStream(newXml)));                
+              return (ImplementationGuide) VersionConvertorFactory_40_N.convertResource(new org.hl7.fhir.r4.formats.JsonParser().parse(new FileInputStream(newXml)));                
             }
           } else
             throw new FHIRException("onLoad script "+targetOnLoad+" failed - no output file produced");        
         case IG_NO_RESOURCE:
           if (new File(newXml).exists()) {
             if (USE_R5_IG_FORMAT) {
-              loadModifiedIg((ImplementationGuide) new XmlParser().parse(new FileInputStream(newXml)), ig);
+              loadModifiedIg((ImplementationGuide) VersionConvertorFactory_50_N.convertResource(new org.hl7.fhir.r5.formats.XmlParser().parse(new FileInputStream(newXml))), ig);
             } else {
-              loadModifiedIg((ImplementationGuide) VersionConvertorFactory_40_50.convertResource(new org.hl7.fhir.r4.formats.XmlParser().parse(new FileInputStream(newXml))), ig);
+              loadModifiedIg((ImplementationGuide) VersionConvertorFactory_40_N.convertResource(new org.hl7.fhir.r4.formats.XmlParser().parse(new FileInputStream(newXml))), ig);
             }
           }
           else if (new File(newJson).exists()) {
             if (USE_R5_IG_FORMAT) {
-              loadModifiedIg((ImplementationGuide) new JsonParser().parse(new FileInputStream(newJson)), ig);
+              loadModifiedIg((ImplementationGuide) VersionConvertorFactory_50_N.convertResource(new org.hl7.fhir.r5.formats.JsonParser().parse(new FileInputStream(newXml))), ig);
             } else {
-              loadModifiedIg((ImplementationGuide) VersionConvertorFactory_40_50.convertResource(new org.hl7.fhir.r4.formats.JsonParser().parse(new FileInputStream(newXml))), ig);
+              loadModifiedIg((ImplementationGuide) VersionConvertorFactory_40_N.convertResource(new org.hl7.fhir.r4.formats.JsonParser().parse(new FileInputStream(newXml))), ig);
             }
           }
           return null;
@@ -454,23 +462,23 @@ public class Template {
   }
 
   private void loadModifiedIg(ImplementationGuide modIg, ImplementationGuide ig) throws FHIRException {
-    int oc = ig.getDefinition().getResource().size();
-    int nc = modIg.getDefinition().getResource().size();
+    int oc = ig.getDefinition().getResourceList().size();
+    int nc = modIg.getDefinition().getResourceList().size();
     if (oc != nc)
       throw new FHIRException("Templates are not allowed to modify the resources ("+oc+"/"+nc+")");
-    for (ImplementationGuideDefinitionResourceComponent or : ig.getDefinition().getResource()) {
-      ImplementationGuideDefinitionResourceComponent nr = getMatchingResource(modIg, or.getReference()); 
+    for (ImplementationGuideDefinitionResourceComponent or : ig.getDefinition().getResourceList()) {
+      ImplementationGuideDefinitionResourceComponent nr = getMatchingResource(modIg, or.getReference());
       if (nr == null)
         throw new FHIRException("Templates are not allowed to modify the resources - didn't find '"+or.getReference()+"'");
     }
     ig.setDefinition(modIg.getDefinition());
-    ig.getManifest().setPage(modIg.getManifest().getPage());
-    ig.getManifest().setImage(modIg.getManifest().getImage());
-    ig.getManifest().setOther(modIg.getManifest().getOther());
+    ig.getManifest().setPageList(modIg.getManifest().getPageList());
+    ig.getManifest().setImageList(modIg.getManifest().getImageList());
+    ig.getManifest().setOtherList(modIg.getManifest().getOtherList());
   }
 
   private ImplementationGuideDefinitionResourceComponent getMatchingResource(ImplementationGuide modIg, Reference reference) {
-    for (ImplementationGuideDefinitionResourceComponent nr : modIg.getDefinition().getResource()) {
+    for (ImplementationGuideDefinitionResourceComponent nr : modIg.getDefinition().getResourceList()) {
       if (nr.getReference().getReference().equals(reference.getReference()))
         return nr;
     }
@@ -478,7 +486,7 @@ public class Template {
   }
 
   private void loadValidationMessages(OperationOutcome op, Map<String, List<ValidationMessage>> res) throws FHIRException {
-    for (OperationOutcomeIssueComponent issue : op.getIssue()) {
+    for (OperationOutcomeIssueComponent issue : op.getIssueList()) {
       String source = ExtensionUtilities.readStringExtension(issue, ExtensionDefinitions.EXT_ISSUE_SOURCE);
       if (source == null)
         source = "";

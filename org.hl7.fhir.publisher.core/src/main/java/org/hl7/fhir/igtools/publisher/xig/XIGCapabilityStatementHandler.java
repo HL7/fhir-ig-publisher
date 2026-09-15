@@ -5,15 +5,12 @@ import java.util.Collections;
 import java.util.List;
 
 import org.hl7.fhir.igtools.publisher.xig.XIGInformation.UsageType;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.CanonicalType;
-import org.hl7.fhir.r5.model.CapabilityStatement;
-import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestComponent;
-import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceComponent;
-import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceOperationComponent;
-import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceSearchParamComponent;
-import org.hl7.fhir.r5.model.CodeType;
-import org.hl7.fhir.r5.model.Enumerations.CapabilityStatementKind;
+import org.hl7.fhir.model.core.*;
+import org.hl7.fhir.model.core.CapabilityStatement.CapabilityStatementRestComponent;
+import org.hl7.fhir.model.core.CapabilityStatement.CapabilityStatementRestResourceComponent;
+import org.hl7.fhir.model.core.CapabilityStatement.CapabilityStatementRestResourceOperationComponent;
+import org.hl7.fhir.model.core.CapabilityStatement.CapabilityStatementRestResourceSearchParamComponent;
+import org.hl7.fhir.model.core.Enumerations.CapabilityStatementKind;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 
 public class XIGCapabilityStatementHandler extends XIGHandler {
@@ -33,33 +30,33 @@ public class XIGCapabilityStatementHandler extends XIGHandler {
       j.add("fhirVersion", cs.getFhirVersion().toCode()); 
     }
     
-    for (CanonicalType g : cs.getInstantiates()) {
+    for (CanonicalType g : cs.getInstantiatesList()) {
       if (g.hasValue()) {    
         j.forceArray("instantiates").add(g.primitiveValue()); 
       }
     }
-    for (CanonicalType g : cs.getImports()) {
+    for (CanonicalType g : cs.getImportsList()) {
       if (g.hasValue()) {    
         j.forceArray("imports").add(g.primitiveValue()); 
       }
     }
-    for (CodeType g : cs.getFormat()) {
+    for (CodeType g : cs.getFormatList()) {
       if (g.hasValue()) {    
         j.forceArray("formats").add(g.primitiveValue()); 
       }
     }
-    for (CodeType g : cs.getPatchFormat()) {
+    for (Enumeration<CapabilityStatement.PatchMimeTypes> g : cs.getPatchFormatList()) {
       if (g.hasValue()) {    
         j.forceArray("formats").add(g.primitiveValue()); 
       }
     }
-    for (CodeType g : cs.getAcceptLanguage()) {
+    for (CodeType g : cs.getAcceptLanguageList()) {
       if (g.hasValue()) {    
         j.forceArray("languages").add(g.primitiveValue()); 
       }
     }
     
-    for (CanonicalType g : cs.getImplementationGuide()) {
+    for (CanonicalType g : cs.getImplementationGuideList()) {
       if (g.hasValue()) {    
         j.forceArray("implementationGuides").add(g.primitiveValue()); 
       }
@@ -100,31 +97,31 @@ public class XIGCapabilityStatementHandler extends XIGHandler {
   }
 
   public static void buildUsages(XIGInformation info, CapabilityStatement cs) {
-    for (CanonicalType ct : cs.getImports()) {
+    for (CanonicalType ct : cs.getImportsList()) {
       info.recordUsage(cs, ct.getValue(), UsageType.CS_IMPORTS);
     }
-    for (CanonicalType ct : cs.getInstantiates()) {
+    for (CanonicalType ct : cs.getInstantiatesList()) {
       info.recordUsage(cs, ct.getValue(), UsageType.CS_IMPORTS);
     }
-    for (CanonicalType ct : cs.getImplementationGuide()) {
+    for (CanonicalType ct : cs.getImplementationGuideList()) {
       info.recordUsage(cs, ct.getValue(), UsageType.CS_IMPORTS);
     }
-    for (CapabilityStatementRestComponent tr1 : cs.getRest()) {
-      for (CapabilityStatementRestResourceSearchParamComponent t : tr1.getSearchParam()) {
+    for (CapabilityStatementRestComponent tr1 : cs.getRestList()) {
+      for (CapabilityStatementRestResourceSearchParamComponent t : tr1.getSearchParamList()) {
         info.recordUsage(cs, t.getDefinition(), UsageType.CS_IMPORTS);
       }
-      for (CapabilityStatementRestResourceOperationComponent t : tr1.getOperation()) {
+      for (CapabilityStatementRestResourceOperationComponent t : tr1.getOperationList()) {
         info.recordUsage(cs, t.getDefinition(), UsageType.CS_IMPORTS);
       }
-      for (CapabilityStatementRestResourceComponent tr : tr1.getResource()) {
+      for (CapabilityStatementRestResourceComponent tr : tr1.getResourceList()) {
         info.recordUsage(cs, tr.getProfile(), UsageType.CS_PROFILE);
-        for (CanonicalType t : tr.getSupportedProfile()) {
+        for (CanonicalType t : tr.getSupportedProfileList()) {
           info.recordUsage(cs, t.getValue(), UsageType.CS_PROFILE);
         }
-        for (CapabilityStatementRestResourceSearchParamComponent t : tr.getSearchParam()) {
+        for (CapabilityStatementRestResourceSearchParamComponent t : tr.getSearchParamList()) {
           info.recordUsage(cs, t.getDefinition(), UsageType.CS_IMPORTS);
         }
-        for (CapabilityStatementRestResourceOperationComponent t : tr.getOperation()) {
+        for (CapabilityStatementRestResourceOperationComponent t : tr.getOperationList()) {
           info.recordUsage(cs, t.getDefinition(), UsageType.CS_IMPORTS);
         }
       }

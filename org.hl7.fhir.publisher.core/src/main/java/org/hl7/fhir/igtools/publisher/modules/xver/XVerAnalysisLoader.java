@@ -3,13 +3,14 @@ package org.hl7.fhir.igtools.publisher.modules.xver;
 import java.io.IOException;
 
 import org.hl7.fhir.convertors.loaders.loaderR5.ILoaderKnowledgeProviderR5;
-import org.hl7.fhir.r5.model.Resource;
+import org.hl7.fhir.convertors.loaders.loaderRN.ILoaderKnowledgeProviderRN;
+import org.hl7.fhir.model.core.Resource;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 
 import com.google.gson.JsonSyntaxException;
 
-public class XVerAnalysisLoader implements ILoaderKnowledgeProviderR5 {
+public class XVerAnalysisLoader implements ILoaderKnowledgeProviderRN {
 
   private String webPath;
   
@@ -24,7 +25,7 @@ public class XVerAnalysisLoader implements ILoaderKnowledgeProviderR5 {
   }
 
   @Override
-  public ILoaderKnowledgeProviderR5 forNewPackage(NpmPackage npm) throws JsonSyntaxException, IOException {
+  public ILoaderKnowledgeProviderRN forNewPackage(NpmPackage npm) throws JsonSyntaxException, IOException {
     return null;
   }
 

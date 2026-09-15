@@ -24,18 +24,10 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_10_30;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_10_40;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_14_50;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_40;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_50;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
-import org.hl7.fhir.dstu2.model.StructureDefinition;
-import org.hl7.fhir.dstu3.formats.IParser.OutputStyle;
-import org.hl7.fhir.dstu3.model.ImplementationGuide;
+import org.hl7.fhir.convertors.factory.*;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
-import org.hl7.fhir.r5.model.Resource;
+import org.hl7.fhir.model.core.Resource;
 import org.hl7.fhir.utilities.FhirPublication;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.FileUtilities;
@@ -374,7 +366,7 @@ public class PackageReleaser {
   private void makeR2Structures(String path, String outVer) throws FHIRException, IOException {
     NpmPackage npm = pcm.loadPackage("hl7.fhir.r2.core", null);
     for (String id : npm.listResources("StructureDefinition")) {
-      StructureDefinition sd = (StructureDefinition) new org.hl7.fhir.dstu2.formats.JsonParser().parse(npm.loadResource(id));
+      org.hl7.fhir.dstu2.model.StructureDefinition sd = (org.hl7.fhir.dstu2.model.StructureDefinition) new org.hl7.fhir.dstu2.formats.JsonParser().parse(npm.loadResource(id));
       sd.setId("r2-"+sd.getId());
       sd.setUrl(sd.getUrl().substring(0, 20)+"2.0/"+sd.getUrl().substring(20));
       String filename = Utilities.path(path, "package", sd.fhirType()+"-"+sd.getId()+".json");
@@ -453,13 +445,13 @@ public class PackageReleaser {
           Resource r = parseResource(f, inVer);
           String filename = Utilities.path(dest, "package", r.fhirType()+"-"+r.getId()+".json");
           if ("1.4".equals(outVer)) {
-            org.hl7.fhir.dstu2016may.model.Resource r2b = VersionConvertorFactory_14_50.convertResource(r);
+            org.hl7.fhir.dstu2016may.model.Resource r2b = VersionConvertorFactory_14_N.convertResource(r);
             new org.hl7.fhir.dstu2016may.formats.JsonParser().compose(new FileOutputStream(filename), r2b);
           } else if ("3.0".equals(outVer)) {
-            org.hl7.fhir.dstu3.model.Resource r3 = VersionConvertorFactory_30_50.convertResource(r);
+            org.hl7.fhir.dstu3.model.Resource r3 = VersionConvertorFactory_30_N.convertResource(r);
             new org.hl7.fhir.dstu3.formats.JsonParser().compose(new FileOutputStream(filename), r3);
           } else if ("4.0".equals(outVer)) {
-            org.hl7.fhir.r4.model.Resource r4 = VersionConvertorFactory_40_50.convertResource(r);
+            org.hl7.fhir.r4.model.Resource r4 = VersionConvertorFactory_40_N.convertResource(r);
             new org.hl7.fhir.r4.formats.JsonParser().compose(new FileOutputStream(filename), r4);
           } else {
             throw new Error("Unknown version "+outVer);
@@ -479,7 +471,7 @@ public class PackageReleaser {
       } else { // if (f.getName().endsWith(".json")) {
         r = new org.hl7.fhir.dstu2016may.formats.JsonParser().parse(new FileInputStream(f));
       }
-      return VersionConvertorFactory_14_50.convertResource(r);
+      return VersionConvertorFactory_14_N.convertResource(r);
     } else if ("3.0".equals(ver)) {
       org.hl7.fhir.dstu3.model.Resource r;
       if (f.getName().endsWith(".xml")) {
@@ -487,7 +479,7 @@ public class PackageReleaser {
       } else { // if (f.getName().endsWith(".json")) {
         r = new org.hl7.fhir.dstu3.formats.JsonParser().parse(new FileInputStream(f));
       }
-      return VersionConvertorFactory_30_50.convertResource(r);
+      return VersionConvertorFactory_30_N.convertResource(r);
     } else if ("4.0".equals(ver)) {
       org.hl7.fhir.r4.model.Resource r;
       if (f.getName().endsWith(".map")) {
@@ -497,7 +489,7 @@ public class PackageReleaser {
       } else { // if (f.getName().endsWith(".json")) {
         r = new org.hl7.fhir.r4.formats.JsonParser().parse(new FileInputStream(f));
       }
-      return VersionConvertorFactory_40_50.convertResource(r);
+      return VersionConvertorFactory_40_N.convertResource(r);
     } else {
       throw new Error("Unknown version "+ver);
     }
@@ -528,9 +520,9 @@ public class PackageReleaser {
       case "1.0":
         throw new Error("R2 is no longer supported processing "+Utilities.path(source, vd.getId()));
       case "3.0" : 
-        org.hl7.fhir.dstu3.model.ImplementationGuide ig3 = (ImplementationGuide) new org.hl7.fhir.dstu3.formats.JsonParser().parse(new FileInputStream(Utilities.path(source, vd.getId(), "package", "ImplementationGuide-"+vd.getId()+".json")));
+        org.hl7.fhir.dstu3.model.ImplementationGuide ig3 = (org.hl7.fhir.dstu3.model.ImplementationGuide) new org.hl7.fhir.dstu3.formats.JsonParser().parse(new FileInputStream(Utilities.path(source, vd.getId(), "package", "ImplementationGuide-"+vd.getId()+".json")));
         ig3.setVersion(vd.getNewVersion());
-        new org.hl7.fhir.dstu3.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(source, vd.getId(), "package", "ImplementationGuide-"+vd.getId()+".json")), ig3);
+        new org.hl7.fhir.dstu3.formats.JsonParser().setOutputStyle(org.hl7.fhir.dstu3.formats.IParser.OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(source, vd.getId(), "package", "ImplementationGuide-"+vd.getId()+".json")), ig3);
         break;
       case "4.0" : 
       case "4.3" : 

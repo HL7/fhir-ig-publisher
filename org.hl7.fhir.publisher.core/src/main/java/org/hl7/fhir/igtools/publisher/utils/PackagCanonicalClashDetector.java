@@ -8,12 +8,14 @@ import java.util.List;
 import java.util.Map;
 
 import lombok.extern.slf4j.Slf4j;
+import org.hl7.elm.r1.Mode;
 import org.hl7.fhir.igtools.publisher.loaders.PublisherLoader;
+import org.hl7.fhir.model.ModelContext;
 import org.hl7.fhir.r4.test.utils.TestingUtilities;
-import org.hl7.fhir.r5.context.IContextResourceLoader;
-import org.hl7.fhir.r5.formats.JsonParser;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.Resource;
+import org.hl7.fhir.services.context.IContextResourceLoaderN;
+import org.hl7.fhir.model.core.formats.JsonParser;
+import org.hl7.fhir.model.core.CanonicalResource;
+import org.hl7.fhir.model.core.Resource;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
@@ -85,13 +87,12 @@ public class PackagCanonicalClashDetector {
     list.get(0).resource.setDate(null);
     list.get(1).resource.setMeta(null);
     list.get(1).resource.setDate(null);
-    FileUtilities.bytesToFile(new JsonParser().composeBytes(list.get(0).resource), fn0);
-    FileUtilities.bytesToFile(new JsonParser().composeBytes(list.get(1).resource), fn1);
+    FileUtilities.bytesToFile(new JsonParser(ModelContext.fullCoreContext()).composeBytes(list.get(0).resource), fn0);
+    FileUtilities.bytesToFile(new JsonParser(ModelContext.fullCoreContext()).composeBytes(list.get(1).resource), fn1);
     String diff = TestingUtilities.checkJsonIsSame(fn0, fn1);
     if (diff != null) {
       System.out.println(s+": "+diff);
     }
-    
   }
 
 
@@ -100,7 +101,7 @@ public class PackagCanonicalClashDetector {
     FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager.Builder().build();
     NpmPackage npm = pcm.loadPackage(pid);
 //    SpecMapManager spm = new SpecMapManager(TextFile.streamToBytes(npm.load("other", "spec.internals")), npm.fhirVersion());
-    IContextResourceLoader loader = new PublisherLoader(npm, null, npm.getWebLocation(), null, false).makeLoader();
+    IContextResourceLoaderN loader = new PublisherLoader(npm, null, npm.getWebLocation(), null, false, ModelContext.fullCoreContext()).makeLoader();
     String[] types = new String[] { "StructureDefinition", "ValueSet", "SearchParameter", "OperationDefinition", "Questionnaire", "ConceptMap", "StructureMap", "NamingSystem" };
     for (String s : npm.listResources(types)) {
       Resource r = loader.loadResource(npm.load("package", s), true);

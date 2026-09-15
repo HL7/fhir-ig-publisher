@@ -13,7 +13,7 @@ import java.util.Set;
 
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.r4.model.CanonicalType;
-import org.hl7.fhir.r4.model.ValueSet.ConceptSetComponent;
+import org.hl7.fhir.r4.model.ValueSet;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
@@ -430,10 +430,10 @@ public class DependentIGFinder {
   }
 
   private void scanValueSetR4(org.hl7.fhir.r4.model.ValueSet vs, DepInfoDetails di, String link) {
-    for (ConceptSetComponent t : vs.getCompose().getInclude()) {
+    for (ValueSet.ConceptSetComponent t : vs.getCompose().getInclude()) {
       addToMap(codeSystems, di.codesystemsVs, t.getSystem(), vs.getUrl(), vs.present(), link);
     }   
-    for (ConceptSetComponent t : vs.getCompose().getExclude()) {
+    for (ValueSet.ConceptSetComponent t : vs.getCompose().getExclude()) {
       addToMap(codeSystems, di.codesystemsVs, t.getSystem(), vs.getUrl(), vs.present(), link);
     }
   }

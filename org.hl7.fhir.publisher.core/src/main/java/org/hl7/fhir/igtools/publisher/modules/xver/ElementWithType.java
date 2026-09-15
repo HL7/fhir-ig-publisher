@@ -1,8 +1,8 @@
 package org.hl7.fhir.igtools.publisher.modules.xver;
 
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.model.ElementDefinition;
-import org.hl7.fhir.r5.model.StructureDefinition;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.model.core.ElementDefinition;
+import org.hl7.fhir.model.core.StructureDefinition;
 
 public class ElementWithType {
 
@@ -47,9 +47,9 @@ public class ElementWithType {
       return ed.getPath();
     } else if (ed.hasContentReference()) {
       return ed.getContentReference();
-    } else if (ed.getType().size() == 0) {
+    } else if (ed.getTypeList().size() == 0) {
       throw new Error("No type information available for "+ed.getPath());
-    } else if (ed.getType().size() > 1) {
+    } else if (ed.getTypeList().size() > 1) {
       throw new Error("Multipe types for "+ed.getPath());
     } else {
       return ed.getTypeFirstRep().getWorkingCode();

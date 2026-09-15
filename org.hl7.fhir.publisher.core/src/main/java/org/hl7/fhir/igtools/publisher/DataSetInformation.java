@@ -1,8 +1,9 @@
 package org.hl7.fhir.igtools.publisher;
 
 import lombok.Getter;
-import org.hl7.fhir.r5.formats.JsonParser;
-import org.hl7.fhir.r5.model.SearchParameter;
+import org.hl7.fhir.model.ModelContext;
+import org.hl7.fhir.model.core.formats.JsonParser;
+import org.hl7.fhir.model.core.SearchParameter;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
@@ -29,7 +30,7 @@ public class DataSetInformation {
     Map<String, SearchParameter> map = new HashMap<>();
     for (String s : config.getStrings("searches")) {
       String file = Utilities.path(rootDir, s);
-      SearchParameter sp = (SearchParameter) new JsonParser().parse(new FileInputStream(file));
+      SearchParameter sp = (SearchParameter) new JsonParser(ModelContext.fullCoreContext()).parse(new FileInputStream(file));
       allSearchParameters.add(sp);
       map.put(sp.getCode(), sp);
     }

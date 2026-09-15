@@ -34,8 +34,8 @@ import java.util.Locale;
 import java.util.Set;
 
 import org.hl7.fhir.exceptions.FHIRException;
-import org.hl7.fhir.r5.context.IContextResourceLoader;
-import org.hl7.fhir.r5.model.Constants;
+import org.hl7.fhir.services.context.IContextResourceLoaderN;
+import org.hl7.fhir.model.core.Constants;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonArray;
@@ -82,7 +82,7 @@ public class SpecMapManager {
   private String auth;
   private String realm;
   private String npmVId;
-  private IContextResourceLoader loader;
+  private IContextResourceLoaderN loader;
   private JsonObject r5ExampleMap;
   
   private SpecMapManager() {
@@ -554,11 +554,11 @@ public class SpecMapManager {
     this.pi = pi;
   }
 
-  public IContextResourceLoader getLoader() {
+  public IContextResourceLoaderN getLoader() {
     return loader;
   }
 
-  public void setLoader(IContextResourceLoader loader) {
+  public void setLoader(IContextResourceLoaderN loader) {
     this.loader = loader;
   }
 

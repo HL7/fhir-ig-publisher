@@ -11,11 +11,10 @@ import java.util.List;
 import java.util.Map;
 
 import org.hl7.fhir.exceptions.FHIRException;
-import org.hl7.fhir.r5.model.Enumerations.FHIRVersion;
-import org.hl7.fhir.r5.model.ImplementationGuide;
-import org.hl7.fhir.r5.model.ImplementationGuide.SPDXLicense;
-import org.hl7.fhir.r5.utils.NPMPackageGenerator;
-import org.hl7.fhir.r5.utils.NPMPackageGenerator.Category;
+import org.hl7.fhir.model.core.Enumerations.FHIRVersion;
+import org.hl7.fhir.model.core.ImplementationGuide;
+import org.hl7.fhir.model.core.ImplementationGuide.SPDXLicense;
+import org.hl7.fhir.services.utilities.NPMPackageGenerator;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
@@ -138,7 +137,7 @@ public class IGPackageChecker {
     ig.setVersion(ver);
     ig.getDateElement().setValue(date);
     ig.setPackageId(packageId);
-    ig.setLicense(SPDXLicense.CC0_1_0);
+    ig.setLicense(SPDXLicense.CC01_0);
     ig.getManifest().setRendering(vpath);
     if (FHIRVersion.isValidCode(fhirversion))
       ig.addFhirVersion(FHIRVersion.fromCode(fhirversion));
@@ -154,7 +153,7 @@ public class IGPackageChecker {
     for (File f : new File(folder).listFiles()) {
       if (f.getName().endsWith(".openapi.json")) {
         byte[] src = FileUtilities.fileToBytes(f.getAbsolutePath());
-        npm.addFile(Category.OPENAPI, f.getName(), src);
+        npm.addFile(NPMPackageGenerator.Category.OPENAPI, f.getName(), src);
       } else if (f.getName().endsWith(".json")) {
         byte[] src = FileUtilities.fileToBytes(f.getAbsolutePath());
         String s = FileUtilities.bytesToString(src);
@@ -163,17 +162,17 @@ public class IGPackageChecker {
           if (json.has("resourceType") && json.has("id") && json.get("id").isJsonPrimitive()) {
             String rt = json.asString("resourceType");
             String id = json.asString("id");
-            npm.addFile(Category.RESOURCE, rt+"-"+id+".json", src);
+            npm.addFile(NPMPackageGenerator.Category.RESOURCE, rt+"-"+id+".json", src);
           }
         }
       }
       if (f.getName().endsWith(".sch")) {
         byte[] src = FileUtilities.fileToBytes(f.getAbsolutePath());
-        npm.addFile(Category.SCHEMATRON, f.getName(), src);
+        npm.addFile(NPMPackageGenerator.Category.SCHEMATRON, f.getName(), src);
       }
       if (f.getName().equals("spec.internals")) {
         byte[] src = FileUtilities.fileToBytes(f.getAbsolutePath());
-        npm.addFile(Category.OTHER, f.getName(), src);
+        npm.addFile(NPMPackageGenerator.Category.OTHER, f.getName(), src);
       }
     }
     npm.finish();    

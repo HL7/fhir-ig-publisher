@@ -10,14 +10,14 @@ import org.hl7.fhir.igtools.publisher.CqlSubSystem;
 import org.hl7.fhir.igtools.publisher.CqlSubSystem.CqlSourceFileInformation;
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
-import org.hl7.fhir.r5.elementmodel.Element;
-import org.hl7.fhir.r5.model.Attachment;
-import org.hl7.fhir.r5.model.Base;
-import org.hl7.fhir.r5.model.Base64BinaryType;
-import org.hl7.fhir.r5.model.Library;
-import org.hl7.fhir.r5.model.Property;
-import org.hl7.fhir.r5.model.RelatedArtifact.RelatedArtifactType;
-import org.hl7.fhir.r5.model.Resource;
+import org.hl7.fhir.services.elementmodel.Element;
+import org.hl7.fhir.model.core.Attachment;
+import org.hl7.fhir.model.Base;
+import org.hl7.fhir.model.core.Base64BinaryType;
+import org.hl7.fhir.model.core.Library;
+import org.hl7.fhir.model.Property;
+import org.hl7.fhir.model.core.RelatedArtifact.RelatedArtifactType;
+import org.hl7.fhir.model.core.Resource;
 import org.hl7.fhir.utilities.NamedItemList;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
@@ -178,7 +178,7 @@ public class AdjunctFileLoader {
           } else {
             f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, e.line(), e.col(), "Binary", "Unknown file type "+fn, IssueSeverity.ERROR));
           }
-          e.setProperty("data".hashCode(), "data", new Base64BinaryType(a.getData()));
+          e.setProperty("data", new Base64BinaryType(a.getData()));
         }
       } catch (Exception ex) {
         f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, e.line(), e.col(), "Binary", "Error Loading "+fn+": " +ex.getMessage(), IssueSeverity.ERROR));
@@ -197,7 +197,7 @@ public class AdjunctFileLoader {
       } else {
         f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, att.getElement().line(), att.getElement().col(), att.getPath(), "Unknown file type "+fn, IssueSeverity.ERROR));
       }
-      att.getElement().setProperty("data".hashCode(), "data", new Base64BinaryType(a.getData()));
+      att.getElement().setProperty("data", new Base64BinaryType(a.getData()));
     }
   }
 
@@ -252,7 +252,7 @@ public class AdjunctFileLoader {
     if (att.getChildren().size() != 1) {
       return null;
     }
-    Element id = att.getChildren().get(0);
+    Element id = att.getChildList().get(0);
     if (!id.getName().equals("id")) {
       return null;
     }
@@ -279,7 +279,7 @@ public class AdjunctFileLoader {
 
   private List<ElementWithPath> makeListOfAttachments(Element element) {
     List<ElementWithPath> res = new ArrayList<>();
-    listAttachments(res, element.getChildren(), element.fhirType());
+    listAttachments(res, element.getChildList(), element.fhirType());
     return res;
   }
 
@@ -300,7 +300,7 @@ public class AdjunctFileLoader {
       if (child.fhirType().equals("Attachment")) {
         res.add(new ElementWithPath(path+p, child));
       } else {
-        listAttachments(res, child.getChildren(), path+p);
+        listAttachments(res, child.getChildList(), path+p);
       }
     }    
   }
@@ -316,7 +316,7 @@ public class AdjunctFileLoader {
     if (focus instanceof Attachment) {
       res.add(new AttachmentWithPath(path, (Attachment) focus));
     } else {
-      for (Property p : focus.children()) {
+      for (Property p : focus.getChildren()) {
         if (p.getMaxCardinality() > 1) {
           int i = 0;
           for (Base b : p.getValues()) {
@@ -340,12 +340,12 @@ public class AdjunctFileLoader {
       if (info.getJsonElm() != null) {
         lib.addContent().setContentType("application/elm+json").setData(info.getJsonElm());
       }
-      lib.getDataRequirement().clear();
-      lib.getDataRequirement().addAll(info.getDataRequirements());
-      lib.getRelatedArtifact().removeIf(n -> n.getType() == RelatedArtifactType.DEPENDSON);
-      lib.getRelatedArtifact().addAll(info.getRelatedArtifacts());
-      lib.getParameter().clear();
-      lib.getParameter().addAll(info.getParameters());
+      lib.getDataRequirementList().clear();
+      lib.getDataRequirementList().addAll(info.getDataRequirements());
+      lib.getRelatedArtifactList().removeIf(n -> n.getType() == RelatedArtifactType.DEPENDSON);
+      lib.getRelatedArtifactList().addAll(info.getRelatedArtifacts());
+      lib.getParameterList().clear();
+      lib.getParameterList().addAll(info.getParameters());
     } else {
       f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, "Library", "No cql info found for "+f.getName(), IssueSeverity.ERROR));      
     }

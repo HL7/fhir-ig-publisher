@@ -1,16 +1,13 @@
 package org.hl7.fhir.igtools.publisher;
 
-import org.hl7.fhir.r5.model.CodeSystem;
-import org.hl7.fhir.r5.model.Enumerations.CodeSystemContentMode;
-import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.elementmodel.Element;
-import org.hl7.fhir.r5.model.CanonicalType;
-import org.hl7.fhir.r5.model.Parameters;
-import org.hl7.fhir.r5.model.Parameters.ParametersParameterComponent;
-import org.hl7.fhir.r5.model.ValueSet;
-import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionParameterComponent;
-import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
+import org.hl7.fhir.model.core.*;
+import org.hl7.fhir.model.core.Enumerations.CodeSystemContentMode;
+import org.hl7.fhir.model.core.Enumerations.PublicationStatus;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.services.elementmodel.Element;
+import org.hl7.fhir.model.core.Parameters.ParametersParameterComponent;
+import org.hl7.fhir.model.core.ValueSet.ValueSetExpansionParameterComponent;
+import org.hl7.fhir.services.terminology.ValueSetExpansionOutcome;
 
 public class ExpansionParameterUtilities {
 
@@ -22,7 +19,7 @@ public class ExpansionParameterUtilities {
   }
 
   public Parameters reviewVersions(Parameters params) {
-    for (ParametersParameterComponent pp : params.getParameter()) {
+    for (ParametersParameterComponent pp : params.getParameterList()) {
       String revised = checkParameter(pp.getName(), pp.getValue().primitiveValue());
       if (revised != null) {
         pp.setValue(new CanonicalType(revised));
@@ -37,10 +34,10 @@ public class ExpansionParameterUtilities {
     }
     String url = value.substring(0, value.indexOf("|"));
     if ("default-valueset-version".equals(name)) {
-      ValueSet vs = context.findTxResource(ValueSet.class, url, IWorkerContext.VersionResolutionRules.defaultRule());
+      ValueSet vs = context.findTxResource(ValueSet.class, url, VersionResolutionRules.defaultRule());
       return vs == null ? null : vs.getVersionedUrl();
     } else if ("system-version".equals(name)) {      
-      CodeSystem cs = context.findTxResource(CodeSystem.class, url, IWorkerContext.VersionResolutionRules.defaultRule());
+      CodeSystem cs = context.findTxResource(CodeSystem.class, url, VersionResolutionRules.defaultRule());
       if (cs != null && !(cs.getContent() == CodeSystemContentMode.NOTPRESENT && cs.hasSourcePackage() && cs.getSourcePackage().isTHO())) {
         return cs.getVersionedUrl();
       }
@@ -54,7 +51,7 @@ public class ExpansionParameterUtilities {
       vs.getCompose().addInclude().setSystem(url).addConcept().setCode("--this-is-intended-to-be-an-invalid-code--");
       ValueSetExpansionOutcome exp = context.expandVS(vs, false, false);
       if (exp != null && exp.getValueset() != null) {
-        for (ValueSetExpansionParameterComponent pp : exp.getValueset().getExpansion().getParameter()) {
+        for (ValueSetExpansionParameterComponent pp : exp.getValueset().getExpansion().getParameterList()) {
           if ("used-codesystem".equals(pp.getName())) {
             return pp.getValue().primitiveValue();
           }

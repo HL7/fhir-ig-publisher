@@ -31,12 +31,12 @@ import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.RelatedIG;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.model.Questionnaire;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext.QuestionnaireRendererMode;
-import org.hl7.fhir.r5.utils.EOperationOutcome;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.model.core.Questionnaire;
+import org.hl7.fhir.services.renderers.utils.RenderingContext;
+import org.hl7.fhir.services.renderers.utils.ResourceWrapper;
+import org.hl7.fhir.services.renderers.utils.RenderingContext.QuestionnaireRendererMode;
+import org.hl7.fhir.model.utilities.EOperationOutcome;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
@@ -58,7 +58,7 @@ public class QuestionnaireRenderer extends CanonicalRenderer {
   }
 
   public String render(QuestionnaireRendererMode mode) throws IOException, FHIRFormatError, DefinitionException, FHIRException, EOperationOutcome {
-    org.hl7.fhir.r5.renderers.QuestionnaireRenderer qr = new org.hl7.fhir.r5.renderers.QuestionnaireRenderer(gen);
+    org.hl7.fhir.services.renderers.QuestionnaireRenderer qr = new org.hl7.fhir.services.renderers.QuestionnaireRenderer(gen);
     gen.setQuestionnaireMode(mode);
     return new XhtmlComposer(XhtmlComposer.HTML).compose(qr.buildNarrative(ResourceWrapper.forResource(gen.getContextUtilities(), q)));
   }

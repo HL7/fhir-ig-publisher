@@ -21,67 +21,70 @@ import org.hl7.fhir.convertors.loaders.loaderR5.R3ToR5Loader;
 import org.hl7.fhir.convertors.loaders.loaderR5.R4BToR5Loader;
 import org.hl7.fhir.convertors.loaders.loaderR5.R4ToR5Loader;
 import org.hl7.fhir.convertors.loaders.loaderR5.R5ToR5Loader;
+import org.hl7.fhir.convertors.loaders.loaderRN.*;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.modules.xver.SourcedElementDefinition.ElementValidState;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.context.SimpleWorkerContext;
-import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.formats.IParser.OutputStyle;
-import org.hl7.fhir.r5.formats.JsonParser;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.CanonicalType;
-import org.hl7.fhir.r5.model.CodeSystem;
-import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
-import org.hl7.fhir.r5.model.CodeType;
-import org.hl7.fhir.r5.model.Coding;
-import org.hl7.fhir.r5.model.ConceptMap;
-import org.hl7.fhir.r5.model.ConceptMap.ConceptMapGroupComponent;
-import org.hl7.fhir.r5.model.ConceptMap.ConceptMapGroupUnmappedMode;
-import org.hl7.fhir.r5.model.ConceptMap.SourceElementComponent;
-import org.hl7.fhir.r5.model.ConceptMap.TargetElementComponent;
-import org.hl7.fhir.r5.model.Element;
-import org.hl7.fhir.r5.model.ElementDefinition;
-import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
-import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
-import org.hl7.fhir.r5.model.Enumerations.BindingStrength;
-import org.hl7.fhir.r5.model.Enumerations.ConceptMapRelationship;
-import org.hl7.fhir.r5.model.Enumerations.FHIRVersion;
-import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
-import org.hl7.fhir.r5.model.Extension;
-import org.hl7.fhir.r5.model.IdType;
-import org.hl7.fhir.r5.model.Parameters;
-import org.hl7.fhir.r5.model.StructureDefinition;
-import org.hl7.fhir.r5.model.StructureDefinition.ExtensionContextType;
-import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionContextComponent;
-import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
-import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
-import org.hl7.fhir.r5.model.StructureMap;
-import org.hl7.fhir.r5.model.StructureMap.StructureMapGroupComponent;
-import org.hl7.fhir.r5.model.StructureMap.StructureMapGroupInputComponent;
-import org.hl7.fhir.r5.model.StructureMap.StructureMapGroupRuleComponent;
-import org.hl7.fhir.r5.model.StructureMap.StructureMapGroupRuleDependentComponent;
-import org.hl7.fhir.r5.model.StructureMap.StructureMapGroupRuleSourceComponent;
-import org.hl7.fhir.r5.model.StructureMap.StructureMapGroupRuleTargetComponent;
-import org.hl7.fhir.r5.model.StructureMap.StructureMapGroupTypeMode;
-import org.hl7.fhir.r5.model.StructureMap.StructureMapInputMode;
-import org.hl7.fhir.r5.model.StructureMap.StructureMapStructureComponent;
-import org.hl7.fhir.r5.model.StructureMap.StructureMapTransform;
-import org.hl7.fhir.r5.model.UriType;
-import org.hl7.fhir.r5.model.ValueSet;
-import org.hl7.fhir.r5.model.ValueSet.ConceptReferenceComponent;
-import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
-import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionComponent;
-import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionContainsComponent;
-import org.hl7.fhir.r5.renderers.ConceptMapRenderer.CollateralDefinition;
-import org.hl7.fhir.r5.renderers.ConceptMapRenderer.IMultiMapRendererAdvisor;
-import org.hl7.fhir.r5.renderers.ConceptMapRenderer.RenderMultiRowSortPolicy;
-import org.hl7.fhir.r5.terminologies.ConceptMapUtilities;
-import org.hl7.fhir.r5.terminologies.ConceptMapUtilities.TranslatedCode;
-import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
+import org.hl7.fhir.model.Base;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.services.fml.StructureMapTools;
+import org.hl7.fhir.standalone.context.SimpleWorkerContext;
+import org.hl7.fhir.model.extensions.ExtensionDefinitions;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.model.utilities.formats.OutputStyle;
+import org.hl7.fhir.model.core.formats.JsonParser;
+import org.hl7.fhir.model.core.CanonicalResource;
+import org.hl7.fhir.model.core.CanonicalType;
+import org.hl7.fhir.model.core.CodeSystem;
+import org.hl7.fhir.model.core.CodeSystem.ConceptDefinitionComponent;
+import org.hl7.fhir.model.core.CodeType;
+import org.hl7.fhir.model.core.Coding;
+import org.hl7.fhir.model.core.ConceptMap;
+import org.hl7.fhir.model.core.ConceptMap.ConceptMapGroupComponent;
+import org.hl7.fhir.model.core.ConceptMap.ConceptMapGroupUnmappedMode;
+import org.hl7.fhir.model.core.ConceptMap.SourceElementComponent;
+import org.hl7.fhir.model.core.ConceptMap.TargetElementComponent;
+import org.hl7.fhir.model.core.Element;
+import org.hl7.fhir.model.core.ElementDefinition;
+import org.hl7.fhir.model.core.ElementDefinition.ElementDefinitionBindingComponent;
+import org.hl7.fhir.model.core.ElementDefinition.TypeRefComponent;
+import org.hl7.fhir.model.core.Enumerations.BindingStrength;
+import org.hl7.fhir.model.core.Enumerations.ConceptMapRelationship;
+import org.hl7.fhir.model.core.Enumerations.FHIRVersion;
+import org.hl7.fhir.model.core.Enumerations.PublicationStatus;
+import org.hl7.fhir.model.core.Extension;
+import org.hl7.fhir.model.core.IdType;
+import org.hl7.fhir.model.core.Parameters;
+import org.hl7.fhir.model.core.StructureDefinition;
+import org.hl7.fhir.model.core.StructureDefinition.ExtensionContextType;
+import org.hl7.fhir.model.core.StructureDefinition.StructureDefinitionContextComponent;
+import org.hl7.fhir.model.core.StructureDefinition.StructureDefinitionKind;
+import org.hl7.fhir.model.core.StructureDefinition.TypeDerivationRule;
+import org.hl7.fhir.model.fml.StructureMap;
+import org.hl7.fhir.model.fml.StructureMap.StructureMapGroupComponent;
+import org.hl7.fhir.model.fml.StructureMap.StructureMapGroupInputComponent;
+import org.hl7.fhir.model.fml.StructureMap.StructureMapGroupRuleComponent;
+import org.hl7.fhir.model.fml.StructureMap.StructureMapGroupRuleDependentComponent;
+import org.hl7.fhir.model.fml.StructureMap.StructureMapGroupRuleSourceComponent;
+import org.hl7.fhir.model.fml.StructureMap.StructureMapGroupRuleTargetComponent;
+import org.hl7.fhir.model.fml.StructureMap.StructureMapGroupTypeMode;
+import org.hl7.fhir.model.fml.StructureMap.StructureMapInputMode;
+import org.hl7.fhir.model.fml.StructureMap.StructureMapStructureComponent;
+import org.hl7.fhir.model.fml.StructureMap.StructureMapTransform;
+import org.hl7.fhir.model.core.UriType;
+import org.hl7.fhir.model.core.ValueSet;
+import org.hl7.fhir.model.core.ValueSet.ConceptReferenceComponent;
+import org.hl7.fhir.model.core.ValueSet.ConceptSetComponent;
+import org.hl7.fhir.model.core.ValueSet.ValueSetExpansionComponent;
+import org.hl7.fhir.model.core.ValueSet.ValueSetExpansionContainsComponent;
+import org.hl7.fhir.services.renderers.ConceptMapRenderer.CollateralDefinition;
+import org.hl7.fhir.services.renderers.ConceptMapRenderer.IMultiMapRendererAdvisor;
+import org.hl7.fhir.services.renderers.ConceptMapRenderer.RenderMultiRowSortPolicy;
+import org.hl7.fhir.model.utilities.ConceptMapUtilities;
+import org.hl7.fhir.model.utilities.ConceptMapUtilities.TranslatedCode;
+import org.hl7.fhir.services.terminology.ValueSetExpansionOutcome;
 import org.hl7.fhir.utilities.UserDataNames;
-import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
+import org.hl7.fhir.model.utilities.StructureMapUtilities;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
@@ -90,6 +93,7 @@ import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.hl7.fhir.validation.BaseValidator.BooleanHolder;
+import org.w3._1999.xhtml.B;
 
 /**
  * This class runs as a pre-compile step for the xversion IG
@@ -273,7 +277,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   private void generateBackboneElements(StructureDefinition sd) {
     Map<String, StructureDefinition> urls = new HashMap<>();
     for (StructureDefinition ext : extensions) {
-      for (StructureDefinitionContextComponent ctxt : ext.getContext()) {
+      for (StructureDefinitionContextComponent ctxt : ext.getContextList()) {
         if (ctxt.getType() == ExtensionContextType.EXTENSION && sd.getUrl().equals(ctxt.getExpression())) {
           urls.put(ext.getUrl(), ext);
         }
@@ -282,8 +286,8 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     if (!urls.isEmpty()) {
       int i = 1;
       for (String s : Utilities.sorted(urls.keySet())) {
-        ElementDefinition ed = new ElementDefinition("Extension.extension");
-        sd.getDifferential().getElement().add(i, ed);
+        ElementDefinition ed = new ElementDefinition(sd.getModelContext(),"Extension.extension");
+        sd.getDifferential().getElementList().add(i, ed);
         ed.setSliceName(urls.get(s).getUserString(UserDataNames.xver_sliceName));
         ed.addType().setCode("Extension").addProfile(s);
         i++;
@@ -338,10 +342,10 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   }
 
   private void processTypes(ConceptMap tm) {
-    for (ConceptMapGroupComponent grp : tm.getGroup()) {
-      for (SourceElementComponent e : grp.getElement()) {
+    for (ConceptMapGroupComponent grp : tm.getGroupList()) {
+      for (SourceElementComponent e : grp.getElementList()) {
         String src = e.getCode();
-        for (TargetElementComponent t : e.getTarget()) {
+        for (TargetElementComponent t : e.getTargetList()) {
           if (t.getRelationship() == ConceptMapRelationship.RELATEDTO || t.getRelationship() == ConceptMapRelationship.EQUIVALENT || t.getRelationship() == ConceptMapRelationship.SOURCEISBROADERTHANTARGET || t.getRelationship() == ConceptMapRelationship.SOURCEISNARROWERTHANTARGET) {
             String tgt = t.getCode();
             if (tgt != null && src != null && !src.equals(tgt)) {
@@ -398,7 +402,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
       sd.setExperimental(false);
       // sd.setDateElement(null); // let the IG set this
       sd.setPublisher(element.getSd().getPublisher());
-      sd.getContact().addAll(element.getSd().getContact());
+      sd.getContactList().addAll(element.getSd().getContactList());
       sd.addJurisdiction().addCoding("http://unstats.un.org/unsd/methods/m49/m49.htm", "001", null);
       sd.setDescription("Cross-Version Extension for "+element.getEd().getPath()+". Valid in versions "+element.getVerList());
       sd.setFhirVersion(FHIRVersion._5_0_0);
@@ -449,19 +453,19 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
       edr.setPath("Extension");      
       sd.getDifferential().addElement(edr);
       edr.setLabel(src.getLabel());
-      edr.setCode(src.getCode());
+      edr.setCodeList(src.getCodeList());
       edr.setShort(src.getShort());
       edr.setDefinition(src.getDefinition());
       edr.setComment(src.getComment());
       edr.setRequirements(src.getRequirements());
-      edr.getAlias().addAll(src.getAlias());
+      edr.getAliasList().addAll(src.getAliasList());
       edr.setComment(src.getComment());
       edr.setMin(src.getMin());
       edr.setMax(src.getMax());
       edr.setIsModifier(src.getIsModifier());
       edr.setIsModifierReason(src.getIsModifierReason());
 //      edr.setIsSummary(src.getIsSummary());
-      edr.setMapping(src.getMapping());
+      edr.setMappingList(src.getMappingList());
 
       ElementDefinition ede = new ElementDefinition();
       ede.setPath("Extension.extension");      
@@ -492,7 +496,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
         if (tsd == null) {
           tsd = vdr4.fetchTypeDefinition(src.getTypeFirstRep().getWorkingCode());
         }
-        for (ElementDefinition ted : tsd.getDifferential().getElement()) {
+        for (ElementDefinition ted : tsd.getDifferential().getElementList()) {
           if (Utilities.charCount(ted.getPath(), '.') == 1 && !ted.getTypeFirstRep().getWorkingCode().equals("Element")) {
             
 
@@ -507,36 +511,36 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
         edv.setMaxValue(src.getMaxValue());
         edv.setMaxLengthElement(src.getMaxLengthElement());
         edv.setMustHaveValueElement(src.getMustHaveValueElement());
-        edv.setValueAlternatives(src.getValueAlternatives());
+        edv.setValueAlternativesList(src.getValueAlternativesList());
   
         IWorkerContext vd = versions.get(element.getVer());
   
         switch (element.getValidState()) {
         case CARDINALITY:
-          for (TypeRefComponent tr : src.getType()) {
+          for (TypeRefComponent tr : src.getTypeList()) {
             TypeRefComponent t = fixType(tr, element.getVer());
             if (t != null) {
-              edv.getType().add(t);
+              edv.getTypeList().add(t);
             }
           }
           copyBinding(vd, edv, src.getBinding());
           break;
         case FULL_VALID:
-          for (TypeRefComponent tr : src.getType()) {
+          for (TypeRefComponent tr : src.getTypeList()) {
             TypeRefComponent t = fixType(tr, element.getVer());
             if (t != null) {
-              edv.getType().add(t);
+              edv.getTypeList().add(t);
             }
           }
           copyBinding(vd, edv, src.getBinding());
           break;
         case NEW_TYPES:
           boolean coded = false;
-          for (TypeRefComponent tr : src.getType()) {
+          for (TypeRefComponent tr : src.getTypeList()) {
             if (element.getNames().contains(tr.getCode())) {
               TypeRefComponent t = fixType(tr, element.getVer());
               if (t != null) {
-                edv.getType().add(t);
+                edv.getTypeList().add(t);
               }
               if (isCoded(tr.getWorkingCode())) {
                 coded = true;
@@ -549,16 +553,16 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
           break;
         case NEW_TARGETS:
           coded = false;
-          for (TypeRefComponent tr : src.getType()) {
+          for (TypeRefComponent tr : src.getTypeList()) {
             if (isReferenceDataType(tr.getCode())) {
               if (isCoded(tr.getWorkingCode())) {
                 coded = true;
               }
               TypeRefComponent n = edv.addType();
               n.setCode(tr.getCode());
-              for (CanonicalType tgt : tr.getTargetProfile()) {
+              for (CanonicalType tgt : tr.getTargetProfileList()) {
                 if (element.getNames().contains(tgt.asStringValue())) {
-                  n.getTargetProfile().add(tgt);
+                  n.getTargetProfileList().add(tgt);
                 }   
               }
             }
@@ -571,11 +575,11 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
           if (isBackboneElement(src)) {
             throw new Error("what?");
           }
-          for (TypeRefComponent tr : src.getType()) {
+          for (TypeRefComponent tr : src.getTypeList()) {
             if (isCoded(tr.getCode())) {
               TypeRefComponent t = fixType(tr, element.getVer());
               if (t != null) {
-                edv.getType().add(t);
+                edv.getTypeList().add(t);
               }
             }
           }
@@ -595,7 +599,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   
 
   private boolean isNarrativeType(ElementDefinition ed) {
-    for (TypeRefComponent tr : ed.getType()) {
+    for (TypeRefComponent tr : ed.getTypeList()) {
       if (tr.getWorkingCode().equals("Narrative")) {
         return true;
       }
@@ -604,7 +608,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   }
 
   private boolean hasNonExtensionDataType(ElementDefinition ted) {
-    for (TypeRefComponent tr : ted.getType()) {
+    for (TypeRefComponent tr : ted.getTypeList()) {
       if (!Utilities.existsInList(tr.getWorkingCode(), "base64Binary", "boolean", "canonical", "code", "date", "dateTime", "decimal", "id", "instant", "integer", "integer64", "markdown", "oid",
           "positiveInt", "string", "time", "unsignedInt", "uri", "url", "uuid", "Address", "Age", "Annotation", "Attachment", "CodeableConcept",
           "CodeableReference", "Coding", "ContactPoint", "Count", "Distance", "Duration", "HumanName", "Identifier", "Money", "Period", "Quantity",
@@ -617,7 +621,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   }
 
   private boolean isUnsupportedDataType(ElementDefinition src) {
-    if (src.getType().size() == 1 && Utilities.existsInList(src.getTypeFirstRep().getWorkingCode(), "Resource", "Contributor", "ProdCharacteristic", 
+    if (src.getTypeList().size() == 1 && Utilities.existsInList(src.getTypeFirstRep().getWorkingCode(), "Resource", "Contributor", "ProdCharacteristic",
         "ProductShelfLife", "MarketingStatus", "Population", "SubstanceAmount", "Narrative", "VirtualServiceDetail", "MonetaryComponent")) {
       return true;
     }
@@ -627,21 +631,21 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   private TypeRefComponent fixType(TypeRefComponent tr, String ver) {
     if ("Quantity".equals(tr.getWorkingCode()) && tr.hasProfile()) {
       // changed from profiles to data types
-      String tu = tr.getProfile().get(0).getValueAsString();
+      String tu = tr.getProfileList().get(0).getValueAsString();
       String t = tail(tu);
       if (!Utilities.existsInList(t, "SimpleQuantity")) {        
-        return new TypeRefComponent(t);
+        return new TypeRefComponent(null, t);
       }
     }
     if (Utilities.existsInList(tr.getWorkingCode(), "Resource", "Contributor", "ProdCharacteristic", 
         "ProductShelfLife", "MarketingStatus", "Population", "SubstanceAmount", "Narrative", "VirtualServiceDetail", "MonetaryComponent")) {
       return null;
     }
-    return tr.copy();
+    return tr.copy(Base.COPY_DATA);
   }
 
   private boolean isBackboneElement(ElementDefinition src) {
-    for (TypeRefComponent tr : src.getType()) {
+    for (TypeRefComponent tr : src.getTypeList()) {
       if (Utilities.existsInList(tr.getWorkingCode(), "Element", "BackboneElement")) {
         return true;
       }
@@ -730,14 +734,14 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   }
 
   private String importValueSet(IWorkerContext defns, ValueSet vs) {
-    vs = vs.copy();
+    vs = vs.copy(Base.COPY_DATA);
     assert vs.hasVersion();
     String vurl = vs.getVersionedUrl();
     if (newValueSets.containsKey(vurl)) {
       return vurl;
     }
-    for (ConceptSetComponent inc : vs.getCompose().getInclude()) {
-      for (CanonicalType ct : inc.getValueSet()) {
+    for (ConceptSetComponent inc : vs.getCompose().getIncludeList()) {
+      for (CanonicalType ct : inc.getValueSetList()) {
         ValueSet ivs = defns.fetchResource(ValueSet.class, ct.asStringValue(), ExtensionUtilities.getVersionResolutionRules(ct));
         if (ivs != null) {
           ct.setValue(importValueSet(defns, ivs));
@@ -907,9 +911,9 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
           CanonicalResource cr = null;
           try {
             if (f.getName().endsWith(".fml")) {
-              cr = new StructureMapUtilities(vdr5).parse(source, f.getName());
+              cr = new StructureMapTools(vdr5).parse(source, f.getName());
             } else {
-              cr = (CanonicalResource) new JsonParser().parse(source);
+              cr = (CanonicalResource) new JsonParser(vdr5.getModelContext()).parse(source);
             }
           } catch (Exception e) {
           }
@@ -1200,21 +1204,21 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
       String srcVer = VersionUtilities.getNameForVersion(getInputUrl(map, "source")).substring(1).toLowerCase();
       String dstVer = VersionUtilities.getNameForVersion(getInputUrl(map, "target")).substring(1).toLowerCase();
       List<StructureMapGroupComponent> grpList = new ArrayList<>();
-      for (StructureMapGroupComponent grp : map.getGroup()) {
+      for (StructureMapGroupComponent grp : map.getGroupList()) {
         if (isStart(grp)) {
           Map<String, ElementWithType> vars = processInputs(map, grp, srcList);
           processGroup(map, grpList, srcVer, dstVer, srcList, vars, grp);          
         }
       }
 
-      for (StructureMapGroupComponent grp : map.getGroup()) {
+      for (StructureMapGroupComponent grp : map.getGroupList()) {
         if (!grpList.contains(grp)) {
           // we didn't process it for some reason, but we'll still try to chcek the concept map references... 
           // qaMsg("unvisited group "+grp.getName()+" in "+map.getUrl(), false);
-          for (StructureMapGroupRuleComponent r : grp.getRule()) {
-            for (StructureMapGroupRuleTargetComponent tgt : r.getTarget()) {
+          for (StructureMapGroupRuleComponent r : grp.getRuleList()) {
+            for (StructureMapGroupRuleTargetComponent tgt : r.getTargetList()) {
               if (tgt.getTransform() == StructureMapTransform.TRANSLATE) {
-                String url = tgt.getParameter().get(1).getValue().primitiveValue();
+                String url = tgt.getParameterList().get(1).getValue().primitiveValue();
                 ConceptMap cm = conceptMapsByUrl.get(url);
                 if (cm == null) {
                   qaMsg("bed ref '"+url+"' in "+map.getUrl(), true);
@@ -1230,7 +1234,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   }
 
   private String getInputUrl(StructureMap map, String mode) {
-    for (StructureMapStructureComponent uses : map.getStructure()) {
+    for (StructureMapStructureComponent uses : map.getStructureList()) {
       if (mode.equals(uses.getMode().toCode())) {
         return uses.getUrl(); 
       }
@@ -1240,7 +1244,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
 
   private  Map<String, ElementWithType> processInputs(StructureMap map, StructureMapGroupComponent grp, Map<String, SourcedStructureDefinition> srcList) {
     Map<String, ElementWithType> vars = new HashMap<>();
-    for (StructureMapGroupInputComponent input : grp.getInput()) {
+    for (StructureMapGroupInputComponent input : grp.getInputList()) {
       SourcedStructureDefinition sd = srcList.get(input.getMode().toCode()+":"+input.getType());
       if (sd == null) {
         qaMsg("Unable to locate type '"+input.getMode().toCode()+":"+input.getType()+"' in map '"+map.getUrl()+"'", true);
@@ -1252,12 +1256,12 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   }
 
   private boolean isStart(StructureMapGroupComponent grp) {
-    return grp.getTypeMode() == StructureMapGroupTypeMode.TYPEANDTYPES && grp.getInput().size() == 2;
+    return grp.getTypeMode() == StructureMapGroupTypeMode.TYPEANDTYPES && grp.getInputList().size() == 2;
   }
 
   private void processGroup(StructureMap map, List<StructureMapGroupComponent> grpList, String srcVer, String dstVer, Map<String, SourcedStructureDefinition> srcList, Map<String, ElementWithType> vars,  StructureMapGroupComponent grp) throws FileNotFoundException, IOException {
     grpList.add(grp);
-    for (StructureMapGroupRuleComponent r : grp.getRule()) {
+    for (StructureMapGroupRuleComponent r : grp.getRuleList()) {
       processRuleSource(map, grpList, srcVer, dstVer, vars, grp, r, srcList);
     }    
   }
@@ -1274,7 +1278,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
         qaMsg("Cannot find src var '"+srcR.getContext()+"' in rule "+r.getName()+" in group "+grp.getName()+" in map "+map.getUrl()+" (vars = "+dump(vars)+")", true);
         bh.fail();
       } else {
-        ElementWithType source = findChild(src, srcR.getElement(), srcR.getType());
+        ElementWithType source = findChild(src, srcR.getElementName(), srcR.getType());
         if (source == null) {
           //          qaMsg("Cannot find src element '"+srcR.getContext()+"."+srcR.getElement()+"'"+(srcR.hasType() ? " : "+srcR.getType() : "")+" on "+src.toString()+" in rule "+r.getName()+" in group "+grp.getName()+" in map "+map.getUrl(), true);
           bh.fail();
@@ -1282,35 +1286,35 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
           if (srcR.hasVariable()) {
             tvars.put("source:"+srcR.getVariable(), source);
           }
-          for (StructureMapGroupRuleTargetComponent t : r.getTarget()) {
+          for (StructureMapGroupRuleTargetComponent t : r.getTargetList()) {
             tvars = processRuleTarget(map, srcVer, dstVer, grp, r, source, tvars, t, srcList, bh);
           }
         }
       }
       if (bh.ok()) {
         if (r.hasRule()) {
-          for (StructureMapGroupRuleComponent dr : r.getRule()) {
+          for (StructureMapGroupRuleComponent dr : r.getRuleList()) {
             Map<String, ElementWithType> rvars = clone(tvars);
             processRuleSource(map, grpList, srcVer, dstVer, rvars, grp, dr, srcList);
           }
         }
         if (r.hasDependent()) {
-          for (StructureMapGroupRuleDependentComponent dep : r.getDependent()) {
+          for (StructureMapGroupRuleDependentComponent dep : r.getDependentList()) {
             StructureMapGroupComponent dgrp = getGroup(map, dep.getName());
             if (dgrp == null) {
               // we assume that it's in some other map we don't care about; we won't validate it anyway
               bh.fail();
             } else {
-              if (dep.getParameter().size() != dgrp.getInput().size()) {              
-                qaMsg("Calling '"+dgrp.getName()+"' with "+dep.getParameter().size()+" parameters, but it has "+dgrp.getInput().size()+" inputs in rule "+r.getName()+" in group "+grp.getName()+" in map "+map.getUrl(), true);
+              if (dep.getParameterList().size() != dgrp.getInputList().size()) {              
+                qaMsg("Calling '"+dgrp.getName()+"' with "+dep.getParameterList().size()+" parameters, but it has "+dgrp.getInputList().size()+" inputs in rule "+r.getName()+" in group "+grp.getName()+" in map "+map.getUrl(), true);
               } else if (!grpList.contains(dgrp)) { // recursive rules
                 Map<String, ElementWithType> gvars = new HashMap<>();
                 boolean ok = true;
-                for (int i = 0; i < dep.getParameter().size(); i++) {
-                  StructureMapGroupInputComponent input = dgrp.getInput().get(i);
-                  if (dep.getParameter().get(i).getValue() instanceof IdType) {
-                    String varName = input.getMode().toCode()+":"+dep.getParameter().get(i).getValue().primitiveValue();
-                    String varName2 = input.getMode() == StructureMapInputMode.SOURCE ? "target:"+dep.getParameter().get(i).getValue().primitiveValue() : null;
+                for (int i = 0; i < dep.getParameterList().size(); i++) {
+                  StructureMapGroupInputComponent input = dgrp.getInputList().get(i);
+                  if (dep.getParameterList().get(i).getValue() instanceof IdType) {
+                    String varName = input.getMode().toCode()+":"+dep.getParameterList().get(i).getValue().primitiveValue();
+                    String varName2 = input.getMode() == StructureMapInputMode.SOURCE ? "target:"+dep.getParameterList().get(i).getValue().primitiveValue() : null;
                     if (tvars.containsKey(varName)) {
                       gvars.put(input.getMode().toCode()+":"+input.getName(), tvars.get(varName));
                     } else if (varName2 != null && tvars.containsKey(varName2)) {
@@ -1333,7 +1337,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   }
 
   private StructureMapGroupComponent getGroup(StructureMap map, String name) {
-    for (StructureMapGroupComponent grp : map.getGroup()) {
+    for (StructureMapGroupComponent grp : map.getGroupList()) {
       if (name.equals(grp.getName())) {
         return grp;
       }
@@ -1349,9 +1353,9 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
         bh.fail();
       } else if (t.getContext() == null && t.getTransform() == StructureMapTransform.CREATE) {
         IWorkerContext vd = getInputDefinitions(srcList, "target");
-        StructureDefinition sd = vd.fetchTypeDefinition(t.getParameter().get(0).getValue().primitiveValue());
+        StructureDefinition sd = vd.fetchTypeDefinition(t.getParameterList().get(0).getValue().primitiveValue());
         if (sd == null) {
-          qaMsg("Cannot find type '"+t.getParameter().get(0).getValue().primitiveValue()+"' in create '"+t.toString()+"' in rule "+r.getName()+" in group "+grp.getName()+" in map "+map.getUrl()+" (vars = "+dump(tvars)+")", true);
+          qaMsg("Cannot find type '"+t.getParameterList().get(0).getValue().primitiveValue()+"' in create '"+t.toString()+"' in rule "+r.getName()+" in group "+grp.getName()+" in map "+map.getUrl()+" (vars = "+dump(tvars)+")", true);
           bh.fail();
         } else {
           ElementWithType var = new ElementWithType(vd, sd, sd.getSnapshot().getElementFirstRep());
@@ -1363,20 +1367,20 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
         // todo bh.fail();
       }
     } else {
-      ElementWithType target = findChild(tgt, t.getElement(), null);
+      ElementWithType target = findChild(tgt, t.getElementName(), null);
       if (target == null) {
-        qaMsg("Cannot find tgt element '"+t.getContext()+"."+t.getElement()+"' on "+tgt.toString()+" in rule "+r.getName()+" in group "+grp.getName()+" in map "+map.getUrl(), false);
+        qaMsg("Cannot find tgt element '"+t.getContext()+"."+t.getElementList()+"' on "+tgt.toString()+" in rule "+r.getName()+" in group "+grp.getName()+" in map "+map.getUrl(), false);
 //       todo  bh.fail();
       } else {
         if (t.getTransform() == StructureMapTransform.CREATE) {
           if (t.hasParameter()) {
-            String type = t.getParameter().get(0).getValue().primitiveValue();
+            String type = t.getParameterList().get(0).getValue().primitiveValue();
             target.setType(type);
           } else {
             bh.fail();
           }
         } else if (t.getTransform() == StructureMapTransform.TRANSLATE) {
-          String url = t.getParameter().get(1).getValue().primitiveValue();
+          String url = t.getParameterList().get(1).getValue().primitiveValue();
           VSPair vsl = isCoded(source.toSED());
           VSPair vsr = isCoded(target.toSED());
           if (vsl == null) {
@@ -1477,7 +1481,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
         path = src.getEd().getPath()+"."+element;
       }
     }
-    for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+    for (ElementDefinition ed : sd.getSnapshot().getElementList()) {
       if (ed.getPath().equals(path) && hasType(ed, type)) {
         return new ElementWithType(src.getDef(), sd, ed, type);
       }
@@ -1489,7 +1493,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   }
 
   private String getR2PathForReference(StructureDefinition sd, String id) {
-    for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+    for (ElementDefinition ed : sd.getSnapshot().getElementList()) {
       if (id.equals(ed.getId())) {
         return ed.getPath();
       }
@@ -1501,7 +1505,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     if (type == null) {
       return true;
     }
-    for (TypeRefComponent tr : ed.getType()) {
+    for (TypeRefComponent tr : ed.getTypeList()) {
       if (type.equals(tr.getWorkingCode())) {
         return true;
       }
@@ -1511,12 +1515,12 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   }
 
   private boolean isProcessible(StructureMapGroupRuleComponent r) {
-    return r.getSource().size() == 1 && r.getSourceFirstRep().hasContext();
+    return r.getSourceList().size() == 1 && r.getSourceFirstRep().hasContext();
   }
 
   private boolean determineSources(StructureMap map, Map<String, SourcedStructureDefinition> srcList) {
     boolean ok = true;
-    for (StructureMapStructureComponent uses : map.getStructure()) {
+    for (StructureMapStructureComponent uses : map.getStructureList()) {
       String type = uses.getUrl();
       String tn = tail(type);
       String verMM = VersionUtilities.getMajMin(type);
@@ -1649,8 +1653,8 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     List<String> issues = new ArrayList<String>();
     if (ConceptMapUtilities.checkReciprocal(left, right, issues, save)) {
       // wipes formatting in files
-      new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(processingPath, "input", folder, "ConceptMap-"+left.getId()+".json")), left);
-      new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(processingPath, "input", folder, "ConceptMap-"+right.getId()+".json")), right);
+      new org.hl7.fhir.model.core.formats.JsonParser(vdr5.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(processingPath, "input", folder, "ConceptMap-"+left.getId()+".json")), left);
+      new org.hl7.fhir.model.core.formats.JsonParser(vdr5.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(processingPath, "input", folder, "ConceptMap-"+right.getId()+".json")), right);
     }
     if (!issues.isEmpty()) {
       qaMsg("Found issues checking reciprocity of "+left.getId()+" and "+right.getId(), true);
@@ -1661,7 +1665,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   }
 
   private boolean isResourceTypeMap(ConceptMap cm) {
-    if (cm.getGroup().size() != 1) {
+    if (cm.getGroupList().size() != 1) {
       return false;
     }
     return cm.getGroupFirstRep().getSource().contains("resource-type") || cm.getGroupFirstRep().getTarget().contains("resource-type");
@@ -1691,14 +1695,14 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
         ConceptMap cm = null;
         String id = null;
         try {
-          cm = (ConceptMap) new org.hl7.fhir.r5.formats.JsonParser().parse(new FileInputStream(f));
+          cm = (ConceptMap) new org.hl7.fhir.model.core.formats.JsonParser(vdr5.getModelContext()).parse(new FileInputStream(f));
 
           if (cm.getName().contains("-")) {
             cm.setName(fixName(cm.getName(), cm.getSourceScope().primitiveValue()));
-            new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(f), cm);                      
+            new org.hl7.fhir.model.core.formats.JsonParser(vdr5.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(f), cm);
           }
           if (addRelationships(cm)) {
-            new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(f), cm);                      
+            new org.hl7.fhir.model.core.formats.JsonParser(vdr5.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(f), cm);
           }
           id = f.getName().replace("ConceptMap-", "").replace(".json", "");
           if (!cm.getId().equals(id)) {
@@ -1746,9 +1750,9 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
 
   private boolean addRelationships(ConceptMap cm) {
     boolean changed = false;
-    for (ConceptMapGroupComponent g : cm.getGroup()) {
-      for (SourceElementComponent e : g.getElement()) {
-        for (TargetElementComponent t : e.getTarget()) {
+    for (ConceptMapGroupComponent g : cm.getGroupList()) {
+      for (SourceElementComponent e : g.getElementList()) {
+        for (TargetElementComponent t : e.getTargetList()) {
           if (!t.hasRelationship()) {
             changed = true;
             t.setRelationship(ConceptMapRelationship.EQUIVALENT);
@@ -1793,7 +1797,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
       if (f.getName().endsWith(".fml")) {
         StructureMap map = null;
         try {
-          map = new StructureMapUtilities(ctxt).parse(FileUtilities.fileToString(f), f.getName());
+          map = new StructureMapTools(ctxt).parse(FileUtilities.fileToString(f), f.getName());
         } catch (Exception e) {
           qaMsg("Error parsing "+f.getAbsolutePath()+": "+e.getMessage(), true);
         }
@@ -2009,8 +2013,8 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
               qaMsg("Error between "+cmF.getId()+" and "+cmR.getId()+" maps: "+s, true);
             }
             if (altered) {
-              new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(processingPath, "input", "codes", "ConceptMap-"+cmR.getId()+".json")), cmR);
-              new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(processingPath, "input", "codes", "ConceptMap-"+cmF.getId()+".json")), cmF);
+              new org.hl7.fhir.model.core.formats.JsonParser(vdr5.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(processingPath, "input", "codes", "ConceptMap-"+cmR.getId()+".json")), cmR);
+              new org.hl7.fhir.model.core.formats.JsonParser(vdr5.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(processingPath, "input", "codes", "ConceptMap-"+cmF.getId()+".json")), cmF);
             }
           }
           link.setNextCM(cmF);
@@ -2165,7 +2169,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
               e.setNoMap(true);         
             } else {
               ConceptMapGroupComponent pg = cm.forceGroup(injectVersionToUri(vu, VersionUtilities.getMajMin(se.getVer())), injectVersionToUri(pc.getSystem(), VersionUtilities.getMajMin(se.getVer())));
-              if (pg.getElement().isEmpty()) {
+              if (pg.getElementList().isEmpty()) {
                 SourceElementComponent e = pg.addElement();
                 e.setCode("CHECK!");              
               }
@@ -2195,7 +2199,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
               }
             } else {
               ConceptMapGroupComponent pg = cm.forceGroup(injectVersionToUri(vu, VersionUtilities.getMajMin(se.getVer())), injectVersionToUri(pc.getSystem(), VersionUtilities.getMajMin(se.getVer())));
-              if (pg.getElement().isEmpty()) {
+              if (pg.getElementList().isEmpty()) {
                 SourceElementComponent e = pg.addElement();
                 e.setCode("CHECK!");              
               }
@@ -2214,10 +2218,10 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
           }
         }
       }
-      Collections.sort(g.getElement(), new ConceptMapUtilities.ConceptMapElementSorter());
+      Collections.sort(g.getElementList(), new ConceptMapUtilities.ConceptMapElementSorter());
     }
-    cm.getGroup().removeIf(g -> g.getElement().isEmpty());
-    new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(processingPath, "input", "codes", "ConceptMap-"+cm.getId()+".json")), cm);
+    cm.getGroupList().removeIf(g -> g.getElementList().isEmpty());
+    new org.hl7.fhir.model.core.formats.JsonParser(vdr5.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(processingPath, "input", "codes", "ConceptMap-"+cm.getId()+".json")), cm);
     return cm;
   }
 
@@ -2314,21 +2318,21 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     for (String su : s.getCodes().keySet()) {
       Set<Coding> src = s.getCodes().get(su);
       int i = 0;
-      while (i < cm.getGroup().size()) {
-        ConceptMapGroupComponent g = cm.getGroup().get(i);
+      while (i < cm.getGroupList().size()) {
+        ConceptMapGroupComponent g = cm.getGroupList().get(i);
         i++;
         if (su.equals(g.getSource()) && d.getCodes().containsKey(g.getTarget())) {
           noGroup.remove(su);
           String tu = g.getTarget();
           Set<Coding> dst = d.getCodes().get(tu);
           ug.add(g);
-          for (SourceElementComponent e : g.getElement()) {
+          for (SourceElementComponent e : g.getElementList()) {
             if (e.hasDisplay()) {
               qaMsg("Issue with "+cm.getId()+": "+e.getCode()+" has a display", true);
               e.setDisplay(null);
               mod = true;
             }
-            for (TargetElementComponent tgt : e.getTarget()) {
+            for (TargetElementComponent tgt : e.getTargetList()) {
               if (!tgt.hasCode()) {
                 tgt.setCode("CHECK!");              
                 mod = true;
@@ -2365,7 +2369,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
               SourceElementComponent e = getSource(g, c.getCode());
               if (e != null) {
                 matched.add(e);
-                for (TargetElementComponent tgt : e.getTarget()) {
+                for (TargetElementComponent tgt : e.getTargetList()) {
                   if (tgt.hasCode()) {
                     Coding dc = getCode(dst, tu, tgt.getCode());
                     if (dc == null) {
@@ -2382,7 +2386,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
               }        
             }
           }
-          if (src != null && g.getElement().removeIf(e -> !matched.contains(e))) {
+          if (src != null && g.getElementList().removeIf(e -> !matched.contains(e))) {
             mod = true;
           }
           if (!missed.isEmpty()) {
@@ -2404,7 +2408,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
                   if (dc != null) {
                     ConceptMapGroupComponent pg = cm.forceGroup(su, dc.getSystem());
                     ug.add(pg);
-                    if (pg.getElement().isEmpty()) {
+                    if (pg.getElementList().isEmpty()) {
                       SourceElementComponent e = pg.addElement();
                       e.setCode("CHECK!");              
                     }
@@ -2426,10 +2430,10 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
           if (!invalid.isEmpty()) {
             qaMsg("Concept Map "+cm.getId()+" has invalid mappings to "+toString(invalid), true);
             if (dst != null) {
-              for (SourceElementComponent e : g.getElement()) {
-                if (e.getTarget().removeIf(t -> t.hasUserData(UserDataNames.xver_delete))) {
+              for (SourceElementComponent e : g.getElementList()) {
+                if (e.getTargetList().removeIf(t -> t.hasUserData(UserDataNames.xver_delete))) {
                   mod = true;
-                  if (e.getTarget().isEmpty()) {
+                  if (e.getTargetList().isEmpty()) {
                     e.setNoMap(true);
                   }
                 }
@@ -2439,7 +2443,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
             for (Coding c : src) {
               SourceElementComponent e = getSource(g, c.getCode());
               if (e != null) {
-                for (TargetElementComponent tgt : e.getTarget()) {
+                for (TargetElementComponent tgt : e.getTargetList()) {
                   if (!hasCode(dst, tu, tgt.getCode())) {
                     qaMsg("Issue with "+cm.getId()+": target "+tgt.getCode()+" is not valid (missed "+toString(unmapped)+")", true);
                   }
@@ -2451,7 +2455,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
             }
           }
           invalid.clear();
-          for (SourceElementComponent t : g.getElement()) {
+          for (SourceElementComponent t : g.getElementList()) {
             if (!hasCode(src, su, t.getCode())) {
               invalid.add(new Coding(tu, t.getCode(), null));
   //            t.setDisplay("Source "+t.getCode()+" is not valid");
@@ -2491,7 +2495,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
             ConceptMapGroupComponent pg = cm.forceGroup(su, pc.getSystem());
             ug.add(pg);
             mod = true;        
-            if (pg.getElement().isEmpty()) {
+            if (pg.getElementList().isEmpty()) {
               SourceElementComponent e = pg.addElement();
               e.setCode("CHECK!");              
             }
@@ -2506,7 +2510,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
         }
       }
     }
-    if (cm.getGroup().removeIf(g -> { 
+    if (cm.getGroupList().removeIf(g -> { 
           if (!ug.contains(g)) {
             System.out.println("Remove Group "+g.getSource()+" -> "+g.getTarget()+" from "+cm.getId()); 
             return true;
@@ -2517,7 +2521,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
       mod = true;
     }
 
-    if (cm.getGroup().removeIf(g -> g.getElement().isEmpty())) {
+    if (cm.getGroupList().removeIf(g -> g.getElementList().isEmpty())) {
       mod = true;
     }
     if (mod) {
@@ -2563,7 +2567,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   }
 
   private SourceElementComponent getSource(ConceptMapGroupComponent g, String c) {
-    for (SourceElementComponent t : g.getElement()) {
+    for (SourceElementComponent t : g.getElementList()) {
       if (c.equals(t.getCode())) {
         return t;
       }
@@ -2585,12 +2589,12 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     IWorkerContext vd = et.getDef();
     if (et.getEd().getBinding().getStrength() == BindingStrength.REQUIRED || et.getEd().getBinding().getStrength() == BindingStrength.EXTENSIBLE) {
       ValueSet vs = vd.fetchResource(ValueSet.class, et.getEd().getBinding().getValueSet(), ExtensionUtilities.getVersionResolutionRules(et.getEd().getBinding().getValueSetElement()));
-      if (vs != null && vs.getCompose().getInclude().size() == 1) {
+      if (vs != null && vs.getCompose().getIncludeList().size() == 1) {
         ValueSetExpansionOutcome vse = vd.expandVS(vs, logStarted, false);
         if (vse.getValueset() != null) {
           Set<Coding> codes = processExpansion(vse.getValueset().getExpansion(), version);
           if (codes.size() > 0) {
-            return new VSPair(et.getDef().getVersion(), vs, codes);
+            return new VSPair(et.getDef().getFHIRVersion(), vs, codes);
           }
         }
 
@@ -2621,7 +2625,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
 
   private Set<Coding> processExpansion(ValueSetExpansionComponent expansion, String version) {
     Set<Coding> codes = new HashSet<>();
-    for (ValueSetExpansionContainsComponent cc : expansion.getContains()) {
+    for (ValueSetExpansionContainsComponent cc : expansion.getContainsList()) {
       Coding c = new Coding(injectVersionToUri(cc.getSystem(), version), cc.getVersion(), cc.getCode(), cc.getDisplay());
       if (cc.hasAbstract() && cc.getAbstract()) {
         c.setUserData(UserDataNames.xver_abstract, true);
@@ -2633,11 +2637,11 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
 
   private List<String> findNewTypes(ElementDefinition template, ElementDefinition element) {
     Set<String> types = new HashSet<>();
-    for (TypeRefComponent tr : template.getType()) {
+    for (TypeRefComponent tr : template.getTypeList()) {
       types.add(tr.getWorkingCode());
     }
     List<String> res = new ArrayList<>();
-    for (TypeRefComponent tr : element.getType()) {
+    for (TypeRefComponent tr : element.getTypeList()) {
       if (!types.contains(tr.getWorkingCode())) {
         res.add(tr.getWorkingCode());
       }
@@ -2647,11 +2651,11 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
 
   private List<String> findOldTypes(ElementDefinition template, ElementDefinition element) {
     Set<String> types = new HashSet<>();
-    for (TypeRefComponent tr : element.getType()) {
+    for (TypeRefComponent tr : element.getTypeList()) {
       types.add(tr.getWorkingCode());
     }
     List<String> res = new ArrayList<>();
-    for (TypeRefComponent tr : template.getType()) {
+    for (TypeRefComponent tr : template.getTypeList()) {
       if (!types.contains(tr.getWorkingCode())) {
         res.add(tr.getWorkingCode());
       }
@@ -2663,15 +2667,15 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
 
   private List<String> findNewTargets(ElementDefinition template, ElementDefinition element, String srcVer, String dstVer) {
     Set<String> targets = new HashSet<>();
-    for (TypeRefComponent tr : template.getType()) {
-      for (CanonicalType c : tr.getTargetProfile()) {
+    for (TypeRefComponent tr : template.getTypeList()) {
+      for (CanonicalType c : tr.getTargetProfileList()) {
         List<String> rtList = getTranslatedResourceNames(c.asStringValue(), srcVer, dstVer);
         targets.addAll(rtList);
       }
     }
     List<String> res = new ArrayList<>();
-    for (TypeRefComponent tr : element.getType()) {
-      for (CanonicalType c : tr.getTargetProfile()) {
+    for (TypeRefComponent tr : element.getTypeList()) {
+      for (CanonicalType c : tr.getTargetProfileList()) {
         if (!targets.contains(tail(c.asStringValue()))) {
           res.add(tail(c.asStringValue()));
         }
@@ -2740,7 +2744,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   
 
   private void buildLinks(XVersions ver, IWorkerContext defsPrev, ConceptMap resFwd, ConceptMap elementFwd, IWorkerContext defsNext, boolean last) {
-    logProgress("Build links between "+defsPrev.getVersion()+" and "+defsNext.getVersion());
+    logProgress("Build links between "+defsPrev.getFHIRVersion()+" and "+defsNext.getFHIRVersion());
 
     for (StructureDefinition sd : sortedSDs(defsPrev.fetchResourcesByType(StructureDefinition.class))) {
       if (sd.getKind() == StructureDefinitionKind.COMPLEXTYPE && (!sd.getAbstract() || Utilities.existsInList(sd.getName(), "Quantity")) && sd.getDerivation() == TypeDerivationRule.SPECIALIZATION) {
@@ -2771,7 +2775,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
 
       for (StructureDefinition sd : sortedSDs(defsNext.fetchResourcesByType(StructureDefinition.class))) {
         if (sd.getKind() == StructureDefinitionKind.COMPLEXTYPE && (!sd.getAbstract() || Utilities.existsInList(sd.getName(), "Quantity")) && sd.getDerivation() == TypeDerivationRule.SPECIALIZATION) {
-          for (ElementDefinition ed : sd.getDifferential().getElement()) {
+          for (ElementDefinition ed : sd.getDifferential().getElementList()) {
             if (!ed.hasUserData(UserDataNames.xver_sed)) {
               List<ElementDefinitionLink> links = makeEDLinks(ed, MakeLinkMode.OUTWARD);
               terminatingElements.add(makeSED(sd, ed));
@@ -2782,7 +2786,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
 
       for (StructureDefinition sd : sortedSDs(defsNext.fetchResourcesByType(StructureDefinition.class))) {
         if (sd.getKind() == StructureDefinitionKind.RESOURCE && !sd.getAbstract() && sd.getDerivation() == TypeDerivationRule.SPECIALIZATION) {
-          for (ElementDefinition ed : sd.getDifferential().getElement()) {   
+          for (ElementDefinition ed : sd.getDifferential().getElementList()) {   
             if (!ed.hasUserData(UserDataNames.xver_sed)) {
               List<ElementDefinitionLink> links = makeEDLinks(ed, MakeLinkMode.OUTWARD);
               terminatingElements.add(makeSED(sd, ed));
@@ -2807,7 +2811,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   }
 
   private void buildLinksForElements(XVersions ver, ConceptMap elementFwd, StructureDefinition sd, List<SourcedStructureDefinition> matches) {
-    for (ElementDefinition ed : sd.getDifferential().getElement()) {        
+    for (ElementDefinition ed : sd.getDifferential().getElementList()) {        
       List<ElementDefinitionLink> links = makeEDLinks(ed, MakeLinkMode.OUTWARD);
       for (SourcedStructureDefinition ssd : matches) {
         if (ssd.getStructureDefinition() != null) {
@@ -2875,10 +2879,10 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
 
   private List<ConceptMapUtilities.TranslatedCode> translateResourceName(ConceptMap map, String name) {
     List<ConceptMapUtilities.TranslatedCode> res = new ArrayList<>();
-    for (ConceptMapGroupComponent g : map.getGroup()) {
-      for (SourceElementComponent e : g.getElement()) {
+    for (ConceptMapGroupComponent g : map.getGroupList()) {
+      for (SourceElementComponent e : g.getElementList()) {
         if (e.getCode().equals(name)) {
-          for (TargetElementComponent t : e.getTarget()) {
+          for (TargetElementComponent t : e.getTargetList()) {
             if (t.getRelationship() == ConceptMapRelationship.EQUIVALENT) {
               res.add(new ConceptMapUtilities.TranslatedCode(t.getCode(), t.getRelationship()));
             } else if (t.getRelationship() == ConceptMapRelationship.SOURCEISBROADERTHANTARGET) {
@@ -2910,12 +2914,12 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
 
   private List<TranslatedCode> translateElementName(String name, ConceptMap map, String def) {
     List<TranslatedCode> res = new ArrayList<>();
-    for (ConceptMapGroupComponent g : map.getGroup()) {
+    for (ConceptMapGroupComponent g : map.getGroupList()) {
       boolean found = false;
-      for (SourceElementComponent e : g.getElement()) {
+      for (SourceElementComponent e : g.getElementList()) {
         if (e.getCode().equals(name) || e.getCode().equals(def)) {
           found = true;
-          for (TargetElementComponent t : e.getTarget()) {
+          for (TargetElementComponent t : e.getTargetList()) {
             if (t.getRelationship() == ConceptMapRelationship.EQUIVALENT || t.getRelationship() == ConceptMapRelationship.SOURCEISBROADERTHANTARGET || t.getRelationship() == ConceptMapRelationship.SOURCEISNARROWERTHANTARGET) {
               res.add(new TranslatedCode(t.getCode(), t.getRelationship()));
             }
@@ -2938,27 +2942,27 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager.Builder().build();
     vdr2 = loadR2(path, pcm);
     versions.put("r2", vdr2);
-    versions.put(vdr2.getVersion(), vdr2);
+    versions.put(vdr2.getFHIRVersion(), vdr2);
     vdr3 = loadR3(path, pcm);
     versions.put("r3", vdr3);
-    versions.put(vdr3.getVersion(), vdr3);
+    versions.put(vdr3.getFHIRVersion(), vdr3);
     vdr4 = loadR4(path, pcm);
     versions.put("r4", vdr4);
-    versions.put(vdr4.getVersion(), vdr4);
+    versions.put(vdr4.getFHIRVersion(), vdr4);
     vdr4b = loadR4B(path, pcm);
     versions.put("r4b", vdr4b);
-    versions.put(vdr4b.getVersion(), vdr4b);
+    versions.put(vdr4b.getFHIRVersion(), vdr4b);
     vdr5 = loadR5(path, pcm);
     versions.put("r5", vdr5);
-    versions.put(vdr5.getVersion(), vdr5);
+    versions.put(vdr5.getFHIRVersion(), vdr5);
   }
 
 
   private IWorkerContext loadR2(String path, FilesystemPackageCacheManager pcm) throws FHIRException, IOException {
     logProgress("Load R2");
     NpmPackage npm = pcm.loadPackage("hl7.fhir.r2.core");
-    R2ToR5Loader ldr = new R2ToR5Loader(loadTypes(), new XVerAnalysisLoader("http://hl7.org/fhir/DSTU2"));
-    SimpleWorkerContext ctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder().withTerminologyCachePath(Utilities.path(path, "input-cache", "xv-tx", "r2")).fromPackage(npm, ldr, true);
+    R2ToRNLoader ldr = new R2ToRNLoader(vdr5.getModelContext(), loadTypes(), new XVerAnalysisLoader("http://hl7.org/fhir/DSTU2"));
+    SimpleWorkerContext ctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder(vdr5.getModelContext()).withTerminologyCachePath(Utilities.path(path, "input-cache", "xv-tx", "r2")).fromPackage(npm, ldr, true);
     ctxt.connectToTSServer(ldr.txFactory(), "https://tx.fhir.org", "Java Client", null, false);
     ctxt.setExpansionParameters(new Parameters());
     return ctxt;
@@ -2967,8 +2971,8 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   private IWorkerContext loadR3(String path, FilesystemPackageCacheManager pcm) throws FHIRException, IOException {
     logProgress("Load R3");
     NpmPackage npm = pcm.loadPackage("hl7.fhir.r3.core");
-    R3ToR5Loader ldr = new R3ToR5Loader(loadTypes(), new XVerAnalysisLoader("http://hl7.org/fhir/STU3"));
-    SimpleWorkerContext ctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder().withTerminologyCachePath(Utilities.path(path, "input-cache", "xv-tx", "r3")).fromPackage(npm, ldr, true);
+    R3ToRNLoader ldr = new R3ToRNLoader(vdr5.getModelContext(), loadTypes(), new XVerAnalysisLoader("http://hl7.org/fhir/STU3"));
+    SimpleWorkerContext ctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder(vdr5.getModelContext()).withTerminologyCachePath(Utilities.path(path, "input-cache", "xv-tx", "r3")).fromPackage(npm, ldr, true);
     ctxt.connectToTSServer(ldr.txFactory(), "https://tx.fhir.org", "Java Client", null, false);
     ctxt.setExpansionParameters(new Parameters());
     return ctxt;
@@ -2977,8 +2981,8 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   private IWorkerContext loadR4(String path, FilesystemPackageCacheManager pcm) throws FHIRFormatError, FHIRException, IOException {
     logProgress("Load R4");
     NpmPackage npm = pcm.loadPackage("hl7.fhir.r4.core");
-    R4ToR5Loader ldr = new R4ToR5Loader(loadTypes(), new XVerAnalysisLoader("http://hl7.org/fhir/R4"), "4.0.0");
-    SimpleWorkerContext ctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder().withTerminologyCachePath(Utilities.path(path, "input-cache", "xv-tx", "r4")).fromPackage(npm, ldr, true);
+    R4ToRNLoader ldr = new R4ToRNLoader(vdr5.getModelContext(), loadTypes(), new XVerAnalysisLoader("http://hl7.org/fhir/R4"), "4.0.0");
+    SimpleWorkerContext ctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder(vdr5.getModelContext()).withTerminologyCachePath(Utilities.path(path, "input-cache", "xv-tx", "r4")).fromPackage(npm, ldr, true);
     ctxt.connectToTSServer(ldr.txFactory(), "https://tx.fhir.org", "Java Client", null, false);
     ctxt.setExpansionParameters(new Parameters());
     return ctxt;
@@ -2987,8 +2991,8 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   private IWorkerContext loadR4B(String path, FilesystemPackageCacheManager pcm) throws FHIRException, IOException {
     logProgress("Load R4B");
     NpmPackage npm = pcm.loadPackage("hl7.fhir.r4b.core");
-    R4BToR5Loader ldr = new R4BToR5Loader(loadTypes(), new XVerAnalysisLoader("http://hl7.org/fhir/R4B"), "4.3.0");
-    SimpleWorkerContext ctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder().withTerminologyCachePath(Utilities.path(path, "input-cache", "xv-tx", "r4b")).fromPackage(npm, ldr, true);
+    R4BToRNLoader ldr = new R4BToRNLoader(vdr5.getModelContext(), loadTypes(), new XVerAnalysisLoader("http://hl7.org/fhir/R4B"), "4.3.0");
+    SimpleWorkerContext ctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder(vdr5.getModelContext()).withTerminologyCachePath(Utilities.path(path, "input-cache", "xv-tx", "r4b")).fromPackage(npm, ldr, true);
     ctxt.connectToTSServer(ldr.txFactory(), "https://tx.fhir.org", "Java Client", null, false);
     ctxt.setExpansionParameters(new Parameters());
     return ctxt;
@@ -2997,8 +3001,8 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   private IWorkerContext loadR5(String path, FilesystemPackageCacheManager pcm) throws FHIRException, IOException {
     logProgress("Load R5");
     NpmPackage npm = pcm.loadPackage("hl7.fhir.r5.core");
-    R5ToR5Loader ldr = new R5ToR5Loader(loadTypes(), new XVerAnalysisLoader("http://hl7.org/fhir/R5"));
-    SimpleWorkerContext ctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder().withTerminologyCachePath(Utilities.path(path, "input-cache", "xv-tx", "r5")).fromPackage(npm, ldr, true);
+    R5ToRNLoader ldr = new R5ToRNLoader(vdr5.getModelContext(), loadTypes(), new XVerAnalysisLoader("http://hl7.org/fhir/R5"));
+    SimpleWorkerContext ctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder(vdr5.getModelContext()).withTerminologyCachePath(Utilities.path(path, "input-cache", "xv-tx", "r5")).fromPackage(npm, ldr, true);
     ctxt.connectToTSServer(ldr.txFactory(), "https://tx.fhir.org", "Java Client", null, false);
     ctxt.setExpansionParameters(new Parameters());
     return ctxt;
@@ -3077,10 +3081,10 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
 
   private List<String> translateResourceName(List<String> codes, ConceptMap cm) {
     List<String> res = new ArrayList<String>();
-    for (ConceptMapGroupComponent grp : cm.getGroup()) {
-      for (SourceElementComponent src : grp.getElement()) {
+    for (ConceptMapGroupComponent grp : cm.getGroupList()) {
+      for (SourceElementComponent src : grp.getElementList()) {
         if (codes.contains(src.getCode())) {
-          for (TargetElementComponent tgt : src.getTarget()) {
+          for (TargetElementComponent tgt : src.getTargetList()) {
             if (tgt.getRelationship() == ConceptMapRelationship.EQUIVALENT || tgt.getRelationship() == ConceptMapRelationship.RELATEDTO ||
                 tgt.getRelationship() == ConceptMapRelationship.SOURCEISBROADERTHANTARGET || tgt.getRelationship() == ConceptMapRelationship.SOURCEISNARROWERTHANTARGET) {
               res.add(tgt.getCode());
@@ -3108,9 +3112,9 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
           return processVS(vd, ed.getBinding().getValueSetElement());
         }
       } else if (uri.endsWith("/ValueSet/resource-types")) {
-        return listResources(vd.fetchResourcesByType(StructureDefinition.class), VersionUtilities.getMajMin(vd.getVersion()));
+        return listResources(vd.fetchResourcesByType(StructureDefinition.class), VersionUtilities.getMajMin(vd.getFHIRVersion()));
       } else if (uri.endsWith("/ValueSet/data-types")) {
-        return listDatatypes(vd.fetchResourcesByType(StructureDefinition.class), VersionUtilities.getMajMin(vd.getVersion()));
+        return listDatatypes(vd.fetchResourcesByType(StructureDefinition.class), VersionUtilities.getMajMin(vd.getFHIRVersion()));
       } else {
         System.out.println(uri);
       }
@@ -3144,14 +3148,14 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     ValueSet vs = vd.fetchResource(ValueSet.class, url.primitiveValue(), ExtensionUtilities.getVersionResolutionRules(url));
     if (vs != null && vs.hasCompose() && !vs.getCompose().hasExclude()) {
       List<Coding> list = new ArrayList<>();
-      for (ConceptSetComponent inc : vs.getCompose().getInclude()) {
+      for (ConceptSetComponent inc : vs.getCompose().getIncludeList()) {
         if (inc.hasValueSet() || inc.hasFilter()) {
           return null;
         }
-        String system = inc.getSystem().replace("http://hl7.org/fhir/", "http://hl7.org/fhir/"+VersionUtilities.getMajMin(vd.getVersion())+"/");
-        String vn = VersionUtilities.getNameForVersion(vd.getVersion());
+        String system = inc.getSystem().replace("http://hl7.org/fhir/", "http://hl7.org/fhir/"+VersionUtilities.getMajMin(vd.getFHIRVersion())+"/");
+        String vn = VersionUtilities.getNameForVersion(vd.getFHIRVersion());
         if (inc.hasConcept()) {
-          for (ConceptReferenceComponent cc : inc.getConcept()) {
+          for (ConceptReferenceComponent cc : inc.getConceptList()) {
             list.add(new Coding().setSystem(system).setCode(cc.getCode()).setDisplay(cc.getDisplay()+" ("+vn+")"));
           }
         } else {
@@ -3159,7 +3163,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
           if (cs == null) {
             return null;
           } else {
-            addCodings(system, vn, cs.getConcept(), list);
+            addCodings(system, vn, cs.getConceptList(), list);
           }
         }
       }
@@ -3172,7 +3176,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   private void addCodings(String system, String vn, List<ConceptDefinitionComponent> concepts, List<Coding> list) {
     for (ConceptDefinitionComponent cd : concepts) {
       list.add(new Coding().setSystem(system).setCode(cd.getCode()).setDisplay(cd.getDisplay()+" ("+vn+")"));
-      addCodings(system, vn, cd.getConcept(), list);
+      addCodings(system, vn, cd.getConceptList(), list);
     }
 
   }

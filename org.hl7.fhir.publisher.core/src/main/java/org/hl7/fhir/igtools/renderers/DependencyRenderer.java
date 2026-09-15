@@ -13,10 +13,7 @@ import java.util.Set;
 
 import lombok.Getter;
 import lombok.Setter;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_14_50;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_50;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_43_50;
+import org.hl7.fhir.convertors.factory.*;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.DependencyAnalyser;
@@ -24,17 +21,16 @@ import org.hl7.fhir.igtools.publisher.DependencyAnalyser.ArtifactDependency;
 import org.hl7.fhir.igtools.publisher.PublisherIGLoader;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.igtools.templates.TemplateManager;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.Extension;
-import org.hl7.fhir.r5.model.ImplementationGuide;
-import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnComponent;
-import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideGlobalComponent;
-import org.hl7.fhir.r5.model.StructureDefinition;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.tools.ExtensionConstants;
+import org.hl7.fhir.model.core.CanonicalResource;
+import org.hl7.fhir.model.core.Extension;
+import org.hl7.fhir.model.core.ImplementationGuide;
+import org.hl7.fhir.model.core.ImplementationGuide.*;
+import org.hl7.fhir.model.core.StructureDefinition;
+import org.hl7.fhir.model.extensions.ExtensionDefinitions;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.model.tools.ExtensionConstants;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.services.renderers.utils.RenderingContext;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
@@ -219,8 +215,8 @@ public class DependencyRenderer {
    * (R5) dependency table so it agrees with the (R5) package.json.
    */
   static String baseVersionKey(ImplementationGuide ig) {
-    return ig.hasFhirVersion() && ig.getFhirVersion().get(0).getValue() != null
-        ? PublisherIGLoader.canonicalTarget(ig.getFhirVersion().get(0).getValue().toCode()) : null;
+    return ig.hasFhirVersion() && ig.getFhirVersionList().get(0).getValue() != null
+        ? PublisherIGLoader.canonicalTarget(ig.getFhirVersionList().get(0).getValue().toCode()) : null;
   }
 
   /**
@@ -263,7 +259,7 @@ public class DependencyRenderer {
   public String renderNonTech(ImplementationGuide ig) throws FHIRException, IOException {
     packagesByName = new HashMap<String, PackageInfo>();
     String baseVer = baseVersionKey(ig);
-    for (ImplementationGuideDependsOnComponent d : ig.getDependsOn()) {
+    for (ImplementationGuideDependsOnComponent d : ig.getDependsOnList()) {
       if (baseVer != null && !PublisherIGLoader.isDepApplicableForVersion(d, baseVer)) {
         continue;
       }
@@ -356,7 +352,7 @@ public class DependencyRenderer {
   public String render(ImplementationGuide ig, boolean QA, boolean details, boolean first) throws FHIRException, IOException {
     String baseVer = baseVersionKey(ig);
     boolean hasDesc = false;
-    for (ImplementationGuideDependsOnComponent d : ig.getDependsOn()) {
+    for (ImplementationGuideDependsOnComponent d : ig.getDependsOnList()) {
       if (baseVer != null && !PublisherIGLoader.isDepApplicableForVersion(d, baseVer)) {
         continue;
       }
@@ -374,7 +370,7 @@ public class DependencyRenderer {
     StringBuilder b = new StringBuilder();
     
     Row row = addBaseRow(gen, model, ig, QA, hasDesc);
-    for (ImplementationGuideDependsOnComponent d : ig.getDependsOn()) {
+    for (ImplementationGuideDependsOnComponent d : ig.getDependsOnList()) {
       if (baseVer != null && !PublisherIGLoader.isDepApplicableForVersion(d, baseVer)) {
         continue;
       }
@@ -604,15 +600,17 @@ public class DependencyRenderer {
 
   private ImplementationGuide loadImplementationGuide(InputStream content, String v) throws FHIRFormatError, FHIRException, IOException {
     if (VersionUtilities.isR2BVer(v)) {
-      return (ImplementationGuide) VersionConvertorFactory_14_50.convertResource(new org.hl7.fhir.dstu2016may.formats.JsonParser().parse(content));
+      return (ImplementationGuide) VersionConvertorFactory_14_N.convertResource(new org.hl7.fhir.dstu2016may.formats.JsonParser().parse(content));
     } else if (VersionUtilities.isR3Ver(v)) {
-      return (ImplementationGuide) VersionConvertorFactory_30_50.convertResource(new org.hl7.fhir.dstu3.formats.JsonParser().parse(content));
+      return (ImplementationGuide) VersionConvertorFactory_30_N.convertResource(new org.hl7.fhir.dstu3.formats.JsonParser().parse(content));
     } else if (VersionUtilities.isR4Ver(v)) {
-      return (ImplementationGuide) VersionConvertorFactory_40_50.convertResource(new org.hl7.fhir.r4.formats.JsonParser().parse(content));
+      return (ImplementationGuide) VersionConvertorFactory_40_N.convertResource(new org.hl7.fhir.r4.formats.JsonParser().parse(content));
     } else if (VersionUtilities.isR4BVer(v)) {
-      return (ImplementationGuide) VersionConvertorFactory_43_50.convertResource(new org.hl7.fhir.r4b.formats.JsonParser().parse(content));
-    } else if (VersionUtilities.isR4BVer(v)) {
-      return (ImplementationGuide) new org.hl7.fhir.r5.formats.JsonParser().parse(content);
+      return (ImplementationGuide) VersionConvertorFactory_43_N.convertResource(new org.hl7.fhir.r4b.formats.JsonParser().parse(content));
+    } else if (VersionUtilities.isR5Ver(v)) {
+      return (ImplementationGuide) VersionConvertorFactory_50_N.convertResource(new org.hl7.fhir.r5.formats.JsonParser().parse(content));
+    } else if (VersionUtilities.isR6Plus(v)) {
+      return (ImplementationGuide) new org.hl7.fhir.model.core.formats.JsonParser(context.getModelContext()).parse(content);
     } else {
       return null;
     }
@@ -623,7 +621,7 @@ public class DependencyRenderer {
     String pid = npm == null ? null : npm.vid();
     if (!globalPackages.contains(key) && !globalPackages.contains(pid)) {
       globalPackages.add(key);
-      for (ImplementationGuideGlobalComponent g : ig.getGlobal()) {
+      for (ImplementationGuideGlobalComponent g : ig.getGlobalList()) {
         StructureDefinition sd = context.fetchResource(StructureDefinition.class, g.getProfile(), ExtensionUtilities.getVersionResolutionRules(g.getProfileElement()));
         globals.add(new GlobalProfile(npm, ig, g.getType(), g.getProfile(), sd));
       }    
@@ -704,7 +702,7 @@ public class DependencyRenderer {
   private Row addBaseRow(HierarchicalTableGenerator gen, TableModel model, ImplementationGuide ig, boolean QA, boolean hasDesc) {
     String id = ig.getFullPackageId();
     String ver = ig.getVersion();
-    String fver = ig.getFhirVersion().get(0).asStringValue();
+    String fver = ig.getFhirVersionList().get(0).asStringValue();
     this.fhirVersion = fver;
     String canonical = ig.getUrl();
     String web = ig.getManifest().getRendering();

@@ -49,20 +49,20 @@ import org.hl7.fhir.igtools.publisher.comparators.IpaComparator;
 import org.hl7.fhir.igtools.publisher.comparators.IpsComparator;
 import org.hl7.fhir.igtools.publisher.comparators.PreviousVersionComparator;
 import org.hl7.fhir.igtools.publisher.realm.RealmBusinessRules;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.elementmodel.Element;
-import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.fhirpath.FHIRPathEngine;
-import org.hl7.fhir.r5.formats.XmlParser;
-import org.hl7.fhir.r5.model.*;
-import org.hl7.fhir.r5.model.Bundle.BundleEntryComponent;
-import org.hl7.fhir.r5.model.Parameters.ParametersParameterComponent;
-import org.hl7.fhir.r5.terminologies.client.TerminologyClientContext;
-import org.hl7.fhir.r5.terminologies.client.TerminologyClientContext.TerminologyClientContextUseCount;
-import org.hl7.fhir.r5.terminologies.client.TerminologyClientManager;
-import org.hl7.fhir.r5.terminologies.client.TerminologyClientManager.InternalLogEvent;
-import org.hl7.fhir.r5.utils.OperationOutcomeUtilities;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.services.elementmodel.Element;
+import org.hl7.fhir.model.extensions.ExtensionDefinitions;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.services.fhirpath.FHIRPathEngine;
+import org.hl7.fhir.model.core.formats.XmlParser;
+import org.hl7.fhir.model.core.*;
+import org.hl7.fhir.model.core.Bundle.BundleEntryComponent;
+import org.hl7.fhir.model.core.Parameters.ParametersParameterComponent;
+import org.hl7.fhir.standalone.terminology.client.TerminologyClientContext;
+import org.hl7.fhir.standalone.terminology.client.TerminologyClientContext.TerminologyClientContextUseCount;
+import org.hl7.fhir.standalone.terminology.client.TerminologyClientManager;
+import org.hl7.fhir.standalone.terminology.client.TerminologyClientManager.InternalLogEvent;
+import org.hl7.fhir.model.utilities.OperationOutcomeUtilities;
 import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.i18n.I18nConstants;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
@@ -214,7 +214,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
         ok = ok || !Utilities.noString(s);
         b.append("<li>"+root+e.getPath()+": Validated against "+s+"</li>");
       }
-      for (Element c : e.getChildren()) {
+      for (Element c : e.getChildList()) {
         ok = showMessages(b, root, c) || ok;
       }
       return ok;
@@ -237,7 +237,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
           String url = s.contains(" ") ? s.substring(0, s.indexOf(" ")) : s;
           s = s.contains(" ") ? s.substring(s.indexOf(" ")) : "";
           String specName = getSpecName(url);
-          StructureDefinition sd = context.fetchResource(StructureDefinition.class, url, IWorkerContext.VersionResolutionRules.defaultRule());
+          StructureDefinition sd = context.fetchResource(StructureDefinition.class, url, VersionResolutionRules.defaultRule());
           String l = null;
           if (sd != null) {
             l = specName+"<a href=\""+sd.getWebPath()+"\">"+sd.present()+"</a>"+s;
@@ -525,7 +525,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
         } catch (Exception e) {
           System.out.println("Internal error in location for message: '"+e.getMessage()+"', loc = '"+subst100(vm.getLocation())+"', err = '"+subst100(vm.getMessage())+"'");
         }
-        oo.getIssue().add(OperationOutcomeUtilities.convertToIssue(vm, oo));
+        oo.getIssueList().add(OperationOutcomeUtilities.convertToIssue(vm, oo));
       }
     }
     for (FetchedFile f : files) {
@@ -534,12 +534,12 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
         validationBundle.addEntry(new BundleEntryComponent().setResource(oo));
         ExtensionUtilities.addStringExtension(oo, ExtensionDefinitions.EXT_OO_FILE, f.getStatedPath());
         for (ValidationMessage vm : filterMessages(f, f.getErrors(), false, filteredMessages)) {
-          oo.getIssue().add(OperationOutcomeUtilities.convertToIssue(vm, oo));
+          oo.getIssueList().add(OperationOutcomeUtilities.convertToIssue(vm, oo));
         }
       }
     }
     FileOutputStream s = new FileOutputStream(FileUtilities.changeFileExt(path, ".xml"));
-    new XmlParser().compose(s, validationBundle, true);
+    new XmlParser(context.getModelContext()).compose(s, validationBundle, true);
     s.close();
 
     genQAText(title, files, path, filteredMessages, linkErrors);
@@ -561,7 +561,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       x.para("This page provides a report on which terminology servers were used while publishing this IG. Note that terminology caching reduces the server hit count - this page only reports content that wasn't cached");
       x.h2().tx("Terminology Parameters");
       XhtmlNode ul = x.ul();
-      for (ParametersParameterComponent p : context.getExpansionParameters().getParameter()) {
+      for (ParametersParameterComponent p : context.getExpansionParameters().getParameterList()) {
         XhtmlNode li = ul.li();
         li.b().tx(p.getName());
         li.tx(": ");
@@ -683,7 +683,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
           tr.td().tx(us.getExpands());
           tr.td().tx(us.getValidates());
           XhtmlNode td = tr.td();
-          CodeSystem cs = context.fetchResource(CodeSystem.class, s, IWorkerContext.VersionResolutionRules.defaultRule());
+          CodeSystem cs = context.fetchResource(CodeSystem.class, s, VersionResolutionRules.defaultRule());
           if (cs != null) {
             if (cs.hasWebPath()) {
               td.ah(cs.getWebPath()).tx(cs.present());
@@ -699,7 +699,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       for (String s : nl) { 
         TerminologyClientContextUseCount us = uc.get(s);
         if (us.getReadVS() > 0) {
-          ValueSet vs = context.fetchResource(ValueSet.class, s, IWorkerContext.VersionResolutionRules.defaultRule());
+          ValueSet vs = context.fetchResource(ValueSet.class, s, VersionResolutionRules.defaultRule());
           if (vs != null && vs.hasWebPath()) {
             ul.li().ah(vs.getWebPath()).tx(s);
           } else {

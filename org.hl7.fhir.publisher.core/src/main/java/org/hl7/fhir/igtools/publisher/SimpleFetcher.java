@@ -33,22 +33,22 @@ import java.util.List;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.openehr.ArchetypeImporter;
-import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
-import org.hl7.fhir.r5.context.ILoggingService;
-import org.hl7.fhir.r5.context.ILoggingService.LogCategory;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.elementmodel.FmlParser;
-import org.hl7.fhir.r5.elementmodel.JsonParser.ILogicalModelResolver;
-import org.hl7.fhir.r5.elementmodel.ValidatedFragment;
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.fhirpath.FHIRPathEngine;
-import org.hl7.fhir.r5.formats.FormatUtilities;
-import org.hl7.fhir.r5.model.CanonicalType;
-import org.hl7.fhir.r5.model.DataType;
-import org.hl7.fhir.r5.model.ElementDefinition;
-import org.hl7.fhir.r5.model.Reference;
-import org.hl7.fhir.r5.model.StructureDefinition;
-import org.hl7.fhir.r5.model.UriType;
+import org.hl7.fhir.services.conformance.profile.ProfileUtilities;
+import org.hl7.fhir.services.context.ILoggingService;
+import org.hl7.fhir.services.context.ILoggingService.LogCategory;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.services.elementmodel.FmlParser;
+import org.hl7.fhir.services.elementmodel.JsonParser.ILogicalModelResolver;
+import org.hl7.fhir.services.elementmodel.ValidatedFragment;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.services.fhirpath.FHIRPathEngine;
+import org.hl7.fhir.model.utilities.formats.FormatUtilities;
+import org.hl7.fhir.model.core.CanonicalType;
+import org.hl7.fhir.model.core.DataType;
+import org.hl7.fhir.model.core.ElementDefinition;
+import org.hl7.fhir.model.core.Reference;
+import org.hl7.fhir.model.core.StructureDefinition;
+import org.hl7.fhir.model.core.UriType;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
@@ -355,7 +355,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
               boolean ok = false;
               if (!Utilities.existsInList(ext, fixedFileTypes()))
                 try {
-                  org.hl7.fhir.r5.elementmodel.Element e = new org.hl7.fhir.r5.elementmodel.XmlParser(context).parseSingle(new FileInputStream(f), null);
+                  org.hl7.fhir.services.elementmodel.Element e = new org.hl7.fhir.services.elementmodel.XmlParser(context).parseSingle(new FileInputStream(f), null);
                   addFileForElement(res, f, e, "application/fhir+xml");
                   count++;
                   ok = true;
@@ -371,7 +371,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
                 }
               if (!ok && !Utilities.existsInList(ext, "xml", "ttl", "html", "txt", "fml", "adl")) {
                 try {
-                  List<ValidatedFragment> el = new org.hl7.fhir.r5.elementmodel.JsonParser(context).setLogicalModelResolver(this).parse(new FileInputStream(fn));
+                  List<ValidatedFragment> el = new org.hl7.fhir.services.elementmodel.JsonParser(context).setLogicalModelResolver(this).parse(new FileInputStream(fn));
                   if (el.size() == 1) {
                     addFileForElement(res, f, el.get(0).getElement(), "application/fhir+json");
                     count++;
@@ -390,7 +390,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
               }
               if (!ok && !Utilities.existsInList(ext, "json", "xml", "html", "txt", "fml", "adl")) {
                 try {
-                  org.hl7.fhir.r5.elementmodel.Element e = new org.hl7.fhir.r5.elementmodel.TurtleParser(context).parseSingle(new FileInputStream(fn), null);
+                  org.hl7.fhir.services.elementmodel.Element e = new org.hl7.fhir.services.elementmodel.TurtleParser(context).parseSingle(new FileInputStream(fn), null);
                   addFileForElement(res, f, e, "application/fhir+turtle");
                   count++;
                   ok = true;
@@ -411,7 +411,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
                   if (fp==null) {
                     fp = new FmlParser(context, fpe);
                   }
-                  org.hl7.fhir.r5.elementmodel.Element e  = fp.parse(new FileInputStream(f)).get(0).getElement();
+                  org.hl7.fhir.services.elementmodel.Element e  = fp.parse(new FileInputStream(f)).get(0).getElement();
                   addFileForElement(res, f, e, "fml");
                   count++;
                   ok = true;
@@ -463,7 +463,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
         "jpg", "png", "gif", "mp3", "mp4", "pfd", "doc", "docx", "ppt", "pptx", "svg");
   }
 
-  private void addFileForElement(List<FetchedFile> res, File f, org.hl7.fhir.r5.elementmodel.Element e, String cnt) throws IOException {
+  private void addFileForElement(List<FetchedFile> res, File f, org.hl7.fhir.services.elementmodel.Element e, String cnt) throws IOException {
     if (( e == null || !e.fhirType().equals("ImplementationGuide")) && !(f.getName().startsWith("Binary") && !"Binary".equals(e.fhirType()))) {
       addFile(res, f, cnt);
     }

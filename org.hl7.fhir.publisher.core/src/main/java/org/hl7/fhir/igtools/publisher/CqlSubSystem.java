@@ -37,10 +37,11 @@ import org.hl7.elm.r1.ValueSetRef;
 import org.hl7.elm.r1.VersionedIdentifier;
 import org.hl7.elm_modelinfo.r1.ModelInfo;
 import org.hl7.elm_modelinfo.r1.serializing.ModelInfoReaderFactory;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_50_N;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
-import org.hl7.fhir.r5.context.ILoggingService;
-import org.hl7.fhir.r5.model.*;
+import org.hl7.fhir.services.context.ILoggingService;
+import org.hl7.fhir.model.core.*;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
@@ -139,7 +140,7 @@ public class CqlSubSystem {
           InputStream s = p.loadByCanonicalVersion(identifier.getSystem()+"/Library/"+identifier.getId(), identifier.getVersion());
           if (s != null) {
             Library l = reader.readLibrary(s);
-            for (org.hl7.fhir.r5.model.Attachment a : l.getContent()) {
+            for (org.hl7.fhir.model.core.Attachment a : l.getContentList()) {
               if (a.getContentType() != null && a.getContentType().equals("text/cql")) {
                 return new ByteArrayInputStream(a.getData());
               }
@@ -174,7 +175,7 @@ public class CqlSubSystem {
           InputStream s = p.loadByCanonicalVersion(identifier.getSystem()+"/Library/"+identifier.getId()+"-ModelInfo", identifier.getVersion());
           if (s != null) {
             Library l = reader.readLibrary(s);
-            for (org.hl7.fhir.r5.model.Attachment a : l.getContent()) {
+            for (org.hl7.fhir.model.core.Attachment a : l.getContentList()) {
               if (a.getContentType() != null && a.getContentType().equals("application/xml")) {
                 // Do not set the URL to the package canonical, the model info may be loading from another package
                 //if (modelIdentifier.getSystem() == null) {
@@ -939,8 +940,8 @@ public class CqlSubSystem {
     return result;
   }
 
-  private org.hl7.fhir.r5.model.RelatedArtifact toRelatedArtifact(UsingDef usingDef) {
-    return new org.hl7.fhir.r5.model.RelatedArtifact()
+  private org.hl7.fhir.model.core.RelatedArtifact toRelatedArtifact(UsingDef usingDef) {
+    return new org.hl7.fhir.model.core.RelatedArtifact()
             .setType(RelatedArtifact.RelatedArtifactType.DEPENDSON)
             .setDisplay("Model " + usingDef.getLocalIdentifier())
             .setResource(getModelInfoReferenceUrl(usingDef.getUri(), usingDef.getLocalIdentifier(), usingDef.getVersion()));
@@ -971,9 +972,9 @@ public class CqlSubSystem {
     return String.format("%s/Library/%s-ModelInfo%s", canonicalBase, name, version != null ? ("|" + version) : "");
   }
 
-  private org.hl7.fhir.r5.model.RelatedArtifact toRelatedArtifact(IncludeDef includeDef) {
-    return new org.hl7.fhir.r5.model.RelatedArtifact()
-            .setType(org.hl7.fhir.r5.model.RelatedArtifact.RelatedArtifactType.DEPENDSON)
+  private org.hl7.fhir.model.core.RelatedArtifact toRelatedArtifact(IncludeDef includeDef) {
+    return new org.hl7.fhir.model.core.RelatedArtifact()
+            .setType(org.hl7.fhir.model.core.RelatedArtifact.RelatedArtifactType.DEPENDSON)
             .setDisplay(includeDef.getLocalIdentifier() != null ? "Library " + includeDef.getLocalIdentifier() : null)
             .setResource(getReferenceUrl(includeDef.getPath(), includeDef.getVersion()));
   }
@@ -989,16 +990,16 @@ public class CqlSubSystem {
     return String.format("Library/%s%s", path, version != null ? ("|" + version) : "");
   }
 
-  private org.hl7.fhir.r5.model.RelatedArtifact toRelatedArtifact(CodeSystemDef codeSystemDef) {
-    return new org.hl7.fhir.r5.model.RelatedArtifact()
-            .setType(org.hl7.fhir.r5.model.RelatedArtifact.RelatedArtifactType.DEPENDSON)
+  private org.hl7.fhir.model.core.RelatedArtifact toRelatedArtifact(CodeSystemDef codeSystemDef) {
+    return new org.hl7.fhir.model.core.RelatedArtifact()
+            .setType(org.hl7.fhir.model.core.RelatedArtifact.RelatedArtifactType.DEPENDSON)
             .setDisplay("Code System " + codeSystemDef.getName())
             .setResource(toReference(codeSystemDef));
   }
 
-  private org.hl7.fhir.r5.model.RelatedArtifact toRelatedArtifact(ValueSetDef valueSetDef) {
-    return new org.hl7.fhir.r5.model.RelatedArtifact()
-            .setType(org.hl7.fhir.r5.model.RelatedArtifact.RelatedArtifactType.DEPENDSON)
+  private org.hl7.fhir.model.core.RelatedArtifact toRelatedArtifact(ValueSetDef valueSetDef) {
+    return new org.hl7.fhir.model.core.RelatedArtifact()
+            .setType(org.hl7.fhir.model.core.RelatedArtifact.RelatedArtifactType.DEPENDSON)
             .setDisplay("Value Set " + valueSetDef.getName())
             .setResource(toReference(valueSetDef));
   }
@@ -1105,20 +1106,20 @@ public class CqlSubSystem {
     return "Any";
   }
 
-  private org.hl7.fhir.r5.model.DataRequirement toDataRequirement(Retrieve retrieve, CompiledLibrary library, LibraryManager libraryManager) {
-    org.hl7.fhir.r5.model.DataRequirement dr = new org.hl7.fhir.r5.model.DataRequirement();
+  private org.hl7.fhir.model.core.DataRequirement toDataRequirement(Retrieve retrieve, CompiledLibrary library, LibraryManager libraryManager) {
+    org.hl7.fhir.model.core.DataRequirement dr = new org.hl7.fhir.model.core.DataRequirement();
 
-    dr.setType(org.hl7.fhir.r5.model.Enumerations.FHIRTypes.fromCode(retrieve.getDataType().getLocalPart()));
+    dr.setType(org.hl7.fhir.model.core.Enumerations.FHIRTypes.fromCode(retrieve.getDataType().getLocalPart()));
 
     // Set profile if specified
     if (retrieve.getTemplateId() != null) {
-      dr.setProfile(Collections.singletonList(new org.hl7.fhir.r5.model.CanonicalType(retrieve.getTemplateId())));
+      dr.setProfileList(Collections.singletonList(new org.hl7.fhir.model.core.CanonicalType(retrieve.getTemplateId())));
     }
 
     // Set code path if specified
     if (retrieve.getCodeProperty() != null) {
-      org.hl7.fhir.r5.model.DataRequirement.DataRequirementCodeFilterComponent cfc =
-              new org.hl7.fhir.r5.model.DataRequirement.DataRequirementCodeFilterComponent();
+      org.hl7.fhir.model.core.DataRequirement.DataRequirementCodeFilterComponent cfc =
+              new org.hl7.fhir.model.core.DataRequirement.DataRequirementCodeFilterComponent();
 
       cfc.setPath(retrieve.getCodeProperty());
 
@@ -1141,7 +1142,7 @@ public class CqlSubSystem {
         }
       }
 
-      dr.getCodeFilter().add(cfc);
+      dr.getCodeFilterList().add(cfc);
     }
 
     // TODO: Set date range filters if literal
@@ -1149,7 +1150,7 @@ public class CqlSubSystem {
     return dr;
   }
 
-  private void resolveCodeFilterCodes(org.hl7.fhir.r5.model.DataRequirement.DataRequirementCodeFilterComponent cfc, Expression e,
+  private void resolveCodeFilterCodes(org.hl7.fhir.model.core.DataRequirement.DataRequirementCodeFilterComponent cfc, Expression e,
                                       CompiledLibrary library, LibraryManager libraryManager) {
     if (e instanceof org.hl7.elm.r1.CodeRef) {
       CodeRef cr = (CodeRef)e;
@@ -1164,23 +1165,23 @@ public class CqlSubSystem {
     if (e instanceof org.hl7.elm.r1.ConceptRef) {
       ConceptRef cr = (ConceptRef)e;
       ResolutionContext context = new ResolutionContext(libraryManager, library);
-      org.hl7.fhir.r5.model.CodeableConcept c = toCodeableConcept(toConcept(resolveConceptRef(cr, context), context), context);
-      for (org.hl7.fhir.r5.model.Coding code : c.getCoding()) {
+      org.hl7.fhir.model.core.CodeableConcept c = toCodeableConcept(toConcept(resolveConceptRef(cr, context), context), context);
+      for (org.hl7.fhir.model.core.Coding code : c.getCodingList()) {
         cfc.addCode(code);
       }
     }
 
     if (e instanceof org.hl7.elm.r1.Concept) {
-      org.hl7.fhir.r5.model.CodeableConcept c = toCodeableConcept((org.hl7.elm.r1.Concept)e, new ResolutionContext(libraryManager, library));
-      for (org.hl7.fhir.r5.model.Coding code : c.getCoding()) {
+      org.hl7.fhir.model.core.CodeableConcept c = toCodeableConcept((org.hl7.elm.r1.Concept)e, new ResolutionContext(libraryManager, library));
+      for (org.hl7.fhir.model.core.Coding code : c.getCodingList()) {
         cfc.addCode(code);
       }
     }
   }
 
-  private org.hl7.fhir.r5.model.Coding toCoding(Code code, ResolutionContext context) {
+  private org.hl7.fhir.model.core.Coding toCoding(Code code, ResolutionContext context) {
     CodeSystemDef codeSystemDef = resolveCodeSystemRef(code.getSystem(), context);
-    org.hl7.fhir.r5.model.Coding coding = new org.hl7.fhir.r5.model.Coding();
+    org.hl7.fhir.model.core.Coding coding = new org.hl7.fhir.model.core.Coding();
     coding.setCode(code.getCode());
     coding.setDisplay(code.getDisplay());
     if (codeSystemDef != null) {
@@ -1198,8 +1199,8 @@ public class CqlSubSystem {
     return coding;
   }
 
-  private org.hl7.fhir.r5.model.CodeableConcept toCodeableConcept(Concept concept, ResolutionContext context) {
-    org.hl7.fhir.r5.model.CodeableConcept codeableConcept = new org.hl7.fhir.r5.model.CodeableConcept();
+  private org.hl7.fhir.model.core.CodeableConcept toCodeableConcept(Concept concept, ResolutionContext context) {
+    org.hl7.fhir.model.core.CodeableConcept codeableConcept = new org.hl7.fhir.model.core.CodeableConcept();
     codeableConcept.setText(concept.getDisplay());
     for (Code code : concept.getCode()) {
       codeableConcept.addCoding(toCoding(code, new ResolutionContext(context.getLibraryManager(), context.getLibrary())));
@@ -1344,13 +1345,13 @@ public class CqlSubSystem {
 
   private CqlSourceFileInformation getLibraryInfo(FetchedFile f, DomainResource r) {
     if (r instanceof Measure) {
-      return getLibraryInfo(f, ((Measure)r).getLibrary());
+      return getLibraryInfo(f, ((Measure)r).getLibraryList());
     }
     else if (r instanceof ActivityDefinition) {
-      return getLibraryInfo(f, ((ActivityDefinition)r).getLibrary());
+      return getLibraryInfo(f, ((ActivityDefinition)r).getLibraryList());
     }
     else if (r instanceof PlanDefinition) {
-      return getLibraryInfo(f, ((PlanDefinition)r).getLibrary());
+      return getLibraryInfo(f, ((PlanDefinition)r).getLibraryList());
     }
     else if (r instanceof Questionnaire) {
       return getLibraryInfo(f, r.getExtensionsByUrl("http://hl7.org/fhir/StructureDefinition/cqf-library").stream().map(Extension::getValueCanonicalType).toList());
@@ -1417,7 +1418,7 @@ public class CqlSubSystem {
 
   private void fixupFHIRReferences(FetchedFile f, Library library, CompiledLibrary compiledLibrary) {
     // Correct references to any reported models to the models and loadedModels tables (local ig and ig dependency models)
-    for (var r : library.getRelatedArtifact()) {
+    for (var r : library.getRelatedArtifactList()) {
       if (r.hasResource() && r.getResource().contains("/Library/") && r.getResource().contains("-ModelInfo")) {
         var tail = Utilities.urlTail(r.getResource());
         var uri = Utilities.extractBaseUrl(Utilities.extractBaseUrl(r.getResource()));
@@ -1433,7 +1434,7 @@ public class CqlSubSystem {
     // the dependency resolved to the translator-included FHIRHelpers, which doesn't resolve in the
     // IG. So correct the dependency to 'http://fhir.org/guides/cqf/common/Library/FHIRHelpers'
     RelatedArtifact cqfCommonModelInfo = null;
-    for (var r : library.getRelatedArtifact()) {
+    for (var r : library.getRelatedArtifactList()) {
       if (r.hasResource() && r.getResource().startsWith("http://fhir.org/guides/cqf/common/Library/FHIR-ModelInfo")) {
         cqfCommonModelInfo = r;
           break;
@@ -1458,7 +1459,7 @@ public class CqlSubSystem {
             fhirModel.getVersion() != null ? "|" + fhirModel.getVersion() : ""
         ));
 
-        for (var r : library.getRelatedArtifact()) {
+        for (var r : library.getRelatedArtifactList()) {
           if (r.hasResource() && r.getResource().startsWith("http://hl7.org/fhir/Library/FHIRHelpers")) {
             if (r.getResource().contains("|")) {
               r.setResource(fhirModel.getSystem() + "/Library/FHIRHelpers|4.0.1");
@@ -1484,7 +1485,7 @@ public class CqlSubSystem {
         // But order of providers loaded model info from the implicit translator
         // And then the data requirements processing assigned it to the CQF uri
         // So switch FHIRHelpers to the cqf common as well
-        for (var r : library.getRelatedArtifact()) {
+        for (var r : library.getRelatedArtifactList()) {
           if (r.hasResource() && r.getResource().startsWith("http://hl7.org/fhir/Library/FHIRHelpers")) {
             if (r.getResource().contains("|")) {
               r.setResource("http://fhir.org/guides/cqf/common/Library/FHIRHelpers|4.0.1");
@@ -1529,7 +1530,7 @@ public class CqlSubSystem {
       }
       else {
         // Remove the reported dependency (it is the implicit one loaded in the translator)
-        library.getRelatedArtifact().remove(cqfCommonModelInfo);
+        library.getRelatedArtifactList().remove(cqfCommonModelInfo);
 
         f.getErrors().add(
             new ValidationMessage(
@@ -1546,7 +1547,7 @@ public class CqlSubSystem {
 
   private void attachModuleDefinitionLibrary(DomainResource r, Library moduleDefinitionLibrary) {
     // Remove extensions from QM IG STU2 or earlier
-    r.getExtension().removeAll(r.getExtensionsByUrl(
+    r.getExtensionList().removeAll(r.getExtensionsByUrl(
         "http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-directReferenceCode",
         "http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-logicDefinition",
         "http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-parameter",
@@ -1554,8 +1555,8 @@ public class CqlSubSystem {
     ));
 
     // Remove the existing effective data requirements library and extension if one is present
-    r.getContained().removeIf(res -> res.getId().equals(getDataRequirementsLibraryId(r)));
-    r.getExtension().removeAll(r.getExtensionsByUrl(
+    r.getContainedList().removeIf(res -> res.getId().equals(getDataRequirementsLibraryId(r)));
+    r.getExtensionList().removeAll(r.getExtensionsByUrl(
         "http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-effectiveDataRequirements",
         "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-effectiveDataRequirements"
     ));
@@ -1564,8 +1565,8 @@ public class CqlSubSystem {
     if (!moduleDefinitionLibrary.hasId()) {
       moduleDefinitionLibrary.setId("effective-data-requirements");
     }
-    r.getContained().add(moduleDefinitionLibrary);
-    r.getExtension().add(
+    r.getContainedList().add(moduleDefinitionLibrary);
+    r.getExtensionList().add(
         new Extension(
             "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-effectiveDataRequirements",
             new CanonicalType("#" + moduleDefinitionLibrary.getId())
@@ -1619,20 +1620,20 @@ public class CqlSubSystem {
     }
 
     CompiledLibrary compiledLibrary = getLibraryManager().resolveLibrary(info.getIdentifier(), new ArrayList<>());
-    Library moduleDefinitionLibrary = drp.gatherDataRequirements(
+    Library moduleDefinitionLibrary = (Library) VersionConvertorFactory_50_N.convertResource(drp.gatherDataRequirements(
         getLibraryManager(),
         compiledLibrary,
         info.getOptions().getCqlCompilerOptions(),
         expressions,
         annotationsEnabled
-    );
+    ));
 
     fixupFHIRReferences(f, moduleDefinitionLibrary, compiledLibrary);
 
     return moduleDefinitionLibrary;
   }
 
-  private boolean isExpressionIdentifier(org.hl7.fhir.r5.model.Expression expression) {
+  private boolean isExpressionIdentifier(org.hl7.fhir.model.core.Expression expression) {
     return expression.hasLanguage() && expression.hasExpression()
         && (expression.getLanguage().equalsIgnoreCase("text/cql.identifier")
         || expression.getLanguage().equalsIgnoreCase("text/cql")
@@ -1658,26 +1659,26 @@ public class CqlSubSystem {
   }
 
   private void getPlanDefinitionActionExpressions(PlanDefinition.PlanDefinitionActionComponent action, Set<String> expressionSet) {
-    for (var condition : action.getCondition()) {
+    for (var condition : action.getConditionList()) {
       if (condition.hasExpression() && isExpressionIdentifier(condition.getExpression())) {
         expressionSet.add(condition.getExpression().getExpression());
       }
     }
 
-    for (var dynamicValue : action.getDynamicValue()) {
+    for (var dynamicValue : action.getDynamicValueList()) {
       if (dynamicValue.hasExpression() && isExpressionIdentifier(dynamicValue.getExpression())) {
         expressionSet.add(dynamicValue.getExpression().getExpression());
       }
     }
 
-    for (var childAction : action.getAction()) {
+    for (var childAction : action.getActionList()) {
       getPlanDefinitionActionExpressions(childAction, expressionSet);
     }
   }
 
   private Set<String> getPlanDefinitionExpressions(PlanDefinition planDefinition) {
     Set<String> expressionSet = new HashSet<>();
-    planDefinition.getAction().forEach(action -> {
+    planDefinition.getActionList().forEach(action -> {
       getPlanDefinitionActionExpressions(action, expressionSet);
     });
     return expressionSet;
@@ -1685,7 +1686,7 @@ public class CqlSubSystem {
 
   private Set<String> getActivityDefinitionExpressions(ActivityDefinition activityDefinition) {
     Set<String> expressionSet = new HashSet<>();
-    for (var dynamicValue : activityDefinition.getDynamicValue()) {
+    for (var dynamicValue : activityDefinition.getDynamicValueList()) {
       if (dynamicValue.hasExpression() && isExpressionIdentifier(dynamicValue.getExpression())) {
         expressionSet.add(dynamicValue.getExpression().getExpression());
       }
@@ -1718,7 +1719,7 @@ public class CqlSubSystem {
   private Set<String> getQuestionnaireExpressions(Questionnaire questionnaire) {
     Set<String> expressionSet = new HashSet<>();
     getQuestionnaireExtensionExpressions(questionnaire.getExtension(), expressionSet);
-    for (var item : questionnaire.getItem()) {
+    for (var item : questionnaire.getItemList()) {
       getQuestionnaireExtensionExpressions(item.getExtension(), expressionSet);
     }
     return expressionSet;
@@ -1726,18 +1727,18 @@ public class CqlSubSystem {
 
   private Set<String> getMeasureExpressions(Measure measure) {
     Set<String> expressionSet = new HashSet<>();
-    measure.getSupplementalData().forEach(supData -> {
+    measure.getSupplementalDataList().forEach(supData -> {
       if (supData.hasCriteria() && isExpressionIdentifier(supData.getCriteria())) {
         expressionSet.add(supData.getCriteria().getExpression());
       }
     });
-    measure.getGroup().forEach(groupMember -> {
-      groupMember.getPopulation().forEach(population -> {
+    measure.getGroupList().forEach(groupMember -> {
+      groupMember.getPopulationList().forEach(population -> {
         if (population.hasCriteria() && isExpressionIdentifier(population.getCriteria())) {
           expressionSet.add(population.getCriteria().getExpression());
         }
       });
-      groupMember.getStratifier().forEach(stratifier -> {
+      groupMember.getStratifierList().forEach(stratifier -> {
         if (stratifier.hasCriteria() && isExpressionIdentifier(stratifier.getCriteria())) {
           expressionSet.add(stratifier.getCriteria().getExpression());
         }

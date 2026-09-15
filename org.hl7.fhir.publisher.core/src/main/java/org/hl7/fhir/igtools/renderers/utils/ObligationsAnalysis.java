@@ -8,12 +8,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
-import org.hl7.fhir.r5.model.Extension;
-import org.hl7.fhir.r5.model.ElementDefinition;
-import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
-import org.hl7.fhir.r5.model.StructureDefinition;
-import org.hl7.fhir.r5.utils.ResourceSorters.CanonicalResourceSortByUrl;
+import org.hl7.fhir.model.extensions.ExtensionDefinitions;
+import org.hl7.fhir.model.core.Extension;
+import org.hl7.fhir.model.core.ElementDefinition;
+import org.hl7.fhir.model.core.ElementDefinition.TypeRefComponent;
+import org.hl7.fhir.model.core.StructureDefinition;
+import org.hl7.fhir.services.utilities.ResourceSorters.CanonicalResourceSortByUrl;
 
 public class ObligationsAnalysis {
 
@@ -83,11 +83,11 @@ public class ObligationsAnalysis {
       for (Extension ob : sd.getExtensionsByUrl(ExtensionDefinitions.EXT_OBLIGATION_CORE)) {
         seeObligation(self, sd, null, ob);
       }
-      for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+      for (ElementDefinition ed : sd.getSnapshot().getElementList()) {
         for (Extension ob : ed.getExtensionsByUrl(ExtensionDefinitions.EXT_OBLIGATION_CORE)) {
           seeObligation(self, sd, ed, ob);
         }
-        for (TypeRefComponent tr : ed.getType()) {
+        for (TypeRefComponent tr : ed.getTypeList()) {
           for (Extension ob : tr.getExtensionsByUrl(ExtensionDefinitions.EXT_OBLIGATION_CORE)) {
             seeObligation(self, sd, ed, ob);
           }

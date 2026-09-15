@@ -40,41 +40,29 @@ import lombok.Getter;
 import lombok.Setter;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.modules.IPublisherModule;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.elementmodel.Element;
-import org.hl7.fhir.r5.elementmodel.Manager;
-import org.hl7.fhir.r5.elementmodel.Manager.FhirFormat;
-import org.hl7.fhir.r5.elementmodel.ObjectConverter;
-import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.model.ActorDefinition;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.CanonicalType;
-import org.hl7.fhir.r5.model.CodeSystem;
-import org.hl7.fhir.r5.model.ElementDefinition;
-import org.hl7.fhir.r5.model.Enumerations.CodeSystemContentMode;
-import org.hl7.fhir.r5.model.Extension;
-import org.hl7.fhir.r5.model.ImplementationGuide;
-import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionResourceComponent;
-import org.hl7.fhir.r5.model.NamingSystem;
-import org.hl7.fhir.r5.model.NamingSystem.NamingSystemIdentifierType;
-import org.hl7.fhir.r5.model.NamingSystem.NamingSystemUniqueIdComponent;
-import org.hl7.fhir.r5.model.OperationDefinition;
-import org.hl7.fhir.r5.model.Questionnaire;
-import org.hl7.fhir.r5.model.Resource;
-import org.hl7.fhir.r5.model.StructureDefinition;
-import org.hl7.fhir.r5.model.StructureMap;
-import org.hl7.fhir.r5.model.ValueSet;
-import org.hl7.fhir.r5.terminologies.ImplicitValueSets;
-import org.hl7.fhir.r5.terminologies.NamingSystemUtilities;
+import org.hl7.fhir.model.core.*;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.services.elementmodel.Element;
+import org.hl7.fhir.services.elementmodel.Manager;
+import org.hl7.fhir.model.utilities.formats.FhirFormat;
+import org.hl7.fhir.services.elementmodel.ObjectConverter;
+import org.hl7.fhir.model.extensions.ExtensionDefinitions;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.model.core.Enumerations.CodeSystemContentMode;
+import org.hl7.fhir.model.core.ImplementationGuide.ImplementationGuideDefinitionResourceComponent;
+import org.hl7.fhir.model.core.NamingSystem.NamingSystemIdentifierType;
+import org.hl7.fhir.model.core.NamingSystem.NamingSystemUniqueIdComponent;
+import org.hl7.fhir.model.fml.StructureMap;
+import org.hl7.fhir.model.utilities.ImplicitValueSets;
+import org.hl7.fhir.services.utilities.NamingSystemUtilities;
 import org.hl7.fhir.utilities.UserDataNames;
-import org.hl7.fhir.r5.utils.validation.IMessagingServices;
-import org.hl7.fhir.r5.utils.validation.IResourceValidator;
-import org.hl7.fhir.r5.utils.validation.IValidationPolicyAdvisor;
-import org.hl7.fhir.r5.utils.validation.IValidatorResourceFetcher;
-import org.hl7.fhir.r5.utils.validation.constants.BindingKind;
-import org.hl7.fhir.r5.utils.validation.constants.ContainedReferenceValidationPolicy;
-import org.hl7.fhir.r5.utils.validation.constants.ReferenceValidationPolicy;
+import org.hl7.fhir.services.validation.IMessagingServices;
+import org.hl7.fhir.services.validation.IResourceValidator;
+import org.hl7.fhir.services.validation.IValidationPolicyAdvisor;
+import org.hl7.fhir.services.validation.IValidatorResourceFetcher;
+import org.hl7.fhir.services.validation.constants.BindingKind;
+import org.hl7.fhir.services.validation.constants.ContainedReferenceValidationPolicy;
+import org.hl7.fhir.services.validation.constants.ReferenceValidationPolicy;
 import org.hl7.fhir.utilities.SIDUtilities;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
@@ -145,7 +133,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
       url = url.substring(0, url.indexOf("/_history"));
     }
     String turl = (!Utilities.isAbsoluteUrl(url)) ? Utilities.pathURL(ipg.getCanonical(), url) : url;
-    Resource res = context.fetchResource(getResourceType(turl), turl, IWorkerContext.VersionResolutionRules.defaultRule());
+    Resource res = context.fetchResource(getResourceType(turl), turl, VersionResolutionRules.defaultRule());
     if (res != null) {
       Element e = (Element)res.getUserData(UserDataNames.pub_element);
       if (e!=null)
@@ -237,7 +225,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
           String aurl = ExtensionUtilities.readStringExtension(act, "http://hl7.org/fhir/tools/StructureDefinition/ig-actor-example-url");
           if (aurl != null && turl.startsWith(aurl)) {
             String tail = turl.substring(aurl.length()+1);
-            for (ImplementationGuideDefinitionResourceComponent igr : ig.getDefinition().getResource()) {
+            for (ImplementationGuideDefinitionResourceComponent igr : ig.getDefinition().getResourceList()) {
               if (tail.equals(igr.getReference().getReference())) {
                 String actor = ExtensionUtilities.readStringExtension(igr, "http://hl7.org/fhir/tools/StructureDefinition/ig-example-actor");
                 if (actor.equals(act.getUrl())) {
@@ -349,7 +337,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
   }
 
   @Override
-  public boolean resolveURL(IResourceValidator validator, Object appContext, String path, String url, IWorkerContext.VersionResolutionRules rules, String type, boolean canonical, List<CanonicalType> targets) throws IOException {
+  public boolean resolveURL(IResourceValidator validator, Object appContext, String path, String url, VersionResolutionRules rules, String type, boolean canonical, List<CanonicalType> targets) throws IOException {
     String u = url;
     String v = null;
     if (url.contains("|")) {
@@ -497,7 +485,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
       for (FetchedFile f : files) {
         // a file with a logical model, and exactly one resource in it, also claims the url for the logical type
         StructureDefinition logical = f.getLogical() == null || f.getResources().size() != 1 ? null
-            : context.fetchResource(StructureDefinition.class, f.getLogical(), IWorkerContext.VersionResolutionRules.defaultRule());
+            : context.fetchResource(StructureDefinition.class, f.getLogical(), VersionResolutionRules.defaultRule());
         for (FetchedResource r : f.getResources()) {
           addIgUrl(res, Utilities.pathURL(ipg.getCanonical(), r.fhirType(), r.getId()), r.fhirType());
           if (logical != null) {
@@ -547,17 +535,17 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
   }
 
   private boolean isCanonicalResourceType(String type) {
-    if (VersionUtilities.getCanonicalResourceNames(context.getVersion()).contains(type)) {
+    if (VersionUtilities.getCanonicalResourceNames(context.getFHIRVersion()).contains(type)) {
       return true;
     }
     // ok, let's look in the definition
-    StructureDefinition sdt = context.fetchResource(StructureDefinition.class, type, IWorkerContext.VersionResolutionRules.defaultRule());
+    StructureDefinition sdt = context.fetchResource(StructureDefinition.class, type, VersionResolutionRules.defaultRule());
     while (sdt != null) {
       String s = ExtensionUtilities.readStringExtension(sdt, ExtensionDefinitions.EXT_RESOURCE_IMPLEMENTS);
       if (s != null && "http://hl7.org/fhir/StructureDefinition/CanonicalResource".equals(s)) {
         return true;
       }
-      sdt = context.fetchResource(StructureDefinition.class, sdt.getBaseDefinition(), IWorkerContext.VersionResolutionRules.defaultRule());
+      sdt = context.fetchResource(StructureDefinition.class, sdt.getBaseDefinition(), VersionResolutionRules.defaultRule());
     }
     return false;
   }
@@ -581,7 +569,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
 
   
   private boolean hasURL(NamingSystem ns, String url) {
-    for (NamingSystemUniqueIdComponent uid : ns.getUniqueId()) {
+    for (NamingSystemUniqueIdComponent uid : ns.getUniqueIdList()) {
       if (uid.getType() == NamingSystemIdentifierType.URI && uid.hasValue() && uid.getValue().equals(url)) {
         return true;
       }
@@ -647,7 +635,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
       AdditionalBindingPurpose purpose,
       ValueSet valueSet,
       List<String> systems) {
-    if (VersionUtilities.isR4BVer(context.getVersion()) && 
+    if (VersionUtilities.isR4BVer(context.getFHIRVersion()) &&
         "ImplementationGuide.definition.parameter.code".equals(definition.getBase().getPath())) {
       return EnumSet.noneOf(CodedContentValidationAction.class);
     }

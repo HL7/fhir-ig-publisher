@@ -27,9 +27,9 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.hl7.fhir.r5.model.DomainResource;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext.ILiquidTemplateProvider;
+import org.hl7.fhir.model.core.DomainResource;
+import org.hl7.fhir.services.renderers.utils.RenderingContext;
+import org.hl7.fhir.services.renderers.utils.RenderingContext.ILiquidTemplateProvider;
 import org.hl7.fhir.utilities.FileUtilities;
 
 public class IGPublisherLiquidTemplateServices implements ILiquidTemplateProvider {

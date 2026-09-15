@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.hl7.fhir.convertors.misc.ProfileVersionAdaptor;
-import org.hl7.fhir.r5.context.IWorkerContext;
+import org.hl7.fhir.services.context.IWorkerContext;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 

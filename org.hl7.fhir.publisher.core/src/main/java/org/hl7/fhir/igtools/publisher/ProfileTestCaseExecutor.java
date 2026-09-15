@@ -11,13 +11,13 @@ import java.util.List;
 import org.apache.tools.ant.filters.StringInputStream;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.ProfileTestCaseExecutor.Fetched;
-import org.hl7.fhir.r5.context.SimpleWorkerContext;
-import org.hl7.fhir.r5.elementmodel.Element;
-import org.hl7.fhir.r5.elementmodel.Manager;
-import org.hl7.fhir.r5.elementmodel.Manager.FhirFormat;
-import org.hl7.fhir.r5.model.OperationOutcome;
-import org.hl7.fhir.r5.model.StructureDefinition;
-import org.hl7.fhir.r5.utils.OperationOutcomeUtilities;
+import org.hl7.fhir.standalone.context.SimpleWorkerContext;
+import org.hl7.fhir.services.elementmodel.Element;
+import org.hl7.fhir.services.elementmodel.Manager;
+import org.hl7.fhir.model.utilities.formats.FhirFormat;
+import org.hl7.fhir.model.core.OperationOutcome;
+import org.hl7.fhir.model.core.StructureDefinition;
+import org.hl7.fhir.model.utilities.OperationOutcomeUtilities;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.JsonException;
@@ -108,7 +108,7 @@ public class ProfileTestCaseExecutor {
     OperationOutcome oo = OperationOutcomeUtilities.createOutcome(messages);
     TxTesterSorters.sortOperationOutcome(oo);    
     output.set("valid", passes);
-    String js = new org.hl7.fhir.r5.formats.JsonParser().composeString(oo);
+    String js = new org.hl7.fhir.model.core.formats.JsonParser(context.getModelContext()).composeString(oo);
     JsonObject ooj = JsonParser.parseObject(js);
     output.set("outcome", ooj);
     
@@ -131,7 +131,7 @@ public class ProfileTestCaseExecutor {
       }
       if (!passes) {
         passesTest = false;
-        js = new org.hl7.fhir.r5.formats.JsonParser().composeString(moo);
+        js = new org.hl7.fhir.model.core.formats.JsonParser(context.getModelContext()).composeString(moo);
         ooj = JsonParser.parseObject(js);
         output.set("outcome-test", ooj);
       }
