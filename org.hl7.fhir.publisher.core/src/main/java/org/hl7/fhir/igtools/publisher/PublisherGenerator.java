@@ -1830,7 +1830,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       ProfileUtilities pu = new ProfileUtilities(this.pf.context, this.pf.errors, this.pf.igpkp);
       pu.generateCsv(new FileOutputStream(path), sd, true);
       if (this.pf.allProfilesCsv == null) {
-        this.pf.allProfilesCsv = new  org.hl7.fhir.services.utilities.CSVWriter(new FileOutputStream(Utilities.path(this.pf.tempDir, "all-profiles.csv")), true);
+        this.pf.allProfilesCsv = new  org.hl7.fhir.services.utilities.CSVWriter(new FileOutputStream(Utilities.path(this.pf.tempDir, "all-profiles.csv")), this.pf.context, true);
         this.pf.otherFilesRun.add(Utilities.path(this.pf.tempDir, "all-profiles.csv"));
 
       }
@@ -3425,7 +3425,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       logMessage("Run Template");
       TimeTracker.Session tts = pf.tt.start("template");
       List<String> newFileList = new ArrayList<String>();
-      checkOutcomes(pf.template.beforeGenerateEvent(pf.publishedIg, pf.tempDir, pf.otherFilesRun, newFileList, allLangs()));
+      checkOutcomes(pf.template.beforeGenerateEvent(pf.context, pf.publishedIg, pf.tempDir, pf.otherFilesRun, newFileList, allLangs()));
       for (String newFile: newFileList) {
         if (!newFile.isEmpty()) {
           try {
@@ -3933,7 +3933,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     if (pf.template != null) {
       TimeTracker.Session tts = pf.tt.start("template");
       List<String> newFileList = new ArrayList<String>();
-      checkOutcomes(pf.template.beforeJekyllEvent(pf.publishedIg, newFileList));
+      checkOutcomes(pf.template.beforeJekyllEvent(pf.context, pf.publishedIg, newFileList));
       tts.end();
     }
   }
@@ -4472,7 +4472,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
   private void templateOnCheck() throws IOException, FHIRException {
     if (pf.template != null) {
       TimeTracker.Session tts = pf.tt.start("template");
-      checkOutcomes(pf.template.onCheckEvent(pf.publishedIg));
+      checkOutcomes(pf.template.onCheckEvent(pf.context, pf.publishedIg));
       tts.end();
     }
   }

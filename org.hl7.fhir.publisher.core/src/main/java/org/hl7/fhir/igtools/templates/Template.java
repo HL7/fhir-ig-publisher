@@ -47,12 +47,15 @@ import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_N;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_50_N;
 import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.model.IModelContext;
+import org.hl7.fhir.model.ModelContext;
 import org.hl7.fhir.model.core.ImplementationGuide;
 import org.hl7.fhir.model.core.ImplementationGuide.*;
 import org.hl7.fhir.model.core.OperationOutcome;
 import org.hl7.fhir.model.core.OperationOutcome.*;
 import org.hl7.fhir.model.core.Reference;
 import org.hl7.fhir.model.core.formats.JsonParser;
+import org.hl7.fhir.model.utilities.formats.IParser;
 import org.hl7.fhir.model.core.formats.XmlParser;
 import org.hl7.fhir.model.extensions.ExtensionDefinitions;
 import org.hl7.fhir.model.extensions.ExtensionUtilities;
@@ -72,6 +75,7 @@ import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.settings.FhirSettings;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
+import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
 import org.hl7.fhir.utilities.xml.XMLUtil;
 
@@ -107,7 +111,6 @@ public class Template {
   @Getter Map<String, TemplateFragmentTypeLoader.PrefixGroup> usedFragmentTypes;
   private boolean rapido;
   private boolean devMode;
-  private IWorkerContext context;
 
   /** unpack the template into /template 
    * 
@@ -117,8 +120,7 @@ public class Template {
    * 
    * @throws IOException - only if the path is incorrect or the disk runs out of space
    */
-  public Template(IWorkerContext context, String rootDir, boolean canExecute, String templateThatCantExecute, String templateReason, boolean wantLog, boolean rapido, boolean devMode) throws IOException {
-    this.context = context;
+  public Template(String rootDir, boolean canExecute, String templateThatCantExecute, String templateReason, boolean wantLog, boolean rapido, boolean devMode) throws IOException {
     root = rootDir;
     this.canExecute = canExecute;
     this.templateThatCantExecute = templateThatCantExecute;
@@ -371,7 +373,7 @@ public class Template {
     return formatList;
   }
   
-  private ImplementationGuide runScriptTarget(String target, Map<String, List<ValidationMessage>> messages, ImplementationGuide ig, List<String> fileNames, int modifyIg) throws IOException, FHIRException {
+  private ImplementationGuide runScriptTarget(IWorkerContext context, String target, Map<String, List<ValidationMessage>> messages, ImplementationGuide ig, List<String> fileNames, int modifyIg) throws IOException, FHIRException {
     if (!canExecute) {
       throw new FHIRException("Unable to execute '"+target+"' in script '"+script+"' as the template '"+templateThatCantExecute+"' is not trusted (reason: "+templateReason+")");
     }
@@ -412,10 +414,19 @@ public class Template {
         }
       }
     }
+    IModelContext modelContext = context == null ? ModelContext.fullCoreContext() : context.getModelContext();
+    // the outcomes file is written by the template's script, not by us, so a malformed one is a
+    // problem with the template - report it against the template rather than killing the build
     if (jsonOutcomes.exists()) {
-      loadValidationMessages((OperationOutcome) new JsonParser(context.getModelContext()).parse(new FileInputStream(jsonOutcomes)), messages);
+      OperationOutcome oo = readOutcomes(target, jsonOutcomes, new JsonParser(modelContext), messages);
+      if (oo != null) {
+        loadValidationMessages(oo, messages);
+      }
     } else if (xmlOutcomes.exists()) {
-      loadValidationMessages((OperationOutcome) new XmlParser(context.getModelContext()).parse(new FileInputStream(xmlOutcomes)), messages);
+      OperationOutcome oo = readOutcomes(target, xmlOutcomes, new XmlParser(modelContext), messages);
+      if (oo != null) {
+        loadValidationMessages(oo, messages);
+      }
     }
     if (ig != null) {
       String newXml = fn+"xml";
@@ -483,6 +494,32 @@ public class Template {
         return nr;
     }
     return null;
+  }
+
+  /**
+   * The template script writes the outcomes file itself, so it can be malformed in ways we have no
+   * control over (a stray trailing comma in the issue array, a truncated write, the wrong resource
+   * type). That should not stop the build: report it as an error attributed to the template, and
+   * carry on without the messages that file was carrying.
+   * <p>
+   * Note that only the read is guarded. Once the outcome is in hand, loadValidationMessages() is
+   * called outside this method, so a FATAL issue from the template still aborts the build as it
+   * always has.
+   *
+   * @return the parsed OperationOutcome, or null if the file could not be read
+   */
+  private OperationOutcome readOutcomes(String target, File outcomes, IParser parser, Map<String, List<ValidationMessage>> res) {
+    try (FileInputStream f = new FileInputStream(outcomes)) {
+      return (OperationOutcome) parser.parse(f);
+    } catch (IOException | FHIRException | ClassCastException e) {
+      if (!res.containsKey("")) {
+        res.put("", new ArrayList<>());
+      }
+      res.get("").add(new ValidationMessage(Source.Template, IssueType.STRUCTURE, outcomes.getName(),
+          "The template did not produce a readable outcomes file for '" + target + "' (" + outcomes.getAbsolutePath() + "): " + e.getMessage()
+          + ". Any messages the template reported for this step have been lost", IssueSeverity.ERROR));
+      return null;
+    }
   }
 
   private void loadValidationMessages(OperationOutcome op, Map<String, List<ValidationMessage>> res) throws FHIRException {
@@ -558,10 +595,10 @@ public class Template {
     if (targetOnLoad == null)
       return ig;
     else
-      return runScriptTarget(targetOnLoad, messages, ig, null, IG_ANY);
+      return runScriptTarget(null, targetOnLoad, messages, ig, null, IG_ANY);
   }
   
-  public Map<String, List<ValidationMessage>> beforeGenerateEvent(ImplementationGuide ig, String tempDir, Set<String> fileList, List<String> newFileList, List<String> translationLangs) throws IOException, FHIRException {
+  public Map<String, List<ValidationMessage>> beforeGenerateEvent(IWorkerContext context, ImplementationGuide ig, String tempDir, Set<String> fileList, List<String> newFileList, List<String> translationLangs) throws IOException, FHIRException {
     File src = new File(Utilities.path(templateDir, "content"));
     if (src.exists()) {
       for (File f : src.listFiles()) {
@@ -589,25 +626,25 @@ public class Template {
     if (targetOnGenerate != null) {
       Map<String, List<ValidationMessage>> messages = new HashMap<String, List<ValidationMessage>>();
       antProject.setProperty("ig.temp", tempDir);
-      runScriptTarget(targetOnGenerate, messages, ig, newFileList, IG_NO_RESOURCE);
+      runScriptTarget(context, targetOnGenerate, messages, ig, newFileList, IG_NO_RESOURCE);
       return messages;
     } else
       return null;
   }
 
-  public Map<String, List<ValidationMessage>> beforeJekyllEvent(ImplementationGuide ig, List<String> newFileList) throws IOException, FHIRException {
+  public Map<String, List<ValidationMessage>> beforeJekyllEvent(IWorkerContext context, ImplementationGuide ig, List<String> newFileList) throws IOException, FHIRException {
     if (targetOnJekyll != null) {
       Map<String, List<ValidationMessage>> messages = new HashMap<String, List<ValidationMessage>>();
-      runScriptTarget(targetOnJekyll, messages, null, newFileList, IG_NONE);
+      runScriptTarget(context, targetOnJekyll, messages, null, newFileList, IG_NONE);
       return messages;
     } else
       return null;
   }
 
-  public Map<String, List<ValidationMessage>> onCheckEvent(ImplementationGuide ig) throws IOException, FHIRException {
+  public Map<String, List<ValidationMessage>> onCheckEvent(IWorkerContext context, ImplementationGuide ig) throws IOException, FHIRException {
     if (targetOnCheck != null) {
       Map<String, List<ValidationMessage>> messages = new HashMap<String, List<ValidationMessage>>();
-      runScriptTarget(targetOnCheck, messages, null, null, IG_NONE);
+      runScriptTarget(context, targetOnCheck, messages, null, null, IG_NONE);
       return messages;
     } else
       return null;

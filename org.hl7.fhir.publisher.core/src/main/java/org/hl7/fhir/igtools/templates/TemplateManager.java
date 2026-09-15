@@ -58,12 +58,10 @@ public class TemplateManager {
   List<String> templateList = new ArrayList<>();
   Set<String> antScripts = new HashSet<>();
   private boolean autoMode;
-  private IWorkerContext context;
 
-  public TemplateManager(IWorkerContext context, FilesystemPackageCacheManager pcm, ILoggingService logger) {
+  public TemplateManager(FilesystemPackageCacheManager pcm, ILoggingService logger) {
     this.pcm = pcm;
     this.logger = logger;
-    this.context = context;
   }
 
   public Template loadTemplate(String template, String rootFolder, String packageId, boolean autoMode, boolean wantLog, boolean rapidoMode) throws FHIRException, IOException {
@@ -88,7 +86,7 @@ public class TemplateManager {
     if (!canExecute) {
       logger.logMessage("IG template '"+templateThatCantExecute+"' is not trusted.  No scripts will be executed");
     }
-    return new Template(context, rootFolder, canExecute, templateThatCantExecute, templateReason, wantLog, rapidoMode, isDevMode(template));
+    return new Template(rootFolder, canExecute, templateThatCantExecute, templateReason, wantLog, rapidoMode, isDevMode(template));
   }
 
   private boolean isDevMode(String template) {

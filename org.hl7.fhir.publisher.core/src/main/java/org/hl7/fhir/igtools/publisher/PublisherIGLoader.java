@@ -144,7 +144,7 @@ public class PublisherIGLoader extends PublisherBase {
       log("FHIR settings loaded from " + fhirSettingsPath);
     }
 
-    pf.templateManager = new TemplateManager(pf.context, pf.pcm, pf.logger);
+    pf.templateManager = new TemplateManager(pf.pcm, pf.logger);
     pf.templateProvider = new IGPublisherLiquidTemplateServices();
     pf.extensionTracker = new ExtensionTracker();
     log("Package Cache: "+ pf.pcm.getFolder());
