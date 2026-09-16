@@ -325,8 +325,8 @@ public class PublisherIGLoader extends PublisherBase {
 //    if (VersionUtilities.isR2Ver(pf.version) || VersionUtilities.isR2Ver(pf.version)) {
 //      throw new Error("As of the end of 2024, the FHIR  R2 (version "+ pf.version +") is no longer supported by the IG Publisher");
 //    }
-    if (!Utilities.existsInList(pf.version, "5.0.0", "4.3.0", "4.0.1", "3.0.2", "1.0.2", "6.0.0-ballot5")) {
-      throw new Error("Unable to support version '"+ pf.version +"' - must be one of 5.0.0, 4.3.0, 4.0.1, 3.0.2 or 6.0.0-ballot5");
+    if (!Utilities.existsInList(pf.version, "5.0.0", "4.3.0", "4.0.1", "3.0.2", "1.0.2", "6.0.0-snapshot1")) {
+      throw new Error("Unable to support version '"+ pf.version +"' - must be one of 5.0.0, 4.3.0, 4.0.1, 3.0.2 or 6.0.0-snapshot1");
     }
 
     if (!VersionUtilities.isSupportedVersion(pf.version)) {
@@ -627,7 +627,7 @@ public class PublisherIGLoader extends PublisherBase {
         case "additional-resource": {
           pf.additionalResourceFiles.add(p.getValue());
           try {
-            StructureDefinition sd = (StructureDefinition) new XmlParser(pf.context.getModelContext()).parse(new FileInputStream(Utilities.path(pf.rootDir, p.getValue())));
+            StructureDefinition sd = (StructureDefinition) new XmlParser(ModelContext.fullCoreContext()).parse(new FileInputStream(Utilities.path(pf.rootDir, p.getValue())));
             if (sd.hasExtension(ExtensionDefinitions.EXT_ADDITIONAL_RESOURCE)) {
               sd.getExtensionByUrl(ExtensionDefinitions.EXT_ADDITIONAL_RESOURCE).setValue(new BooleanType(true));
             } else {
@@ -1160,6 +1160,7 @@ public class PublisherIGLoader extends PublisherBase {
         pf.context.dropResource(sd.fhirType(), sd.getId());
       }
     }
+    checkAdditionalResourceVersions();
     for (StructureDefinition t : additionalResources) {
       pf.context.cacheResource(t);
     }
@@ -4797,8 +4798,14 @@ public class PublisherIGLoader extends PublisherBase {
         this.pf.igpkp.checkForPath(f, r, bc, false);
         try {
           // check if it's a preregistered additional resource, and unregister the pre-registration if it is
-          StructureDefinition sdTemp = getAdditionalResources(bc.getVersionedUrl());
+          StructureDefinition sdTemp = getAdditionalResources(bc.getUrl());
           if (sdTemp != null) {
+            // anything parsed before now - every instance of the resource in the IG - holds the
+            // pre-registered definition in its element model properties, and keeps holding it after
+            // the swap below. It was registered straight from the file, before there was any path
+            // configuration, so it has no web path, and every property link rendered from those
+            // instances comes out as "null#Type.element". Give it the path we just worked out
+            sdTemp.setWebPath(bc.getWebPath());
             this.pf.context.dropResource(sdTemp);
           }
           this.pf.context.cacheResourceFromPackage(bc, this.pf.packageInfo);
@@ -4839,9 +4846,44 @@ public class PublisherIGLoader extends PublisherBase {
     }
   }
 
-  private StructureDefinition getAdditionalResources(String versionedUrl) {
+  /**
+   * An additional resource definition is pre-registered straight from the file, before any version
+   * is applied to anything, while the copy of it that loads as an IG resource has the IG's version
+   * stamped on it (apply-version / default-version both take pf.sourceIg.getVersion()). If the two
+   * disagree, the pre-registration is never matched to the loaded resource, so it is never dropped
+   * and the build carries two definitions of the same resource type - which shows up much later as
+   * unresolvable "null#Type.element" links, or worse. So the version has to be the IG's, or absent,
+   * in which case we fill it in. Anything else stops the build here, where it can still be
+   * explained, rather than somewhere downstream where it can't
+   */
+  private void checkAdditionalResourceVersions() {
+    if (!pf.sourceIg.hasVersion()) {
+      return;
+    }
+    String igVersion = pf.sourceIg.getVersion();
+    for (int i = 0; i < additionalResources.size(); i++) {
+      StructureDefinition sd = additionalResources.get(i);
+      String src = i < pf.additionalResourceFiles.size() ? pf.additionalResourceFiles.get(i) : sd.getUrl();
+      if (!sd.hasVersion()) {
+        sd.setVersion(igVersion);
+      } else if (!igVersion.equals(sd.getVersion())) {
+        throw new Error("The additional resource definition "+src+" ("+sd.getUrl()+") has version '"+sd.getVersion()+
+            "', but this IG has version '"+igVersion+"'. An additional resource definition must either have no version, "+
+            "or the same version as the IG - remove the version from the file, or change it to '"+igVersion+"'");
+      }
+    }
+  }
+
+  /**
+   * The pre-registered definition of an additional resource, matched on url alone rather than on
+   * the versioned url. checkAdditionalResourceVersions makes the two versions agree, so the
+   * versioned url would work as well - but the url is the identity here (an IG declares at most
+   * one additional-resource definition per type), and matching on it keeps this independent of
+   * when and how a version gets applied to the loaded copy
+   */
+  private StructureDefinition getAdditionalResources(String url) {
     for (StructureDefinition sd : additionalResources) {
-      if (versionedUrl.equals(sd.getVersionedUrl())) {
+      if (url.equals(sd.getUrl())) {
         return sd;
       }
     }
