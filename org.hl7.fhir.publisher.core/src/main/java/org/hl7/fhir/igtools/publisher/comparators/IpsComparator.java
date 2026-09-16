@@ -185,7 +185,7 @@ public class IpsComparator {
           }
           NpmPackage core = pcm.loadPackage(VersionUtilities.packageForVersion(current.fhirVersion()), VersionUtilities.getCurrentVersion(current.fhirVersion()));
           vi.context = new SimpleWorkerContext.SimpleWorkerContextBuilder(ModelContext.fullCoreContext()).withTerminologyCachePath(Utilities.path(context.getTxCache().getFolder(), vi.version)).fromPackage(core,
-                  new PublisherLoader(core, SpecMapManager.fromPackage(core), core.getWebLocation(), null, false, vi.context.getModelContext()).makeLoader(), true);
+                  new PublisherLoader(core, SpecMapManager.fromPackage(core), core.getWebLocation(), null, false, ModelContext.fullCoreContext()).makeLoader(), true);
           //vi.context.initTS();
           vi.context.connectToTSServer(context.getTxClientManager().getFactory(), context.getTxClientManager().getMasterClient(), false);
           vi.context.setExpansionParameters(context.getExpansionParameters());
