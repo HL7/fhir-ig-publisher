@@ -3749,8 +3749,12 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     jsonPage.add("breadcrumblang", jsonBreadcrumb);
     for (String l : allLangs()) {
       String tBreadcrumb = breadcrumbs.get(l);
-      if (tBreadcrumb.endsWith("</a></li>"))
-        tBreadcrumb += "<li><b>" + titles.get(l) + "</b></li>";
+      // the title is raw here (titlelang is data, and the templates escape it themselves), but a
+      // breadcrumb is pre-rendered html - an & or < in a title made the page malformed XHTML.
+      // breadCrumbForPage and addToBreadcrumbs escape for the same reason
+      if (tBreadcrumb.endsWith("</a></li>")) {
+        tBreadcrumb += "<li><b>" + Utilities.escapeXml(titles.get(l)) + "</b></li>";
+      }
       jsonBreadcrumb.add(l, tBreadcrumb);
     }
     if (fmm != null)
@@ -4264,6 +4268,17 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     return pf.listedURLExemptions.contains(uc);
   }
 
+  /**
+   * Whether this resource can be written as RDF. The RDF parsers are generated for the base
+   * specification only - a resource type registered in the model context comes from one of the
+   * incubation packages (fml, tools, testing, api), which have no RDF support and aren't going to
+   * get any. Such a resource is left out of definitions.ttl.zip rather than failing the build;
+   * the per-resource .ttl still gets written, because that goes through the element model
+   */
+  private boolean supportsRdf(Resource res) {
+    return pf.context.getModelContext().getContextInformation().getHandler(res.fhirType()) == null;
+  }
+
   private void generateDefinitions(FhirFormat fmt, String specFile)  throws Exception {
     // public definitions
     Set<FetchedResource> files = new HashSet<FetchedResource>();
@@ -4277,6 +4292,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     if (!files.isEmpty()) {
       ZipGenerator zip = new ZipGenerator(Utilities.path(pf.outputDir, "definitions."+fmt.getExtension()+".zip"));
       for (FetchedResource r : files) {
+        if (fmt.equals(FhirFormat.TURTLE) && !supportsRdf(r.getResource())) {
+          continue;
+        }
         ByteArrayOutputStream bs = new ByteArrayOutputStream();
         if (VersionUtilities.isR3Ver(pf.version)) {
           org.hl7.fhir.dstu3.model.Resource r3 = VersionConvertorFactory_30_N.convertResource(r.getResource());
