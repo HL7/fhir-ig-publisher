@@ -386,18 +386,6 @@
         </dependency>
 
         <dependency>
-            <groupId>org.ogce</groupId>
-            <artifactId>xpp3</artifactId>
-            <version>1.1.6</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>junit</groupId>
-                    <artifactId>junit</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-
-        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
             <version>${junit_jupiter_version}</version>
