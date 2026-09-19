@@ -11,19 +11,15 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
 import org.hl7.fhir.igtools.publisher.ProvenanceDetails;
 import org.hl7.fhir.igtools.publisher.ProvenanceDetails.ProvenanceDetailsTarget;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.elementmodel.Element;
-import org.hl7.fhir.r5.model.Bundle;
-import org.hl7.fhir.r5.model.Bundle.BundleEntryComponent;
-import org.hl7.fhir.r5.model.CodeSystem;
-import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
-import org.hl7.fhir.r5.model.Coding;
-import org.hl7.fhir.r5.model.Reference;
-import org.hl7.fhir.r5.model.Resource;
-import org.hl7.fhir.r5.renderers.DataRenderer;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceWithReference;
-import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
+import org.hl7.fhir.model.core.*;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.services.elementmodel.Element;
+import org.hl7.fhir.model.core.Bundle.BundleEntryComponent;
+import org.hl7.fhir.model.core.CodeSystem.ConceptDefinitionComponent;
+import org.hl7.fhir.services.renderers.DataRenderer;
+import org.hl7.fhir.services.renderers.utils.RenderingContext;
+import org.hl7.fhir.services.renderers.utils.Resolver.ResourceWithReference;
+import org.hl7.fhir.model.utilities.CodeSystemUtilities;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 
@@ -72,7 +68,7 @@ public class HistoryGenerator {
       tr.td().b().tx("Date");
       tr.td().b().tx("Action");
       for (Coding c : actorTypes) {
-        CodeSystem cs = context.getWorker().fetchCodeSystem(c.getSystem(), IWorkerContext.VersionResolutionRules.defaultRule());
+        CodeSystem cs = context.getWorker().fetchCodeSystem(c.getSystem(), VersionResolutionRules.defaultRule());
         XhtmlNode td = tr.td().b(); 
         if (cs != null && cs.hasWebPath()) {
           ConceptDefinitionComponent cd = CodeSystemUtilities.getCode(cs, c.getCode());
@@ -102,7 +98,7 @@ public class HistoryGenerator {
         
 
         XhtmlNode td = tr.td(); 
-        CodeSystem cs = context.getWorker().fetchCodeSystem(pd.getAction().getSystem(), IWorkerContext.VersionResolutionRules.defaultRule());
+        CodeSystem cs = context.getWorker().fetchCodeSystem(pd.getAction().getSystem(), VersionResolutionRules.defaultRule());
         if (cs != null && cs.hasWebPath()) {
           ConceptDefinitionComponent cd = CodeSystemUtilities.getCode(cs, pd.getAction().getCode());
           td.ah(cs.getWebPath()+"#"+cs.getId()+"-"+pd.getAction().getCode()).tx(cd != null ? cd.getDisplay() : pd.getAction().getCode());
@@ -176,7 +172,7 @@ public class HistoryGenerator {
     if (!resource.fhirType().equals("Bundle")) {
       return false;
     }
-    for (BundleEntryComponent be : ((Bundle) resource).getEntry()) {
+    for (BundleEntryComponent be : ((Bundle) resource).getEntryList()) {
       if (!"Provenance".equals(be.getResource().fhirType())) {
         return false;
       }

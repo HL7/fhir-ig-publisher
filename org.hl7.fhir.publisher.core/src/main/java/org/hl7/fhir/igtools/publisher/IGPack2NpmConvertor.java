@@ -39,25 +39,20 @@ import java.util.Scanner;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_10_50;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_14_50;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_50;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
+import org.hl7.fhir.convertors.factory.*;
 import org.hl7.fhir.exceptions.FHIRException;
-import org.hl7.fhir.r5.formats.IParser.OutputStyle;
-import org.hl7.fhir.r5.formats.JsonParser;
-import org.hl7.fhir.r5.model.Constants;
-import org.hl7.fhir.r5.model.Enumeration;
-import org.hl7.fhir.r5.model.Enumerations.FHIRVersion;
-import org.hl7.fhir.r5.model.ImplementationGuide;
-import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionResourceComponent;
-import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnComponent;
-import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideManifestComponent;
-import org.hl7.fhir.r5.model.ImplementationGuide.ManifestResourceComponent;
-import org.hl7.fhir.r5.model.ImplementationGuide.SPDXLicense;
-import org.hl7.fhir.r5.model.Reference;
-import org.hl7.fhir.r5.utils.NPMPackageGenerator;
-import org.hl7.fhir.r5.utils.NPMPackageGenerator.Category;
+import org.hl7.fhir.model.ModelContext;
+import org.hl7.fhir.model.core.Constants;
+import org.hl7.fhir.model.core.Enumeration;
+import org.hl7.fhir.model.core.Enumerations.FHIRVersion;
+import org.hl7.fhir.model.core.ImplementationGuide;
+import org.hl7.fhir.model.core.ImplementationGuide.ImplementationGuideDefinitionResourceComponent;
+import org.hl7.fhir.model.core.ImplementationGuide.ImplementationGuideDependsOnComponent;
+import org.hl7.fhir.model.core.ImplementationGuide.ImplementationGuideManifestComponent;
+import org.hl7.fhir.model.core.ImplementationGuide.ManifestResourceComponent;
+import org.hl7.fhir.model.core.ImplementationGuide.SPDXLicense;
+import org.hl7.fhir.model.core.Reference;
+import org.hl7.fhir.services.utilities.NPMPackageGenerator;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.Utilities;
@@ -194,13 +189,13 @@ public class IGPack2NpmConvertor {
         checkVersions(ig, version, f.getAbsolutePath());
         checkLicense(ig);
 
-        System.out.println("  url = "+canonical+", version = "+ig.getVersion()+", fhirversion = "+ig.getFhirVersion()+", id = "+ig.getPackageId()+", license = "+ig.getLicense());
+        System.out.println("  url = "+canonical+", version = "+ig.getVersion()+", fhirversion = "+ig.getFhirVersionList()+", id = "+ig.getPackageId()+", license = "+ig.getLicense());
 
         for (String k : files.keySet()) {
           if (k.endsWith(".json"))
             ig.getManifest().addResource().setReference(convertToReference(k));
         }
-        for (ImplementationGuideDefinitionResourceComponent rd : ig.getDefinition().getResource()) {
+        for (ImplementationGuideDefinitionResourceComponent rd : ig.getDefinition().getResourceList()) {
           ManifestResourceComponent ra = getMatchingResource(rd.getReference().getReference(), ig);
           if (ra != null) {
             ra.setIsExample(rd.getIsExample());
@@ -219,17 +214,17 @@ public class IGPack2NpmConvertor {
         NPMPackageGenerator npm = new NPMPackageGenerator(ig.getPackageId(), destFile, canonical, url, PackageType.IG, ig, new Date(), null, false);
         
 
-        npm.addFile(Category.RESOURCE, "ImplementationGuide-"+ig.getId()+".json", compose(ig, version));
+        npm.addFile(NPMPackageGenerator.Category.RESOURCE, "ImplementationGuide-"+ig.getId()+".json", compose(ig, version));
 
         for (String k : files.keySet()) {
           if (k.endsWith(".json"))
-            npm.addFile(Category.RESOURCE, k, files.get(k));
+            npm.addFile(NPMPackageGenerator.Category.RESOURCE, k, files.get(k));
           else if (k.equals("schematron.zip")) {
             Map<String, byte[]> xfiles = loadZip(new ByteArrayInputStream(files.get(k)));
             for (String xk : xfiles.keySet())
-              npm.addFile(Category.SCHEMATRON, xk, xfiles.get(xk));
+              npm.addFile(NPMPackageGenerator.Category.SCHEMATRON, xk, xfiles.get(xk));
           } else if (k.equals("spec.internals")) {  // hedging against changes in IG format
-            npm.addFile(Category.OTHER, k, files.get(k));
+            npm.addFile(NPMPackageGenerator.Category.OTHER, k, files.get(k));
           }
         }
         npm.finish();
@@ -246,20 +241,22 @@ public class IGPack2NpmConvertor {
 
   private Reference convertToReference(String k) {
     k = k.substring(0, k.length()-5);
-    return new Reference(k.substring(0, k.indexOf("-"))+'/'+k.substring(k.indexOf("-")+1));
+    return new Reference(ModelContext.fullCoreContext(), k.substring(0, k.indexOf("-"))+'/'+k.substring(k.indexOf("-")+1));
   }
 
   private byte[] compose(ImplementationGuide ig, String version) throws IOException, FHIRException {
     if (version.startsWith("1.0")) {
-      return new org.hl7.fhir.dstu2.formats.JsonParser().composeBytes(VersionConvertorFactory_10_50.convertResource(ig));
+      return new org.hl7.fhir.dstu2.formats.JsonParser().composeBytes(VersionConvertorFactory_10_N.convertResource(ig));
     } else if (version.startsWith("1.4")) {
-      return new org.hl7.fhir.dstu2016may.formats.JsonParser().composeBytes(VersionConvertorFactory_14_50.convertResource(ig));
+      return new org.hl7.fhir.dstu2016may.formats.JsonParser().composeBytes(VersionConvertorFactory_14_N.convertResource(ig));
     } else if (version.startsWith("3.0") ) {
-      return new org.hl7.fhir.dstu3.formats.JsonParser().composeBytes(VersionConvertorFactory_30_50.convertResource(ig));
+      return new org.hl7.fhir.dstu3.formats.JsonParser().composeBytes(VersionConvertorFactory_30_N.convertResource(ig));
     } else if (version.startsWith("4.0") ) {
-      return new org.hl7.fhir.r4.formats.JsonParser().composeBytes(VersionConvertorFactory_40_50.convertResource(ig));
+      return new org.hl7.fhir.r4.formats.JsonParser().composeBytes(VersionConvertorFactory_40_N.convertResource(ig));
+    } else if (version.startsWith("5.0") ) {
+      return new org.hl7.fhir.r5.formats.JsonParser().composeBytes(VersionConvertorFactory_50_N.convertResource(ig));
     } else if (version.equals(Constants.VERSION)) {
-      return new org.hl7.fhir.r5.formats.JsonParser().composeBytes(ig);
+      return new org.hl7.fhir.model.core.formats.JsonParser(ModelContext.fullCoreContext()).composeBytes(ig);
     } else
       throw new FHIRException("Unsupported version "+version);
   }
@@ -272,7 +269,7 @@ public class IGPack2NpmConvertor {
         ig.setLicense(SPDXLicense.fromCode(license));
       }
     } else
-      ig.setLicense(SPDXLicense.CC0_1_0);
+      ig.setLicense(SPDXLicense.CC01_0);
     
   }
 
@@ -302,29 +299,29 @@ public class IGPack2NpmConvertor {
   }
 
   private ManifestResourceComponent getMatchingResource(String r, ImplementationGuide ig) {
-    for (ManifestResourceComponent t : ig.getManifest().getResource()) 
+    for (ManifestResourceComponent t : ig.getManifest().getResourceList())
       if (r.equals(t.getReference().getReference()))
         return t;
     return null;
   }
 
   private void checkVersions(ImplementationGuide ig, String version, String filename) throws FHIRException, IOException {
-    if ("STU3".equals(ig.getFhirVersion()))
+    if ("STU3".equals(ig.getFhirVersionList()))
       ig.addFhirVersion(FHIRVersion._3_0_0);
     
     if (!ig.hasFhirVersion())
       ig.addFhirVersion(FHIRVersion.fromCode(version));
-    else if (ig.getFhirVersion().size()>1) {
+    else if (ig.getFhirVersionList().size()>1) {
       throw new FHIRException("Can't create an IGPack for a multi-version IG");
     }
     else {
       boolean ok = false;
-      for (Enumeration<FHIRVersion> v : ig.getFhirVersion()) {
+      for (Enumeration<FHIRVersion> v : ig.getFhirVersionList()) {
         if (version.equals(v.primitiveValue()))
           ok = true;
       }
       if (!ok)
-        throw new FHIRException("FHIR version mismatch: "+version +" vs "+ig.getFhirVersion().get(0));
+        throw new FHIRException("FHIR version mismatch: "+version +" vs "+ig.getFhirVersionList().get(0));
     }
     
     if (!ig.hasVersion()) {
@@ -344,7 +341,7 @@ public class IGPack2NpmConvertor {
       }
     }
     
-    for (ImplementationGuideDependsOnComponent d : ig.getDependsOn()) {
+    for (ImplementationGuideDependsOnComponent d : ig.getDependsOnList()) {
       if (!d.hasVersion()) {
         if (d.getUri().equals("http://hl7.org/fhir/us/core")) {
           d.setVersion("1.0.1");
@@ -395,18 +392,21 @@ public class IGPack2NpmConvertor {
     byte[] b = files.get(n);
     if (version.startsWith("1.0")) {
       org.hl7.fhir.dstu2.model.Resource r = new org.hl7.fhir.dstu2.formats.JsonParser().parse(b);
-      return (ImplementationGuide) VersionConvertorFactory_10_50.convertResource(r);
+      return (ImplementationGuide) VersionConvertorFactory_10_N.convertResource(r);
     } else if (version.startsWith("1.4")) {
       org.hl7.fhir.dstu2016may.model.Resource r = new org.hl7.fhir.dstu2016may.formats.JsonParser().parse(b);
-      return (ImplementationGuide) VersionConvertorFactory_14_50.convertResource(r);
+      return (ImplementationGuide) VersionConvertorFactory_14_N.convertResource(r);
     } else if (version.startsWith("3.0") ) {
       org.hl7.fhir.dstu3.model.Resource r = new org.hl7.fhir.dstu3.formats.JsonParser().parse(b);
-      return (ImplementationGuide) VersionConvertorFactory_30_50.convertResource(r);
+      return (ImplementationGuide) VersionConvertorFactory_30_N.convertResource(r);
     } else if (version.startsWith("4.0") ) {
       org.hl7.fhir.r4.model.Resource r = new org.hl7.fhir.r4.formats.JsonParser().parse(b);
-      return (ImplementationGuide) VersionConvertorFactory_40_50.convertResource(r);
+      return (ImplementationGuide) VersionConvertorFactory_40_N.convertResource(r);
+    } else if (version.startsWith("5.0")) {
+      org.hl7.fhir.model.core.Resource r = VersionConvertorFactory_50_N.convertResource(new org.hl7.fhir.r5.formats.JsonParser().parse(b));
+      return (ImplementationGuide) r;
     } else if (version.equals(Constants.VERSION)) {
-      org.hl7.fhir.r5.model.Resource r = new org.hl7.fhir.r5.formats.JsonParser().parse(b);
+      org.hl7.fhir.model.core.Resource r = new org.hl7.fhir.model.core.formats.JsonParser(ModelContext.fullCoreContext()).parse(b);
       return (ImplementationGuide) r;
     } else
       throw new FHIRException("Unsupported version "+version);

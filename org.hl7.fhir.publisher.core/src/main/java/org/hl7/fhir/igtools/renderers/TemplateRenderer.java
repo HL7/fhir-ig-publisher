@@ -1,11 +1,13 @@
 package org.hl7.fhir.igtools.renderers;
 
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.formats.IParser;
-import org.hl7.fhir.r5.formats.XmlParser;
-import org.hl7.fhir.r5.model.*;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.utils.TypesUtilities;
+import org.hl7.fhir.model.ModelContext;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.model.utilities.formats.IParser;
+import org.hl7.fhir.model.core.formats.XmlParser;
+import org.hl7.fhir.model.core.*;
+import org.hl7.fhir.model.utilities.formats.OutputStyle;
+import org.hl7.fhir.services.renderers.utils.RenderingContext;
+import org.hl7.fhir.services.utilities.TypesUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.npm.PackageHacker;
@@ -28,7 +30,7 @@ public class TemplateRenderer {
     this.context = context;
     this.sd = sd;
     this.defPage = defPage;
-    this.pathToSpec = VersionUtilities.getSpecUrl(context.getContext().getVersion());
+    this.pathToSpec = VersionUtilities.getSpecUrl(context.getContext().getFHIRVersion());
     this.invFlag = "<a style=\"padding-left: 3px; padding-right: 3px; border: 1px maroon solid; font-weight: bold; color: #301212; background-color: #fdeeee;\" href=\""+
             specPath("conformance-rules.html#constraints")+
             "\" title=\"This element has or is affected by some invariants\">I</a>";
@@ -174,7 +176,7 @@ public class TemplateRenderer {
 
     String en = elem.getName();
 
-    if (en.contains("[x]") && elem.getType().size() == 1)
+    if (en.contains("[x]") && elem.getTypeList().size() == 1)
       en = en.replace("[x]", elem.typeSummary());
 
     if (defPage == null) {
@@ -189,7 +191,7 @@ public class TemplateRenderer {
       b.append("&lt;<a href=\"" + (defPage + "#" + pathName + "." + en) + "\" title=\"" + Utilities.escapeXml(elem.getDefinition()) + "\" class=\"dict\">");
 
     // element contains xhtml
-    if (!elem.getType().isEmpty() && elem.getType().get(0).getWorkingCode().equals("xhtml")) {
+    if (!elem.getTypeList().isEmpty() && elem.getTypeList().get(0).getWorkingCode().equals("xhtml")) {
       b.append("<b title=\""
               + Utilities.escapeXml(elem.getDefinition())
               + "\">div</b>" + ((elem.getIsModifier() || elem.getMustSupport()) ? "</span>" : "")
@@ -217,7 +219,7 @@ public class TemplateRenderer {
       } else {
         b.append("</b></a>");
       }
-      if (elem.getType().size() == 1 && context.getContextUtilities().isPrimitiveType(elem.typeSummary())) {
+      if (elem.getTypeList().size() == 1 && context.getContextUtilities().isPrimitiveType(elem.typeSummary())) {
         doneType = true;
         b.append(" value=\"[<span style=\"color: darkgreen\"><a href=\"" + getLinkFor(elem.typeSummary()) + "\">" + elem.typeSummary() + "</a></span>]\"/");
       }
@@ -236,8 +238,8 @@ public class TemplateRenderer {
         b.append(" <span style=\"color: darkgreen\">");
         b.append("Content as for " + elem.getContentReference().substring(elem.getContentReference().indexOf("#")+1) + "</span>");
         listed = true;
-      } else if (!elem.getType().isEmpty()
-              && !(elem.getType().size() == 1)) {
+      } else if (!elem.getTypeList().isEmpty()
+              && !(elem.getTypeList().size() == 1)) {
         writeCardinality(b, elem);
         listed = true;
         if (!doneType) {
@@ -245,7 +247,7 @@ public class TemplateRenderer {
         }
       } else if (elem.getName().equals("extension")) {
         b.append(" <a href=\"" + specPath("extensibility.html")+"\"><span style=\"color: navy\">See Extensions</span></a> ");
-      } else if (elem.getType().size() == 1) {
+      } else if (elem.getTypeList().size() == 1) {
         writeCardinality(b, elem);
         b.append(" <span style=\"color: darkgreen\">");
         b.append("<a href=\"" + specPath("datatypes.html#open")+"\">*</a>");
@@ -343,9 +345,9 @@ public class TemplateRenderer {
       b.append(" ");
     String ind = b.toString();
 
-    XmlParser xml = new XmlParser();
+    XmlParser xml = new XmlParser(ModelContext.fullCoreContext());
     ByteArrayOutputStream bs = new ByteArrayOutputStream();
-    xml.setOutputStyle(IParser.OutputStyle.PRETTY);
+    xml.setOutputStyle(OutputStyle.PRETTY);
     xml.compose(bs, null, value);
     bs.close();
     String[] result = bs.toString().split("\\r?\\n");
@@ -358,7 +360,7 @@ public class TemplateRenderer {
   }
 
   private void writeCardinality(StringBuilder b, ElementDefinition elem) throws IOException {
-    if (elem.getConstraint().size() > 0)
+    if (elem.getConstraintList().size() > 0)
       b.append(" <span style=\"color: brown\" title=\""
               + Utilities.escapeXml(getInvariants(elem)) + "\"><b>" + invFlag + " "
               + describeCardinality(elem) + "</b></span>");
@@ -374,7 +376,7 @@ public class TemplateRenderer {
   private String getInvariants(ElementDefinition elem) {
     StringBuilder b = new StringBuilder();
     boolean first = true;
-    for (ElementDefinition.ElementDefinitionConstraintComponent i : elem.getConstraint()) {
+    for (ElementDefinition.ElementDefinitionConstraintComponent i : elem.getConstraintList()) {
       if (!first)
         b.append("; ");
       first = false;
@@ -388,7 +390,7 @@ public class TemplateRenderer {
     b.append(" <span style=\"color: darkgreen\">");
     int i = 0;
     int w = indent + 12 + elem.getName().length(); // this is wrong if the type is an attribute, but the wrapping concern shouldn't apply in this case, so this is ok
-    for (ElementDefinition.TypeRefComponent t : elem.getType()) {
+    for (ElementDefinition.TypeRefComponent t : elem.getTypeList()) {
       if (i > 0) {
         b.append("|");
         w++;
@@ -403,7 +405,7 @@ public class TemplateRenderer {
       if (t.getWorkingCode().equals("xhtml")) {
         b.append(t.getName());
       } else if (t.getName().equals("Extension") && t.hasProfile()) {
-        b.append("<a href=\"" + t.getProfile().get(0).primitiveValue() + "\"><span style=\"color: DarkViolet\">@" + t.getProfile().get(0).primitiveValue() + "</span></a>");
+        b.append("<a href=\"" + t.getProfileList().get(0).primitiveValue() + "\"><span style=\"color: DarkViolet\">@" + t.getProfileList().get(0).primitiveValue() + "</span></a>");
       } else
         b.append("<a href=\"" + (getLinkFor(t.getWorkingCode())
                 + ".html#" + t.getName() + "\">" + t.getName())
@@ -412,7 +414,7 @@ public class TemplateRenderer {
         b.append("(");
         boolean firstp = true;
         List<StructureDefinition> ap = new ArrayList<>();
-        for (CanonicalType p : t.getTargetProfile()) {
+        for (CanonicalType p : t.getTargetProfileList()) {
           StructureDefinition sdt = context.getContext().fetchResource(StructureDefinition.class, p.primitiveValue(), ExtensionUtilities.getVersionResolutionRules(p));
           if (sdt != null) {
             ap.add(sdt);
@@ -520,7 +522,7 @@ public class TemplateRenderer {
 
     String en = elem.getName();
 
-    if (en.contains("[x]") && elem.getType().size() == 1)
+    if (en.contains("[x]") && elem.getTypeList().size() == 1)
       en = en.replace("[x]", elem.typeSummary());
 
     if (en.contains("[x]")) {
@@ -528,24 +530,24 @@ public class TemplateRenderer {
       for (int i = 0; i < indent; i++) {
         b.append("  ");
       }
-      if (elem.getType().size() > 1) {
-        b.append("<span style=\"color: Gray\">// "+en+": <span style=\"color: navy; opacity: 0.8\">" + docPrefix(width, indent, elem)+Utilities.escapeXml(elem.getShort()) + "</span>. One of these "+Integer.toString(elem.getType().size())+":</span>\r\n");
+      if (elem.getTypeList().size() > 1) {
+        b.append("<span style=\"color: Gray\">// "+en+": <span style=\"color: navy; opacity: 0.8\">" + docPrefix(width, indent, elem)+Utilities.escapeXml(elem.getShort()) + "</span>. One of these "+Integer.toString(elem.getTypeList().size())+":</span>\r\n");
         int c = 0;
-        for (ElementDefinition.TypeRefComponent t : elem.getType()) {
+        for (ElementDefinition.TypeRefComponent t : elem.getTypeList()) {
           c++;
-          generateCoreElemDetailsJson(b, elem, indent, rootName, pathName, backbone, last && c == elem.getType().size(), width, en.replace("[x]", upFirst(t.getName())), en, t, false);
+          generateCoreElemDetailsJson(b, elem, indent, rootName, pathName, backbone, last && c == elem.getTypeList().size(), width, en.replace("[x]", upFirst(t.getName())), en, t, false);
         }
       } else {
-        List<TypesUtilities.WildcardInformation> tr = TypesUtilities.wildcards(context.getContext().getVersion());
+        List<TypesUtilities.WildcardInformation> tr = TypesUtilities.wildcards(context.getContext().getFHIRVersion());
         b.append("<span style=\"color: Gray\">// "+en+": <span style=\"color: navy; opacity: 0.8\">" + docPrefix(width, indent, elem)+Utilities.escapeXml(elem.getShort()) + "</span>. One of these "+Integer.toString(tr.size())+":</span>\r\n");
         int c = 0;
         for (TypesUtilities.WildcardInformation t : tr) {
           c++;
-          generateCoreElemDetailsJson(b, elem, indent, rootName, pathName, backbone, last && c == elem.getType().size(), width, en.replace("[x]", upFirst(t.getTypeName())), en, toTypeRef(t), false);
+          generateCoreElemDetailsJson(b, elem, indent, rootName, pathName, backbone, last && c == elem.getTypeList().size(), width, en.replace("[x]", upFirst(t.getTypeName())), en, toTypeRef(t), false);
         }
       }
     } else {
-      generateCoreElemDetailsJson(b, elem, indent, rootName, pathName, backbone, last, width, en, en, elem.getType().isEmpty() ? null : elem.getType().get(0), true);
+      generateCoreElemDetailsJson(b, elem, indent, rootName, pathName, backbone, last, width, en, en, elem.getTypeList().isEmpty() ? null : elem.getTypeList().get(0), true);
     }
   }
 
@@ -629,7 +631,7 @@ public class TemplateRenderer {
       if (type.hasTargetProfile()) {
         b.append("(");
         boolean first = true;
-        for (CanonicalType p : type.getTargetProfile()) {
+        for (CanonicalType p : type.getTargetProfileList()) {
           if (first) first = false; else b.append("|");
           StructureDefinition sdt = context.getContext().fetchResource(StructureDefinition.class, p.primitiveValue(), ExtensionUtilities.getVersionResolutionRules(p));
           if (sdt != null) {
@@ -725,7 +727,7 @@ public class TemplateRenderer {
     if (t.getWorkingCode().equals("xhtml"))
       b.append(t.getName());
     else if (t.getName().equals("Extension") && t.hasProfile()) {
-      b.append("<a href=\""+t.getProfile()+"\"><span style=\"color: DarkViolet\">@"+t.getProfile()+"</span></a>");
+      b.append("<a href=\""+t.getProfileList()+"\"><span style=\"color: DarkViolet\">@"+t.getProfileList()+"</span></a>");
     } else {
       b.append("<a href=\"" + (getLinkFor(t.getName())
               + "#" + t.getName() + "\">" + t.getName())
@@ -735,7 +737,7 @@ public class TemplateRenderer {
       b.append("(");
       boolean firstp = true;
       List<StructureDefinition> ap = new ArrayList<>();
-      for (CanonicalType p : t.getTargetProfile()) {
+      for (CanonicalType p : t.getTargetProfileList()) {
         StructureDefinition sdt = context.getContext().fetchResource(StructureDefinition.class, p.primitiveValue(), ExtensionUtilities.getVersionResolutionRules(p));
         if (sdt != null) {
           ap.add(sdt);
@@ -790,8 +792,8 @@ public class TemplateRenderer {
       rn = "extension|modifierExtension";
     else if (root.getName().equals("Meta"))
       rn = "meta";
-    else if (root.getType().size() > 0 && (root.getType().get(0).getName().equals("Type")
-            || (root.getType().get(0).getName().equals("Structure"))) || isAbstract)
+    else if (root.getTypeList().size() > 0 && (root.getTypeList().get(0).getName().equals("Type")
+            || (root.getTypeList().get(0).getName().equals("Structure"))) || isAbstract)
       rn = "[name]";
     else
       rn = root.getName();
@@ -858,14 +860,14 @@ public class TemplateRenderer {
       b.append(Utilities.escapeXml(elem.getShort()));
       b.append("</span>");
       b.append(". One of these ");
-      b.append(Integer.toString(elem.getType().size()));
+      b.append(Integer.toString(elem.getTypeList().size()));
       b.append("\r\n");
-      for (ElementDefinition.TypeRefComponent t : elem.getType()) {
+      for (ElementDefinition.TypeRefComponent t : elem.getTypeList()) {
         generateElementTypeTtl(b, elem, path, left + "  ", t, elem.getName().replace("[x]", ""),  elem.getName(), true, false);
         b.append("\r\n");
       }
-    } else if (elem.getType().size() == 1) {
-      ElementDefinition.TypeRefComponent t = elem.getType().get(0);
+    } else if (elem.getTypeList().size() == 1) {
+      ElementDefinition.TypeRefComponent t = elem.getTypeList().get(0);
       String en = elem.getName();
       generateElementTypeTtl(b, elem, path, left, t, en, en,false, true);
       if (elem.repeats())
@@ -921,7 +923,7 @@ public class TemplateRenderer {
       b.append("(");
       boolean firstp = true;
       List<StructureDefinition> ap = new ArrayList<>();
-      for (CanonicalType p : t.getTargetProfile()) {
+      for (CanonicalType p : t.getTargetProfileList()) {
         StructureDefinition sd = context.getContext().fetchResource(StructureDefinition.class, p.primitiveValue(), ExtensionUtilities.getVersionResolutionRules(p));
         if (sd != null) {
           ap.add(sd);
@@ -955,11 +957,11 @@ public class TemplateRenderer {
   }
 
   private boolean isChoice(ElementDefinition elem) {
-    return elem.getType().size() > 1 || elem.getName().endsWith("[x]") || elem.typeSummary().equals("*");
+    return elem.getTypeList().size() > 1 || elem.getName().endsWith("[x]") || elem.typeSummary().equals("*");
   }
 
   private void writeInvariants(StringBuilder b, ElementDefinition elem) throws IOException {
-    if (elem.getConstraint().size() > 0)
+    if (elem.getConstraintList().size() > 0)
       b.append(" <span style=\"color: brown\" title=\""+Utilities.escapeXml(getInvariants(elem))+ "\">"+invFlag+"</span>");
   }
 

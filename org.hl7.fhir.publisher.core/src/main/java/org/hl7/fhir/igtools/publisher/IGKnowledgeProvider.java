@@ -27,22 +27,22 @@ import org.hl7.fhir.convertors.VersionConvertorConstants;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.modules.IPublisherModule;
 import org.hl7.fhir.igtools.templates.Template;
-import org.hl7.fhir.r5.conformance.profile.BindingResolution;
-import org.hl7.fhir.r5.conformance.profile.ProfileKnowledgeProvider;
-import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
-import org.hl7.fhir.r5.context.ContextUtilities;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.elementmodel.Element;
-import org.hl7.fhir.r5.elementmodel.ParserBase;
-import org.hl7.fhir.r5.elementmodel.Property;
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.model.*;
-import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
-import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
-import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
+import org.hl7.fhir.services.conformance.profile.BindingResolution;
+import org.hl7.fhir.services.conformance.profile.ProfileKnowledgeProvider;
+import org.hl7.fhir.services.conformance.profile.ProfileUtilities;
+import org.hl7.fhir.services.context.ContextUtilities;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.services.elementmodel.Element;
+import org.hl7.fhir.services.elementmodel.ParserBase;
+import org.hl7.fhir.services.elementmodel.Property;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.model.core.*;
+import org.hl7.fhir.model.core.ElementDefinition.ElementDefinitionBindingComponent;
+import org.hl7.fhir.model.core.StructureDefinition.StructureDefinitionKind;
+import org.hl7.fhir.model.core.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.utilities.UserDataNames;
-import org.hl7.fhir.r5.utils.xver.XVerExtensionManager;
-import org.hl7.fhir.r5.utils.xver.XVerExtensionManagerFactory;
+import org.hl7.fhir.services.xver.XVerExtensionManager;
+import org.hl7.fhir.services.xver.XVerExtensionManagerFactory;
 import org.hl7.fhir.utilities.LoincLinker;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
@@ -572,7 +572,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   public String getLinkFor(String corepath, String name) {
     if (noXhtml && name.equals("xhtml"))
       return null;
-    StructureDefinition sd = context.fetchResource(StructureDefinition.class, ProfileUtilities.sdNs(name, null), IWorkerContext.VersionResolutionRules.defaultRule());
+    StructureDefinition sd = context.fetchResource(StructureDefinition.class, ProfileUtilities.sdNs(name, null), VersionResolutionRules.defaultRule());
     if (sd != null && sd.hasWebPath())
         return sd.getWebPath();
     sd = contextUtilities.findType(name);
@@ -594,7 +594,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     }
   }
   
-  public BindingResolution resolveBinding(StructureDefinition profile, String ref, String path, org.hl7.fhir.r5.model.Element ctxt) {
+  public BindingResolution resolveBinding(StructureDefinition profile, String ref, String path, org.hl7.fhir.model.core.Element ctxt) {
     BindingResolution br = new BindingResolution();
     if (ref.startsWith("http://hl7.org/fhir/ValueSet/v3-")) {
       br.url = specPath("v3/"+ref.substring(32)+"/vs.html");
@@ -708,7 +708,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
 
   @Override
   public String getLinkForProfile(StructureDefinition profile, String url) {
-    StructureDefinition sd = context.fetchResource(StructureDefinition.class, url, IWorkerContext.VersionResolutionRules.defaultRule());
+    StructureDefinition sd = context.fetchResource(StructureDefinition.class, url, VersionResolutionRules.defaultRule());
     if (noXhtml && sd != null && sd.getType().equals("xhtml"))
       return null;
     if (xver.matchingUrl(url)) {
@@ -854,7 +854,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     if (ref == null) {
       return null;
     }
-    Resource res = context.fetchResource(Resource.class, ref, IWorkerContext.VersionResolutionRules.defaultRule());
+    Resource res = context.fetchResource(Resource.class, ref, VersionResolutionRules.defaultRule());
     if (res != null && res.hasWebPath()) {
       return res.getWebPath();
     }

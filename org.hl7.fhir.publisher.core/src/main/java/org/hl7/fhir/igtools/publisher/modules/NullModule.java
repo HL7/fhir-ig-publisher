@@ -2,7 +2,7 @@ package org.hl7.fhir.igtools.publisher.modules;
 
 import java.util.Map;
 
-import org.hl7.fhir.r5.model.CanonicalResource;
+import org.hl7.fhir.model.core.CanonicalResource;
 
 public class NullModule implements IPublisherModule {
   

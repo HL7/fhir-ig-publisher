@@ -5,12 +5,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.hl7.fhir.igtools.publisher.PublisherIGLoader;
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.model.Enumeration;
-import org.hl7.fhir.r5.model.Enumerations;
-import org.hl7.fhir.r5.model.Extension;
-import org.hl7.fhir.r5.model.ImplementationGuide;
-import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnComponent;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.model.core.Enumeration;
+import org.hl7.fhir.model.core.Enumerations;
+import org.hl7.fhir.model.core.Extension;
+import org.hl7.fhir.model.core.ImplementationGuide;
+import org.hl7.fhir.model.core.ImplementationGuide.ImplementationGuideDependsOnComponent;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -68,10 +68,10 @@ class DependencyRendererPerVersionTest {
   @Test
   void baseView_excludesR4OnlyAddFromR5Table() {
     ImplementationGuide ig = new ImplementationGuide();
-    ig.getFhirVersion().add(new Enumeration<>(new Enumerations.FHIRVersionEnumFactory(), "5.0.0"));
+    ig.getFhirVersionList().add(new Enumeration<>(new Enumerations.FHIRVersionEnumFactory(), "5.0.0"));
     ImplementationGuideDependsOnComponent add = dep("http://example.org/add", "test.add.r4", "3.0.0");
     addOccurrence(add, "4.0.1", null, null, null);
-    ig.getDependsOn().add(add);
+    ig.getDependsOnList().add(add);
 
     String baseVer = DependencyRenderer.baseVersionKey(ig);
     assertEquals("r5", baseVer);
@@ -86,17 +86,17 @@ class DependencyRendererPerVersionTest {
     // so a base-version override must (a) still pass the renderer's base-view applicability filter and
     // (b) carry the overridden packageId that render() resolves and shows - not the raw one.
     ImplementationGuide ig = new ImplementationGuide();
-    ig.getFhirVersion().add(new Enumeration<>(new Enumerations.FHIRVersionEnumFactory(), "5.0.0"));
+    ig.getFhirVersionList().add(new Enumeration<>(new Enumerations.FHIRVersionEnumFactory(), "5.0.0"));
     ImplementationGuideDependsOnComponent dep = dep("http://example.org/base", "test.base.r5", "1.0.0");
     addOccurrence(dep, "5.0.0", "test.base.override", "2.0.0", null);
-    ig.getDependsOn().add(dep);
+    ig.getDependsOnList().add(dep);
 
     // build the effective base view exactly as PublisherIGLoader does for pf.effectiveBaseIg
     PublisherIGLoader.applyPerVersionDeps(ig, "5.0.0", "5.0.0");
 
     String baseVer = DependencyRenderer.baseVersionKey(ig);
     assertEquals("r5", baseVer);
-    ImplementationGuideDependsOnComponent effective = ig.getDependsOn().get(0);
+    ImplementationGuideDependsOnComponent effective = ig.getDependsOnList().get(0);
     assertTrue(PublisherIGLoader.isDepApplicableForVersion(effective, baseVer), "the overridden dep is still listed by the base table");
     assertEquals("test.base.override", effective.getPackageId(), "render() resolves the overridden packageId");
     assertEquals("2.0.0", effective.getVersion(), "render() resolves the overridden version");

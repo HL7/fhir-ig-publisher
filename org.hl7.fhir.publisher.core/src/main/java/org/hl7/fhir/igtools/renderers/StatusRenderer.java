@@ -2,18 +2,18 @@ package org.hl7.fhir.igtools.renderers;
 
 import java.util.List;
 
-import org.hl7.fhir.r5.elementmodel.Element;
-import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.ContactDetail;
-import org.hl7.fhir.r5.model.ContactPoint;
-import org.hl7.fhir.r5.model.ContactPoint.ContactPointSystem;
-import org.hl7.fhir.r5.model.DomainResource;
-import org.hl7.fhir.r5.model.Extension;
-import org.hl7.fhir.r5.model.IntegerType;
-import org.hl7.fhir.r5.model.StringType;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext;
+import org.hl7.fhir.services.elementmodel.Element;
+import org.hl7.fhir.model.extensions.ExtensionDefinitions;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.model.core.CanonicalResource;
+import org.hl7.fhir.model.core.ContactDetail;
+import org.hl7.fhir.model.core.ContactPoint;
+import org.hl7.fhir.model.core.ContactPoint.ContactPointSystem;
+import org.hl7.fhir.model.core.DomainResource;
+import org.hl7.fhir.model.core.Extension;
+import org.hl7.fhir.model.core.IntegerType;
+import org.hl7.fhir.model.core.StringType;
+import org.hl7.fhir.services.renderers.utils.RenderingContext;
 import org.hl7.fhir.utilities.Utilities;
 
 public class StatusRenderer {
@@ -228,8 +228,8 @@ public class StatusRenderer {
 
   private static String readOwnerLink(DomainResource resource) {
     if (resource instanceof CanonicalResource) {
-      for (ContactDetail cd : ((CanonicalResource) resource).getContact()) {
-        for (ContactPoint cp : cd.getTelecom()) {
+      for (ContactDetail cd : ((CanonicalResource) resource).getContactList()) {
+        for (ContactPoint cp : cd.getTelecomList()) {
           if (cp.getSystem() == ContactPointSystem.URL) {
             return cp.getValue();
           }

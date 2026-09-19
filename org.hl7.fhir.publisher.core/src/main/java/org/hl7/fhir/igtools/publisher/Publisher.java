@@ -61,31 +61,30 @@ import org.hl7.fhir.igtools.renderers.*;
 import org.hl7.fhir.igtools.renderers.ValidationPresenter.IGLanguageInformation;
 import org.hl7.fhir.igtools.ui.IGPublisherUI;
 import org.hl7.fhir.igtools.web.*;
-import org.hl7.fhir.r5.context.*;
-import org.hl7.fhir.r5.elementmodel.Element;
-import org.hl7.fhir.r5.elementmodel.ElementVisitor;
-import org.hl7.fhir.r5.elementmodel.Manager.FhirFormat;
-import org.hl7.fhir.r5.extensions.*;
-import org.hl7.fhir.r5.model.*;
-import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
-import org.hl7.fhir.r5.model.Enumerations.CodeSystemContentMode;
-import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionResourceComponent;
-import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideGlobalComponent;
-import org.hl7.fhir.r5.model.Parameters.ParametersParameterComponent;
-import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext.IResourceLinkResolver;
-import org.hl7.fhir.r5.renderers.utils.Resolver.IReferenceResolver;
-import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceReferenceKind;
-import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceWithReference;
-import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
-import org.hl7.fhir.r5.terminologies.client.TerminologyClientContext;
-import org.hl7.fhir.r5.utils.EOperationOutcome;
-import org.hl7.fhir.r5.utils.NPMPackageGenerator;
+import org.hl7.fhir.services.context.*;
+import org.hl7.fhir.services.elementmodel.Element;
+import org.hl7.fhir.services.elementmodel.ElementVisitor;
+import org.hl7.fhir.model.utilities.formats.FhirFormat;
+import org.hl7.fhir.model.extensions.*;
+import org.hl7.fhir.model.core.*;
+import org.hl7.fhir.model.core.ElementDefinition.TypeRefComponent;
+import org.hl7.fhir.model.core.Enumerations.CodeSystemContentMode;
+import org.hl7.fhir.model.core.ImplementationGuide.ImplementationGuideDefinitionResourceComponent;
+import org.hl7.fhir.model.core.ImplementationGuide.ImplementationGuideGlobalComponent;
+import org.hl7.fhir.model.core.Parameters.ParametersParameterComponent;
+import org.hl7.fhir.model.core.ValueSet.ConceptSetComponent;
+import org.hl7.fhir.services.renderers.utils.RenderingContext;
+import org.hl7.fhir.services.renderers.utils.RenderingContext.IResourceLinkResolver;
+import org.hl7.fhir.services.renderers.utils.Resolver.IReferenceResolver;
+import org.hl7.fhir.services.renderers.utils.Resolver.ResourceReferenceKind;
+import org.hl7.fhir.services.renderers.utils.Resolver.ResourceWithReference;
+import org.hl7.fhir.services.renderers.utils.ResourceWrapper;
+import org.hl7.fhir.standalone.terminology.client.TerminologyClientContext;
+import org.hl7.fhir.model.utilities.EOperationOutcome;
+import org.hl7.fhir.services.utilities.NPMPackageGenerator;
 import org.hl7.fhir.utilities.UserDataNames;
-import org.hl7.fhir.r5.utils.xver.XVerExtensionManager;
-import org.hl7.fhir.r5.utils.validation.IValidationProfileUsageTracker;
-import org.hl7.fhir.r5.utils.xver.XVerExtensionManagerFactory;
+import org.hl7.fhir.services.xver.XVerExtensionManager;
+import org.hl7.fhir.services.validation.IValidationProfileUsageTracker;
 import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 import org.hl7.fhir.utilities.http.HTTPResult;
@@ -96,6 +95,7 @@ import org.hl7.fhir.utilities.json.model.JsonBoolean;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.model.JsonPrimitive;
 import org.hl7.fhir.utilities.json.model.JsonString;
+import org.hl7.fhir.utilities.logging.ILoggingService;
 import org.hl7.fhir.utilities.npm.*;
 import org.hl7.fhir.utilities.npm.NpmPackage.PackageResourceInformation;
 import org.hl7.fhir.utilities.settings.FhirSettings;
@@ -163,7 +163,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   public static final long JEKYLL_TIMEOUT = 60000 * 5; // 5 minutes....
   public static final long FSH_TIMEOUT = 60000 * 5; // 5 minutes....
   public static final int PRISM_SIZE_LIMIT = 16384;
-  public static final String TOOLING_IG_CURRENT_RELEASE = "1.1.2";
+  public static final String TOOLING_IG_CURRENT_RELEASE = "1.2.0";
   public static final String PACKAGE_CACHE_FOLDER_PARAM = "-package-cache-folder";
 
   private PublisherIGLoader loader;
@@ -261,11 +261,11 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   private String renderGlobals() {
     if (pf.sourceIg.hasGlobal()) {
       StringBuilder b = new StringBuilder();
-      boolean list = pf.sourceIg.getGlobal().size() > 1;
+      boolean list = pf.sourceIg.getGlobalList().size() > 1;
       if (list) {
         b.append("<ul>\r\n");
       }
-      for (ImplementationGuideGlobalComponent g : pf.sourceIg.getGlobal()) {
+      for (ImplementationGuideGlobalComponent g : pf.sourceIg.getGlobalList()) {
         b.append(list ? "<li>" : "");
         b.append(""+g.getType()+": "+g.getProfile());
         b.append(list ? "</li>" : "");
@@ -406,6 +406,10 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
           throw(ex);
         }
         pf.validatorSession.close();
+        // Validation is where the overwhelming majority of terminology work happens, and
+        // generation below can run for a long time afterwards, so bank it now rather than
+        // waiting for the end of the build.
+        saveTerminologyCache();
       }
       if (pf.needsRegen) {
         log("Regenerating Narratives");
@@ -459,6 +463,25 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         ex.printStackTrace();
       }
       throw e;
+    } finally {
+      // Generation asks the terminology server plenty of its own (expansions for rendering),
+      // so flush again on the way out. In a finally because a build that fell over at hour
+      // three still earned everything it learned up to that point, and there is no reason to
+      // make the next attempt ask for all of it again.
+      saveTerminologyCache();
+    }
+  }
+
+  /**
+   * Write any terminology answers this build has picked up but not yet flushed.
+   *
+   * <p>The terminology cache coalesces its writes over a long window, so it relies on callers
+   * marking the points where a chunk of work is finished. Cheap when nothing is pending, and
+   * safe to call as often as you like.
+   */
+  private void saveTerminologyCache() {
+    if (pf.context != null && pf.context.getTxCache() != null) {
+      pf.context.getTxCache().save();
     }
   }
 
@@ -526,7 +549,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       }
     }
     if (e.hasChildren()) {
-      for (Element c : e.getChildren()) {
+      for (Element c : e.getChildList()) {
         scanForUnattributedCodeSystems(list, link, c);
       }
     }    
@@ -535,7 +558,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   private void checkForSnomedVersion() {
     if (!(pf.igrealm == null || "uv".equals(pf.igrealm)) && pf.context.getCodeSystemsUsed().contains("http://snomed.info/sct")) {
       boolean ok = false;
-      for (ParametersParameterComponent p : pf.context.getExpansionParameters().getParameter()) {
+      for (ParametersParameterComponent p : pf.context.getExpansionParameters().getParameterList()) {
         if ("system-version".equals(p.getName()) && p.hasValuePrimitive() && p.getValue().primitiveValue().startsWith("http://snomed.info/sct")) {
           ok = true;
         }
@@ -604,7 +627,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       String url = element.getChildValue("url");
       scanRefForR5(xver, set, url);
     }
-    for (Element c : element.getChildren()) {
+    for (Element c : element.getChildList()) {
       scanElementForR5(xver, set, c);
     }
   }
@@ -634,16 +657,16 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     if (base != null) {
       scanProfileForR5(xver, set, base);
     }
-    for (ElementDefinition ed : sd.getDifferential().getElement()) {
-      for (TypeRefComponent t : ed.getType()) {
-        for (CanonicalType u : t.getProfile()) {
+    for (ElementDefinition ed : sd.getDifferential().getElementList()) {
+      for (TypeRefComponent t : ed.getTypeList()) {
+        for (CanonicalType u : t.getProfileList()) {
           scanRefForR5(xver, set, u.getValue());
         }
       }
     }
-    for (ElementDefinition ed : sd.getSnapshot().getElement()) {
-      for (TypeRefComponent t : ed.getType()) {
-        for (CanonicalType u : t.getProfile()) {
+    for (ElementDefinition ed : sd.getSnapshot().getElementList()) {
+      for (TypeRefComponent t : ed.getTypeList()) {
+        for (CanonicalType u : t.getProfileList()) {
           scanRefForR5(xver, set, u.getValue());
         }
       }
@@ -801,7 +824,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
           String aurl = ExtensionUtilities.readStringExtension(act, "http://hl7.org/fhir/tools/StructureDefinition/ig-actor-example-url");
           if (aurl != null && url.startsWith(aurl)) {
             String tail = url.substring(aurl.length()+1);
-            for (ImplementationGuideDefinitionResourceComponent igr : this.pf.sourceIg.getDefinition().getResource()) {
+            for (ImplementationGuideDefinitionResourceComponent igr : this.pf.sourceIg.getDefinition().getResourceList()) {
               if (tail.equals(igr.getReference().getReference())) {
                 String actor = ExtensionUtilities.readStringExtension(igr, "http://hl7.org/fhir/tools/StructureDefinition/ig-example-actor");
                 if (actor.equals(act.getUrl())) {
@@ -856,7 +879,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       if (s == null) {
         return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, url, path, null);
       } else {
-        IContextResourceLoader loader = sp.getLoader();
+        IContextResourceLoaderN loader = sp.getLoader();
         Resource res = loader.loadResource(s, true);
         res.setWebPath(path);
         return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, url, path, ResourceWrapper.forResource(context, res));
@@ -961,26 +984,26 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 
   private void loadValueSetDependencies(FetchedFile f, FetchedResource r) {
     ValueSet vs = (ValueSet) r.getResource();
-    for (ConceptSetComponent cc : vs.getCompose().getInclude()) {
-      for (UriType vsi : cc.getValueSet()) {
+    for (ConceptSetComponent cc : vs.getCompose().getIncludeList()) {
+      for (UriType vsi : cc.getValueSetList()) {
         FetchedFile fi = getFileForUri(vsi.getValue());
         if (fi != null)
           f.getDependencies().add(fi);
       }
     }
-    for (ConceptSetComponent cc : vs.getCompose().getExclude()) {
-      for (UriType vsi : cc.getValueSet()) {
+    for (ConceptSetComponent cc : vs.getCompose().getExcludeList()) {
+      for (UriType vsi : cc.getValueSetList()) {
         FetchedFile fi = getFileForUri(vsi.getValue());
         if (fi != null)
           f.getDependencies().add(fi);
       }
     }
-    for (ConceptSetComponent vsc : vs.getCompose().getInclude()) {
+    for (ConceptSetComponent vsc : vs.getCompose().getIncludeList()) {
       FetchedFile fi = getFileForUri(vsc.getSystem());
       if (fi != null)
         f.getDependencies().add(fi);
     }
-    for (ConceptSetComponent vsc : vs.getCompose().getExclude()) {
+    for (ConceptSetComponent vsc : vs.getCompose().getExcludeList()) {
       FetchedFile fi = getFileForUri(vsc.getSystem());
       if (fi != null)
         f.getDependencies().add(fi);
@@ -1983,7 +2006,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         }
         if (match) {
           InputStream s = spec.getNpm().load(pri);
-          IContextResourceLoader pl = new PublisherLoader(spec.getNpm(), spec.getSpm(), PackageHacker.fixPackageUrl(spec.getNpm().getWebLocation()), pf.igpkp, false).makeLoader();
+          IContextResourceLoaderN pl = new PublisherLoader(spec.getNpm(), spec.getSpm(), PackageHacker.fixPackageUrl(spec.getNpm().getWebLocation()), pf.igpkp, false, pf.context.getModelContext()).makeLoader();
           Resource res = pl.loadResource(s, true);
           return (T) res;
         }

@@ -4,12 +4,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.model.Enumeration;
-import org.hl7.fhir.r5.model.Enumerations;
-import org.hl7.fhir.r5.model.Extension;
-import org.hl7.fhir.r5.model.ImplementationGuide;
-import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnComponent;
+import org.hl7.fhir.model.Base;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.model.core.Enumeration;
+import org.hl7.fhir.model.core.Enumerations;
+import org.hl7.fhir.model.core.Extension;
+import org.hl7.fhir.model.core.ImplementationGuide;
+import org.hl7.fhir.model.core.ImplementationGuide.ImplementationGuideDependsOnComponent;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -37,7 +38,7 @@ class PerVersionDependencyConsistencyTest {
   private ImplementationGuide igWithBaseOverride() {
     ImplementationGuide ig = new ImplementationGuide();
     ig.setPackageId("example.test");
-    ig.getFhirVersion().add(new Enumeration<>(new Enumerations.FHIRVersionEnumFactory(), "5.0.0"));
+    ig.getFhirVersionList().add(new Enumeration<>(new Enumerations.FHIRVersionEnumFactory(), "5.0.0"));
     ImplementationGuideDependsOnComponent dep = ig.addDependsOn();
     dep.setId("base");
     dep.setUri("http://example.org/fhir/ImplementationGuide/test.base");
@@ -68,7 +69,7 @@ class PerVersionDependencyConsistencyTest {
 
   @Test
   void applyEffectiveOverride_baseVersionOverride_appliesIdAndVersion() {
-    ImplementationGuideDependsOnComponent dep = igWithBaseOverride().getDependsOn().get(0);
+    ImplementationGuideDependsOnComponent dep = igWithBaseOverride().getDependsOnList().get(0);
     PublisherIGLoader.applyEffectiveOverride(dep, "5.0.0", "5.0.0");
     assertEquals("test.base.override", dep.getPackageId(), "base-version packageId override applied");
     assertEquals("2.0.0", dep.getVersion(), "base-version version override applied");
@@ -93,18 +94,18 @@ class PerVersionDependencyConsistencyTest {
   @Test
   void loadLoopAndManifest_resolveSameEffectiveDep_withoutMutatingSource() {
     ImplementationGuide raw = igWithBaseOverride();
-    ImplementationGuideDependsOnComponent rawDep = raw.getDependsOn().get(0);
+    ImplementationGuideDependsOnComponent rawDep = raw.getDependsOnList().get(0);
 
     // load-loop path: copy the raw dep and apply the single-entry transform (as PublisherIGLoader's
     // dependency load loop does before loadIg).
-    ImplementationGuideDependsOnComponent loadLoop = rawDep.copy();
+    ImplementationGuideDependsOnComponent loadLoop = rawDep.copy(Base.COPY_DATA);
     PublisherIGLoader.applyEffectiveOverride(loadLoop, "5.0.0", "5.0.0");
 
     // manifest/table path: copy the whole IG and apply the per-version transform (as the baseVig that
     // backs pf.effectiveBaseIg does).
-    ImplementationGuide manifestIg = raw.copy();
+    ImplementationGuide manifestIg = raw.copy(Base.COPY_DATA);
     PublisherIGLoader.applyPerVersionDeps(manifestIg, "5.0.0", "5.0.0");
-    ImplementationGuideDependsOnComponent manifestDep = manifestIg.getDependsOn().get(0);
+    ImplementationGuideDependsOnComponent manifestDep = manifestIg.getDependsOnList().get(0);
 
     assertEquals("test.base.override", loadLoop.getPackageId());
     assertEquals("2.0.0", loadLoop.getVersion());

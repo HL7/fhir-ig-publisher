@@ -4,7 +4,7 @@ import org.apache.commons.codec.binary.Base64;
 import org.eclipse.persistence.internal.sessions.DirectCollectionChangeRecord;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.utils.OldIGAIGenerator;
-import org.hl7.fhir.r5.model.ImplementationGuide;
+import org.hl7.fhir.model.core.ImplementationGuide;
 import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 import org.hl7.fhir.utilities.json.model.JsonElement;

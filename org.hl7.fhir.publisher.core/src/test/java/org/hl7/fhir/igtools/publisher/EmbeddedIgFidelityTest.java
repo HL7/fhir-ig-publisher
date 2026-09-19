@@ -8,10 +8,10 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import org.hl7.fhir.r5.model.Enumeration;
-import org.hl7.fhir.r5.model.Enumerations;
-import org.hl7.fhir.r5.model.ImplementationGuide;
-import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnComponent;
+import org.hl7.fhir.model.core.Enumeration;
+import org.hl7.fhir.model.core.Enumerations;
+import org.hl7.fhir.model.core.ImplementationGuide;
+import org.hl7.fhir.model.core.ImplementationGuide.ImplementationGuideDependsOnComponent;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -37,7 +37,7 @@ class EmbeddedIgFidelityTest {
     ig.setName("Example");
     ig.setPackageId("example.test");
     ig.setStatus(Enumerations.PublicationStatus.ACTIVE);
-    ig.getFhirVersion().add(new Enumeration<>(new Enumerations.FHIRVersionEnumFactory(), "5.0.0"));
+    ig.getFhirVersionList().add(new Enumeration<>(new Enumerations.FHIRVersionEnumFactory(), "5.0.0"));
     for (String ref : references) {
       ig.getDefinition().addResource().getReference().setReference(ref);
     }
@@ -56,7 +56,7 @@ class EmbeddedIgFidelityTest {
   }
 
   private Set<String> referencesOf(ImplementationGuide ig) {
-    return ig.getDefinition().getResource().stream()
+    return ig.getDefinition().getResourceList().stream()
         .map(res -> res.getReference().getReference())
         .collect(Collectors.toSet());
   }
@@ -120,7 +120,7 @@ class EmbeddedIgFidelityTest {
   }
 
   private List<String> depPackageIds(ImplementationGuide ig) {
-    return ig.getDependsOn().stream()
+    return ig.getDependsOnList().stream()
         .map(ImplementationGuideDependsOnComponent::getPackageId)
         .collect(Collectors.toList());
   }
@@ -133,13 +133,13 @@ class EmbeddedIgFidelityTest {
     // and mislabel survivors).
     ImplementationGuide target = igWithDeps("dep.a", "dep.b", "dep.c", "dep.d");
     ImplementationGuide effective = igWithDeps("dep.d", "dep.b");
-    effective.getDependsOn().get(0).setVersion("9.9.9"); // prove values come from effective, not target
+    effective.getDependsOnList().get(0).setVersion("9.9.9"); // prove values come from effective, not target
 
     PublisherBase.applyEffectiveDependsOn(target, effective);
 
     assertEquals(List.of("dep.d", "dep.b"), depPackageIds(target),
         "overlay reproduces the effective (filtered + reordered) dependsOn, not the full list");
-    assertEquals("9.9.9", target.getDependsOn().get(0).getVersion(),
+    assertEquals("9.9.9", target.getDependsOnList().get(0).getVersion(),
         "overlay copies the effective entry's coordinates");
   }
 

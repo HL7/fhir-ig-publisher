@@ -19,38 +19,36 @@ import org.apache.commons.compress.compressors.gzip.GzipParameters;
 import org.apache.commons.io.IOUtils;
 import org.hl7.fhir.convertors.analytics.PackageVisitor.IPackageVisitorProcessor;
 import org.hl7.fhir.convertors.analytics.PackageVisitor.PackageContext;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_50;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_43_50;
+import org.hl7.fhir.convertors.factory.*;
 import org.hl7.fhir.dstu3.model.Composition;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
-import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
-import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.formats.JsonParser;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.CanonicalType;
-import org.hl7.fhir.r5.model.CapabilityStatement;
-import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestComponent;
-import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceComponent;
-import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceOperationComponent;
-import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceSearchParamComponent;
-import org.hl7.fhir.r5.model.CodeSystem;
-import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
-import org.hl7.fhir.r5.model.ConceptMap;
-import org.hl7.fhir.r5.model.ConceptMap.ConceptMapGroupComponent;
-import org.hl7.fhir.r5.model.ElementDefinition;
-import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingAdditionalComponent;
-import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
-import org.hl7.fhir.r5.model.Resource;
-import org.hl7.fhir.r5.model.StructureDefinition;
-import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionContextComponent;
-import org.hl7.fhir.r5.model.ValueSet;
-import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
-import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionContainsComponent;
-import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionParameterComponent;
-import org.hl7.fhir.r5.utils.EOperationOutcome;
+import org.hl7.fhir.model.ModelContext;
+import org.hl7.fhir.services.conformance.profile.ProfileUtilities;
+import org.hl7.fhir.model.extensions.ExtensionDefinitions;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.model.core.formats.JsonParser;
+import org.hl7.fhir.model.core.CanonicalResource;
+import org.hl7.fhir.model.core.CanonicalType;
+import org.hl7.fhir.model.core.CapabilityStatement;
+import org.hl7.fhir.model.core.CapabilityStatement.CapabilityStatementRestComponent;
+import org.hl7.fhir.model.core.CapabilityStatement.CapabilityStatementRestResourceComponent;
+import org.hl7.fhir.model.core.CapabilityStatement.CapabilityStatementRestResourceOperationComponent;
+import org.hl7.fhir.model.core.CapabilityStatement.CapabilityStatementRestResourceSearchParamComponent;
+import org.hl7.fhir.model.core.CodeSystem;
+import org.hl7.fhir.model.core.CodeSystem.ConceptDefinitionComponent;
+import org.hl7.fhir.model.core.ConceptMap;
+import org.hl7.fhir.model.core.ConceptMap.ConceptMapGroupComponent;
+import org.hl7.fhir.model.core.ElementDefinition;
+import org.hl7.fhir.model.core.ElementDefinition.ElementDefinitionBindingAdditionalComponent;
+import org.hl7.fhir.model.core.ElementDefinition.TypeRefComponent;
+import org.hl7.fhir.model.core.Resource;
+import org.hl7.fhir.model.core.StructureDefinition;
+import org.hl7.fhir.model.core.StructureDefinition.StructureDefinitionContextComponent;
+import org.hl7.fhir.model.core.ValueSet;
+import org.hl7.fhir.model.core.ValueSet.ConceptSetComponent;
+import org.hl7.fhir.model.core.ValueSet.ValueSetExpansionContainsComponent;
+import org.hl7.fhir.model.core.ValueSet.ValueSetExpansionParameterComponent;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
@@ -551,7 +549,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
   }
 
   @Override
-  public void processResource(PackageContext context, Object clientContext, String type, String id, byte[] content) throws FHIRException, IOException, EOperationOutcome {   
+  public void processResource(PackageContext context, Object clientContext, String type, String id, byte[] content) throws FHIRException, IOException {
     if (clientContext != null) {
       SpecMapManager smm = (SpecMapManager) clientContext;
 
@@ -657,7 +655,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
               sqlUpdateResource.setInt(25, resKey);
               sqlUpdateResource.execute();
 
-              sqlUpdateContents.setBytes(1, gzip(new JsonParser().composeBytes(cr)));
+              sqlUpdateContents.setBytes(1, gzip(new JsonParser(ModelContext.fullCoreContext()).composeBytes(cr)));
               sqlUpdateContents.setInt(2, resKey);
               sqlUpdateContents.execute();
 
@@ -686,7 +684,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
     if (cs.hasSupplements()) {
       recordDependency(dependencies, resKey, cs.getSupplements());
     }
-    return processCodes(cs.getConcept());
+    return processCodes(cs.getConceptList());
   }
 
   private void recordDependency(Set<String> dependencies, int resKey, String url) throws SQLException {
@@ -705,32 +703,32 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
 
   private String processCapabilityStatement(int resKey, CapabilityStatement cs, NpmPackage npm, Set<String> dependencies) throws SQLException {
 
-    for (CanonicalType cr : cs.getInstantiates()) {
+    for (CanonicalType cr : cs.getInstantiatesList()) {
       recordDependency(dependencies, resKey, cr.asStringValue());
     }
-    for (CanonicalType cr : cs.getImports()) {
+    for (CanonicalType cr : cs.getImportsList()) {
       recordDependency(dependencies, resKey, cr.asStringValue());
     }
-    for (CanonicalType cr : cs.getImplementationGuide()) {
+    for (CanonicalType cr : cs.getImplementationGuideList()) {
       recordDependency(dependencies, resKey, cr.asStringValue());
     }
-    for (CapabilityStatementRestComponent r : cs.getRest()) {
-      for (CapabilityStatementRestResourceComponent res : r.getResource()) {
+    for (CapabilityStatementRestComponent r : cs.getRestList()) {
+      for (CapabilityStatementRestResourceComponent res : r.getResourceList()) {
         recordDependency(dependencies, resKey, res.getProfile());
-        for (CanonicalType cr : res.getSupportedProfile()) {
+        for (CanonicalType cr : res.getSupportedProfileList()) {
           recordDependency(dependencies, resKey, cr.asStringValue());
         }
-        for (CapabilityStatementRestResourceSearchParamComponent sp : res.getSearchParam()) {
+        for (CapabilityStatementRestResourceSearchParamComponent sp : res.getSearchParamList()) {
           recordDependency(dependencies, resKey, sp.getDefinition());
         }
-        for (CapabilityStatementRestResourceOperationComponent op : res.getOperation()) {
+        for (CapabilityStatementRestResourceOperationComponent op : res.getOperationList()) {
           recordDependency(dependencies, resKey, op.getDefinition());
         }
       }
-      for (CapabilityStatementRestResourceSearchParamComponent sp : r.getSearchParam()) {
+      for (CapabilityStatementRestResourceSearchParamComponent sp : r.getSearchParamList()) {
         recordDependency(dependencies, resKey, sp.getDefinition());
       }
-      for (CapabilityStatementRestResourceOperationComponent op : r.getOperation()) {
+      for (CapabilityStatementRestResourceOperationComponent op : r.getOperationList()) {
         recordDependency(dependencies, resKey, op.getDefinition());
       }
     }
@@ -739,23 +737,23 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
 
   private String processStructureDefinition(int resKey, StructureDefinition sd, NpmPackage npm, Set<String> dependencies) throws SQLException {
     recordDependency(dependencies, resKey, sd.getBaseDefinition());
-    for (ElementDefinition ed : sd.getDifferential().getElement()) {
+    for (ElementDefinition ed : sd.getDifferential().getElementList()) {
       if (ed.hasBinding()) {
         recordDependency(dependencies, resKey, ed.getBinding().getValueSet());
-        for (ElementDefinitionBindingAdditionalComponent ab : ed.getBinding().getAdditional()) {
+        for (ElementDefinitionBindingAdditionalComponent ab : ed.getBinding().getAdditionalList()) {
           recordDependency(dependencies, resKey, ab.getValueSet());            
         }
       }
-      for (TypeRefComponent tr : ed.getType()) {
+      for (TypeRefComponent tr : ed.getTypeList()) {
         recordDependency(dependencies, resKey, tr.getWorkingCode());
-        for (CanonicalType cr : tr.getProfile()) {
+        for (CanonicalType cr : tr.getProfileList()) {
           recordDependency(dependencies, resKey, cr.asStringValue());
         }
-        for (CanonicalType cr : tr.getTargetProfile()) {
+        for (CanonicalType cr : tr.getTargetProfileList()) {
           recordDependency(dependencies, resKey, cr.asStringValue());
         }
       }
-      for (CanonicalType cr : ed.getValueAlternatives()) {
+      for (CanonicalType cr : ed.getValueAlternativesList()) {
         recordDependency(dependencies, resKey, cr.asStringValue());
       }
     }
@@ -770,7 +768,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
   private String processExtensionDefinition(int resKey, StructureDefinition sd) throws SQLException {
     Set<String> tset = new HashSet<>();
     Set<String> eset = new HashSet<>();
-    for (StructureDefinitionContextComponent ec : sd.getContext()) {
+    for (StructureDefinitionContextComponent ec : sd.getContextList()) {
       switch (ec.getType()) {
       case ELEMENT:
         eset.add(ec.getExpression());
@@ -798,7 +796,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
     } else {
       ElementDefinition ed = sd.getSnapshot().getElementByPath("Extension.value[x]");
       Set<String> tset = new HashSet<>();
-      for (TypeRefComponent tr : ed.getType()) {
+      for (TypeRefComponent tr : ed.getTypeList()) {
         tset.add(tr.getWorkingCode());
       }
       for (String s : tset) {
@@ -849,7 +847,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
       set.add(seeTxReference(cm.getTargetScope().primitiveValue(), npm));
       recordDependency(dependencies, resKey, cm.getTargetScope().primitiveValue());
     }
-    for (ConceptMapGroupComponent g : cm.getGroup()) {
+    for (ConceptMapGroupComponent g : cm.getGroupList()) {
       set.add(seeTxReference(g.getSource(), npm));
       recordDependency(dependencies, resKey, g.getSource());
       set.add(seeTxReference(g.getTarget(), npm));
@@ -863,8 +861,8 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
 
   private String processValueSet(int resKey, ValueSet vs, NpmPackage npm, Set<String> dependencies) throws SQLException {
     Set<String> set = new HashSet<>();
-    for (ConceptSetComponent inc : vs.getCompose().getInclude()) {
-      for (CanonicalType c : inc.getValueSet()) {
+    for (ConceptSetComponent inc : vs.getCompose().getIncludeList()) {
+      for (CanonicalType c : inc.getValueSetList()) {
         recordDependency(dependencies, resKey, c.getValueAsString());
         set.add(seeTxReference(c.getValue(), npm));
       }
@@ -872,12 +870,12 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
       recordDependency(dependencies, resKey, inc.getSystem());
     }
     if (vs.hasExpansion()) {
-      for (ValueSetExpansionParameterComponent p : vs.getExpansion().getParameter()) {
+      for (ValueSetExpansionParameterComponent p : vs.getExpansion().getParameterList()) {
         if (p.hasValue()) {
           recordDependency(dependencies, resKey, p.getValue().primitiveValue());
         }
       }
-      checkVSEDependencies(resKey, dependencies, vs.getExpansion().getContains());
+      checkVSEDependencies(resKey, dependencies, vs.getExpansion().getContainsList());
     }
     for (String s : set) {
       seeReference(resKey, 1, s);
@@ -889,7 +887,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
     for (ValueSetExpansionContainsComponent c : list) {
       recordDependency(dependencies, resKey, c.getSystem());
       if (c.hasContains()) {
-        checkVSEDependencies(resKey, dependencies, c.getContains());
+        checkVSEDependencies(resKey, dependencies, c.getContainsList());
       }
     }
   }
@@ -1008,7 +1006,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
       psqlCI.setString(3, concept.getDisplay());
       psqlCI.setString(4, concept.getDefinition());
       psqlCI.execute();
-      c = c + processCodes(concept.getConcept());
+      c = c + processCodes(concept.getConceptList());
     }    
     return c;
   }
@@ -1053,33 +1051,50 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
         res = new org.hl7.fhir.dstu3.formats.JsonParser(true).parse(source);
         scanForExtensionUsage(pid, res, smm.getPath(res.fhirType(), res.getIdBase()));
         scanForDocuments(res);
-        return VersionConvertorFactory_30_50.convertResource(res);
+        return VersionConvertorFactory_30_N.convertResource(res);
       } else if (VersionUtilities.isR4Ver(parseVersion)) {
         org.hl7.fhir.r4.model.Resource res;
         res = new org.hl7.fhir.r4.formats.JsonParser(true, true).parse(source);
         scanForExtensionUsage(pid, res, smm.getPath(res.fhirType(), res.getIdBase()));
         scanForDocuments(res);
-        return VersionConvertorFactory_40_50.convertResource(res);
+        return VersionConvertorFactory_40_N.convertResource(res);
+      } else if (VersionUtilities.isR5Ver(parseVersion)) {
+        org.hl7.fhir.model.core.Resource res;
+        res = VersionConvertorFactory_50_N.convertResource(new org.hl7.fhir.r5.formats.JsonParser(true, true).parse(source));
+        scanForExtensionUsage(pid, res, smm.getPath(res.fhirType(), res.getIdBase()));
+        scanForDocuments(res);
+        return res;
+      } else if (VersionUtilities.isR6Plus(parseVersion)) {
+        org.hl7.fhir.model.core.Resource res;
+        res = new org.hl7.fhir.model.core.formats.JsonParser(ModelContext.fullCoreContext(), true, true).parse(source);
+        scanForExtensionUsage(pid, res, smm.getPath(res.fhirType(), res.getIdBase()));
+        scanForDocuments(res);
+        return res;
 //      } else if (VersionUtilities.isR2BVer(parseVersion)) {
 //        org.hl7.fhir.dstu2016may.model.Resource res;
 //        res = new org.hl7.fhir.dstu2016may.formats.JsonParser(true).parse(source);
 //        scanForExtensionUsage(res, Utilities.pathURL(smm.getBase(), smm.getPath(res.fhirType(), res.getId())));
-//        return VersionConvertorFactory_14_50.convertResource(res);
+//        return VersionConvertorFactory_14_N.convertResource(res);
 //      } else if (VersionUtilities.isR2Ver(parseVersion)) {
 //        org.hl7.fhir.dstu2.model.Resource res;
 //        res = new org.hl7.fhir.dstu2.formats.JsonParser(true).parse(source);
 //        scanForExtensionUsage(res, Utilities.pathURL(smm.getBase(), smm.getPath(res.fhirType(), res.getId())));
 //
 //        BaseAdvisor_10_50 advisor = new IGR2ConvertorAdvisor5();
-//        return VersionConvertorFactory_10_50.convertResource(res, advisor);
+//        return VersionConvertorFactory_10_N.convertResource(res, advisor);
       } else if (VersionUtilities.isR4BVer(parseVersion)) {
         org.hl7.fhir.r4b.model.Resource res;
         res = new org.hl7.fhir.r4b.formats.JsonParser(true).parse(source);
         scanForExtensionUsage(pid, res, smm.getPath(res.fhirType(), res.getIdBase()));
         scanForDocuments(res);
-        return VersionConvertorFactory_43_50.convertResource(res);
-      } else if (VersionUtilities.isR5Plus(parseVersion)) {
-        Resource res = new JsonParser(true, true).parse(source);
+        return VersionConvertorFactory_43_N.convertResource(res);
+      } else if (VersionUtilities.isR5Ver(parseVersion)) {
+        org.hl7.fhir.model.core.Resource res = VersionConvertorFactory_50_N.convertResource(new org.hl7.fhir.r5.formats.JsonParser(true, true).parse(source));
+        scanForExtensionUsage(pid, res, smm.getPath(res.fhirType(), res.getIdBase()));
+        scanForDocuments(res);
+        return res;
+      } else if (VersionUtilities.isR6Plus(parseVersion)) {
+        Resource res = new JsonParser(ModelContext.fullCoreContext(), true, true).parse(source);
         scanForExtensionUsage(pid, res, smm.getPath(res.fhirType(), res.getIdBase()));
         scanForDocuments(res);
         return res;
@@ -1210,17 +1225,17 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
   }
 
 
-  private void scanForDocuments(org.hl7.fhir.r5.model.Resource res) throws SQLException {
-    org.hl7.fhir.r5.model.Composition cmp = null;
-    List<org.hl7.fhir.r5.model.CanonicalType> p = new ArrayList<>();
-    if (res instanceof org.hl7.fhir.r5.model.Composition) {
-      cmp = (org.hl7.fhir.r5.model.Composition) res;
+  private void scanForDocuments(org.hl7.fhir.model.core.Resource res) throws SQLException {
+    org.hl7.fhir.model.core.Composition cmp = null;
+    List<org.hl7.fhir.model.core.CanonicalType> p = new ArrayList<>();
+    if (res instanceof org.hl7.fhir.model.core.Composition) {
+      cmp = (org.hl7.fhir.model.core.Composition) res;
       p.addAll(cmp.getMeta().getProfile());
-    } else if (res instanceof org.hl7.fhir.r5.model.Bundle) {
-      org.hl7.fhir.r5.model.Bundle b = (org.hl7.fhir.r5.model.Bundle) res;
-      org.hl7.fhir.r5.model.Resource r = b.getEntryFirstRep().getResource();
-      if (r != null && r instanceof org.hl7.fhir.r5.model.Composition) {
-        cmp = (org.hl7.fhir.r5.model.Composition) r;
+    } else if (res instanceof org.hl7.fhir.model.core.Bundle) {
+      org.hl7.fhir.model.core.Bundle b = (org.hl7.fhir.model.core.Bundle) res;
+      org.hl7.fhir.model.core.Resource r = b.getEntryFirstRep().getResource();
+      if (r != null && r instanceof org.hl7.fhir.model.core.Composition) {
+        cmp = (org.hl7.fhir.model.core.Composition) r;
         p.addAll(b.getMeta().getProfile());
         p.addAll(cmp.getMeta().getProfile());
       }
@@ -1236,7 +1251,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
         sqlAddDocumentProfile.setString(2, pi.primitiveValue());
         sqlAddDocumentProfile.execute();
       }
-      for (var c : cmp.getType().getCoding()) {
+      for (var c : cmp.getType().getCodingList()) {
         sqlAddDocumentCode.setInt(1, docKey);
         sqlAddDocumentCode.setString(2, c.getSystem());
         sqlAddDocumentCode.setString(3, c.getVersion());
@@ -1270,10 +1285,10 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
     }
   }
 
-  private void scanForExtensionUsage(String pid,org.hl7.fhir.r5.model.Resource res, String path) throws SQLException {
+  private void scanForExtensionUsage(String pid,org.hl7.fhir.model.core.Resource res, String path) throws SQLException {
     if (path != null) {
       int key = getExtnUsageKey(pid, res.fhirType(), res.getId(), path, 6);
-      new org.hl7.fhir.r5.utils.ElementVisitor(new XIGExtensionUsageProcessor.ExtensionVisitorR5(key, extensionUrls, psqlExtnUrl, psqlExtnUse)).visit(null, res);
+      new org.hl7.fhir.model.utilities.ElementVisitor(new XIGExtensionUsageProcessor.ExtensionVisitorR5(key, extensionUrls, psqlExtnUrl, psqlExtnUse)).visit(null, res);
     }
   }
 
@@ -1465,12 +1480,12 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
   }
 
   @Override
-  public void finishPackage(PackageContext context) throws FHIRException, IOException, EOperationOutcome {
+  public void finishPackage(PackageContext context) throws FHIRException, IOException {
 
   }
 
   @Override
-  public void alreadyVisited(String pid) throws FHIRException, IOException, EOperationOutcome {
+  public void alreadyVisited(String pid) throws FHIRException, IOException {
     try {
       pck++;
       Statement stmt = con.createStatement();

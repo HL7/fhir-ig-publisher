@@ -27,9 +27,9 @@ import java.io.InputStream;
 import java.util.List;
 
 import org.hl7.fhir.exceptions.FHIRException;
-import org.hl7.fhir.r5.context.ILoggingService;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.model.DataType;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.model.core.DataType;
+import org.hl7.fhir.utilities.logging.ILoggingService;
 
 public interface IFetchFile {
   

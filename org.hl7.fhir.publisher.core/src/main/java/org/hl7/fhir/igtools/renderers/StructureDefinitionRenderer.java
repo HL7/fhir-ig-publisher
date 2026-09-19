@@ -22,45 +22,45 @@ import org.hl7.fhir.igtools.publisher.FetchedResource.AlternativeVersionResource
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.RelatedIG;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
-import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.CanonicalResourceComparison;
-import org.hl7.fhir.r5.comparison.VersionComparisonAnnotation;
-import org.hl7.fhir.r5.conformance.profile.BindingResolution;
-import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
-import org.hl7.fhir.r5.conformance.profile.SnapshotGenerationPreProcessor;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.elementmodel.Element;
-import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.formats.JsonParser;
-import org.hl7.fhir.r5.model.*;
-import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestComponent;
-import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceComponent;
-import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
-import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionConstraintComponent;
-import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionMappingComponent;
-import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionSlicingComponent;
-import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionSlicingDiscriminatorComponent;
-import org.hl7.fhir.r5.model.ElementDefinition.SlicingRules;
-import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
-import org.hl7.fhir.r5.model.Enumerations.BindingStrength;
-import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionContextComponent;
-import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
-import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionMappingComponent;
-import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
-import org.hl7.fhir.r5.profilemodel.PEBuilder;
-import org.hl7.fhir.r5.profilemodel.PEBuilder.PEElementPropertiesPolicy;
-import org.hl7.fhir.r5.profilemodel.PEDefinition;
-import org.hl7.fhir.r5.profilemodel.PEType;
-import org.hl7.fhir.r5.renderers.DataRenderer;
-import org.hl7.fhir.r5.renderers.Renderer.RenderingStatus;
-import org.hl7.fhir.r5.renderers.ResourceRenderer;
-import org.hl7.fhir.r5.renderers.StructureDefinitionRenderer.MapStructureMode;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext.StructureDefinitionRendererMode;
-import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
-import org.hl7.fhir.r5.utils.EOperationOutcome;
-import org.hl7.fhir.r5.utils.ElementDefinitionUtilities;
-import org.hl7.fhir.r5.utils.ElementVisitor;
+import org.hl7.fhir.model.Base;
+import org.hl7.fhir.services.comparison.CanonicalResourceComparer.CanonicalResourceComparison;
+import org.hl7.fhir.services.comparison.VersionComparisonAnnotation;
+import org.hl7.fhir.services.conformance.profile.BindingResolution;
+import org.hl7.fhir.services.conformance.profile.ProfileUtilities;
+import org.hl7.fhir.services.conformance.profile.SnapshotGenerationPreProcessor;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.services.elementmodel.Element;
+import org.hl7.fhir.model.extensions.ExtensionDefinitions;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.model.core.formats.JsonParser;
+import org.hl7.fhir.model.core.*;
+import org.hl7.fhir.model.core.CapabilityStatement.CapabilityStatementRestComponent;
+import org.hl7.fhir.model.core.CapabilityStatement.CapabilityStatementRestResourceComponent;
+import org.hl7.fhir.model.core.ElementDefinition.ElementDefinitionBindingComponent;
+import org.hl7.fhir.model.core.ElementDefinition.ElementDefinitionConstraintComponent;
+import org.hl7.fhir.model.core.ElementDefinition.ElementDefinitionMappingComponent;
+import org.hl7.fhir.model.core.ElementDefinition.ElementDefinitionSlicingComponent;
+import org.hl7.fhir.model.core.ElementDefinition.ElementDefinitionSlicingDiscriminatorComponent;
+import org.hl7.fhir.model.core.ElementDefinition.SlicingRules;
+import org.hl7.fhir.model.core.ElementDefinition.TypeRefComponent;
+import org.hl7.fhir.model.core.Enumerations.BindingStrength;
+import org.hl7.fhir.model.core.StructureDefinition.StructureDefinitionContextComponent;
+import org.hl7.fhir.model.core.StructureDefinition.StructureDefinitionKind;
+import org.hl7.fhir.model.core.StructureDefinition.StructureDefinitionMappingComponent;
+import org.hl7.fhir.model.core.StructureDefinition.TypeDerivationRule;
+import org.hl7.fhir.services.profilemodel.PEBuilder;
+import org.hl7.fhir.services.profilemodel.PEBuilder.PEElementPropertiesPolicy;
+import org.hl7.fhir.services.profilemodel.PEDefinition;
+import org.hl7.fhir.services.profilemodel.PEType;
+import org.hl7.fhir.services.renderers.DataRenderer;
+import org.hl7.fhir.services.renderers.Renderer.RenderingStatus;
+import org.hl7.fhir.services.renderers.ResourceRenderer;
+import org.hl7.fhir.services.renderers.StructureDefinitionRenderer.MapStructureMode;
+import org.hl7.fhir.services.renderers.utils.RenderingContext;
+import org.hl7.fhir.services.renderers.utils.RenderingContext.StructureDefinitionRendererMode;
+import org.hl7.fhir.services.renderers.utils.ResourceWrapper;
+import org.hl7.fhir.model.utilities.EOperationOutcome;
+import org.hl7.fhir.model.utilities.ElementVisitor;
 import org.hl7.fhir.utilities.UserDataNames;
 import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.i18n.RenderingI18nContext;
@@ -78,7 +78,7 @@ import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 
-import static org.hl7.fhir.r5.utils.ElementVisitor.ElementVisitorInstruction.VISIT_CHILDREN;
+import static org.hl7.fhir.services.elementmodel.ElementVisitor.ElementVisitorInstruction.VISIT_CHILDREN;
 
 public class StructureDefinitionRenderer extends CanonicalRenderer {
 
@@ -134,7 +134,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   private String specPath;
   private final String packageId;
 
-  private org.hl7.fhir.r5.renderers.StructureDefinitionRenderer sdr;
+  private org.hl7.fhir.services.renderers.StructureDefinitionRenderer sdr;
   private ResourceWrapper resE;
 
   public StructureDefinitionRenderer(IWorkerContext context, String packageId, String corePath, StructureDefinition sd, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, RenderingContext gen, boolean allInvariants,Map<String, Map<String, ElementDefinition>> mapCache, String specPath, String versionToAnnotate, List<RelatedIG> relatedIgs, ReferenceResolver resolver) {
@@ -146,7 +146,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     this.files = files;
     this.allInvariants = allInvariants;
     this.sdMapCache = mapCache;
-    sdr = new org.hl7.fhir.r5.renderers.StructureDefinitionRenderer(gen);
+    sdr = new org.hl7.fhir.services.renderers.StructureDefinitionRenderer(gen);
     sdr.setSdMapCache(sdMapCache);
     sdr.setHostMd(this);
     this.specPath = specPath;
@@ -175,7 +175,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       int fixeds = 0;
       int prohibits = 0;
 
-      for (ElementDefinition ed : sd.getDifferential().getElement()) {
+      for (ElementDefinition ed : sd.getDifferential().getElementList()) {
         if (ed.getPath().contains(".")) {
           if (ed.getMin() == 1) {
             if (parentChainHasOptional(ed, sd)) {
@@ -194,19 +194,19 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
             fixeds++;
           }
 
-          for (TypeRefComponent t : ed.getType()) {
-            if (t.hasProfile() && t.getProfile().get(0).getValue().length() > 40 && !igp.isDatatype(t.getProfile().get(0).getValue().substring(40))) {
+          for (TypeRefComponent t : ed.getTypeList()) {
+            if (t.hasProfile() && t.getProfileList().get(0).getValue().length() > 40 && !igp.isDatatype(t.getProfileList().get(0).getValue().substring(40))) {
               if (ed.getPath().endsWith(".extension")) {
-                tryAdd(ext, summariseExtension(t.getProfile(), false));
+                tryAdd(ext, summariseExtension(t.getProfileList(), false));
               } else if (ed.getPath().endsWith(".modifierExtension")) {
-                tryAdd(ext, summariseExtension(t.getProfile(), true));
+                tryAdd(ext, summariseExtension(t.getProfileList(), true));
               } else {
-                for (CanonicalType ct : t.getProfile()) {
+                for (CanonicalType ct : t.getProfileList()) {
                   tryAdd(refs, describeProfile(ct));
                 }
               }
             }
-            for (CanonicalType ct : t.getTargetProfile()) {
+            for (CanonicalType ct : t.getTargetProfileList()) {
               tryAdd(refs, describeProfile(ct));
             }
           }
@@ -294,7 +294,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     } else {
       List<ElementDefinition> subs = new ArrayList<>();
       ElementDefinition slice = null;
-      for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+      for (ElementDefinition ed : sd.getSnapshot().getElementList()) {
         if (ed.getPath().endsWith(".extension") && ed.hasSliceName()) {
           slice = ed;
         } else if (ed.getPath().endsWith(".extension.value[x]")) {
@@ -330,7 +330,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       if (match.getMin() == 0) {
         return true;
       }
-      match = getElementParent(profile.getSnapshot().getElement(), match);
+      match = getElementParent(profile.getSnapshot().getElementList(), match);
       if (match == null) {
         return true;
       }
@@ -361,9 +361,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (!Utilities.noString(s))
       s = " (" + s + ")";
     CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder();
-    for (ElementDefinitionSlicingDiscriminatorComponent d : slicing.getDiscriminator())
+    for (ElementDefinitionSlicingDiscriminatorComponent d : slicing.getDiscriminatorList())
       b.append(d.getType().toCode() + ":" + d.getPath());
-    return "<li>" + gen.formatMessagePlural(slicing.getDiscriminator().size(), RenderingI18nContext.SD_SUMMARY_SLICE, path, b.toString()) + s + "</li>\r\n";
+    return "<li>" + gen.formatMessagePlural(slicing.getDiscriminatorList().size(), RenderingI18nContext.SD_SUMMARY_SLICE, path, b.toString()) + s + "</li>\r\n";
   }
 
   private void tryAdd(List<String> ext, String s) {
@@ -396,8 +396,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
   private String summariseValue(DataType fixed) throws FHIRException {
-    if (fixed instanceof org.hl7.fhir.r5.model.PrimitiveType)
-      return Utilities.escapeXml(((org.hl7.fhir.r5.model.PrimitiveType) fixed).asStringValue());
+    if (fixed instanceof org.hl7.fhir.model.core.PrimitiveType)
+      return Utilities.escapeXml(((org.hl7.fhir.model.core.PrimitiveType) fixed).asStringValue());
     if (fixed instanceof CodeableConcept)
       return summarise((CodeableConcept) fixed);
     if (fixed instanceof Coding)
@@ -424,13 +424,13 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
   private String summarise(CodeableConcept cc) throws FHIRException {
-    if (cc.getCoding().size() == 1 && cc.getText() == null) {
-      return summarise(cc.getCoding().get(0));
+    if (cc.getCodingList().size() == 1 && cc.getText() == null) {
+      return summarise(cc.getCodingList().get(0));
     } else if (cc.hasText()) {
       return "\"" + cc.getText() + "\"";
-    } else if (cc.getCoding().size() > 0) {
+    } else if (cc.getCodingList().size() > 0) {
       CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder();
-      for (Coding c : cc.getCoding()) {
+      for (Coding c : cc.getCodingList()) {
         b.append(summarise(c));
       }
       return b.toString();
@@ -446,7 +446,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       return "" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_LOINC)) + " " + coding.getCode() + (!coding.hasDisplay() ? "" : "(\"" + gen.getTranslated(coding.getDisplayElement()) + "\")");
     if ("http://unitsofmeasure.org/".equals(coding.getSystem()))
       return " (" + (gen.formatPhrase(RenderingI18nContext.GENERAL_UCUM)) + ": " + coding.getCode() + ")";
-    CodeSystem cs = context.fetchCodeSystem(coding.getSystem(), IWorkerContext.VersionResolutionRules.defaultRule());
+    CodeSystem cs = context.fetchCodeSystem(coding.getSystem(), VersionResolutionRules.defaultRule());
     if (cs == null)
       return "<span title=\"" + coding.getSystem() + "\">" + coding.getCode() + "</a>" + (!coding.hasDisplay() ? "" : "(\"" + gen.getTranslated(coding.getDisplayElement()) + "\")");
     else
@@ -455,7 +455,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   
   public String contexts() throws IOException {
     XhtmlNode ul = new XhtmlNode(NodeType.Element, "ul");
-    for (StructureDefinitionContextComponent ctxt : sd.getContext()) {
+    for (StructureDefinitionContextComponent ctxt : sd.getContextList()) {
       var li = ul.li();
       li.tx(ctxt.getType().toCode());
       li.tx(" ");
@@ -487,11 +487,11 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
   public String diff(String defnFile, Set<String> outputTracker, boolean toTabs, StructureDefinitionRendererMode mode, boolean all) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
-    if (sd.getDifferential().getElement().isEmpty())
+    if (sd.getDifferential().getElementList().isEmpty())
       return "";
     else {
       sdr.getContext().setStructureMode(mode);
-      return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateTable(new RenderingStatus(), defnFile, sd, true, destDir, false, sd.getId(), false, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, false, gen.withUniqueLocalPrefix(all ? mc(mode)+"a" : mc(mode)), toTabs ? ANCHOR_PREFIX_DIFF : ANCHOR_PREFIX_SNAP, resE, all ? "DA" : "D"));
+      return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateTable(new RenderingStatus(), defnFile, sd, true, destDir, false, sd.getId(), false, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, false, gen.withUniqueLocalPrefix(all ? mc(mode)+"a" : mc(mode)), toTabs ? ANCHOR_PREFIX_DIFF : ANCHOR_PREFIX_SNAP, resE, mc(mode)+(all ? "DA" : "D")));
     }
   }
 
@@ -510,12 +510,12 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
   public String snapshot(String defnFile, Set<String> outputTracker, boolean toTabs, StructureDefinitionRendererMode mode, boolean all) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
-    if (sd.getSnapshot().getElement().isEmpty())
+    if (sd.getSnapshot().getElementList().isEmpty())
       return "";
     else {
       sdr.getContext().setStructureMode(mode);
       try {
-        return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, true, outputTracker, false, gen.withUniqueLocalPrefix(all ? mc(mode) + "sa" : mc(mode) + "s"), toTabs ? ANCHOR_PREFIX_SNAP : ANCHOR_PREFIX_SNAP, resE, all ? "SA" : "S"));
+        return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, true, outputTracker, false, gen.withUniqueLocalPrefix(all ? mc(mode) + "sa" : mc(mode) + "s"), toTabs ? ANCHOR_PREFIX_SNAP : ANCHOR_PREFIX_SNAP, resE, mc(mode)+(all ? "SA" : "S")));
       } catch (Exception e) {
         return "<span style=\"color:red\">"+e.getMessage()+"</span>";
       }
@@ -523,11 +523,11 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
   public String obligations(String defnFile, Set<String> outputTracker, boolean toTabs, StructureDefinitionRendererMode mode, boolean all) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
-    if (sd.getSnapshot().getElement().isEmpty())
+    if (sd.getSnapshot().getElementList().isEmpty())
       return "";
     else {
       sdr.getContext().setStructureMode(mode);
-      return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, false, gen.withUniqueLocalPrefix(all ? mc(mode)+"oa" : mc(mode)+"o"), toTabs ? ANCHOR_PREFIX_SNAP : ANCHOR_PREFIX_SNAP, resE, all ? "OA" : "O"));
+      return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, false, gen.withUniqueLocalPrefix(all ? mc(mode)+"oa" : mc(mode)+"o"), toTabs ? ANCHOR_PREFIX_SNAP : ANCHOR_PREFIX_SNAP, resE, mc(mode)+(all ? "OA" : "O")));
     }
   }
 
@@ -573,7 +573,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
    * @param index the index of the actor in {@link #getObligationActors()}, used to keep table ids and anchors unique
    */
   public String obligationsForActor(String defnFile, Set<String> outputTracker, boolean toTabs, StructureDefinitionRendererMode mode, boolean all, ActorDefinition actor, int index) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
-    if (sd.getSnapshot().getElement().isEmpty())
+    if (sd.getSnapshot().getElementList().isEmpty())
       return "";
     else {
       // clone the rendering context and cut the actor white list down to just this one actor, so that the
@@ -584,7 +584,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       ctxt.setStructureMode(mode);
       // some of the obligation rendering happens against the renderer's own context, and some against the context
       // passed to generateTable, so the renderer has to be bound to the cloned context as well
-      org.hl7.fhir.r5.renderers.StructureDefinitionRenderer asdr = new org.hl7.fhir.r5.renderers.StructureDefinitionRenderer(ctxt);
+      org.hl7.fhir.services.renderers.StructureDefinitionRenderer asdr = new org.hl7.fhir.services.renderers.StructureDefinitionRenderer(ctxt);
       asdr.setSdMapCache(sdMapCache);
       asdr.setHostMd(this);
       return new XhtmlComposer(XhtmlComposer.HTML).compose(asdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, false, ctxt, toTabs ? ANCHOR_PREFIX_SNAP : ANCHOR_PREFIX_SNAP, resE, (all ? "OA" : "O")+index));
@@ -592,30 +592,30 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
   public String byKey(String defnFile, Set<String> outputTracker, boolean toTabs, StructureDefinitionRendererMode mode, boolean all) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
-    if (sd.getSnapshot().getElement().isEmpty())
+    if (sd.getSnapshot().getElementList().isEmpty())
       return "";
     else {
       XhtmlComposer composer = new XhtmlComposer(XhtmlComposer.HTML);
-      StructureDefinition sdCopy = sd.copy();
+      StructureDefinition sdCopy = sd.copy(Base.COPY_DATA);
       
-      sdCopy.getSnapshot().setElement(getKeyElements());
+      sdCopy.getSnapshot().setElementList(getKeyElements());
       sdr.getContext().setStructureMode(mode);
-      org.hl7.fhir.utilities.xhtml.XhtmlNode table = sdr.generateTable(new RenderingStatus(), defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, true, outputTracker, false, gen.withUniqueLocalPrefix(all ? mc(mode)+"ka" :mc(mode)+"k"), toTabs ? ANCHOR_PREFIX_KEY : ANCHOR_PREFIX_SNAP, resE, all ? "KA" : "K");
+      org.hl7.fhir.utilities.xhtml.XhtmlNode table = sdr.generateTable(new RenderingStatus(), defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, true, outputTracker, false, gen.withUniqueLocalPrefix(all ? mc(mode)+"ka" :mc(mode)+"k"), toTabs ? ANCHOR_PREFIX_KEY : ANCHOR_PREFIX_SNAP, resE, mc(mode)+(all ? "KA" : "K"));
 
       return composer.compose(table);
     }
   }
 
   public String byMustSupport(String defnFile, Set<String> outputTracker, boolean toTabs, StructureDefinitionRendererMode mode, boolean all) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
-    if (sd.getSnapshot().getElement().isEmpty())
+    if (sd.getSnapshot().getElementList().isEmpty())
       return "";
     else {
       XhtmlComposer composer = new XhtmlComposer(XhtmlComposer.HTML);
-      StructureDefinition sdCopy = sd.copy();
+      StructureDefinition sdCopy = sd.copy(Base.COPY_DATA);
       sdr.getContext().setStructureMode(mode);
 
-      sdCopy.getSnapshot().setElement(getMustSupportElements());
-      org.hl7.fhir.utilities.xhtml.XhtmlNode table = sdr.generateTable(new RenderingStatus(), defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, true, gen.withUniqueLocalPrefix(all ? mc(mode)+"ma" :mc(mode)+"m"), toTabs ? ANCHOR_PREFIX_MS : ANCHOR_PREFIX_SNAP, resE, all ? "MA" : "M");
+      sdCopy.getSnapshot().setElementList(getMustSupportElements());
+      org.hl7.fhir.utilities.xhtml.XhtmlNode table = sdr.generateTable(new RenderingStatus(), defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, true, gen.withUniqueLocalPrefix(all ? mc(mode)+"ma" :mc(mode)+"m"), toTabs ? ANCHOR_PREFIX_MS : ANCHOR_PREFIX_SNAP, resE, mc(mode)+(all ? "MA" : "M"));
 
       return composer.compose(table);
     }
@@ -628,18 +628,18 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       // Scan through all the properties checking for must support elements
       // and clear properties in the cloned StructureDefinition that we don't want to
       // show in the custom view
-      for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+      for (ElementDefinition ed : sd.getSnapshot().getElementList()) {
         if (mustSupport.containsKey(ed.getId())) {
-          ElementDefinition edCopy = ed.copy();
+          ElementDefinition edCopy = ed.copy(Base.COPY_DATA);
           edCopy.copyUserData(ed);
           if (edCopy.hasExample())
-            edCopy.getExample().clear();
+            edCopy.getExampleList().clear();
           if (!edCopy.getMustSupport()) {
             if (edCopy.getPath().contains(".")) {
               edCopy.setUserData(UserDataNames.render_opaque, true);
             }
             edCopy.setBinding(null);
-            edCopy.getConstraint().clear();
+            edCopy.getConstraintList().clear();
           }
           edCopy.setMustSupport(false);
           mustSupportElements.add(edCopy);
@@ -650,14 +650,14 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
   public String byKeyElements(String defnFile, Set<String> outputTracker) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
-    if (sd.getSnapshot().getElement().isEmpty())
+    if (sd.getSnapshot().getElementList().isEmpty())
       return "";
     else {
       XhtmlComposer composer = new XhtmlComposer(XhtmlComposer.HTML);
-      StructureDefinition sdCopy = sd.copy();
+      StructureDefinition sdCopy = sd.copy(Base.COPY_DATA);
       List<ElementDefinition> keyElements = getKeyElements();
 
-      sdCopy.getSnapshot().setElement(keyElements);      
+      sdCopy.getSnapshot().setElementList(keyElements);
       org.hl7.fhir.utilities.xhtml.XhtmlNode table = sdr.generateTable(new RenderingStatus(), defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, true, outputTracker, true, gen, ANCHOR_PREFIX_KEY, resE, "KK");
 
       return composer.compose(table);
@@ -667,7 +667,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   protected Map<String, ElementDefinition> getMustSupport() {
     if (mustSupportHash==null) {
       mustSupportHash = new HashMap<String, ElementDefinition>();
-      scanForMustSupport(mustSupportHash, sd.getSnapshot().getElement(), sd.getSnapshot().getElementFirstRep(), new ArrayList<>());
+      scanForMustSupport(mustSupportHash, sd.getSnapshot().getElementList(), sd.getSnapshot().getElementFirstRep(), new ArrayList<>());
     }
     return mustSupportHash;
   }
@@ -677,7 +677,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   protected Map<String, ElementDefinition> getDifferential() {
     if (differentialHash==null) {
       differentialHash = new HashMap<String, ElementDefinition>();
-      for (ElementDefinition e : sd.getDifferential().getElement()) {
+      for (ElementDefinition e : sd.getDifferential().getElementList()) {
         differentialHash.put(e.getId(), e);
         if (e.getId().contains(".")) {
           String id = e.getId();
@@ -697,11 +697,11 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   protected List<ElementDefinition> getDifferentialElements() {
     if (diffElements == null) {
       diffElements = new ArrayList<ElementDefinition>();
-      for (ElementDefinition e : sd.getSnapshot().getElement()) {
+      for (ElementDefinition e : sd.getSnapshot().getElementList()) {
         if (getDifferential().containsKey(e.getId())) {
           ElementDefinition ediff = getDifferential().get(e.getId());
           if (ediff == null)
-            ediff = e.copy();
+            ediff = e.copy(Base.COPY_DATA);
           diffElements.add(ediff);
         }
       }
@@ -732,10 +732,10 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       Map<String, ElementDefinition> mustSupport = getMustSupport();
       Set<ElementDefinition> keyElementsSet = new HashSet<ElementDefinition>();
       if (keyEligible)
-        scanForKeyElements(keyElementsSet, mustSupport, sd.getSnapshot().getElement(), sd.getSnapshot().getElementFirstRep(), null);
-      for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+        scanForKeyElements(keyElementsSet, mustSupport, sd.getSnapshot().getElementList(), sd.getSnapshot().getElementFirstRep(), null);
+      for (ElementDefinition ed : sd.getSnapshot().getElementList()) {
         if (!keyEligible || keyElementsSet.contains(ed)) {
-          ElementDefinition edCopy = ed.copy();
+          ElementDefinition edCopy = ed.copy(Base.COPY_DATA);
           edCopy.copyUserData(ed);
           keyElements.add(edCopy);
         }
@@ -768,9 +768,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       boolean bindingChanged = false;
       String basePath = child.getBase().getPath();
       StructureDefinition baseType = context.fetchResource(StructureDefinition.class,
-              "http://hl7.org/fhir/StructureDefinition/" + basePath.substring(0, basePath.indexOf(".")), IWorkerContext.VersionResolutionRules.defaultRule());
+              "http://hl7.org/fhir/StructureDefinition/" + basePath.substring(0, basePath.indexOf(".")), VersionResolutionRules.defaultRule());
       ElementDefinition baseElement = null;
-      for (ElementDefinition e: baseType.getSnapshot().getElement()) {
+      for (ElementDefinition e: baseType.getSnapshot().getElementList()) {
         if (e.getPath().equals(basePath)) {
           baseElement = e;
           break;
@@ -791,15 +791,15 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
             else if (!baseBinding.hasValueSet() || !baseBinding.getValueSet().equals(binding.getValueSet()))
               bindingChanged = true;
           }
-          String additionalBindings = getAdditional(binding.getAdditional());
-          String baseAdditionalBindings = getAdditional(binding.getAdditional());
+          String additionalBindings = getAdditional(binding.getAdditionalList());
+          String baseAdditionalBindings = getAdditional(binding.getAdditionalList());
           if (!additionalBindings.equals(baseAdditionalBindings))
             bindingChanged = true;
         }
       }
       if (child.hasBinding()) {
         if (baseType.hasSnapshot()) {
-          for (ElementDefinition e : baseType.getSnapshot().getElement()) {
+          for (ElementDefinition e : baseType.getSnapshot().getElementList()) {
             if (e.getPath().equals(basePath)) {
               baseElement = e;
               break;
@@ -809,7 +809,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       }
       boolean oldMS = mustSupport.containsKey(child.getId()) ||
               child.getMin()!=0 ||
-              (child.hasCondition() && child.getCondition().size()>1) ||
+              (child.hasCondition() && child.getConditionList().size()>1) ||
               child.getIsModifier() ||
               (child.hasSlicing() && !child.getPath().endsWith(".extension") && !child.getPath().endsWith(".modifierExtension")) ||
               child.hasSliceName() ||
@@ -851,7 +851,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
   public String grid(String defnFile, Set<String> outputTracker) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
-    if (sd.getSnapshot().getElement().isEmpty())
+    if (sd.getSnapshot().getElementList().isEmpty())
       return "";
     else
       return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateGrid(defnFile, sd, destDir, false, sd.getId(), corePath, "", outputTracker, false));
@@ -862,7 +862,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     boolean hasFixed = false;
     boolean hasDesc = false; // this is currently unused - have to figure out whether we want to try and show descriptions or not
     Map<String, ElementDefinition> txmap = new HashMap<String, ElementDefinition>();
-    for (ElementDefinition ed : sd.getDifferential().getElement()) {
+    for (ElementDefinition ed : sd.getDifferential().getElementList()) {
       if (ed.hasBinding() && !"0".equals(ed.getMax()) && (!mustSupportOnly || ed.getMustSupport())) {
         String id = ed.getId();
         if (ed.hasFixed()) {
@@ -877,8 +877,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           if (t != null)
             ed.getBinding().setUserData(UserDataNames.render_tx_value, t);
         }
-        if (ed.getType().size() == 1 && ed.getType().get(0).getWorkingCode().equals("Extension"))
-          id = id + "<br/>" + ed.getType().get(0).getProfile();
+        if (ed.getTypeList().size() == 1 && ed.getTypeList().get(0).getWorkingCode().equals("Extension"))
+          id = id + "<br/>" + ed.getTypeList().get(0).getProfileList();
         hasDesc = hasDesc || ed.getBinding().hasDescription();
         txlist.add(id);
         txmap.put(id, ed);
@@ -915,7 +915,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     boolean hasFixed = false;
     boolean hasDesc = false; // this is currently unused - have to figure out whether we want to try and show descriptions or not
     Map<String, ElementDefinition> txmap = new HashMap<String, ElementDefinition>();
-    for (ElementDefinition ed : keyOnly? getKeyElements() : sd.getSnapshot().getElement()) {
+    for (ElementDefinition ed : keyOnly? getKeyElements() : sd.getSnapshot().getElementList()) {
       if (ed.hasBinding() && !"0".equals(ed.getMax()) && (!mustSupportOnly || ed.getMustSupport())) {
         String id = ed.getId();
         if (ed.hasFixed()) {
@@ -930,8 +930,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           if (t != null)
             ed.getBinding().setUserData(UserDataNames.render_tx_value, t);
         }
-        if (ed.getType().size() == 1 && ed.getType().get(0).getWorkingCode().equals("Extension"))
-          id = id + "<br/>" + ed.getType().get(0).getProfile();
+        if (ed.getTypeList().size() == 1 && ed.getTypeList().get(0).getWorkingCode().equals("Extension"))
+          id = id + "<br/>" + ed.getTypeList().get(0).getProfileList();
         txlist.add(id);
         txmap.put(id, ed);
         hasDesc = hasDesc || ed.getBinding().hasDescription();
@@ -954,7 +954,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
   private DataType findFixedValue(ElementDefinition ed, boolean diff) {
-    if (ElementDefinitionUtilities.hasType(ed, "Coding")) {
+    if (ed.hasElementType("Coding")) {
       List<ElementDefinition> children = utils.getChildList(sd, ed, diff);
       String sys = null;
       String code = null;
@@ -997,7 +997,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
     boolean inherited = ed.hasUserData(UserDataNames.SNAPSHOT_DERIVATION_POINTER);
     String uri = null;
-    IWorkerContext.VersionResolutionRules resolutionMethod = null;
+    VersionResolutionRules resolutionMethod = null;
     if (tx.getValueSet() != null) {
       uri = tx.getValueSet().trim();
       resolutionMethod = ExtensionUtilities.getVersionResolutionRules(tx.getValueSetElement());
@@ -1141,7 +1141,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
   }
 
-  private void showVersion(XhtmlNode td, String uri, IWorkerContext.VersionResolutionRules resolutionMethod, ValueSet vs) {
+  private void showVersion(XhtmlNode td, String uri, VersionResolutionRules resolutionMethod, ValueSet vs) {
     String statedVersion = uri != null && uri.contains("|") ? uri.substring(uri.indexOf("|")+1) : null;
     String actualVersion = vs == null ? null : vs.getVersion();
     boolean fromPackages = vs == null ? false : vs.hasSourcePackage();
@@ -1280,7 +1280,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     case GEN_MODE_MS:
       return getMustSupportElements();
     default:
-      return sd.getSnapshot().getElement();
+      return sd.getSnapshot().getElementList();
     }
   }
 
@@ -1289,7 +1289,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     List<ElementDefinition> list = elementsForMode(genMode);
     for (ElementDefinition ed : list) {
       if (!"0".equals(ed.getMax()) && ed.hasConstraint()) {
-        for (ElementDefinitionConstraintComponent c : ed.getConstraint()) {
+        for (ElementDefinitionConstraintComponent c : ed.getConstraintList()) {
           ConstraintInfo ci = constraintMap.get(c.getKey());
           if (ci == null) {
             ci = new ConstraintInfo(c, ed.getId());
@@ -1416,38 +1416,38 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       }
     }
     XhtmlNode intTable = sdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, 
-        outputTracker, false, gen.withUniqueLocalPrefix(ANCHOR_PREFIX_MAP_I), ANCHOR_PREFIX_MAP_I, resE, "M");
+        outputTracker, false, gen.withUniqueLocalPrefix(ANCHOR_PREFIX_MAP_I), ANCHOR_PREFIX_MAP_I, resE, "M"+ANCHOR_PREFIX_MAP_I);
 
     sdr.setMappingsMode(MapStructureMode.NOT_IN_LIST);
 
     XhtmlNode extTable = sdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, 
-        outputTracker, false, gen.withUniqueLocalPrefix(ANCHOR_PREFIX_MAP_E), ANCHOR_PREFIX_MAP_E, resE, "M");
+        outputTracker, false, gen.withUniqueLocalPrefix(ANCHOR_PREFIX_MAP_E), ANCHOR_PREFIX_MAP_E, resE, "M"+ANCHOR_PREFIX_MAP_E);
 
     sdr.setMappingsMode(MapStructureMode.OTHER);
 
     XhtmlNode otherTable = sdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, 
-        outputTracker, false, gen.withUniqueLocalPrefix(ANCHOR_PREFIX_MAP_O), ANCHOR_PREFIX_MAP_O, resE, "M");
+        outputTracker, false, gen.withUniqueLocalPrefix(ANCHOR_PREFIX_MAP_O), ANCHOR_PREFIX_MAP_O, resE, "M"+ANCHOR_PREFIX_MAP_O);
 
     if (intTable == null && extTable == null && otherTable == null) {
       return "<p>"+sdr.getContext().formatPhrase(RenderingI18nContext.STRUC_DEF_NO_MAPPINGS)+"</p>";
     } else {
       StringBuilder b = new StringBuilder();
       
-      b.append("<h4>Mappings to Structures in this Implementation Guide</h4>\r\n");
+      b.append("<h3>Mappings to Structures in this Implementation Guide</h3>\r\n");
       if (intTable == null) {
         b.append("<p>No Mappings Found</p>\r\n");                
       } else {
         b.append(new XhtmlComposer(false, false).compose(intTable));        
       }
       
-      b.append("<h4>Mappings to other Structures</h4>\r\n");
+      b.append("<h3>Mappings to other Structures</h3>\r\n");
       if (extTable == null) {
         b.append("<p>No Mappings Found</p>\r\n");                
       } else {
         b.append(new XhtmlComposer(false, false).compose(extTable));        
       }
 
-      b.append("<h4>Other Mappings</h4>\r\n");
+      b.append("<h3>Other Mappings</h3>\r\n");
       if (otherTable == null) {
         b.append("<p>No Mappings Found</p>\r\n");                
       } else {
@@ -1489,9 +1489,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     List<ElementDefinitionMappingComponent> ml = getMap(e, map.getIdentity());
     if (!ml.isEmpty())
       return true;
-    int i = sd.getSnapshot().getElement().indexOf(e) + 1;
-    while (i < sd.getSnapshot().getElement().size()) {
-      ElementDefinition t = sd.getSnapshot().getElement().get(i);
+    int i = sd.getSnapshot().getElementList().indexOf(e) + 1;
+    while (i < sd.getSnapshot().getElementList().size()) {
+      ElementDefinition t = sd.getSnapshot().getElementList().get(i);
       if (t.getPath().startsWith(e.getPath() + ".")) {
         ml = getMap(t, map.getIdentity());
         if (!ml.isEmpty())
@@ -1575,7 +1575,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   private List<ElementDefinitionMappingComponent> getMap(ElementDefinition e, String id) {
     List<ElementDefinitionMappingComponent> res = new ArrayList<>();
-    for (ElementDefinitionMappingComponent m : e.getMapping()) {
+    for (ElementDefinitionMappingComponent m : e.getMappingList()) {
       if (m.getIdentity().equals(id))
         res.add(m);
     }
@@ -1647,8 +1647,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     for (CanonicalResource cr : crl) {
       StructureDefinition t = (StructureDefinition) cr;
       boolean uses = false;
-      for (ElementDefinition ed : t.getDifferential().getElement()) {
-        for (TypeRefComponent u : ed.getType()) {
+      for (ElementDefinition ed : t.getDifferential().getElementList()) {
+        for (TypeRefComponent u : ed.getTypeList()) {
           if (u.hasProfile(sd.getUrl())) {
             uses = true;
           }
@@ -1804,16 +1804,16 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
   public String pseudoJson() throws Exception {
-    if (sd.getSnapshot() == null || sd.getSnapshot().getElement() == null || sd.getSnapshot().getElement().size() == 0) {
+    if (sd.getSnapshot() == null || sd.getSnapshot().getElementList() == null || sd.getSnapshot().getElementList().size() == 0) {
       return "";
     }
     StringBuilder b = new StringBuilder();
-    String rn = sd.getSnapshot().getElement().get(0).getPath();
+    String rn = sd.getSnapshot().getElementList().get(0).getPath();
     b.append(" // <span style=\"color: navy; opacity: 0.8\">" + Utilities.escapeXml(sd.getTitle()) + "</span>\r\n {\r\n");
     if (sd.getKind() == StructureDefinitionKind.RESOURCE)
       b.append("   \"resourceType\" : \"" + sd.getType() + "\",\r\n");
 
-    List<ElementDefinition> children = getChildren(sd.getSnapshot().getElement(), sd.getSnapshot().getElement().get(0));
+    List<ElementDefinition> children = getChildren(sd.getSnapshot().getElementList(), sd.getSnapshot().getElementList().get(0));
     boolean complex = isComplex(children);
     if (!complex && !hasExtensionChild(children))
       b.append(gen.formatPhrase(RenderingI18nContext.SDR_FROM_ELEM, corePath + "extensibility.html")+"\r\n"); 
@@ -1824,19 +1824,19 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     for (ElementDefinition child : children)
       if (isExtension(child)) {
         if (!extDone)
-          generateCoreElemExtension(b, sd.getSnapshot().getElement(), child, children, 2, rn, false, child.getType().get(0), ++c == l, complex);
+          generateCoreElemExtension(b, sd.getSnapshot().getElementList(), child, children, 2, rn, false, child.getTypeList().get(0), ++c == l, complex);
         extDone = true;
       } else if (child.hasSlicing())
-        generateCoreElemSliced(b, sd.getSnapshot().getElement(), child, children, 2, rn, false, child.getType().isEmpty() ? null : child.getType().get(0), ++c == l, complex);
+        generateCoreElemSliced(b, sd.getSnapshot().getElementList(), child, children, 2, rn, false, child.getTypeList().isEmpty() ? null : child.getTypeList().get(0), ++c == l, complex);
       else if (wasSliced(child, children))
         ; // nothing
-      else if (child.getType().size() == 1 || allTypesAreReference(child))
-        generateCoreElem(b, sd.getSnapshot().getElement(), child, 2, rn, false, child.getType().get(0), ++c == l, complex);
+      else if (child.getTypeList().size() == 1 || allTypesAreReference(child))
+        generateCoreElem(b, sd.getSnapshot().getElementList(), child, 2, rn, false, child.getTypeList().get(0), ++c == l, complex);
       else {
         if (!"0".equals(child.getMax())) {
-          b.append("<span style=\"color: Gray\">// " + tail(child.getPath()) + ": <span style=\"color: navy; opacity: 0.8\">" + Utilities.escapeXml(child.getShort()) + "</span>. "+gen.formatPhrase(RenderingI18nContext.SDR_ONE_OF, child.getType().size()) + ":</span>\r\n"); 
-          for (TypeRefComponent t : child.getType())
-            generateCoreElem(b, sd.getSnapshot().getElement(), child, 2, rn, false, t, ++c == l, false);
+          b.append("<span style=\"color: Gray\">// " + tail(child.getPath()) + ": <span style=\"color: navy; opacity: 0.8\">" + Utilities.escapeXml(child.getShort()) + "</span>. "+gen.formatPhrase(RenderingI18nContext.SDR_ONE_OF, child.getTypeList().size()) + ":</span>\r\n"); 
+          for (TypeRefComponent t : child.getTypeList())
+            generateCoreElem(b, sd.getSnapshot().getElementList(), child, 2, rn, false, t, ++c == l, false);
         }
       }
     b.append("  }\r\n");
@@ -1844,11 +1844,11 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
   private boolean allTypesAreReference(ElementDefinition child) {
-    for (TypeRefComponent tr : child.getType()) {
+    for (TypeRefComponent tr : child.getTypeList()) {
       if (!"Reference".equals(tr.getWorkingCode()))
         return false;
     }
-    return !child.getType().isEmpty();
+    return !child.getTypeList().isEmpty();
   }
 
   private boolean isExtension(ElementDefinition child) {
@@ -1957,16 +1957,16 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       b.append("{");
       b.append("<span style=\"color: darkgreen\"><a href=\"" + Utilities.escapeXml(suffix(getSrcFile(type.getWorkingCode()), type.getWorkingCode())) + "\">" + type.getWorkingCode() + "</a></span>");
       if (type.hasProfile()) {
-        StructureDefinition tsd = context.fetchResource(StructureDefinition.class, type.getProfile().get(0).getValue(),
-                ExtensionUtilities.getVersionResolutionRules(type.getProfile().get(0)));
+        StructureDefinition tsd = context.fetchResource(StructureDefinition.class, type.getProfileList().get(0).getValue(),
+                ExtensionUtilities.getVersionResolutionRules(type.getProfileList().get(0)));
         if (tsd != null)
           b.append(" (as <span style=\"color: darkgreen\"><a href=\"" + Utilities.escapeXml(tsd.getWebPath()) + "#" + tsd.getType() + "\">" + tsd.getName() + "</a></span>)");
         else
-          b.append(" (as <span style=\"color: darkgreen\">" + type.getProfile() + "</span>)");
+          b.append(" (as <span style=\"color: darkgreen\">" + type.getProfileList() + "</span>)");
       }
       if (type.hasTargetProfile()) {
-        if (type.getTargetProfile().get(0).getValue().startsWith("http://hl7.org/fhir/StructureDefinition/")) {
-          String t = type.getTargetProfile().get(0).getValue().substring(40);
+        if (type.getTargetProfileList().get(0).getValue().startsWith("http://hl7.org/fhir/StructureDefinition/")) {
+          String t = type.getTargetProfileList().get(0).getValue().substring(40);
           if (hasType(t))
             b.append("(<span style=\"color: darkgreen\"><a href=\"" + Utilities.escapeXml(suffix(getSrcFile(t), t)) + "\">" + t + "</a></span>)");
           else if (hasResource(t))
@@ -1974,7 +1974,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           else
             b.append("(" + t + ")");
         } else
-          b.append("(" + type.getTargetProfile() + ")");
+          b.append("(" + type.getTargetProfileList() + ")");
       }
       b.append("}");
     }
@@ -2016,19 +2016,19 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       for (ElementDefinition child : children) {
         if (isExtension(child)) {
           if (!extDone) {
-            generateCoreElemExtension(b, sd.getSnapshot().getElement(), child, children, indent + 1, pathName + "." + name, false, child.getType().get(0), ++c == l, complex);
+            generateCoreElemExtension(b, sd.getSnapshot().getElementList(), child, children, indent + 1, pathName + "." + name, false, child.getTypeList().get(0), ++c == l, complex);
           }
           extDone = true;
         } else if (child.hasSlicing()) {
-          generateCoreElemSliced(b, sd.getSnapshot().getElement(), child, children, indent + 1, pathName + "." + name, false, child.hasType() ? child.getType().get(0) : null, ++c == l, complex);
+          generateCoreElemSliced(b, sd.getSnapshot().getElementList(), child, children, indent + 1, pathName + "." + name, false, child.hasType() ? child.getTypeList().get(0) : null, ++c == l, complex);
         } else if (wasSliced(child, children)) {
           ; // nothing
-        } else if (child.getType().size() == 1 || allTypesAreReference(child)) {
-          generateCoreElem(b, elements, child, indent + 1, pathName + "." + name, false, child.getType().get(0), ++c == l, false);
+        } else if (child.getTypeList().size() == 1 || allTypesAreReference(child)) {
+          generateCoreElem(b, elements, child, indent + 1, pathName + "." + name, false, child.getTypeList().get(0), ++c == l, false);
         } else {
           if (!"0".equals(child.getMax())) {
-            b.append("<span style=\"color: Gray\">// value[x]: <span style=\"color: navy; opacity: 0.8\">" + Utilities.escapeXml(child.getShort()) + "</span>. One of these " + Integer.toString(child.getType().size()) + ":</span>\r\n");
-            for (TypeRefComponent t : child.getType()) {
+            b.append("<span style=\"color: Gray\">// value[x]: <span style=\"color: navy; opacity: 0.8\">" + Utilities.escapeXml(child.getShort()) + "</span>. One of these " + Integer.toString(child.getTypeList().size()) + ":</span>\r\n");
+            for (TypeRefComponent t : child.getTypeList()) {
               generateCoreElem(b, elements, child, indent + 1, pathName + "." + name, false, t, ++c == l, false);
             }
           }
@@ -2107,14 +2107,14 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       int l = lastChild(extchildren);
       for (ElementDefinition child : extchildren)
         if (child.hasSlicing())
-          generateCoreElemSliced(b, elements, child, children, indent + 2, pathName + "." + en, false, child.getType().isEmpty() ? null : child.getType().get(0), ++cc == l, extcomplex);
+          generateCoreElemSliced(b, elements, child, children, indent + 2, pathName + "." + en, false, child.getTypeList().isEmpty() ? null : child.getTypeList().get(0), ++cc == l, extcomplex);
         else if (wasSliced(child, children))
           ; // nothing
-        else if (child.getType().size() == 1)
-          generateCoreElem(b, elements, child, indent + 2, pathName + "." + en, false, child.getType().get(0), ++cc == l, extcomplex);
+        else if (child.getTypeList().size() == 1)
+          generateCoreElem(b, elements, child, indent + 2, pathName + "." + en, false, child.getTypeList().get(0), ++cc == l, extcomplex);
         else {
-          b.append("<span style=\"color: Gray\">// value[x]: <span style=\"color: navy; opacity: 0.8\">" + Utilities.escapeXml(child.getShort()) + "</span>. "+gen.formatPhrase(RenderingI18nContext.SDR_ONE_OF, child.getType().size()) + ":</span>\r\n"); 
-          for (TypeRefComponent t : child.getType())
+          b.append("<span style=\"color: Gray\">// value[x]: <span style=\"color: navy; opacity: 0.8\">" + Utilities.escapeXml(child.getShort()) + "</span>. "+gen.formatPhrase(RenderingI18nContext.SDR_ONE_OF, child.getTypeList().size()) + ":</span>\r\n"); 
+          for (TypeRefComponent t : child.getTypeList())
             generateCoreElem(b, elements, child, indent + 2, pathName + "." + en, false, t, ++cc == l, false);
         }
       c++;
@@ -2159,7 +2159,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     List<ElementDefinition> slices = getSlices(elem, children);
     int c = 0;
     for (ElementDefinition slice : slices) {
-      List<CanonicalType> profiles = slice.getTypeFirstRep().getProfile();
+      List<CanonicalType> profiles = slice.getTypeFirstRep().getProfileList();
       // Won't have a profile if this slice is part of a complex extension
       String url = profiles.isEmpty() ? null : profiles.get(0).getValue();
       StructureDefinition sdExt = url == null ? null : context.fetchResource(StructureDefinition.class, url, ExtensionUtilities.getVersionResolutionRules(profiles.get(0)));
@@ -2179,17 +2179,17 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         if (sdExt == null)
           b.append(gen.formatPhrase(RenderingI18nContext.SDR_UNK_EXT,  url) + "\r\n"); 
         else
-          extchildren = getChildren(sdExt.getSnapshot().getElement(), sdExt.getSnapshot().getElementFirstRep());
+          extchildren = getChildren(sdExt.getSnapshot().getElementList(), sdExt.getSnapshot().getElementFirstRep());
       }
 
       ElementDefinition value = getValue(extchildren);
       if (value != null) {
-        if (value.getType().size() == 1)
-          generateCoreElem(b, elements, value, indent + 2, pathName + "." + en, false, value.getType().get(0), true, false);
+        if (value.getTypeList().size() == 1)
+          generateCoreElem(b, elements, value, indent + 2, pathName + "." + en, false, value.getTypeList().get(0), true, false);
         else {
-          b.append("<span style=\"color: Gray\">// value[x]: <span style=\"color: navy; opacity: 0.8\">" + Utilities.escapeXml(value.getShort()) + "</span>. "+gen.formatPhrase(RenderingI18nContext.SDR_ONE_OF, value.getType().size()) + ":</span>\r\n"); 
-          for (TypeRefComponent t : value.getType())
-            generateCoreElem(b, elements, value, indent + 2, pathName + "." + en, false, t, t == value.getType().get(value.getType().size() - 1), false);
+          b.append("<span style=\"color: Gray\">// value[x]: <span style=\"color: navy; opacity: 0.8\">" + Utilities.escapeXml(value.getShort()) + "</span>. "+gen.formatPhrase(RenderingI18nContext.SDR_ONE_OF, value.getTypeList().size()) + ":</span>\r\n"); 
+          for (TypeRefComponent t : value.getTypeList())
+            generateCoreElem(b, elements, value, indent + 2, pathName + "." + en, false, t, t == value.getTypeList().get(value.getTypeList().size() - 1), false);
         }
       } else {
         b.append(gen.formatPhrase(RenderingI18nContext.SDR_NOT_HANDLED_EXT, "Not handled yet: complex extension " + url) + "\r\n"); 
@@ -2224,12 +2224,12 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
   private boolean hasType(String code) {
-    StructureDefinition sd = context.fetchResource(StructureDefinition.class, ProfileUtilities.sdNs(code, null), IWorkerContext.VersionResolutionRules.defaultRule());
+    StructureDefinition sd = context.fetchResource(StructureDefinition.class, ProfileUtilities.sdNs(code, null), VersionResolutionRules.defaultRule());
     return sd != null && (sd.getKind() == StructureDefinitionKind.PRIMITIVETYPE || sd.getKind() == StructureDefinitionKind.COMPLEXTYPE);
   }
 
   private String getSrcFile(String code) {
-    StructureDefinition sd = context.fetchResource(StructureDefinition.class, ProfileUtilities.sdNs(code, null), IWorkerContext.VersionResolutionRules.defaultRule());
+    StructureDefinition sd = context.fetchResource(StructureDefinition.class, ProfileUtilities.sdNs(code, null), VersionResolutionRules.defaultRule());
     if (sd == null)
       return "?sd-src?";
     else {
@@ -2253,7 +2253,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
   private void writeCardinality(boolean unbounded, StringBuilder b, ElementDefinition elem) throws IOException {
-    if (elem.getConstraint().size() > 0)
+    if (elem.getConstraintList().size() > 0)
       b.append(" <span style=\"color: brown\" title=\""
           + Utilities.escapeXml(getInvariants(elem)) + "\"><b>C?</b></span>");
     if (elem.getMin() > 0)
@@ -2265,7 +2265,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   private String getInvariants(ElementDefinition elem) {
     StringBuilder b = new StringBuilder();
     boolean first = true;
-    for (ElementDefinitionConstraintComponent i : elem.getConstraint()) {
+    for (ElementDefinitionConstraintComponent i : elem.getConstraintList()) {
       if (!i.hasSource() || i.getSource().equals(sd.getUrl()) || allInvariants) {
         if (!first)
           b.append("; ");
@@ -2314,7 +2314,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (slicing.getRules() == SlicingRules.CLOSED)
       return "";
     CommaSeparatedStringBuilder csv = new CommaSeparatedStringBuilder();
-    for (ElementDefinitionSlicingDiscriminatorComponent d : slicing.getDiscriminator()) {
+    for (ElementDefinitionSlicingDiscriminatorComponent d : slicing.getDiscriminatorList()) {
       csv.append(d.getType().toCode() + ":" + d.getPath());
     }
     String s = " " + gen.formatPhrase(slicing.getOrdered() ? RenderingI18nContext.SDR_ANY_ORDER : RenderingI18nContext.SDR_SORTED, csv.toString(), (slicing.hasRules() ? slicing.getRules().getDisplay() : "")); 
@@ -2356,14 +2356,14 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       scanExtensions(imposed, sdt, ExtensionDefinitions.EXT_SD_IMPOSE_PROFILE);
       scanExtensions(compliedWith, sdt, ExtensionDefinitions.EXT_SD_COMPLIES_WITH_PROFILE);
 
-      for (ElementDefinition ed : sdt.getDifferential().getElement()) {
-        for (TypeRefComponent tr : ed.getType()) {
+      for (ElementDefinition ed : sdt.getDifferential().getElementList()) {
+        for (TypeRefComponent tr : ed.getTypeList()) {
           if (refersToThisSD(tr.getCode())) {
             if (sdt.hasWebPath()) {
               refs.put(sdt.getWebPath(), sdt.present());
             }
           }
-          for (CanonicalType u : tr.getProfile()) {
+          for (CanonicalType u : tr.getProfileList()) {
             if (refersToThisSD(u.getValue())) {
               if (sdt.hasWebPath()) {
                 refs.put(sdt.getWebPath(), sdt.present());
@@ -2372,7 +2372,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
               }
             }
           }
-          for (CanonicalType u : tr.getTargetProfile()) {
+          for (CanonicalType u : tr.getTargetProfileList()) {
             if (refersToThisSD(u.getValue())) {
               if (sdt.hasWebPath()) {
                 trefs.put(sdt.getWebPath(), sdt.present());
@@ -2398,7 +2398,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       scanCapStmt(capStmts, cst);
     }
     
-    if (VersionUtilities.isR5Plus(context.getVersion())) {
+    if (VersionUtilities.isR5Plus(context.getFHIRVersion())) {
       if (usages == null) {
         FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager.Builder().build();
         NpmPackage npm = pcm.loadPackage("hl7.fhir.r5.core");
@@ -2574,7 +2574,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     NpmPackage npm = pcm.loadPackage("hl7.fhir.r5.examples");
     for (String fn : npm.getFolders().get("package").listFiles()) {
       try {
-        Resource r = new JsonParser().parse(npm.getFolders().get("package").fetchFile(fn));
+        Resource r = new JsonParser(context.getModelContext()).parse(npm.getFolders().get("package").fetchFile(fn));
         JsonObject details = examples.getJsonObject(r.fhirType()+"/"+r.getId());
         if (details != null) {
           new ElementVisitor(new ExtensionVisitor(details.asString("path"), details.asString("name"))).visit(null, r);
@@ -2598,34 +2598,34 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     public ElementVisitor.ElementVisitorInstruction visit(Object context, Resource resource) {
       if (resource instanceof DomainResource) {
         DomainResource dr = (DomainResource) resource;
-        for (Extension ex : dr.getExtension()) {
+        for (Extension ex : dr.getExtensionList()) {
           seeExtension(path, name, ex.getUrl());
         }
-        for (Extension ex : dr.getModifierExtension()) {
+        for (Extension ex : dr.getModifierExtensionList()) {
           seeExtension(path, name, ex.getUrl());
         }
       }
-      return VISIT_CHILDREN;
+      return ElementVisitor.ElementVisitorInstruction.VISIT_CHILDREN;
     }
 
     @Override
-    public ElementVisitor.ElementVisitorInstruction visit(Object context, org.hl7.fhir.r5.model.Element element) {
+    public ElementVisitor.ElementVisitorInstruction visit(Object context, org.hl7.fhir.model.core.Element element) {
       for (Extension ex : element.getExtension()) {
         seeExtension(path, name, ex.getUrl());
       }
       if (element instanceof BackboneElement) {
         BackboneElement be = (BackboneElement) element;
-        for (Extension ex : be.getModifierExtension()) {
+        for (Extension ex : be.getModifierExtensionList()) {
           seeExtension(path, name, ex.getUrl());
         }
       }
       if (element instanceof BackboneType) {
         BackboneType be = (BackboneType) element;
-        for (Extension ex : be.getModifierExtension()) {
+        for (Extension ex : be.getModifierExtensionList()) {
           seeExtension(path, name, ex.getUrl());
         }
       }
-      return VISIT_CHILDREN;
+      return ElementVisitor.ElementVisitorInstruction.VISIT_CHILDREN;
     }
   }
 
@@ -2647,12 +2647,12 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
   public void scanCapStmt(Map<String, String> capStmts, CapabilityStatement cst) {
-    for (CapabilityStatementRestComponent rest : cst.getRest()) {
-      for (CapabilityStatementRestResourceComponent res : rest.getResource()) {
+    for (CapabilityStatementRestComponent rest : cst.getRestList()) {
+      for (CapabilityStatementRestResourceComponent res : rest.getResourceList()) {
         boolean inc = false;
         if (refersToThisSD(res.getProfile())) {
           inc = true;
-        } else for (CanonicalType c : res.getSupportedProfile()) {
+        } else for (CanonicalType c : res.getSupportedProfileList()) {
           if (refersToThisSD(c.getValue())) {
             inc = true;
           } 
@@ -2700,7 +2700,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
   private boolean usesExtension(Element focus) {
-    for (Element child : focus.getChildren()) {
+    for (Element child : focus.getChildList()) {
       if (child.getName().equals("extension") && refersToThisSD(child.getChildValue("url")))
         return true;
       if (usesExtension(child))
@@ -2836,11 +2836,11 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (element.definition().getIsSummary()) {
       gc.addStyledText((this.gen.formatPhrase(RenderingI18nContext.STRUC_DEF_ELE_INCLUDED)), "\u03A3", null, null, null, false);
     }
-    if (sdr.hasNonBaseConstraints(element.definition().getConstraint()) || sdr.hasNonBaseConditions(element.definition().getCondition())) {
+    if (sdr.hasNonBaseConstraints(element.definition().getConstraintList()) || sdr.hasNonBaseConditions(element.definition().getConditionList())) {
       Piece p = gc.addText(org.hl7.fhir.r5.renderers.StructureDefinitionRenderer.CONSTRAINT_CHAR);
       p.setHint((this.gen.formatPhrase(RenderingI18nContext.STRUC_DEF_AFFECT_CONSTRAINTS)+sdr.listConstraintsAndConditions(element.definition())+")"));
       p.addStyle(org.hl7.fhir.r5.renderers.StructureDefinitionRenderer.CONSTRAINT_STYLE);
-      p.setReference(Utilities.pathURL(VersionUtilities.getSpecUrl(context.getVersion()), "conformance-rules.html#constraints"));
+      p.setReference(Utilities.pathURL(VersionUtilities.getSpecUrl(context.getFHIRVersion()), "conformance-rules.html#constraints"));
     }
     if (element != null && element.definition().hasExtension(ExtensionDefinitions.EXT_STANDARDS_STATUS)) {
       StandardsStatus ss = StandardsStatus.fromCode(element.definition().getExtensionString(ExtensionDefinitions.EXT_STANDARDS_STATUS));
@@ -2858,7 +2858,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     row.getCells().add(gc);
     if (element.types().size() == 1) {
       PEType t = element.types().get(0);
-      StructureDefinition sd = context.fetchResource(StructureDefinition.class, t.getUrl(), IWorkerContext.VersionResolutionRules.defaultRule());
+      StructureDefinition sd = context.fetchResource(StructureDefinition.class, t.getUrl(), VersionResolutionRules.defaultRule());
       if (sd != null) {
         gc.addPiece(gen.new Piece(sd.getWebPath(), t.getName(), t.getType()));        
       } else {
@@ -2907,7 +2907,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         // type
         gc = gen.new Cell();
         trow.getCells().add(gc);
-        StructureDefinition sd = context.fetchResource(StructureDefinition.class, t.getUrl(), IWorkerContext.VersionResolutionRules.defaultRule());
+        StructureDefinition sd = context.fetchResource(StructureDefinition.class, t.getUrl(), VersionResolutionRules.defaultRule());
         if (sd != null) {
           gc.addPiece(gen.new Piece(sd.getWebPath(), t.getName(), t.getType()));        
         } else {
@@ -2981,12 +2981,12 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
 
 
-    if (sd.getContext().isEmpty()) {
+    if (sd.getContextList().isEmpty()) {
       div.para().tx(gen.formatPhrase(RenderingI18nContext.SDR_EXT_ANY));
     } else {
       div.para().tx(gen.formatPhrase(RenderingI18nContext.SDR_EXT_ELEM)); 
       var ul = div.ul();
-      for (StructureDefinitionContextComponent c : sd.getContext()) {
+      for (StructureDefinitionContextComponent c : sd.getContextList()) {
         var li = ul.li();
         switch (c.getType()) {
         case ELEMENT:
@@ -3031,17 +3031,17 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       }
     }
     if (sd.hasContextInvariant()) {
-      if (sd.getContextInvariant().size() == 1) {
+      if (sd.getContextInvariantList().size() == 1) {
         XhtmlNode x = div.para();
         x.tx(gen.formatPhrase(RenderingI18nContext.SDR_EXT_CTXT_PATH)); 
         x.tx(": ");
-        div.para().code().tx(sd.getContextInvariant().get(0).asStringValue());
+        div.para().code().tx(sd.getContextInvariantList().get(0).asStringValue());
       } else {
         XhtmlNode x = div.para();
         x.tx(gen.formatPhrase(RenderingI18nContext.SDR_EXT_CTXT_PATHS)); 
         x.tx(": ");
         var ul = div.ul();
-        for (StringType sv : sd.getContextInvariant()) {
+        for (StringType sv : sd.getContextInvariantList()) {
           ul.li().code().tx(sv.asStringValue());
         }
       }
@@ -3129,7 +3129,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
             }
             sdr.getContext().setStructureMode(StructureDefinitionRendererMode.SUMMARY);
             x.add(sdr.generateTable(new RenderingStatus(), null, (StructureDefinition) sdv.getResource(), true, destDir, false, sd.getId(), false, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, 
-                outputTracker, false, gen.withUniqueLocalPrefix(VersionUtilities.getNameForVersion(v)), ANCHOR_PREFIX_SNAP, resE, "V"));
+                outputTracker, false, gen.withUniqueLocalPrefix(VersionUtilities.getNameForVersion(v)), ANCHOR_PREFIX_SNAP, resE, "V"+VersionUtilities.getNameForVersion(v)));
           }
         }
       }
@@ -3172,7 +3172,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       tr.styleChildren("border-bottom: 1px solid #666");
       // generate a heirarchical table, and put it in td
       gen.setStructureMode(StructureDefinitionRendererMode.SUMMARY);
-      XhtmlNode tblt = sdr.generateAttributeTable(new RenderingStatus(), defnFile, sd, true, destDir, false, sd.getId(), false, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, false, gen.withUniqueLocalPrefix(all ? mc(mode) + "a" : mc(mode)), toTabs ? ANCHOR_PREFIX_DIFF : ANCHOR_PREFIX_SNAP, resE, all ? "DA" : "D");
+      XhtmlNode tblt = sdr.generateAttributeTable(new RenderingStatus(), defnFile, sd, true, destDir, false, sd.getId(), false, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, false, gen.withUniqueLocalPrefix(all ? mc(mode) + "a" : mc(mode)), toTabs ? ANCHOR_PREFIX_DIFF : ANCHOR_PREFIX_SNAP, resE, mc(mode)+(all ? "CA" : "C"));
       if (!tblt.getChildNodes().isEmpty()) {
         XhtmlNode tt = null;
         for (XhtmlNode t : tblt.getChildNodes()) {
@@ -3197,7 +3197,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
             td.style("padding: 0px 4px 0px 4px");
             List<OperationDefinition.OperationDefinitionParameterComponent> inp = new ArrayList<>();
             List<OperationDefinition.OperationDefinitionParameterComponent> outp = new ArrayList<>();
-            for (OperationDefinition.OperationDefinitionParameterComponent p : od.getParameter()) {
+            for (OperationDefinition.OperationDefinitionParameterComponent p : od.getParameterList()) {
               if (p.getUse() == Enumerations.OperationParameterUse.IN) {
                 inp.add(p);
               } else {
@@ -3214,14 +3214,14 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
               td.tx(p.getName());
               if (p.hasType()) {
                 td.tx(" : ");
-                td.tx(p.getType().toCode());
+                td.tx(p.getType());
               }
             }
             td.tx(")");
             if (!outp.isEmpty()) {
               td.tx(" : ");
               if (outp.size() == 1) {
-                td.tx(outp.get(0).getType().toCode());
+                td.tx(outp.get(0).getType());
               } else {
                 td.tx("[");
                 first = true;
@@ -3230,7 +3230,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
                   td.tx(p.getName());
                   if (p.hasType()) {
                     td.tx(" : ");
-                    td.tx(p.getType().toCode());
+                    td.tx(p.getType());
                   }
                 }
                 td.tx("]");
@@ -3288,12 +3288,12 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (cLocal != eLocal) {
       return cLocal;
     }
-    return candidate.getBase().size() < existing.getBase().size();
+    return candidate.getBaseList().size() < existing.getBaseList().size();
   }
 
   private boolean hasBase(SearchParameter sp, String type) {
-    for (Enumeration<Enumerations.VersionIndependentResourceTypesAll> c : sp.getBase()) {
-      if (type.equals(c.getCode())) {
+    for (UriType c : sp.getBaseList()) {
+      if (type.equals(c.primitiveValue())) {
         return true;
       }
     }

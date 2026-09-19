@@ -14,28 +14,27 @@ import org.hl7.fhir.igtools.spreadsheets.MappingSpace;
 import org.hl7.fhir.igtools.templates.Template;
 import org.hl7.fhir.igtools.templates.TemplateManager;
 import org.hl7.fhir.igtools.web.PublisherConsoleLogger;
-import org.hl7.fhir.r5.context.ContextUtilities;
-import org.hl7.fhir.r5.context.ILoggingService;
-import org.hl7.fhir.r5.context.SimpleWorkerContext;
-import org.hl7.fhir.r5.elementmodel.LanguageUtils;
-import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.model.*;
-import org.hl7.fhir.r5.model.Enumeration;
-import org.hl7.fhir.r5.renderers.DataRenderer;
-import org.hl7.fhir.r5.renderers.RendererFactory;
-import org.hl7.fhir.r5.renderers.spreadsheets.StructureDefinitionSpreadsheetGenerator;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.renderers.utils.Resolver;
-import org.hl7.fhir.r5.tools.ExtensionConstants;
-import org.hl7.fhir.r5.utils.NPMPackageGenerator;
-import org.hl7.fhir.r5.utils.client.FHIRToolingClient;
-import org.hl7.fhir.r5.utils.formats.CSVWriter;
-import org.hl7.fhir.r5.utils.validation.ValidatorSession;
-import org.hl7.fhir.r5.utils.xver.XVerExtensionManager;
+import org.hl7.fhir.services.context.ContextUtilities;
+import org.hl7.fhir.standalone.context.SimpleWorkerContext;
+import org.hl7.fhir.services.elementmodel.LanguageUtils;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.model.core.*;
+import org.hl7.fhir.model.core.Enumeration;
+import org.hl7.fhir.services.renderers.DataRenderer;
+import org.hl7.fhir.services.renderers.RendererFactory;
+import org.hl7.fhir.services.renderers.spreadsheets.StructureDefinitionSpreadsheetGenerator;
+import org.hl7.fhir.services.renderers.utils.RenderingContext;
+import org.hl7.fhir.services.renderers.utils.Resolver;
+import org.hl7.fhir.model.tools.ExtensionConstants;
+import org.hl7.fhir.services.utilities.NPMPackageGenerator;
+import org.hl7.fhir.services.client.FHIRToolingClient;
+import org.hl7.fhir.services.utilities.CSVWriter;
+import org.hl7.fhir.services.validation.ValidatorSession;
+import org.hl7.fhir.services.xver.XVerExtensionManager;
 import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.i18n.subtag.LanguageSubtagRegistry;
 import org.hl7.fhir.utilities.json.model.JsonObject;
+import org.hl7.fhir.utilities.logging.ILoggingService;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
@@ -268,6 +267,20 @@ public class PublisherFields {
     List<String> usedLangFiles = new ArrayList<String>();
     List<String> viewDefinitions = new ArrayList<String>();
     int validationLogTime = 0;
+    /**
+     * The heading level a resource's narrative is seated at when it is composed into a page
+     * (see PublisherGenerator.seatNarrative). 3 suits the stock templates, whose page title is an
+     * h2; a template that titles its pages differently overrides it with the IG parameter
+     * 'narrative-heading-level'.
+     */
+    int narrativeHeadingLevel = 3;
+    /**
+     * The level the top heading on every page is moved to, from the IG parameter
+     * 'page-heading-level'. 0 means the IG did not set it, and HTMLInspector leaves heading levels
+     * exactly as generated - which is the default, because re-levelling breaks the section
+     * numbering of any template whose CSS counters are still keyed to h2/h3/h4.
+     */
+    int pageHeadingLevel = 0;
     long maxMemory = 0;
     String oidRoot;
     IniFile oidIni;

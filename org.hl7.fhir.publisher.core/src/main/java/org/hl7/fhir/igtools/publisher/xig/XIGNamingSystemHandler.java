@@ -4,12 +4,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.Coding;
-import org.hl7.fhir.r5.model.NamingSystem;
-import org.hl7.fhir.r5.model.NamingSystem.NamingSystemType;
-import org.hl7.fhir.r5.renderers.DataRenderer;
-import org.hl7.fhir.r5.renderers.RendererFactory;
+import org.hl7.fhir.model.core.CanonicalResource;
+import org.hl7.fhir.model.core.Coding;
+import org.hl7.fhir.model.core.NamingSystem;
+import org.hl7.fhir.model.core.NamingSystem.NamingSystemType;
+import org.hl7.fhir.services.renderers.DataRenderer;
+import org.hl7.fhir.services.renderers.RendererFactory;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 
 
@@ -28,7 +28,7 @@ public class XIGNamingSystemHandler extends XIGHandler {
     }
     if (ns.hasType()) {    
       j.add("type", new DataRenderer(info.getCtxt(), new RendererFactory()).displayDataType(ns.getType()));
-      for (Coding t : ns.getType().getCoding()) {
+      for (Coding t : ns.getType().getCodingList()) {
         info.getNspr().add(t.getCode());
       }
     }
@@ -65,7 +65,7 @@ public class XIGNamingSystemHandler extends XIGHandler {
         if (cr instanceof NamingSystem) {
           NamingSystem ns = (NamingSystem) cr;
           boolean ok = false;
-          for (Coding c : ns.getType().getCoding()) {
+          for (Coding c : ns.getType().getCodingList()) {
             if (type.equals(c.getCode())) {
               ok = true;
             }

@@ -1,8 +1,9 @@
 package org.hl7.fhir.igtools.openehr;
 
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.context.SimpleWorkerContext;
-import org.hl7.fhir.r5.fhirpath.FHIRPathEngine;
+import org.hl7.fhir.model.ModelContext;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.standalone.context.SimpleWorkerContext;
+import org.hl7.fhir.services.fhirpath.FHIRPathEngine;
 import org.hl7.fhir.utilities.json.model.JsonElement;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.model.JsonProperty;
@@ -95,7 +96,7 @@ public class InvariantExtractor {
     try {
       FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager.Builder().build();
       NpmPackage npm = pcm.loadPackage("hl7.fhir.r5.core");
-      IWorkerContext context = new SimpleWorkerContext.SimpleWorkerContextBuilder().withAllowLoadingDuplicates(true).fromPackage(npm);
+      IWorkerContext context = new SimpleWorkerContext.SimpleWorkerContextBuilder(ModelContext.fullCoreContext()).withAllowLoadingDuplicates(true).fromPackage(npm);
       return new FHIRPathEngine(context);
     } catch (Exception e) {
       System.err.println("Warning: Could not initialize FHIRPath engine: " + e.getMessage());

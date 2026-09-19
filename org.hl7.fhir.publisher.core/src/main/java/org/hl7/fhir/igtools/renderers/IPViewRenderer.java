@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.hl7.fhir.igtools.publisher.HTMLInspector.ExternalReference;
-import org.hl7.fhir.r5.context.IWorkerContext;
+import org.hl7.fhir.services.context.IWorkerContext;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
@@ -46,6 +46,7 @@ public class IPViewRenderer {
     head.addTag("title").tx("IP Review");
     head.link("stylesheet", "fhir.css");
     XhtmlNode body = html.addTag("body");
+    body.h1().tx("IP Review"); // the sections below are h2, so the page needs a single h1 above them
     body.h2().tx("Unattributed Code Systems");
     XhtmlNode ul = body.ul();
     for (String s : Utilities.sorted(csList.keySet())) {

@@ -26,14 +26,14 @@ import java.util.List;
 import java.util.Map;
 
 import org.hl7.fhir.exceptions.FHIRException;
-import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
-import org.hl7.fhir.r5.context.SimpleWorkerContext;
-import org.hl7.fhir.r5.model.Base;
-import org.hl7.fhir.r5.model.Bundle;
-import org.hl7.fhir.r5.model.Coding;
-import org.hl7.fhir.r5.model.Resource;
-import org.hl7.fhir.r5.model.ResourceFactory;
-import org.hl7.fhir.r5.utils.structuremap.ITransformerServices;
+import org.hl7.fhir.services.conformance.profile.ProfileUtilities;
+import org.hl7.fhir.standalone.context.SimpleWorkerContext;
+import org.hl7.fhir.model.Base;
+import org.hl7.fhir.model.core.Bundle;
+import org.hl7.fhir.model.core.Coding;
+import org.hl7.fhir.model.core.Resource;
+import org.hl7.fhir.model.core.ResourceFactory;
+import org.hl7.fhir.services.fml.ITransformerServices;
 
 public class MappingServices implements ITransformerServices {
 

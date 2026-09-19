@@ -4,9 +4,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.hl7.fhir.r5.context.SimpleWorkerContext;
-import org.hl7.fhir.r5.elementmodel.LanguageUtils;
-import org.hl7.fhir.r5.model.Resource;
+import org.hl7.fhir.standalone.context.SimpleWorkerContext;
+import org.hl7.fhir.services.elementmodel.LanguageUtils;
+import org.hl7.fhir.model.core.Resource;
 import org.hl7.fhir.utilities.UserDataNames;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;

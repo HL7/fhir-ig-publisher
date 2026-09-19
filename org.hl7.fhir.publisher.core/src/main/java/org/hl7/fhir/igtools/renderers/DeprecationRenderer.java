@@ -6,11 +6,11 @@ import org.hl7.fhir.igtools.publisher.FetchedResource;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.igtools.publisher.comparators.PreviousVersionComparator;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.StructureDefinition;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.model.extensions.ExtensionDefinitions;
+import org.hl7.fhir.model.core.CanonicalResource;
+import org.hl7.fhir.model.core.StructureDefinition;
+import org.hl7.fhir.services.renderers.utils.RenderingContext;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
@@ -34,10 +34,10 @@ public class DeprecationRenderer extends BaseRenderer {
     List<DeprecationInfo> list = new ArrayList<>();
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
-        org.hl7.fhir.r5.elementmodel.Element sse = r.getElement().getExtension(ExtensionDefinitions.EXT_STANDARDS_STATUS);
+        org.hl7.fhir.services.elementmodel.Element sse = r.getElement().getExtension(ExtensionDefinitions.EXT_STANDARDS_STATUS);
         boolean dep = false;
         if (sse != null) {
-          org.hl7.fhir.r5.elementmodel.Element ssv = sse.getNamedChild("value");
+          org.hl7.fhir.services.elementmodel.Element ssv = sse.getNamedChild("value");
           String ss = ssv.primitiveValue();
           if ("deprecated".equals(ss)) {
             dep = true;

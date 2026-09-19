@@ -1,7 +1,7 @@
 package org.hl7.fhir.igtools.publisher;
 
-import org.hl7.fhir.r5.elementmodel.Element;
-import org.hl7.fhir.r5.elementmodel.ElementVisitor;
+import org.hl7.fhir.services.elementmodel.Element;
+import org.hl7.fhir.services.elementmodel.ElementVisitor;
 
 import java.util.List;
 

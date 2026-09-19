@@ -52,7 +52,7 @@ package org.hl7.fhir.igtools.spreadsheets;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.hl7.fhir.r5.model.ElementDefinition.ReferenceVersionRules;
+import org.hl7.fhir.model.core.ElementDefinition.ReferenceVersionRules;
 import org.hl7.fhir.utilities.Utilities;
 
 

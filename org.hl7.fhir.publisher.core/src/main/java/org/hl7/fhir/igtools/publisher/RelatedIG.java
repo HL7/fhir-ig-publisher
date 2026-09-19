@@ -8,17 +8,18 @@ import java.util.Map;
 
 import org.hl7.fhir.convertors.context.ContextResourceLoaderFactory;
 import org.hl7.fhir.convertors.loaders.loaderR5.NullLoaderKnowledgeProviderR5;
+import org.hl7.fhir.convertors.loaders.loaderRN.NullLoaderKnowledgeProviderRN;
 import org.hl7.fhir.exceptions.FHIRException;
-import org.hl7.fhir.r5.context.IContextResourceLoader;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.elementmodel.Element;
-import org.hl7.fhir.r5.elementmodel.Manager;
-import org.hl7.fhir.r5.elementmodel.Manager.FhirFormat;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.ImplementationGuide;
-import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionResourceComponent;
+import org.hl7.fhir.services.context.IContextResourceLoaderN;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.services.elementmodel.Element;
+import org.hl7.fhir.services.elementmodel.Manager;
+import org.hl7.fhir.model.utilities.formats.FhirFormat;
+import org.hl7.fhir.model.core.CanonicalResource;
+import org.hl7.fhir.model.core.ImplementationGuide;
+import org.hl7.fhir.model.core.ImplementationGuide.ImplementationGuideDefinitionResourceComponent;
 import org.hl7.fhir.utilities.UserDataNames;
-import org.hl7.fhir.r5.model.Resource;
+import org.hl7.fhir.model.core.Resource;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
@@ -93,9 +94,11 @@ public class RelatedIG {
   private String message;
   private ImplementationGuide ig;
   private String webLocation;
+  private IWorkerContext context;
   
-  protected RelatedIG(String code, String id, RelatedIGLoadingMode mode, RelatedIGRole role, NpmPackage npm) {
+  protected RelatedIG(IWorkerContext context, String code, String id, RelatedIGLoadingMode mode, RelatedIGRole role, NpmPackage npm) {
     super();
+    this.context = context;
     this.id = id;
     this.mode = mode;
     this.npm = npm;
@@ -106,8 +109,9 @@ public class RelatedIG {
     load();
   }
   
-  protected RelatedIG(String code, String id, RelatedIGLoadingMode mode, RelatedIGRole role, NpmPackage npm, String location) {
+  protected RelatedIG(IWorkerContext context, String code, String id, RelatedIGLoadingMode mode, RelatedIGRole role, NpmPackage npm, String location) {
     super();
+    this.context = context;
     this.id = id;
     this.mode = mode;
     this.npm = npm;
@@ -122,7 +126,7 @@ public class RelatedIG {
   private void load() {
     
     try {
-      IContextResourceLoader loader = ContextResourceLoaderFactory.makeLoader(npm.fhirVersion(), new NullLoaderKnowledgeProviderR5());
+      IContextResourceLoaderN loader = ContextResourceLoaderFactory.makeLoaderN(context.getModelContext(), npm.fhirVersion(), new NullLoaderKnowledgeProviderRN());
       for (String s : npm.listResources("ImplementationGuide")) {
         try {
           Resource res = loader.loadResource(npm.load("package", s), true);
@@ -238,7 +242,7 @@ public class RelatedIG {
       List<CanonicalResource> list = new ArrayList<>();
       resources.put(rt,  list);
       try {
-        IContextResourceLoader loader = ContextResourceLoaderFactory.makeLoader(npm.fhirVersion(), new NullLoaderKnowledgeProviderR5());
+        IContextResourceLoaderN loader = ContextResourceLoaderFactory.makeLoaderN(context.getModelContext(), npm.fhirVersion(), new NullLoaderKnowledgeProviderRN());
         for (String s : npm.listResources(rt)) {
           try {
             Resource res = loader.loadResource(npm.load("package", s), true);
@@ -292,7 +296,7 @@ public class RelatedIG {
 
   private String getTitle(String fhirType, String id) {
     String res = fhirType+"/"+id;
-    for (ImplementationGuideDefinitionResourceComponent r : ig.getDefinition().getResource()) {
+    for (ImplementationGuideDefinitionResourceComponent r : ig.getDefinition().getResourceList()) {
       if (res.equals(r.getReference().getReference())) {
         if (r.hasDescription()) {
           return r.getDescription();

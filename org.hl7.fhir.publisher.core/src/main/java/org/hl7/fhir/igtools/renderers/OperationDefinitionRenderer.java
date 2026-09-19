@@ -7,10 +7,10 @@ import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.RelatedIG;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
-import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.model.OperationDefinition;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext;
+import org.hl7.fhir.services.conformance.profile.ProfileUtilities;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.model.core.OperationDefinition;
+import org.hl7.fhir.services.renderers.utils.RenderingContext;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 

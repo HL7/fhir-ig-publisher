@@ -27,14 +27,14 @@ import java.util.Map;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.codec.binary.Base64;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.context.SimpleWorkerContext;
-import org.hl7.fhir.r5.elementmodel.Element;
-import org.hl7.fhir.r5.elementmodel.Manager;
-import org.hl7.fhir.r5.elementmodel.Manager.FhirFormat;
-import org.hl7.fhir.r5.elementmodel.ParserBase;
-import org.hl7.fhir.r5.formats.IParser.OutputStyle;
-import org.hl7.fhir.r5.terminologies.utilities.ValidationResult;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.standalone.context.SimpleWorkerContext;
+import org.hl7.fhir.services.elementmodel.Element;
+import org.hl7.fhir.services.elementmodel.Manager;
+import org.hl7.fhir.model.utilities.formats.FhirFormat;
+import org.hl7.fhir.services.elementmodel.ParserBase;
+import org.hl7.fhir.model.utilities.formats.OutputStyle;
+import org.hl7.fhir.services.terminology.ValidationResult;
 import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.validation.ValidationOptions;
 import org.hl7.fhir.validation.instance.utils.DigitalSignatureSupport;
@@ -285,9 +285,9 @@ public class PublisherSigner {
     }
     Instant instant = roundToNearestSecond(Instant.now());
     if (xml) {
-      sig.setChildValue("targetFormat", "application/fhir+xml;canonicalization="+canon);
+      sig.setChildValue("targetFormat", "application/fhir+xml; canonicalization="+canon);
     } else {
-      sig.setChildValue("targetFormat", "application/fhir+json;canonicalization="+canon);
+      sig.setChildValue("targetFormat", "application/fhir+json; canonicalization="+canon);
     }
     String when = DateTimeFormatter.ISO_INSTANT.format(instant);
     sig.setChildValue("when", when);
@@ -362,9 +362,9 @@ public class PublisherSigner {
     }
     Instant instant = roundToNearestSecond(Instant.now());
     if (xml) {
-      sig.setChildValue("targetFormat", "application/fhir+xml;canonicalization="+canon);
+      sig.setChildValue("targetFormat", "application/fhir+xml; canonicalization="+canon);
     } else {
-      sig.setChildValue("targetFormat", "application/fhir+json;canonicalization="+canon);      
+      sig.setChildValue("targetFormat", "application/fhir+json; canonicalization="+canon);      
     }
     String when = DateTimeFormatter.ISO_INSTANT.format(instant);
     sig.setChildValue("when", when);

@@ -1,9 +1,9 @@
 package org.hl7.fhir.igtools.publisher.loaders;
 
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.CodeSystem;
-import org.hl7.fhir.r5.model.Resource;
+import org.hl7.fhir.model.core.CanonicalResource;
+import org.hl7.fhir.model.core.CodeSystem;
+import org.hl7.fhir.model.core.Resource;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 

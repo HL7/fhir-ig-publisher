@@ -1,33 +1,37 @@
 package org.hl7.fhir.igtools.publisher;
 
 import org.hl7.fhir.convertors.context.ContextResourceLoaderFactory;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_50;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_43_50;
+import org.hl7.fhir.convertors.factory.*;
 import org.hl7.fhir.convertors.loaders.loaderR5.NullLoaderKnowledgeProviderR5;
+import org.hl7.fhir.convertors.loaders.loaderRN.NullLoaderKnowledgeProviderRN;
 import org.hl7.fhir.convertors.misc.ProfileVersionAdaptor;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.renderers.ValidationPresenter;
-import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
-import org.hl7.fhir.r5.context.IContextResourceLoader;
-import org.hl7.fhir.r5.context.SimpleWorkerContext;
-import org.hl7.fhir.r5.elementmodel.Element;
-import org.hl7.fhir.r5.elementmodel.ElementUtilities;
-import org.hl7.fhir.r5.elementmodel.Manager;
-import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.fhirpath.ExpressionNode;
-import org.hl7.fhir.r5.fhirpath.FHIRPathEngine;
-import org.hl7.fhir.r5.model.*;
-import org.hl7.fhir.r5.renderers.BundleRenderer;
-import org.hl7.fhir.r5.renderers.ParametersRenderer;
-import org.hl7.fhir.r5.renderers.ResourceRenderer;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
-import org.hl7.fhir.r5.utils.NPMPackageGenerator;
+import org.hl7.fhir.model.Base;
+import org.hl7.fhir.model.ModelContext;
+import org.hl7.fhir.model.Property;
+import org.hl7.fhir.model.fml.StructureMap;
+import org.hl7.fhir.model.utilities.formats.FhirFormat;
+import org.hl7.fhir.services.conformance.profile.ProfileUtilities;
+import org.hl7.fhir.services.context.IContextResourceLoaderN;
+import org.hl7.fhir.services.fml.StructureMapAnalysis;
+import org.hl7.fhir.services.fml.StructureMapTools;
+import org.hl7.fhir.services.utilities.NPMPackageGenerator;
+import org.hl7.fhir.standalone.context.SimpleWorkerContext;
+import org.hl7.fhir.services.elementmodel.Element;
+import org.hl7.fhir.services.elementmodel.ElementModelUtilities;
+import org.hl7.fhir.services.elementmodel.Manager;
+import org.hl7.fhir.model.extensions.ExtensionDefinitions;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.services.fhirpath.ExpressionNode;
+import org.hl7.fhir.services.fhirpath.FHIRPathEngine;
+import org.hl7.fhir.model.core.*;
+import org.hl7.fhir.services.renderers.BundleRenderer;
+import org.hl7.fhir.services.renderers.ParametersRenderer;
+import org.hl7.fhir.services.renderers.ResourceRenderer;
+import org.hl7.fhir.services.renderers.utils.RenderingContext;
+import org.hl7.fhir.services.renderers.utils.ResourceWrapper;
 import org.hl7.fhir.utilities.UserDataNames;
-import org.hl7.fhir.r5.utils.structuremap.StructureMapAnalysis;
-import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.i18n.I18nConstants;
 import org.hl7.fhir.utilities.json.model.JsonObject;
@@ -35,6 +39,7 @@ import org.hl7.fhir.utilities.json.model.JsonProperty;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
+import org.w3._1999.xhtml.B;
 
 import java.io.ByteArrayInputStream;
 import java.io.FileNotFoundException;
@@ -115,7 +120,7 @@ public class PublisherProcessor extends PublisherBase  {
     for (FetchedFile f : pf.fileList) {
       for (FetchedResource r: f.getResources()) {
         if (r.getResource() != null && r.getResource() instanceof StructureDefinition) {
-          for (ElementDefinition ed : ((StructureDefinition) r.getResource()).getDifferential().getElement()) {
+          for (ElementDefinition ed : ((StructureDefinition) r.getResource()).getDifferential().getElementList()) {
             for (Extension obd : ExtensionUtilities.getExtensions(ed, ExtensionDefinitions.EXT_OBLIGATION_CORE)) {
               for (Extension act : ExtensionUtilities.getExtensions(obd, "actor")) {
                 ActorDefinition ad = this.pf.context.fetchResource(ActorDefinition.class, act.getValue().primitiveValue());
@@ -259,12 +264,12 @@ public class PublisherProcessor extends PublisherBase  {
   private void generateOtherVersions() throws Exception {
     for (String v : pf.generateVersions) {
       String version = VersionUtilities.versionFromCode(v);
-      if (!VersionUtilities.versionMatches(version, pf.context.getVersion())) {
+      if (!VersionUtilities.versionMatches(version, pf.context.getFHIRVersion())) {
         logDebugMessage(LogCategory.PROGRESS, "Generate Other Version: "+version);
 
         NpmPackage targetNpm = pf.pcm.loadPackage(VersionUtilities.packageForVersion(version));
-        IContextResourceLoader loader = ContextResourceLoaderFactory.makeLoader(targetNpm.fhirVersion(), new NullLoaderKnowledgeProviderR5());
-        SimpleWorkerContext tctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder().withAllowLoadingDuplicates(true).fromPackage(targetNpm, loader, true);
+        IContextResourceLoaderN loader = ContextResourceLoaderFactory.makeLoaderN(pf.context.getModelContext(), targetNpm.fhirVersion(), new NullLoaderKnowledgeProviderRN());
+        SimpleWorkerContext tctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder(ModelContext.fullCoreContext()).withAllowLoadingDuplicates(true).fromPackage(targetNpm, loader, true);
         ProfileVersionAdaptor pva = new ProfileVersionAdaptor(pf.context, tctxt);
 
         for (FetchedFile f : pf.fileList) {
@@ -321,7 +326,7 @@ public class PublisherProcessor extends PublisherBase  {
 
 
   private void checkForCoreDependenciesSD(NPMPackageGenerator npm, SimpleWorkerContext tctxt, StructureDefinition sd, NpmPackage tnpm) throws IOException {
-    for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+    for (ElementDefinition ed : sd.getSnapshot().getElementList()) {
       if (ed.hasBinding() && ed.getBinding().hasValueSet()) {
         ValueSet vs = pf.context.fetchResource(ValueSet.class, ed.getBinding().getValueSet());
         if (vs != null) {
@@ -336,13 +341,13 @@ public class PublisherProcessor extends PublisherBase  {
     if (isCoreResource(valueSet)) {
       if (!inTargetCore(tnpm, valueSet)) {
         if (!npm.hasFile(NPMPackageGenerator.Category.RESOURCE, valueSet.fhirType()+"-"+valueSet.getIdBase()+".json")) {
-          noteOtherVersionAddedFile(tctxt.getVersion(), "ValueSet", valueSet.getIdBase());
-          npm.addFile(NPMPackageGenerator.Category.RESOURCE, valueSet.fhirType()+"-"+valueSet.getIdBase()+".json", convVersion(valueSet, tctxt.getVersion()));
+          noteOtherVersionAddedFile(tctxt.getFHIRVersion(), "ValueSet", valueSet.getIdBase());
+          npm.addFile(NPMPackageGenerator.Category.RESOURCE, valueSet.fhirType()+"-"+valueSet.getIdBase()+".json", convVersion(valueSet, tctxt.getFHIRVersion()));
         }
       }
     }
-    for (ValueSet.ConceptSetComponent inc : valueSet.getCompose().getInclude()) {
-      for (CanonicalType c : inc.getValueSet()) {
+    for (ValueSet.ConceptSetComponent inc : valueSet.getCompose().getIncludeList()) {
+      for (CanonicalType c : inc.getValueSetList()) {
         ValueSet vs = pf.context.fetchResource(ValueSet.class, c.getValue());
         if (vs != null) {
           checkForCoreDependenciesVS(npm, tctxt, vs, tnpm);
@@ -361,8 +366,8 @@ public class PublisherProcessor extends PublisherBase  {
     if (isCoreResource(cs)) {
       if (!inTargetCore(tnpm, cs)) {
         if (!npm.hasFile(NPMPackageGenerator.Category.RESOURCE, cs.fhirType()+"-"+cs.getIdBase()+".json")) {
-          noteOtherVersionAddedFile(tctxt.getVersion(), "CodeSystem", cs.getIdBase());
-          npm.addFile(NPMPackageGenerator.Category.RESOURCE, cs.fhirType()+"-"+cs.getIdBase()+".json", convVersion(cs, tctxt.getVersion()));
+          noteOtherVersionAddedFile(tctxt.getFHIRVersion(), "CodeSystem", cs.getIdBase());
+          npm.addFile(NPMPackageGenerator.Category.RESOURCE, cs.fhirType()+"-"+cs.getIdBase()+".json", convVersion(cs, tctxt.getFHIRVersion()));
         }
       }
     }
@@ -438,8 +443,8 @@ public class PublisherProcessor extends PublisherBase  {
 
   private void validateExpressions(FetchedFile f, StructureDefinition sd, FetchedResource r) {
     FHIRPathEngine fpe = new FHIRPathEngine(this.pf.context);
-    for (ElementDefinition ed : sd.getSnapshot().getElement()) {
-      for (ElementDefinition.ElementDefinitionConstraintComponent inv : ed.getConstraint()) {
+    for (ElementDefinition ed : sd.getSnapshot().getElementList()) {
+      for (ElementDefinition.ElementDefinitionConstraintComponent inv : ed.getConstraintList()) {
         validateExpression(f, sd, fpe, ed, inv, r);
       }
     }
@@ -462,7 +467,7 @@ public class PublisherProcessor extends PublisherBase  {
   }
 
   private void generateLogicalMaps() throws Exception {
-    StructureMapUtilities mu = new StructureMapUtilities(pf.context, null, null);
+    StructureMapTools mu = new StructureMapTools(pf.context, null, null);
     for (FetchedFile f : pf.fileList) {
       f.start("generateLogicalMaps");
       try {
@@ -523,7 +528,7 @@ public class PublisherProcessor extends PublisherBase  {
               if (profile == null) {
                 errs.add(new ValidationMessage(ValidationMessage.Source.InstanceValidator, ValidationMessage.IssueType.NOTFOUND, "file", this.pf.context.formatMessage(I18nConstants.Bundle_BUNDLE_Entry_NO_LOGICAL_EXPL, r0.getId(), f.getLogical()), ValidationMessage.IssueSeverity.ERROR));
               } else {
-                Manager.FhirFormat fmt = Manager.FhirFormat.readFromMimeType(bin.getContentType() == null ? f.getContentType() : bin.getContentType());
+                FhirFormat fmt = FhirFormat.readFromMimeType(bin.getContentType() == null ? f.getContentType() : bin.getContentType());
                 TimeTracker.Session tts = this.pf.tt.start("validation");
                 List<StructureDefinition> profiles = new ArrayList<>();
                 profiles.add(profile);
@@ -549,7 +554,7 @@ public class PublisherProcessor extends PublisherBase  {
     }
   }
 
-  private void validate(FetchedFile f, FetchedResource r, Binary bin, List<ValidationMessage> errs, Manager.FhirFormat fmt, List<StructureDefinition> profiles) {
+  private void validate(FetchedFile f, FetchedResource r, Binary bin, List<ValidationMessage> errs, FhirFormat fmt, List<StructureDefinition> profiles) {
     long ts = System.currentTimeMillis();
     r.setLogicalElement(this.pf.validator.validate(r.getElement(), errs, new ByteArrayInputStream(bin.getContent()), fmt, profiles));
     long tf = System.currentTimeMillis();
@@ -569,7 +574,7 @@ public class PublisherProcessor extends PublisherBase  {
 
   private void validate(FetchedFile f, FetchedResource r, List<ValidationMessage> errs, Binary bin) {
     long ts = System.currentTimeMillis();
-    this.pf.validator.validate(r.getElement(), errs, new ByteArrayInputStream(bin.getContent()), Manager.FhirFormat.readFromMimeType(bin.getContentType() == null ? f.getContentType() : bin.getContentType()));
+    this.pf.validator.validate(r.getElement(), errs, new ByteArrayInputStream(bin.getContent()), FhirFormat.readFromMimeType(bin.getContentType() == null ? f.getContentType() : bin.getContentType()));
     long tf = System.currentTimeMillis();
     if (tf-ts > this.pf.validationLogTime && this.pf.validationLogTime > 0) {
       reportLongValidation(f, r, tf-ts);
@@ -580,7 +585,7 @@ public class PublisherProcessor extends PublisherBase  {
     long ts = System.currentTimeMillis();
     List<StructureDefinition> profiles = new ArrayList<StructureDefinition>();
     profiles.add(sd);
-    this.pf.validator.validate(r.getElement(), errs, new ByteArrayInputStream(bin.getContent()), Manager.FhirFormat.readFromMimeType(bin.getContentType() == null ? f.getContentType(): bin.getContentType()), profiles);
+    this.pf.validator.validate(r.getElement(), errs, new ByteArrayInputStream(bin.getContent()), FhirFormat.readFromMimeType(bin.getContentType() == null ? f.getContentType(): bin.getContentType()), profiles);
     long tf = System.currentTimeMillis();
     if (tf-ts > this.pf.validationLogTime && this.pf.validationLogTime > 0) {
       reportLongValidation(f, r, tf-ts);
@@ -706,7 +711,7 @@ public class PublisherProcessor extends PublisherBase  {
 
   private List<String> loadOids(CanonicalResource cr) {
     List<String> res = new ArrayList<>();
-    for (Identifier id : cr.getIdentifier()) {
+    for (Identifier id : cr.getIdentifierList()) {
       if (id.hasValue() && id.getValue().startsWith("urn:oid:") && id.getUse() != Identifier.IdentifierUse.OLD) {
         res.add(id.getValue().substring(8));
       }
@@ -809,7 +814,7 @@ public class PublisherProcessor extends PublisherBase  {
     Extension fmmExt = page.getExtensionByUrl(ExtensionDefinitions.EXT_FMM_LEVEL);
 
     if (parentStatus != null && standardsStatus == null) {
-      standardsStatus = parentStatus.copy();
+      standardsStatus = parentStatus.copy(Base.COPY_DATA);
       page.addExtension(new Extension(ExtensionDefinitions.EXT_STANDARDS_STATUS, standardsStatus));
       if (parentNormVersion != null && normVersion == null) {
         normVersion = parentNormVersion;
@@ -825,12 +830,12 @@ public class PublisherProcessor extends PublisherBase  {
         page.getExtension().remove(fmmExt);
     } else {
       if (parentFmm != null && fmmExt == null) {
-        fmm = parentFmm.copy();
+        fmm = parentFmm.copy(Base.COPY_DATA);
         page.addExtension(new Extension(ExtensionDefinitions.EXT_FMM_LEVEL, fmm));
       } else if (fmmExt != null)
         fmm = fmmExt.getValueIntegerType();
     }
-    for (ImplementationGuide.ImplementationGuideDefinitionPageComponent childPage: page.getPage()) {
+    for (ImplementationGuide.ImplementationGuideDefinitionPageComponent childPage: page.getPageList()) {
       FetchedResource res = pf.resources.get(page.getName());
       if (res == null)
         updatePageStatus(childPage, fmm, standardsStatus, normVersion);
@@ -888,13 +893,13 @@ public class PublisherProcessor extends PublisherBase  {
         isInformative = true;
 
       switch (res.getResourceType()) {
-        case ChargeItemDefinition :
-        case Citation:
-        case ConditionDefinition:
-        case EvidenceReport:
-        case EvidenceVariable:
-        case ExampleScenario:
-        case ObservationDefinition:
+        case "ChargeItemDefinition":
+        case "Citation":
+        case "ConditionDefinition":
+        case "EvidenceReport":
+        case "EvidenceVariable":
+        case "ExampleScenario":
+        case "ObservationDefinition":
           isInformative = true;
         default:
           // We're in a resource we need to process, so continue on
@@ -935,7 +940,7 @@ public class PublisherProcessor extends PublisherBase  {
         }
         if (addExtension) {
           fmmChanged = true;
-          IntegerType newFmm = parentFmm.copy();
+          IntegerType newFmm = parentFmm.copy(Base.COPY_DATA);
           Extension e = new Extension(ExtensionDefinitions.EXT_FMM_LEVEL, newFmm);
           newFmm.addExtension(ExtensionDefinitions.EXT_FMM_DERIVED, new CanonicalType(parentCanonical));
           res.addExtension(e);
@@ -961,7 +966,7 @@ public class PublisherProcessor extends PublisherBase  {
         }
         if (addExtension) {
           statusChanged = true;
-          CodeType code = parentStatus.copy();
+          CodeType code = parentStatus.copy(Base.COPY_DATA);
           Extension e = new Extension(ExtensionDefinitions.EXT_STANDARDS_STATUS, code);
           code.addExtension(ExtensionDefinitions.EXT_FMM_DERIVED, new CanonicalType(parentCanonical));
           res.addExtension(e);
@@ -980,117 +985,117 @@ public class PublisherProcessor extends PublisherBase  {
           updateResourceStatus((CanonicalType)e.getValue(), fmm, status, statusNormVersion, res.getUrl());
         }
         switch (res.getResourceType()) {
-          case ActivityDefinition:
+          case "ActivityDefinition":
             ActivityDefinition ad = (ActivityDefinition)res;
-            for (CanonicalType canonical : ad.getLibrary()) {
+            for (CanonicalType canonical : ad.getLibraryList()) {
               updateResourceStatus(canonical, fmm, status, statusNormVersion, res.getUrl());
             }
             if (ad.hasProfile())
               updateResourceStatus(ad.getProfileElement(), fmm, status, statusNormVersion, res.getUrl());
-            for (CanonicalType ref : ad.getObservationRequirement()) {
+            for (CanonicalType ref : ad.getObservationRequirementList()) {
               updateResourceStatus(ref, fmm, status, statusNormVersion, res.getUrl());
             }
-            for (CanonicalType ref : ad.getObservationResultRequirement()) {
+            for (CanonicalType ref : ad.getObservationResultRequirementList()) {
               updateResourceStatus(ref, fmm, status, statusNormVersion, res.getUrl());
             }
             if (ad.hasTransform())
               updateResourceStatus(ad.getTransformElement(), fmm, status, statusNormVersion, res.getUrl());
             break;
 
-          case CapabilityStatement:
+          case "CapabilityStatement":
             CapabilityStatement cs = (CapabilityStatement)res;
-            for (CapabilityStatement.CapabilityStatementRestComponent rest: cs.getRest()) {
-              for (CapabilityStatement.CapabilityStatementRestResourceComponent resource: rest.getResource()) {
+            for (CapabilityStatement.CapabilityStatementRestComponent rest: cs.getRestList()) {
+              for (CapabilityStatement.CapabilityStatementRestResourceComponent resource: rest.getResourceList()) {
                 if (resource.hasProfile())
                   updateResourceStatus(resource.getProfileElement(), fmm, status, statusNormVersion, res.getUrl());
-                for (CapabilityStatement.CapabilityStatementRestResourceSearchParamComponent sp: resource.getSearchParam()) {
+                for (CapabilityStatement.CapabilityStatementRestResourceSearchParamComponent sp: resource.getSearchParamList()) {
                   if (sp.hasDefinition())
                     updateResourceStatus(sp.getDefinitionElement(), fmm, status, statusNormVersion, res.getUrl());
                 }
-                for (CapabilityStatement.CapabilityStatementRestResourceOperationComponent op: resource.getOperation()) {
+                for (CapabilityStatement.CapabilityStatementRestResourceOperationComponent op: resource.getOperationList()) {
                   if (op.hasDefinition())
                     updateResourceStatus(op.getDefinitionElement(), fmm, status, statusNormVersion, res.getUrl());
                 }
               }
-              for (CapabilityStatement.CapabilityStatementRestResourceSearchParamComponent sp: rest.getSearchParam()) {
+              for (CapabilityStatement.CapabilityStatementRestResourceSearchParamComponent sp: rest.getSearchParamList()) {
                 if (sp.hasDefinition())
                   updateResourceStatus(sp.getDefinitionElement(), fmm, status, statusNormVersion, res.getUrl());
               }
-              for (CapabilityStatement.CapabilityStatementRestResourceOperationComponent op: rest.getOperation()) {
+              for (CapabilityStatement.CapabilityStatementRestResourceOperationComponent op: rest.getOperationList()) {
                 if (op.hasDefinition())
                   updateResourceStatus(op.getDefinitionElement(), fmm, status, statusNormVersion, res.getUrl());
               }
-              for (CapabilityStatement.CapabilityStatementMessagingComponent messaging: cs.getMessaging()) {
-                for (CapabilityStatement.CapabilityStatementMessagingSupportedMessageComponent msg: messaging.getSupportedMessage()) {
+              for (CapabilityStatement.CapabilityStatementMessagingComponent messaging: cs.getMessagingList()) {
+                for (CapabilityStatement.CapabilityStatementMessagingSupportedMessageComponent msg: messaging.getSupportedMessageList()) {
                   if (msg.hasDefinition())
                     updateResourceStatus(msg.getDefinitionElement(), fmm, status, statusNormVersion, res.getUrl());
                 }
               }
-              for (CapabilityStatement.CapabilityStatementDocumentComponent doc: cs.getDocument()) {
+              for (CapabilityStatement.CapabilityStatementDocumentComponent doc: cs.getDocumentList()) {
                 updateResourceStatus(doc.getProfileElement(), fmm, status, statusNormVersion, res.getUrl());
               }
             }
             break;
 
-          case ConceptMap:
+          case "ConceptMap":
             ConceptMap cm = (ConceptMap)res;
-            for (ConceptMap.ConceptMapGroupComponent group: cm.getGroup()) {
+            for (ConceptMap.ConceptMapGroupComponent group: cm.getGroupList()) {
               if (group.hasUnmapped() && group.getUnmapped().hasValueSet()) {
                 updateResourceStatus(group.getUnmapped().getValueSetElement(), fmm, status, statusNormVersion, res.getUrl());
               }
             }
             break;
+//
+//          case GraphDefinition:
+//            GraphDefinition gd = (GraphDefinition)res;
+//            //            if (gd.hasProfile())
+//            //              updateResourceStatus(gd.getProfileElement(), fmm, status, statusNormVersion, res.getUrl());
+//            //            for (GraphDefinitionLinkComponent link: gd.getLink()) {
+//            //              for (GraphDefinitionLinkTargetComponent target: link.getTarget()) {
+//            //                if (gd.hasProfile())
+//            //                  updateResourceStatus(target.getProfileElement(), fmm, status, statusNormVersion, res.getUrl());
+//            //              }
+//            //            }
+//            break;
 
-          case GraphDefinition:
-            GraphDefinition gd = (GraphDefinition)res;
-            //            if (gd.hasProfile())
-            //              updateResourceStatus(gd.getProfileElement(), fmm, status, statusNormVersion, res.getUrl());
-            //            for (GraphDefinitionLinkComponent link: gd.getLink()) {
-            //              for (GraphDefinitionLinkTargetComponent target: link.getTarget()) {
-            //                if (gd.hasProfile())
-            //                  updateResourceStatus(target.getProfileElement(), fmm, status, statusNormVersion, res.getUrl());
-            //              }
-            //            }
-            break;
-
-          case ImplementationGuide:
+          case "ImplementationGuide":
             ImplementationGuide ig = (ImplementationGuide)res;
-            for (ImplementationGuide.ImplementationGuideGlobalComponent global: ig.getGlobal()) {
+            for (ImplementationGuide.ImplementationGuideGlobalComponent global: ig.getGlobalList()) {
               updateResourceStatus((CanonicalType)global.getProfileElement(), fmm, status, statusNormVersion, res.getUrl());
             }
             if (ig.hasDefinition()) {
-              for (ImplementationGuide.ImplementationGuideDefinitionResourceComponent resource: ig.getDefinition().getResource()) {
+              for (ImplementationGuide.ImplementationGuideDefinitionResourceComponent resource: ig.getDefinition().getResourceList()) {
                 updateResourceStatus(resource.getReference(), fmm, status, statusNormVersion, res.getUrl());
               }
             }
             break;
 
-          case Measure:
+          case "Measure":
             Measure m = (Measure)res;
-            for (CanonicalType library: m.getLibrary()) {
+            for (CanonicalType library: m.getLibraryList()) {
               updateResourceStatus(library, fmm, status, statusNormVersion, res.getUrl());
             }
             break;
 
-          case MessageDefinition:
+          case "MessageDefinition":
             MessageDefinition md = (MessageDefinition)res;
             if (md.hasBase())
               updateResourceStatus(md.getBaseElement(), fmm, status, statusNormVersion, res.getUrl());
-            for (CanonicalType parent: md.getParent()) {
+            for (CanonicalType parent: md.getParentList()) {
               updateResourceStatus(parent, fmm, status, statusNormVersion, res.getUrl());
             }
-            for (MessageDefinition.MessageDefinitionFocusComponent focus : md.getFocus()) {
+            for (MessageDefinition.MessageDefinitionFocusComponent focus : md.getFocusList()) {
               if (focus.hasProfile())
                 updateResourceStatus(focus.getProfileElement(), fmm, status, statusNormVersion, res.getUrl());
             }
-            for (MessageDefinition.MessageDefinitionAllowedResponseComponent response : md.getAllowedResponse()) {
+            for (MessageDefinition.MessageDefinitionAllowedResponseComponent response : md.getAllowedResponseList()) {
               if (response.hasMessage())
                 updateResourceStatus(response.getMessageElement(), fmm, status, statusNormVersion, res.getUrl());
             }
-            updateResourceStatus(md.getGraph(), fmm, status, statusNormVersion, res.getUrl());
+            // updateResourceStatus(md.getGraphList(), fmm, status, statusNormVersion, res.getUrl());
             break;
 
-          case OperationDefinition:
+          case "OperationDefinition":
             OperationDefinition od = (OperationDefinition)res;
             if (od.hasBase())
               updateResourceStatus(od.getBaseElement(), fmm, status, statusNormVersion, res.getUrl());
@@ -1098,8 +1103,8 @@ public class PublisherProcessor extends PublisherBase  {
               updateResourceStatus(od.getInputProfileElement(), fmm, status, statusNormVersion, res.getUrl());
             if (od.hasOutputProfile())
               updateResourceStatus(od.getOutputProfileElement(), fmm, status, statusNormVersion, res.getUrl());
-            for (OperationDefinition.OperationDefinitionParameterComponent param : od.getParameter()) {
-              for (CanonicalType profile: param.getTargetProfile()) {
+            for (OperationDefinition.OperationDefinitionParameterComponent param : od.getParameterList()) {
+              for (CanonicalType profile: param.getTargetProfileList()) {
                 updateResourceStatus(profile, fmm, status, statusNormVersion, res.getUrl());
               }
               if (param.hasBinding() && param.getBinding().hasValueSet()) {
@@ -1108,23 +1113,23 @@ public class PublisherProcessor extends PublisherBase  {
             }
             break;
 
-          case PlanDefinition:
+          case "PlanDefinition":
             PlanDefinition pd = (PlanDefinition)res;
-            for (CanonicalType library: pd.getLibrary()) {
+            for (CanonicalType library: pd.getLibraryList()) {
               updateResourceStatus(library, fmm, status, statusNormVersion, res.getUrl());
             }
-            for (PlanDefinition.PlanDefinitionActionComponent action: pd.getAction()) {
+            for (PlanDefinition.PlanDefinitionActionComponent action: pd.getActionList()) {
               if (action.hasDefinitionCanonicalType())
                 updateResourceStatus(action.getDefinitionCanonicalType(), fmm, status, statusNormVersion, res.getUrl());
             }
             break;
 
-          case Questionnaire:
+          case "Questionnaire":
             Questionnaire q = (Questionnaire)res;
-            for (CanonicalType derived: q.getDerivedFrom()) {
+            for (CanonicalType derived: q.getDerivedFromList()) {
               updateResourceStatus(derived, fmm, status, statusNormVersion, res.getUrl());
             }
-            for (Questionnaire.QuestionnaireItemComponent item: q.getItem()) {
+            for (Questionnaire.QuestionnaireItemComponent item: q.getItemList()) {
               if (item.hasAnswerValueSet())
                 updateResourceStatus(item.getAnswerValueSetElement(), fmm, status, statusNormVersion, res.getUrl());
               for (Extension ext: item.getExtensionsByUrl("http://hl7.org/fhir/StructureDefinition/questionnaire-referenceProfile")) {
@@ -1136,29 +1141,29 @@ public class PublisherProcessor extends PublisherBase  {
             }
             break;
 
-          case SearchParameter:
+          case "SearchParameter":
             SearchParameter sp = (SearchParameter)res;
             if (sp.hasDerivedFrom())
               updateResourceStatus(sp.getDerivedFromElement(), fmm, status, statusNormVersion, res.getUrl());
-            for (SearchParameter.SearchParameterComponentComponent comp: sp.getComponent()) {
+            for (SearchParameter.SearchParameterComponentComponent comp: sp.getComponentList()) {
               if (comp.hasDefinition())
                 updateResourceStatus(comp.getDefinitionElement(), fmm, status, statusNormVersion, res.getUrl());
             }
             break;
 
-          case StructureDefinition:
+          case "StructureDefinition":
             StructureDefinition sd = (StructureDefinition)res;
             if (sd.hasBaseDefinition())
               updateResourceStatus(sd.getBaseDefinitionElement(), fmm, status, statusNormVersion, res.getUrl());
-            for (ElementDefinition e: sd.getDifferential().getElement()) {
+            for (ElementDefinition e: sd.getDifferential().getElementList()) {
               if (e.hasBinding() && e.getBinding().hasValueSet())
                 updateResourceStatus(e.getBinding().getValueSetElement(), fmm, status, statusNormVersion, res.getUrl());
             }
             break;
 
-          case StructureMap:
+          case "StructureMap":
             StructureMap sm = (StructureMap)res;
-            for (CanonicalType imp: sm.getImport()) {
+            for (CanonicalType imp: sm.getImportList()) {
               updateResourceStatus(imp, fmm, status, statusNormVersion, res.getUrl());
             }
             break;
@@ -1178,7 +1183,7 @@ public class PublisherProcessor extends PublisherBase  {
             }
             break;*/
 
-          case ValueSet:
+          case "ValueSet":
             ValueSet vs = (ValueSet)res;
             for (Extension ext: vs.getExtensionsByUrl("http://hl7.org/fhir/StructureDefinition/valueset-map")) {
               updateResourceStatus(ext.getValueCanonicalType(), fmm, status, statusNormVersion, res.getUrl());
@@ -1187,17 +1192,17 @@ public class PublisherProcessor extends PublisherBase  {
               updateResourceStatus(ext.getValueCanonicalType(), fmm, status, statusNormVersion, res.getUrl());
             }
             if (vs.hasCompose()) {
-              for (ValueSet.ConceptSetComponent compose: vs.getCompose().getInclude()) {
+              for (ValueSet.ConceptSetComponent compose: vs.getCompose().getIncludeList()) {
                 if (compose.hasSystem())
                   updateResourceStatus(new CanonicalType(compose.getSystem()), fmm, status, statusNormVersion, res.getUrl());
-                for (CanonicalType valueSet: compose.getValueSet()) {
+                for (CanonicalType valueSet: compose.getValueSetList()) {
                   updateResourceStatus(valueSet, fmm, status, statusNormVersion, res.getUrl());
                 }
               }
-              for (ValueSet.ConceptSetComponent compose: vs.getCompose().getExclude()) {
+              for (ValueSet.ConceptSetComponent compose: vs.getCompose().getExcludeList()) {
                 if (compose.hasSystem())
                   updateResourceStatus(new CanonicalType(compose.getSystem()), fmm, status, statusNormVersion, res.getUrl());
-                for (CanonicalType valueSet: compose.getValueSet()) {
+                for (CanonicalType valueSet: compose.getValueSetList()) {
                   updateResourceStatus(valueSet, fmm, status, statusNormVersion, res.getUrl());
                 }
               }
@@ -1205,13 +1210,12 @@ public class PublisherProcessor extends PublisherBase  {
             break;
 
           // The following types don't actually have anything to cascade to - at least not yet
-          case CodeSystem:
-          case EventDefinition:
-          case Library:
-          case NamingSystem:
-          case TerminologyCapabilities:
+          case "CodeSystem":
+          case "EventDefinition":
+          case "Library":
+          case "NamingSystem":
+          case "TerminologyCapabilities":
           default:
-
         }
       }
     }
@@ -1271,7 +1275,7 @@ public class PublisherProcessor extends PublisherBase  {
                   }
                   if (regen) {
                     r.setGeneratedNarrative(true);
-                    org.hl7.fhir.r5.elementmodel.Element e = convertToElement(r, r.getResource());
+                    org.hl7.fhir.services.elementmodel.Element e = convertToElement(r, r.getResource());
                     e.copyUserData(r.getElement());
                     r.setElement(e);
                   }
@@ -1298,7 +1302,7 @@ public class PublisherProcessor extends PublisherBase  {
                       this.pf.otherFilesRun.addAll(lrc.getFiles());
                     } else if (r.fhirType().equals("Bundle")) {
                       lrc.setAddName(true);
-                      for (org.hl7.fhir.r5.elementmodel.Element e : r.getElement().getChildrenByName("entry")) {
+                      for (org.hl7.fhir.services.elementmodel.Element e : r.getElement().getChildrenByName("entry")) {
                         Element res = e.getNamedChild("resource");
                         if (res!=null && isDomainResource(res.getProperty().getStructure())) {
                           ResourceWrapper rw = ResourceWrapper.forResource(lrc, res);
@@ -1527,7 +1531,7 @@ public class PublisherProcessor extends PublisherBase  {
     if (this.pf.expectedJurisdiction != null) {
       boolean ok = false;
       CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder();
-      for (CodeableConcept cc : resource.getJurisdiction()) {
+      for (CodeableConcept cc : resource.getJurisdictionList()) {
         ok = ok || cc.hasCoding(this.pf.expectedJurisdiction);
         b.append(cc.toString());
       }
@@ -1587,7 +1591,7 @@ public class PublisherProcessor extends PublisherBase  {
   private void executeTransforms() throws FHIRException, Exception {
     if (pf.doTransforms) {
       MappingServices services = new MappingServices(pf.context, pf.igpkp.getCanonical());
-      StructureMapUtilities utils = new StructureMapUtilities(pf.context, services, pf.igpkp);
+      StructureMapTools utils = new StructureMapTools(pf.context, services, pf.igpkp);
 
       // ok, our first task is to generate the profiles
       for (FetchedFile f : pf.changeList) {
@@ -1647,7 +1651,7 @@ public class PublisherProcessor extends PublisherBase  {
             for (StructureMap map : t.getValue()) {
               boolean ok = true;
               String tgturl = null;
-              for (StructureMap.StructureMapStructureComponent st : map.getStructure()) {
+              for (StructureMap.StructureMapStructureComponent st : map.getStructureList()) {
                 if (st.getMode() == StructureMap.StructureMapModelMode.TARGET) {
                   if (tgturl == null)
                     tgturl = st.getUrl();
@@ -1726,7 +1730,7 @@ public class PublisherProcessor extends PublisherBase  {
       if (res instanceof Bundle) {
         validate(file, r, errs);
 
-        for (Bundle.BundleEntryComponent be : ((Bundle) res).getEntry()) {
+        for (Bundle.BundleEntryComponent be : ((Bundle) res).getEntryList()) {
           Resource ber = be.getResource();
           if (ber.hasUserData(UserDataNames.map_profile)) {
             validate(file, r, errs, ber);
@@ -1830,7 +1834,7 @@ public class PublisherProcessor extends PublisherBase  {
     if (element.fhirType().equals("Extension") && url.equals(element.getChildValue("url"))) {
       res = res + 1;
     }
-    for (Element child : element.getChildren()) {
+    for (Element child : element.getChildList()) {
       res = res + countExtensionUsage(child, url);
     }
     return res;
@@ -1839,7 +1843,7 @@ public class PublisherProcessor extends PublisherBase  {
 
 
   private String getFixedUrl(StructureDefinition sd) {
-    for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+    for (ElementDefinition ed : sd.getSnapshot().getElementList()) {
       if (ed.getPath().equals("Extension.url") && ed.hasFixed()) {
         return ed.getFixed().primitiveValue();
       }
@@ -1879,11 +1883,11 @@ public class PublisherProcessor extends PublisherBase  {
 
   public List<Extension> getDescendantExtensions(Base e, String url) {
     List<Extension> extensions = new ArrayList<Extension>();
-    for (Property childName: e.children()) {
+    for (Property childName: e.getChildren()) {
       String name = childName.getName().endsWith("[x]") ? childName.getName().substring(0, childName.getName().length()-3) : childName.getName();
-      for (Base b: e.listChildrenByName(name)) {
-        if (b instanceof org.hl7.fhir.r5.model.Element) {
-          org.hl7.fhir.r5.model.Element ce = (org.hl7.fhir.r5.model.Element)b;
+      for (Base b: e.getChildValues(name, true)) {
+        if (b instanceof org.hl7.fhir.model.core.Element) {
+          org.hl7.fhir.model.core.Element ce = (org.hl7.fhir.model.core.Element)b;
           extensions.addAll(ce.getExtensionsByUrl(url));
           getDescendantExtensions(ce, url);
         }
@@ -1901,7 +1905,7 @@ public class PublisherProcessor extends PublisherBase  {
           if (pf.isSignatureAsR6()) {
             // we're going to iterate all the provenances looking for a provenance with target #/, and a single signature element, and an appropriate type
             List<Element> signatureProvenances = new ArrayList<>();
-            ElementUtilities.findSignatures(r.getElement(), signatureProvenances);
+            ElementModelUtilities.findSignatures(r.getElement(), signatureProvenances);
             if (signatureProvenances.size() == 1) {
               for (Element resource : signatureProvenances) {
                 List<Element> sigs = resource.getChildrenByName("signature");
@@ -1962,7 +1966,7 @@ public class PublisherProcessor extends PublisherBase  {
       Element res = entry.getNamedChild("resource");
       if (res != null && "Provenance".equals(res.fhirType())) {
         logDebugMessage(LogCategory.PROGRESS, "Process Provenance "+f.getName()+" : "+r.getId()+".entry["+i+"]");
-        if (processProvenance(this.pf.igpkp.getLinkFor(r, true), res, b == null ? null : b.getEntry().get(i).getResource()))
+        if (processProvenance(this.pf.igpkp.getLinkFor(r, true), res, b == null ? null : b.getEntryList().get(i).getResource()))
           isHistory = true;
       }
     }
@@ -2019,27 +2023,30 @@ public class PublisherProcessor extends PublisherBase  {
               } else {
                 throw new Error("Cannot use resources of type "+r.fhirType()+" in a IG with version "+ this.pf.version);
               }
-              Element e = new org.hl7.fhir.r5.elementmodel.JsonParser(this.pf.context).parseSingle(new ByteArrayInputStream(cnt), null);
+              Element e = new org.hl7.fhir.services.elementmodel.JsonParser(this.pf.context).parseSingle(new ByteArrayInputStream(cnt), null);
               e.copyUserData(r.getElement());
               r.setElement(e);
 
-            } else if (SpecialTypeHandler.handlesType(r.fhirType(), this.pf.context.getVersion()) && !VersionUtilities.isR5Plus(this.pf.version)) {
+            } else if (SpecialTypeHandler.handlesType(r.fhirType(), this.pf.context.getFHIRVersion()) && !VersionUtilities.isR5Plus(this.pf.version)) {
               // we validated the resource as it was supplied, but now we need to
               // switch it for the correct representation in the underlying version
               byte[] cnt = null;
               if (VersionUtilities.isR3Ver(this.pf.version)) {
-                org.hl7.fhir.dstu3.model.Resource res = VersionConvertorFactory_30_50.convertResource(r.getResource());
+                org.hl7.fhir.dstu3.model.Resource res = VersionConvertorFactory_30_N.convertResource(r.getResource());
                 cnt = new org.hl7.fhir.dstu3.formats.JsonParser().setOutputStyle(org.hl7.fhir.dstu3.formats.IParser.OutputStyle.PRETTY).composeBytes(res);
               } else if (VersionUtilities.isR4Ver(this.pf.version)) {
-                org.hl7.fhir.r4.model.Resource res = VersionConvertorFactory_40_50.convertResource(r.getResource());
+                org.hl7.fhir.r4.model.Resource res = VersionConvertorFactory_40_N.convertResource(r.getResource());
                 cnt = new org.hl7.fhir.r4.formats.JsonParser().setOutputStyle(org.hl7.fhir.r4.formats.IParser.OutputStyle.PRETTY).composeBytes(res);
               } else if (VersionUtilities.isR4BVer(this.pf.version)) {
-                org.hl7.fhir.r4b.model.Resource res = VersionConvertorFactory_43_50.convertResource(r.getResource());
+                org.hl7.fhir.r4b.model.Resource res = VersionConvertorFactory_43_N.convertResource(r.getResource());
                 cnt = new org.hl7.fhir.r4b.formats.JsonParser().setOutputStyle(org.hl7.fhir.r4b.formats.IParser.OutputStyle.PRETTY).composeBytes(res);
+              } else if (VersionUtilities.isR5Ver(this.pf.version)) {
+                org.hl7.fhir.r5.model.Resource res = VersionConvertorFactory_50_N.convertResource(r.getResource());
+                cnt = new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(org.hl7.fhir.r5.formats.IParser.OutputStyle.PRETTY).composeBytes(res);
               } else {
                 throw new Error("Cannot use resources of type "+r.fhirType()+" in a IG with version "+ this.pf.version);
               }
-              Element e = new org.hl7.fhir.r5.elementmodel.JsonParser(this.pf.context).parseSingle(new ByteArrayInputStream(cnt), null);
+              Element e = new org.hl7.fhir.services.elementmodel.JsonParser(this.pf.context).parseSingle(new ByteArrayInputStream(cnt), null);
               e.copyUserData(r.getElement());
               r.setElement(e);
             }

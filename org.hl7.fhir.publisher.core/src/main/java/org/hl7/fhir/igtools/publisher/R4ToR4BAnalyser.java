@@ -11,31 +11,39 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_43_50;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_N;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_43_N;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.loaders.PublisherLoader;
+import org.hl7.fhir.model.ModelContext;
+import org.hl7.fhir.model.core.*;
+import org.hl7.fhir.model.core.CanonicalResource;
+import org.hl7.fhir.model.core.CanonicalType;
+import org.hl7.fhir.model.core.ElementDefinition;
+import org.hl7.fhir.model.core.StructureDefinition;
 import org.hl7.fhir.r4b.model.*;
+import org.hl7.fhir.r4b.model.Bundle;
 import org.hl7.fhir.r4b.model.Bundle.BundleEntryComponent;
 import org.hl7.fhir.r4b.model.Enumerations.FHIRVersion;
+import org.hl7.fhir.r4b.model.Extension;
+import org.hl7.fhir.r4b.model.MarkdownType;
+import org.hl7.fhir.r4b.model.OperationDefinition;
 import org.hl7.fhir.r4b.model.OperationDefinition.OperationDefinitionParameterComponent;
+import org.hl7.fhir.r4b.model.Resource;
+import org.hl7.fhir.r4b.model.StringType;
 import org.hl7.fhir.r4b.utils.DataTypeVisitor;
 import org.hl7.fhir.r4b.utils.DataTypeVisitor.IDatatypeVisitor;
-import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
-import org.hl7.fhir.r5.context.ContextUtilities;
-import org.hl7.fhir.r5.context.IContextResourceLoader;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.context.SimpleWorkerContext;
-import org.hl7.fhir.r5.elementmodel.Element;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.CanonicalType;
-import org.hl7.fhir.r5.model.ElementDefinition;
-import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
-import org.hl7.fhir.r5.model.StructureDefinition;
-import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
-import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.utils.NPMPackageGenerator;
+import org.hl7.fhir.services.conformance.profile.ProfileUtilities;
+import org.hl7.fhir.services.context.ContextUtilities;
+import org.hl7.fhir.services.context.IContextResourceLoaderN;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.standalone.context.SimpleWorkerContext;
+import org.hl7.fhir.services.elementmodel.Element;
+import org.hl7.fhir.model.core.ElementDefinition.TypeRefComponent;
+import org.hl7.fhir.model.core.StructureDefinition.StructureDefinitionKind;
+import org.hl7.fhir.model.core.StructureDefinition.TypeDerivationRule;
+import org.hl7.fhir.services.renderers.utils.RenderingContext;
+import org.hl7.fhir.services.utilities.NPMPackageGenerator;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
@@ -49,6 +57,7 @@ import org.hl7.fhir.utilities.npm.NpmPackage.NpmPackageFolder;
 import org.hl7.fhir.utilities.npm.NpmPackage.PackageResourceInformation;
 import org.hl7.fhir.utilities.npm.PackageHacker;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
+
 
 public class R4ToR4BAnalyser {
   
@@ -115,7 +124,7 @@ public class R4ToR4BAnalyser {
 
   public void setContext(IWorkerContext context) {
     this.context = context;    
-    if (context != null && (VersionUtilities.isR4Ver(context.getVersion()) || VersionUtilities.isR4BVer(context.getVersion()))) {
+    if (context != null && (VersionUtilities.isR4Ver(context.getFHIRVersion()) || VersionUtilities.isR4BVer(context.getFHIRVersion()))) {
       r4OK = true;
       r4BOK = true;
       checking = true;
@@ -130,16 +139,16 @@ public class R4ToR4BAnalyser {
     if (isExempt(sd)) {
       return;
     }
-    if (sd.getKind() == StructureDefinitionKind.LOGICAL || sd.getDerivation() == TypeDerivationRule.SPECIALIZATION) {
+    if (sd.getKind() == org.hl7.fhir.model.core.StructureDefinition.StructureDefinitionKind.LOGICAL || sd.getDerivation() == TypeDerivationRule.SPECIALIZATION) {
       return;
     }
     if (!checking) {
       return;
     }
     checkTypeDerivation(sd, rc.formatPhrase(RenderingI18nContext.R44B_DERIVES_FROM), sd.getBaseDefinition());
-    for (ElementDefinition ed : sd.getDifferential().getElement()) {
+    for (ElementDefinition ed : sd.getDifferential().getElementList()) {
       checkPathUsage(sd, ed);
-      for (TypeRefComponent tr : ed.getType()) {
+      for (TypeRefComponent tr : ed.getTypeList()) {
         checkTypeUsage(sd, tr);
       }
     }
@@ -150,14 +159,14 @@ public class R4ToR4BAnalyser {
       return;
     }
     checkTypeReference(e, rc.formatPhrase(RenderingI18nContext.R44B_HAS_TYPE), e.fhirType());
-    for (Element c : e.getChildren()) {
+    for (Element c : e.getChildList()) {
       checkExample(e, c);
     }
   }
   
   public void checkExample(Element src, Element e) {
     checkTypeReference(src, rc.formatPhrase(RenderingI18nContext.R44B_HAS_TYPE), e.fhirType());
-    for (Element c : e.getChildren()) {
+    for (Element c : e.getChildList()) {
       checkExample(src, c);
     }
   }
@@ -206,7 +215,7 @@ public class R4ToR4BAnalyser {
   
   private void checkPathUsage(StructureDefinition src, ElementDefinition ed) {
     if (Utilities.existsInList(ed.getPath(), "ActivityDefinition.subject[x]", "PlanDefinitionsubject[x]")) {
-      for (TypeRefComponent tr : ed.getType()) {
+      for (org.hl7.fhir.model.core.ElementDefinition.TypeRefComponent tr : ed.getTypeList()) {
         if ("canonical".equals(tr.getCode())) {
           String msg = rc.formatPhrase(RenderingI18nContext.R44B_REFERS_TO, src.getWebPath(), Utilities.escapeXml(src.present(rc.getLocale().toLanguageTag())), ed.getPath());
           r4OK = false;
@@ -216,17 +225,17 @@ public class R4ToR4BAnalyser {
     } 
   }
 
-  private void checkTypeUsage(StructureDefinition src, TypeRefComponent tr) {
+  private void checkTypeUsage(StructureDefinition src, org.hl7.fhir.model.core.ElementDefinition.TypeRefComponent tr) {
     checkTypeReference(src, rc.formatPhrase(RenderingI18nContext.R44B_DERIVES_FROM), tr.getCode());
-    for (CanonicalType t : tr.getTargetProfile()) {
+    for (CanonicalType t : tr.getTargetProfileList()) {
       checkTypeDerivation(src, rc.formatPhrase(RenderingI18nContext.R44B_HAS_TARGET), t.getValue());
     }
   }
 
   private void checkTypeDerivation(StructureDefinition src, String usage, String ref) {
-    StructureDefinition sd = context.fetchResource(StructureDefinition.class, ref, IWorkerContext.VersionResolutionRules.defaultRule());
+    StructureDefinition sd = context.fetchResource(StructureDefinition.class, ref, VersionResolutionRules.defaultRule());
     while (sd != null && sd.getDerivation() == TypeDerivationRule.SPECIALIZATION) {
-      sd = context.fetchResource(StructureDefinition.class, sd.getBaseDefinition(), IWorkerContext.VersionResolutionRules.defaultRule());
+      sd = context.fetchResource(StructureDefinition.class, sd.getBaseDefinition(), VersionResolutionRules.defaultRule());
     }
     if (sd != null) {
       String type = sd.getType();
@@ -237,11 +246,11 @@ public class R4ToR4BAnalyser {
 
   private void checkTypeReference(StructureDefinition src, String use, String type) {
     String msg = "<a href=\""+src.getWebPath()+"\">"+Utilities.escapeXml(src.present(rc.getLocale().toLanguageTag()))+"</a> "+use+" "+type;
-    if (Utilities.existsInList(type, R4BOnlyTypes) || (VersionUtilities.isR4BVer(context.getVersion()) && Utilities.existsInList(type, R4BChangedTypes))) {
+    if (Utilities.existsInList(type, R4BOnlyTypes) || (VersionUtilities.isR4BVer(context.getFHIRVersion()) && Utilities.existsInList(type, R4BChangedTypes))) {
       r4OK = false;
       addToList(r4Problems, msg);
     }
-    if (Utilities.existsInList(type, R4OnlyTypes) || (VersionUtilities.isR4Ver(context.getVersion()) && Utilities.existsInList(type, R4BChangedTypes))) {
+    if (Utilities.existsInList(type, R4OnlyTypes) || (VersionUtilities.isR4Ver(context.getFHIRVersion()) && Utilities.existsInList(type, R4BChangedTypes))) {
       r4BOK = false;
       addToList(r4BProblems, msg);
     }    
@@ -249,11 +258,11 @@ public class R4ToR4BAnalyser {
 
   private void checkTypeReference(Element src, String use, String type) {
     String msg = "<a href=\""+src.getWebPath()+"\">"+Utilities.escapeXml(src.fhirType()+"/"+src.getIdBase())+"</a> "+use+" "+type;
-    if (Utilities.existsInList(type, R4BOnlyTypes) || (VersionUtilities.isR4BVer(context.getVersion()) && Utilities.existsInList(type, R4BChangedTypes))) {
+    if (Utilities.existsInList(type, R4BOnlyTypes) || (VersionUtilities.isR4BVer(context.getFHIRVersion()) && Utilities.existsInList(type, R4BChangedTypes))) {
       r4OK = false;
       addToList(r4Problems, msg);
     }
-    if (Utilities.existsInList(type, R4OnlyTypes) || (VersionUtilities.isR4Ver(context.getVersion()) && Utilities.existsInList(type, R4BChangedTypes))) {
+    if (Utilities.existsInList(type, R4OnlyTypes) || (VersionUtilities.isR4Ver(context.getFHIRVersion()) && Utilities.existsInList(type, R4BChangedTypes))) {
       r4BOK = false;
       addToList(r4BProblems, msg);
     }    
@@ -274,9 +283,9 @@ public class R4ToR4BAnalyser {
   }
 
   public String generate(String pid, boolean inline) {
-    if (VersionUtilities.isR4Ver(context.getVersion())) {
+    if (VersionUtilities.isR4Ver(context.getFHIRVersion())) {
       return gen(pid, "R4", "R4B", r4OK, r4BOK, r4Problems, r4BProblems, r4Exemptions, r4BExemptions, inline);
-    } else if (VersionUtilities.isR4BVer(context.getVersion())) {
+    } else if (VersionUtilities.isR4BVer(context.getFHIRVersion())) {
       return gen(pid, "R4B", "R4", r4BOK, r4OK, r4BProblems, r4Problems, r4BExemptions, r4Exemptions, inline);
     } else {
       return "";
@@ -367,9 +376,9 @@ public class R4ToR4BAnalyser {
   }
   
   public void log(String pid) {
-    if (VersionUtilities.isR4Ver(context.getVersion())) {
+    if (VersionUtilities.isR4Ver(context.getFHIRVersion())) {
       log(pid, "R4", "R4B", r4BOK, r4Problems, r4BProblems, r4Exemptions, r4BExemptions);
-    } else if (VersionUtilities.isR4BVer(context.getVersion())) {
+    } else if (VersionUtilities.isR4BVer(context.getFHIRVersion())) {
       log(pid, "R4B", "R4", r4OK, r4BProblems, r4Problems, r4BExemptions, r4Exemptions);
     } else {
       System.out.println("??");
@@ -429,10 +438,10 @@ public class R4ToR4BAnalyser {
   }
 
   public void clonePackage(String pid, String filename) throws IOException {
-    if (VersionUtilities.isR4Ver(context.getVersion())) {
+    if (VersionUtilities.isR4Ver(context.getFHIRVersion())) {
       genSameVersionPackage(pid, filename, FileUtilities.changeFileExt(filename, ".r4.tgz"), true, "4.0.1", "r4");
       genOtherVersionPackage(pid, filename, FileUtilities.changeFileExt(filename, ".r4b.tgz"), "hl7.fhir.r4b.core", "4.3.0", "r4b", "4.0.1", VersionUtilities.getSpecUrl("4.0"), VersionUtilities.getSpecUrl("4.3"));
-    } else if (VersionUtilities.isR4BVer(context.getVersion())) {
+    } else if (VersionUtilities.isR4BVer(context.getFHIRVersion())) {
       genSameVersionPackage(pid, filename, FileUtilities.changeFileExt(filename, ".r4b.tgz"), false, "4.3.0", "r4b");
       genOtherVersionPackage(pid, filename, FileUtilities.changeFileExt(filename, ".r4.tgz"), "hl7.fhir.r4.core", "4.0.1", "r4", "4.3.0", VersionUtilities.getSpecUrl("4.3"), VersionUtilities.getSpecUrl("4.0"));
     } else {
@@ -531,10 +540,10 @@ public class R4ToR4BAnalyser {
     if (Utilities.existsInList(folder, "package", "example")) {
       if (!Utilities.existsInList(filename, "package.json", ".index.json", ".index.db")) {
         org.hl7.fhir.r4b.model.Resource res = new org.hl7.fhir.r4b.formats.JsonParser().parse(content);
-        if (VersionUtilities.isR4Ver(context.getVersion()) && "Basic".equals(res.fhirType())) {
+        if (VersionUtilities.isR4Ver(context.getFHIRVersion()) && "Basic".equals(res.fhirType())) {
           org.hl7.fhir.r4.model.Resource r4 =  new org.hl7.fhir.r4.formats.JsonParser().parse(content);
-          org.hl7.fhir.r5.model.Resource r5 = VersionConvertorFactory_40_50.convertResource(r4);
-          res = VersionConvertorFactory_43_50.convertResource(r5);
+          org.hl7.fhir.model.core.Resource r5 = VersionConvertorFactory_40_N.convertResource(r4);
+          res = VersionConvertorFactory_43_N.convertResource(r5);
         }
         boolean exempt = (exemptions.containsKey(res.fhirType()+"/"+res.getId()) ||
             ((res instanceof org.hl7.fhir.r4b.model.CanonicalResource) && exemptions.containsKey(((org.hl7.fhir.r4b.model.CanonicalResource) res).getUrl())));
@@ -726,8 +735,8 @@ public class R4ToR4BAnalyser {
     
     SpecMapManager spm = loadSpecDetails(FileUtilities.streamToBytes(pi.load("other", "spec.internals")), pi.name(), version, specPath);
     SimpleWorkerContext sp;
-    IContextResourceLoader loader = new PublisherLoader(pi, spm, specPath, null, false).makeLoader();
-    sp = new SimpleWorkerContext.SimpleWorkerContextBuilder().fromPackage(pi, loader, true);
+    IContextResourceLoaderN loader = new PublisherLoader(pi, spm, specPath, null, false, ModelContext.fullCoreContext()).makeLoader();
+    sp = new SimpleWorkerContext.SimpleWorkerContextBuilder(ModelContext.fullCoreContext()).fromPackage(pi, loader, true);
     ProfileUtilities utils = new ProfileUtilities(context, new ArrayList<ValidationMessage>(), null);
     for (StructureDefinition sd : new ContextUtilities(sp).allStructures()) {
       utils.setIds(sd, true);

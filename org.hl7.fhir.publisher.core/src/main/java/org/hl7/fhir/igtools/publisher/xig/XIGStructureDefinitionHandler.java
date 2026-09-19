@@ -11,17 +11,17 @@ import java.util.Set;
 
 import org.hl7.fhir.igtools.publisher.xig.XIGInformation.CanonicalResourceUsage;
 import org.hl7.fhir.igtools.publisher.xig.XIGInformation.UsageType;
-import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.CanonicalType;
-import org.hl7.fhir.r5.model.Coding;
-import org.hl7.fhir.r5.model.ElementDefinition;
-import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
-import org.hl7.fhir.r5.model.StringType;
-import org.hl7.fhir.r5.model.StructureDefinition;
-import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionContextComponent;
-import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
-import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
+import org.hl7.fhir.services.conformance.profile.ProfileUtilities;
+import org.hl7.fhir.model.core.CanonicalResource;
+import org.hl7.fhir.model.core.CanonicalType;
+import org.hl7.fhir.model.core.Coding;
+import org.hl7.fhir.model.core.ElementDefinition;
+import org.hl7.fhir.model.core.ElementDefinition.TypeRefComponent;
+import org.hl7.fhir.model.core.StringType;
+import org.hl7.fhir.model.core.StructureDefinition;
+import org.hl7.fhir.model.core.StructureDefinition.StructureDefinitionContextComponent;
+import org.hl7.fhir.model.core.StructureDefinition.StructureDefinitionKind;
+import org.hl7.fhir.model.core.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 
@@ -39,11 +39,11 @@ public class XIGStructureDefinitionHandler extends XIGHandler {
     if (ProfileUtilities.isExtensionDefinition(sd)) {
       info.getExtensionHandler().seeExtension(sd);
     } else {
-      for (ElementDefinition ed : sd.getSnapshot().getElement()) {
-        for (TypeRefComponent tr : ed.getType()) {
+      for (ElementDefinition ed : sd.getSnapshot().getElementList()) {
+        for (TypeRefComponent tr : ed.getTypeList()) {
           if ("Extension".equals(tr.getCode())) {
-            for (CanonicalType u : tr.getProfile()) {
-              ElementDefinition focus = getParent(sd.getSnapshot().getElement(), ed);
+            for (CanonicalType u : tr.getProfileList()) {
+              ElementDefinition focus = getParent(sd.getSnapshot().getElementList(), ed);
               info.getExtensionHandler().seeUse(u.getValue(), focus.getBase().getPath(), focus.getPath());
             }
           }
@@ -57,22 +57,22 @@ public class XIGStructureDefinitionHandler extends XIGHandler {
     if (sd.hasDerivation()) {       j.add("derivation", sd.getDerivation().toCode()); }
     if (sd.hasBaseDefinition()) {   j.add("base", sd.getBaseDefinition()); }
 
-    for (StringType t : sd.getContextInvariant()) {
+    for (StringType t : sd.getContextInvariantList()) {
       j.forceArray("contextInvs").add(t.asStringValue()); 
     }
 
-    for (StructureDefinitionContextComponent t : sd.getContext()) {
+    for (StructureDefinitionContextComponent t : sd.getContextList()) {
       j.forceArray("contexts").add(t.getType().toCode()+":"+t.getExpression()); 
     }
 
-    for (Coding t : sd.getKeyword()) {
+    for (Coding t : sd.getKeywordList()) {
       j.forceArray("keywords").add(t.toString()); 
     }  
 
-    for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+    for (ElementDefinition ed : sd.getSnapshot().getElementList()) {
       if (!ed.getPath().equals("Bundle.entry.resource")) {
-        for (TypeRefComponent tr : ed.getType()) {
-          if (!"Extension".equals(tr.getCode()) && tr.getProfile().size() == 1&& !tr.getProfile().get(0).asStringValue().startsWith("http://hl7.org/fhir/StructureDefinition/")) {
+        for (TypeRefComponent tr : ed.getTypeList()) {
+          if (!"Extension".equals(tr.getCode()) && tr.getProfileList().size() == 1&& !tr.getProfileList().get(0).asStringValue().startsWith("http://hl7.org/fhir/StructureDefinition/")) {
             if (!pidlist.contains(pid)) {
 //              System.out.println(pid+"\t"+sd.getUrl()+"\t"+ed.getPath()+":"+tr.getCode()+"\t"+tr.getProfile().get(0).asStringValue());
               pidlist.add(pid);
@@ -131,7 +131,7 @@ public class XIGStructureDefinitionHandler extends XIGHandler {
         if (cr instanceof StructureDefinition) {
           StructureDefinition sd = (StructureDefinition) cr;
           if ("Extension".equals(sd.getType())) {
-            for (StructureDefinitionContextComponent t : sd.getContext()) {
+            for (StructureDefinitionContextComponent t : sd.getContextList()) {
               String m = descContext(t);
               if (m != null) {
                 if (!profiles.containsKey(m)) {
@@ -196,7 +196,7 @@ public class XIGStructureDefinitionHandler extends XIGHandler {
     StructureDefinition sdt = info.getCtxt().fetchTypeDefinition(actualType);
     if (sdt != null) {
       List<String> paths = new ArrayList<>();
-      for (ElementDefinition ed : sdt.getSnapshot().getElement()) {
+      for (ElementDefinition ed : sdt.getSnapshot().getElementList()) {
         if (!ed.getPath().endsWith(".id")) {
           paths.add(ed.getPath());
         }
@@ -204,7 +204,7 @@ public class XIGStructureDefinitionHandler extends XIGHandler {
       for (StructureDefinition sd : list) {
         List<String> tpaths = new ArrayList<>();
 
-        for (ElementDefinition ed : sd.getDifferential().getElement()) {
+        for (ElementDefinition ed : sd.getDifferential().getElementList()) {
           if (ed.getPath() != null) {
             tpaths.add(ed.getPath());
           }
@@ -280,7 +280,7 @@ public class XIGStructureDefinitionHandler extends XIGHandler {
 
   private String analyse(String p, StructureDefinition sd) {
     List<ElementDefinition> list = new ArrayList<>();
-    for (ElementDefinition ed : sd.getDifferential().getElement()) {
+    for (ElementDefinition ed : sd.getDifferential().getElementList()) {
       if (p.equals(ed.getPath())) {
         list.add(ed);
       }
@@ -377,12 +377,12 @@ public class XIGStructureDefinitionHandler extends XIGHandler {
 
   public static void buildUsages(XIGInformation info, StructureDefinition sd) {
     info.recordUsage(sd, sd.getBaseDefinition(), UsageType.DERIVATION);
-    for (ElementDefinition ed : sd.getDifferential().getElement()) {
-      for (TypeRefComponent tr : ed.getType()) {
-        for (CanonicalType c : tr.getProfile()) {
+    for (ElementDefinition ed : sd.getDifferential().getElementList()) {
+      for (TypeRefComponent tr : ed.getTypeList()) {
+        for (CanonicalType c : tr.getProfileList()) {
           info.recordUsage(sd, c.getValue(), UsageType.SD_PROFILE);
         }
-        for (CanonicalType c : tr.getTargetProfile()) {
+        for (CanonicalType c : tr.getTargetProfileList()) {
           info.recordUsage(sd, c.getValue(), UsageType.TARGET);
         }
       }

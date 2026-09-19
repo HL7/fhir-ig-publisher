@@ -6,16 +6,16 @@ import java.util.List;
 import java.util.Set;
 
 import org.hl7.fhir.igtools.publisher.*;
-import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.CanonicalResourceComparison;
-import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.ChangeAnalysisState;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.model.*;
-import org.hl7.fhir.r5.model.ContactPoint.ContactPointSystem;
-import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
-import org.hl7.fhir.r5.renderers.DataRenderer;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext;
+import org.hl7.fhir.services.comparison.CanonicalResourceComparer.CanonicalResourceComparison;
+import org.hl7.fhir.services.comparison.CanonicalResourceComparer.ChangeAnalysisState;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.model.extensions.ExtensionDefinitions;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.model.core.*;
+import org.hl7.fhir.model.core.ContactPoint.ContactPointSystem;
+import org.hl7.fhir.model.core.Enumerations.PublicationStatus;
+import org.hl7.fhir.services.renderers.DataRenderer;
+import org.hl7.fhir.services.renderers.utils.RenderingContext;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
@@ -52,7 +52,7 @@ public class CanonicalRenderer extends BaseRenderer {
         list.add((CanonicalResource) res);
       }
     }
-    Collections.sort(list, new org.hl7.fhir.r5.utils.ResourceSorters.CanonicalResourceSortByUrl());
+    Collections.sort(list, new org.hl7.fhir.services.utilities.ResourceSorters.CanonicalResourceSortByUrl());
     return list;
   }
 
@@ -128,7 +128,7 @@ public class CanonicalRenderer extends BaseRenderer {
   private String buildPublisherLinks(CanonicalResource cr) {
     CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder(". ");
     boolean useName = false;
-    for (ContactDetail cd : cr.getContact()) {
+    for (ContactDetail cd : cr.getContactList()) {
       if (!cd.hasName()) {
         useName = true;
       }
@@ -136,9 +136,9 @@ public class CanonicalRenderer extends BaseRenderer {
     if (!useName) {
       b.append(Utilities.escapeXml(cr.getPublisher()));            
     }    
-    for (ContactDetail cd : cr.getContact()) {
+    for (ContactDetail cd : cr.getContactList()) {
       String name = cd.hasName() ? cd.getName() : cr.getPublisher();
-      b.append(renderContact(name, cd.getTelecom()));
+      b.append(renderContact(name, cd.getTelecomList()));
     }
     return b.toString();
   }
@@ -287,7 +287,7 @@ public class CanonicalRenderer extends BaseRenderer {
         list.add((CanonicalResource) res);
       }
     }
-    Collections.sort(list, new org.hl7.fhir.r5.utils.ResourceSorters.CanonicalResourceSortByUrl());
+    Collections.sort(list, new org.hl7.fhir.services.utilities.ResourceSorters.CanonicalResourceSortByUrl());
     return list;
   }
 

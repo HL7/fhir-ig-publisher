@@ -16,21 +16,21 @@ import javax.xml.parsers.ParserConfigurationException;
 import com.nedap.archie.adlparser.modelconstraints.BMMConstraintImposer;
 import com.nedap.archie.rminfo.MetaModels;
 import org.hl7.fhir.exceptions.FHIRException;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
-import org.hl7.fhir.r5.model.*;
-import org.hl7.fhir.r5.model.Bundle.BundleType;
-import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
-import org.hl7.fhir.r5.model.ContactPoint.ContactPointSystem;
-import org.hl7.fhir.r5.model.ElementDefinition.DiscriminatorType;
-import org.hl7.fhir.r5.model.ElementDefinition.SlicingRules;
-import org.hl7.fhir.r5.model.Enumerations.BindingStrength;
-import org.hl7.fhir.r5.model.Enumerations.CodeSystemContentMode;
-import org.hl7.fhir.r5.model.Enumerations.FHIRVersion;
-import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
-import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
-import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
-import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.model.extensions.ExtensionDefinitions;
+import org.hl7.fhir.model.core.*;
+import org.hl7.fhir.model.core.Bundle.BundleType;
+import org.hl7.fhir.model.core.CodeSystem.ConceptDefinitionComponent;
+import org.hl7.fhir.model.core.ContactPoint.ContactPointSystem;
+import org.hl7.fhir.model.core.ElementDefinition.DiscriminatorType;
+import org.hl7.fhir.model.core.ElementDefinition.SlicingRules;
+import org.hl7.fhir.model.core.Enumerations.BindingStrength;
+import org.hl7.fhir.model.core.Enumerations.CodeSystemContentMode;
+import org.hl7.fhir.model.core.Enumerations.FHIRVersion;
+import org.hl7.fhir.model.core.Enumerations.PublicationStatus;
+import org.hl7.fhir.model.core.StructureDefinition.StructureDefinitionKind;
+import org.hl7.fhir.model.core.StructureDefinition.TypeDerivationRule;
+import org.hl7.fhir.model.core.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.xml.XMLUtil;
@@ -213,7 +213,7 @@ public class ArchetypeImporter {
     sd.setType("http://openehr.org/fhir/StructureDefinition/"+baseType);
     sd.setBaseDefinition("http://openehr.org/fhir/StructureDefinition/"+baseType);
     
-    List<ElementDefinition> defns = sd.getDifferential().getElement();
+    List<ElementDefinition> defns = sd.getDifferential().getElementList();
     processDefinition(defns, null, defn, baseType, null, baseType, defn.getNodeId());
     
     return new ProcessedArchetype(new String(cnt), name, archetype, bnd, sd);
@@ -261,7 +261,7 @@ public class ArchetypeImporter {
     if (source.getNodeId() != null) {
       atMap.put(source.getNodeId(), id);
     }
-    ElementDefinition defn = new ElementDefinition(path);
+    ElementDefinition defn = new ElementDefinition(context.getModelContext(), path);
     defn.setId(id);
     defns.add(defn);
     defn.setSliceName(sliceName);
@@ -284,7 +284,7 @@ public class ArchetypeImporter {
             defn.getBinding().setStrength(BindingStrength.REQUIRED);
             defn.getBinding().setValueSet(makeValueSet(label, parent.getShort(), parent.getDefinition(), c));
           } else {
-            ElementDefinition ed = new ElementDefinition(path+"."+name);
+            ElementDefinition ed = new ElementDefinition(context.getModelContext(), path+"."+name);
             ed.setId(id+"."+name);
             defns.add(ed);
             ed.getBinding().setStrength(BindingStrength.REQUIRED);
@@ -294,7 +294,7 @@ public class ArchetypeImporter {
           CReal c = (CReal) o;
           if (c.getConstraint().size() == 1) {
             Interval<Double> dbl = c.getConstraint().get(0);
-            ElementDefinition ed = new ElementDefinition(path+"."+name);
+            ElementDefinition ed = new ElementDefinition(context.getModelContext(), path+"."+name);
             ed.setId(id+"."+name);
             defns.add(ed);
             if (dbl.getLower() != null) {
@@ -310,7 +310,7 @@ public class ArchetypeImporter {
           CString c = (CString) o;
           if (c.getConstraint().size() == 1) {
             String v = c.getConstraint().get(0);
-            ElementDefinition ed = new ElementDefinition(path+"."+name);
+            ElementDefinition ed = new ElementDefinition(context.getModelContext(), path+"."+name);
             ed.setId(id+"."+name);
             defns.add(ed);
             ed.setFixed(new StringType(v));
@@ -321,7 +321,7 @@ public class ArchetypeImporter {
           CDuration c = (CDuration) o;
           if (c.getConstraint().size() == 1) {
             Interval<TemporalAmount> v = c.getConstraint().get(0);
-            ElementDefinition ed = new ElementDefinition(path+"."+name);
+            ElementDefinition ed = new ElementDefinition(context.getModelContext(), path+"."+name);
             ed.setId(id+"."+name);
             defns.add(ed);
             if (v.getLower() != null && v.getUpper() != null && v.getLower().equals(v.getUpper())) {
@@ -341,7 +341,7 @@ public class ArchetypeImporter {
           CInteger c = (CInteger) o;
           if (c.getConstraint().size() == 1) {
             Interval<Long> v = c.getConstraint().get(0);
-            ElementDefinition ed = new ElementDefinition(path+"."+name);
+            ElementDefinition ed = new ElementDefinition(context.getModelContext(), path+"."+name);
             ed.setId(id+"."+name);
             defns.add(ed);
             if (v.getLower() != null && v.getUpper() != null && v.getLower() == v.getUpper()) {
@@ -359,7 +359,7 @@ public class ArchetypeImporter {
           }
         } else if (o instanceof CComplexObjectProxy) {
           CComplexObjectProxy c = (CComplexObjectProxy) o;
-          ElementDefinition ed = new ElementDefinition(path+"."+name);
+          ElementDefinition ed = new ElementDefinition(context.getModelContext(), path+"."+name);
           ed.setId(id+"."+name);
           defns.add(ed);
           String[] tp = c.getTargetPath().split("\\/");
@@ -372,7 +372,7 @@ public class ArchetypeImporter {
           System.out.println("not done yet: "+path+"."+name+": "+o.getClass().getName());
         }
       } else {
-        ElementDefinition slicer = new ElementDefinition(path+"."+name);
+        ElementDefinition slicer = new ElementDefinition(context.getModelContext(), path+"."+name);
         slicer.getSlicing().setRules(SlicingRules.CLOSED);
         boolean typeSlicing = false;
         if (isSingleton(source.getRmTypeName(), name)) {
@@ -388,7 +388,7 @@ public class ArchetypeImporter {
             processDefinition(defns, defn, (CComplexObject) o, path+"."+name, sn, id+"."+name+":"+sn, defn.hasLabel() ? defn.getLabel() : label);
           } else if (o instanceof ArchetypeSlot) {
             ArchetypeSlot c = (ArchetypeSlot) o;
-            ElementDefinition ed = new ElementDefinition(path+"."+name);
+            ElementDefinition ed = new ElementDefinition(context.getModelContext(), path+"."+name);
             ed.setId(id+"."+name+":"+sn);
             ed.setSliceName(sn);
             defns.add(ed);

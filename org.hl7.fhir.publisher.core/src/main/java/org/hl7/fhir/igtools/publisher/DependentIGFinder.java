@@ -13,7 +13,7 @@ import java.util.Set;
 
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.r4.model.CanonicalType;
-import org.hl7.fhir.r4.model.ValueSet.ConceptSetComponent;
+import org.hl7.fhir.r4.model.ValueSet;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
@@ -430,10 +430,10 @@ public class DependentIGFinder {
   }
 
   private void scanValueSetR4(org.hl7.fhir.r4.model.ValueSet vs, DepInfoDetails di, String link) {
-    for (ConceptSetComponent t : vs.getCompose().getInclude()) {
+    for (ValueSet.ConceptSetComponent t : vs.getCompose().getInclude()) {
       addToMap(codeSystems, di.codesystemsVs, t.getSystem(), vs.getUrl(), vs.present(), link);
     }   
-    for (ConceptSetComponent t : vs.getCompose().getExclude()) {
+    for (ValueSet.ConceptSetComponent t : vs.getCompose().getExclude()) {
       addToMap(codeSystems, di.codesystemsVs, t.getSystem(), vs.getUrl(), vs.present(), link);
     }
   }
@@ -512,16 +512,17 @@ public class DependentIGFinder {
         "<head>\r\n"+
         "  <title>$title$ : Dependent IGs Analysis</title>\r\n"+
         "  <link href=\"fhir.css\" rel=\"stylesheet\"/>\r\n"+
+        "</head>\r\n"+
         "<body style=\"margin: 20px; background-color: #ffffff\">\r\n"+
         " <h1>Dependent IGs Analysis for $title$</h1>\r\n"+
         " <p>Generated $time$ for $packageId$</p>\r\n"+
-        " <h2>Summary:</h2></tr>\r\n"+
+        " <h2>Summary:</h2>\r\n"+
         "$summary$\r\n"+
-        " <h2>Details By IG</h2></tr>\r\n"+
+        " <h2>Details By IG</h2>\r\n"+
         "$details1$\r\n"+
-        " <h2>Details By Resource</h2></tr>\r\n"+
+        " <h2>Details By Resource</h2>\r\n"+
         "$details2$\r\n"+
-        " <h2>Errors</h2></tr>\r\n"+
+        " <h2>Errors</h2>\r\n"+
         "<pre>\r\n"+
         "$errors$\r\n"+
         "</pre>\r\n"+
