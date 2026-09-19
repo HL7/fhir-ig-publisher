@@ -20,7 +20,28 @@ public class PublishBoxStatementGenerator {
    * @return
    */
   public static String genFragment(PackageList ig, PackageListEntry version, PackageListEntry root, String canonical, boolean currentPublication, boolean isCore) {
-    String p1, p2, p3; 
+    return genFragment(ig, version, root, canonical, currentPublication, isCore, false);
+  }
+
+  /**
+   * The version of the markup contract between the generated publish box and publish-box.js.
+   * Recorded on every dynamic publish box as data-pb-fmt. Pages carrying the current format
+   * (for their own version) are left untouched by later publications - bump this to force a
+   * one-time re-bake of every page on the next -publish-update run.
+   */
+  public static final int DYNAMIC_FORMAT = 1;
+
+  /**
+   * @param dynamicPublishBox when true (publish-setup.json website.dynamic-publish-box), the
+   *   statement is the same accurate-as-published text as the static form, but the "current
+   *   version" reference is wrapped in a marked span (data-pb-*) and the page loads
+   *   package-list.js + publish-box.js from the IG root (relative, deferred). When a newer
+   *   version is published later, the pages of this version are not rewritten; the script
+   *   corrects the statement at view time from package-list.js, and makes no DOM changes at
+   *   all while the baked statement is still accurate.
+   */
+  public static String genFragment(PackageList ig, PackageListEntry version, PackageListEntry root, String canonical, boolean currentPublication, boolean isCore, boolean dynamicPublishBox) {
+    String p1, p2, p3;
     if ("withdrawn".equals(version.status())) {
       p1 = ig.title()+" Withdrawal notice (v"+version.version()+": "+state(ig, version)+").";
       p2 = "";
@@ -31,7 +52,7 @@ public class PublishBoxStatementGenerator {
       if (!isCore) {
         p1 = p1 + (version.fhirVersion() != null ? (isCDA(canonical) ? " generated with " : " based on ")+"<a data-no-external=\"true\" href=\"http://hl7.org/fhir/"+getPath(version.fhirVersion())+"\">FHIR (HL7® FHIR® Standard) "+fhirRef(version.fhirVersion())+"</a>" : "")+". ";
       } else {
-        p1 = p1 + ". ";      
+        p1 = p1 + ". ";
       }
 
       if (root == null) {
@@ -52,9 +73,31 @@ public class PublishBoxStatementGenerator {
       } else {
         p3 = " For a full list of available versions, see the <a data-no-external=\"true\" href=\""+canonical+"/history.html\">Directory of published versions</a>";
       }
+      if (dynamicPublishBox) {
+        // same statement, but marked up so publish-box.js can (a) recognise that it is still
+        // accurate and leave it alone, or (b) correct it once a newer version has been published.
+        // data-pb-current records the assumption the baked text makes; while it matches
+        // package-list.json the script makes no DOM changes at all.
+        p2 = "<span class=\"fhir-pb\" data-pb-fmt=\""+DYNAMIC_FORMAT+"\" data-pb-version=\""+Utilities.escapeXml(version.version())
+            +"\" data-pb-current=\""+(root == null ? "" : Utilities.escapeXml(root.version()))
+            +"\" data-pb-canonical=\""+Utilities.escapeXml(canonical)+"\">"+p2+"</span>";
+        return "This page is part of the "+p1+p2+". "+p3+DYNAMIC_SCRIPTS;
+      }
       return "This page is part of the "+p1+p2+". "+p3;
     }
   }
+
+  /**
+   * Loads the package-list data and the publish box logic from the IG root, where they are
+   * rewritten on every publication (like history.html). {{path}} is replaced per page with the
+   * page's relative path back to the IG root, so the references resolve at the canonical host,
+   * on mirrors/previews under any base path, and from file:// - script tags are not blocked by
+   * the CORS rules that stop fetch() on file://. Deferred: they run in order after parsing, and
+   * being external same-origin scripts they are compatible with a strict CSP (no inline code).
+   */
+  public static final String DYNAMIC_SCRIPTS =
+      "<script type=\"text/javascript\" src=\"{{path}}"+DynamicPublishBoxSupport.PACKAGE_LIST_JS+"\" defer=\"defer\"></script>"
+      + "<script type=\"text/javascript\" src=\"{{path}}"+DynamicPublishBoxSupport.PUBLISH_BOX_JS+"\" defer=\"defer\"></script>";
 
   private static boolean isCDA(String canonical) {
     return canonical.startsWith("http://hl7.org/cda");

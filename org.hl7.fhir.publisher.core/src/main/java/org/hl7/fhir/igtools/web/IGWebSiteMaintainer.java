@@ -71,6 +71,7 @@ public class IGWebSiteMaintainer {
     if (reg == null && !pubSetup.forceObject("website").asBoolean("no-registry"))
       throw new Error("This web site contains IGs that are registered in the implementation guide registry, and you must pass in a reference to the registry");
     ServerType serverType = ServerType.fromCode(pubSetup.forceObject("website").asString("server"));
+    boolean dynamicPublishBox = pubSetup.forceObject("website").asBoolean("dynamic-publish-box");
     
     File sft = null;
     if (pubSetup.forceObject("website").has("search-template")) {
@@ -110,7 +111,7 @@ public class IGWebSiteMaintainer {
       }
     }
     for (String s : igs) {
-      new IGReleaseUpdater(s, url, folder, reg, serverType, igs, sft, filter == null || filter.equalsIgnoreCase(s), historyRepo).check(indexes, true, updateStatements, templateSrc, "??");
+      new IGReleaseUpdater(s, url, folder, reg, serverType, igs, sft, filter == null || filter.equalsIgnoreCase(s), historyRepo, dynamicPublishBox).check(indexes, true, updateStatements, templateSrc, "??");
     }
     for (IndexMaintainer index : indexes.values()) {
       index.buildJson();
