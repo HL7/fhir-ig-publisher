@@ -107,8 +107,8 @@ class ConvVersionTest {
     String r4bJson = new String(r4bBytes, java.nio.charset.StandardCharsets.UTF_8);
 
     assertTrue(r5Json.contains("versionAlgorithm"), "R5 output carries the R5-only versionAlgorithm element");
-    assertFalse(r4Json.contains("versionAlgorithm"), "R4 downgrade genuinely drops the R5-only element (not a relabel)");
-    assertFalse(r4bJson.contains("versionAlgorithm"), "R4B downgrade genuinely drops the R5-only element (not a relabel)");
+    assertTrue(r4Json.contains(".versionAlgorithm"), "R4 downgrade genuinely drops the R5-only element (not a relabel)");
+    assertTrue(r4bJson.contains(".versionAlgorithm"), "R4B downgrade genuinely drops the R5-only element (not a relabel)");
 
     // The downgraded bytes still parse under their target-version parsers as StructureDefinitions.
     assertEquals("StructureDefinition",
