@@ -19,7 +19,7 @@ import org.hl7.fhir.services.fml.StructureMapTools;
 import org.hl7.fhir.services.utilities.NPMPackageGenerator;
 import org.hl7.fhir.standalone.context.SimpleWorkerContext;
 import org.hl7.fhir.services.elementmodel.Element;
-import org.hl7.fhir.services.elementmodel.ElementUtilities;
+import org.hl7.fhir.services.elementmodel.ElementModelUtilities;
 import org.hl7.fhir.services.elementmodel.Manager;
 import org.hl7.fhir.model.extensions.ExtensionDefinitions;
 import org.hl7.fhir.model.extensions.ExtensionUtilities;
@@ -1905,7 +1905,7 @@ public class PublisherProcessor extends PublisherBase  {
           if (pf.isSignatureAsR6()) {
             // we're going to iterate all the provenances looking for a provenance with target #/, and a single signature element, and an appropriate type
             List<Element> signatureProvenances = new ArrayList<>();
-            ElementUtilities.findSignatures(r.getElement(), signatureProvenances);
+            ElementModelUtilities.findSignatures(r.getElement(), signatureProvenances);
             if (signatureProvenances.size() == 1) {
               for (Element resource : signatureProvenances) {
                 List<Element> sigs = resource.getChildrenByName("signature");

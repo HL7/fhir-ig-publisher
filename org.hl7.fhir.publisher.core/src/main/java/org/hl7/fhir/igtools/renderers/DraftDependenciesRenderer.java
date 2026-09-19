@@ -16,7 +16,7 @@ import org.hl7.fhir.model.core.Resource;
 import org.hl7.fhir.model.utilities.ElementVisitor;
 import org.hl7.fhir.model.utilities.ElementVisitor.ElementVisitorInstruction;
 import org.hl7.fhir.model.utilities.ElementVisitor.IElementVisitor;
-import org.hl7.fhir.services.elementmodel.ElementUtilities;
+import org.hl7.fhir.services.elementmodel.ElementModelUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
@@ -84,7 +84,7 @@ public class DraftDependenciesRenderer implements IElementVisitor {
       url = url.substring(0, url.indexOf("#"));
     }
     if (Utilities.isAbsoluteUrl(url)) {
-      CanonicalResource tgt = (CanonicalResource) context.fetchResource(Resource.class, url, ElementUtilities.getVersionResolutionRules(urlE));
+      CanonicalResource tgt = (CanonicalResource) context.fetchResource(Resource.class, url, ElementModelUtilities.getVersionResolutionRules(urlE));
       if (tgt != null && tgt.hasSourcePackage() && !thisPackage.equals(tgt.getSourcePackage().getVID())) {
         if (tgt.getStatus() == PublicationStatus.DRAFT || tgt.getExperimental()) {
           DraftReference dr = new DraftReference(resource, url, tgt);
