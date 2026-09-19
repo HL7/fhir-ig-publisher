@@ -16,3 +16,4 @@
 * Validation: QuestionnaireValidator Calls QuantityComparator.valueOf With Code From Quantity.comparator (#2224)
 * Renderer: Generate actor specific obligation fragments for each profile (StructureDefinition-{id}-obligations-actor-{actorid}[-all])
 * QA: Add ADA code systems to HTA scan
+* Transition to R6
