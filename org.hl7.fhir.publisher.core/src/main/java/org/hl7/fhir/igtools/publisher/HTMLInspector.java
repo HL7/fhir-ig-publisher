@@ -417,6 +417,7 @@ public class HTMLInspector {
         DuplicateAnchorTracker dat = new DuplicateAnchorTracker();
         Stack<XhtmlNode> stack = new Stack<XhtmlNode>();
         checkVisibleFragments(lf.path, stack, x);
+        checkLanguage(s, x, messages);
         boolean headingsShifted = false;
         if (!isBuildReportPage(lf.path)) {
           // both of these run before checkLinks, which mutates the tree as it walks
@@ -828,6 +829,33 @@ public class HTMLInspector {
     // We support div as well because with HTML 5, referenced files might just start with <div>
     // todo: check secure?
 
+  }
+
+  /**
+   * A page must declare its language on the root html element (WCAG 3.1.1, Language of Page). Screen
+   * readers use it to choose the voice and pronunciation rules, and without it they fall back to the
+   * user's default language, which mangles the page for anyone reading it in a different one.
+   * <p>
+   * It has to be the html lang attribute: xml:lang on its own doesn't count, since browsers only
+   * use it when the page is served as XML, and IG pages are served as text/html. Files with a div
+   * root are fragments that get composed into some other page, and take that page's language.
+   */
+  private void checkLanguage(String s, XhtmlNode x, List<ValidationMessage> messages) {
+    if (x.getNodeType() == NodeType.Document) {
+      x = x.getFirstElement();
+    }
+    if (x == null || !"html".equals(x.getName())) {
+      return;
+    }
+    String lang = x.getAttribute("lang");
+    if (lang == null || lang.trim().isEmpty()) {
+      String xmlLang = x.getAttribute("xml:lang");
+      messages.add(new ValidationMessage(Source.HtmlChecker, IssueType.STRUCTURE, s,
+              "The html element has no lang attribute, so the language of the page is not known"
+              + (xmlLang != null && !xmlLang.trim().isEmpty() ? " (it has xml:lang=\""+xmlLang+"\", but browsers ignore that on pages served as html - add lang=\""+xmlLang+"\" as well)" : "")
+              + ". Every page must declare its language on the root element (WCAG compliance test)",
+              IssueSeverity.ERROR).setMessageId("HTML_NO_LANGUAGE"));
+    }
   }
 
   /**
