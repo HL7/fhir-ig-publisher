@@ -60,7 +60,7 @@ public class IGReleaseRedirectionBuilder {
       "%>\r\n"+
       "\r\n"+
       "<!DOCTYPE html>\r\n"+
-      "<html>\r\n"+
+      "<html lang=\"en\">\r\n"+
       "<body>\r\n"+
       "You should not be seeing this page. If you do, ASP has failed badly.\r\n"+
       "</body>\r\n"+
@@ -154,6 +154,9 @@ public class IGReleaseRedirectionBuilder {
    this.canonical = canonical;
    this.vpath = vpath.replace("http://", "https://");
    this.websiteRootFolder = websiteRootFolder;
+   if (!folder.startsWith(websiteRootFolder)) {
+     throw new Error("The folder "+folder+" is not inside the website root folder "+websiteRootFolder);
+   }
    localFolder = folder.substring(websiteRootFolder.length());
    countTotal = 0;
    countUpdated = 0;
@@ -262,7 +265,7 @@ public class IGReleaseRedirectionBuilder {
               "%>\r\n" + 
               "\r\n" + 
               "<!DOCTYPE html>\r\n" + 
-              "<html>\r\n" + 
+              "<html lang=\"en\">\r\n" +
               "<body>\r\n" + 
               "Internal Error - unknown id <%= Request.QueryString(\"id\") %> (from "+Utilities.path(localFolder, "cr"+rt.toLowerCase()+".asp")+") .\r\n" + 
               "</body>\r\n" + 
