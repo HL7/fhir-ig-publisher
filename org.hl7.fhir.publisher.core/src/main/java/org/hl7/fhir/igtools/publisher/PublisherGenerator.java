@@ -3575,24 +3575,24 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     String id = idPrefix + (char)(position+33);
     String s = "<tr style=\"border:0px;padding:0px;vertical-align:top;background-color:inherit;\" id=\"" + Utilities.escapeXml(id) + "\">";
     s = s + "<td style=\"vertical-align:top;text-align:var(--ig-left,left);background-color:inherit;padding:0px 4px 0px 4px;white-space:nowrap;background-image:url(tbl_bck0.png)\" class=\"hierarchy\">";
-    s = s + "<img style=\"background-color:inherit\" alt=\".\" class=\"hierarchy\" src=\"tbl_spacer.png\"/>";
+    s = s + "<img style=\"background-color:inherit\" alt=\"\" class=\"hierarchy\" src=\"tbl_spacer.png\"/>";
     s = s + indents;
     if (!label.equals("0") && !page.hasPage()) {
       if (last)
-        s = s + "<img style=\"background-color:inherit\" alt=\".\" class=\"hierarchy\" src=\"tbl_vjoin_end.png\"/>";
+        s = s + "<img style=\"background-color:inherit\" alt=\"\" class=\"hierarchy\" src=\"tbl_vjoin_end.png\"/>";
       else
-        s = s + "<img style=\"background-color:inherit\" alt=\".\" class=\"hierarchy\" src=\"tbl_vjoin.png\"/>";
+        s = s + "<img style=\"background-color:inherit\" alt=\"\" class=\"hierarchy\" src=\"tbl_vjoin.png\"/>";
     }
     // lloyd check
     if (page.hasPage() && !label.equals("0"))
       if (last)
-        s = s + "<img onClick=\"tableRowAction(this)\" src=\"tbl_vjoin_end-open.png\" alt=\".\" style=\"background-color: inherit\" class=\"hierarchy\"/>";
+        s = s + "<img onClick=\"tableRowAction(this)\" src=\"tbl_vjoin_end-open.png\" alt=\"\" style=\"background-color: inherit\" class=\"hierarchy\"/>";
       else
-        s = s + "<img onClick=\"tableRowAction(this)\" src=\"tbl_vjoin-open.png\" alt=\".\" style=\"background-color: inherit\" class=\"hierarchy\"/>";
+        s = s + "<img onClick=\"tableRowAction(this)\" src=\"tbl_vjoin-open.png\" alt=\"\" style=\"background-color: inherit\" class=\"hierarchy\"/>";
     if (page.hasPage())
-      s = s + "<img style=\"background-color:inherit\" alt=\".\" class=\"hierarchy\" src=\"icon_page-child.gif\"/>";
+      s = s + "<img style=\"background-color:inherit\" alt=\"\" class=\"hierarchy\" src=\"icon_page-child.gif\"/>";
     else
-      s = s + "<img style=\"background-color:inherit\" alt=\".\" class=\"hierarchy\" src=\"icon_page.gif\"/>";
+      s = s + "<img style=\"background-color:inherit\" alt=\"\" class=\"hierarchy\" src=\"icon_page.gif\"/>";
     if (page.hasName()) {
       s = s + "<a title=\"" + Utilities.escapeXml(page.getTitle()) + "\" href=\"" + (currentOffset!=null ? currentOffset + "/" : "") + page.getName() +"\"> " + label + " " + Utilities.escapeXml(page.getTitle()) + "</a></td></tr>";
     } else {
@@ -3605,9 +3605,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       String newIndents = indents;
       if (!label.equals("0")) {
         if (last)
-          newIndents = newIndents + "<img style=\"background-color:inherit\" alt=\".\" class=\"hierarchy\" src=\"tbl_blank.png\"/>";
+          newIndents = newIndents + "<img style=\"background-color:inherit\" alt=\"\" class=\"hierarchy\" src=\"tbl_blank.png\"/>";
         else
-          newIndents = newIndents + "<img style=\"background-color:inherit\" alt=\".\" class=\"hierarchy\" src=\"tbl_vline.png\"/>";
+          newIndents = newIndents + "<img style=\"background-color:inherit\" alt=\"\" class=\"hierarchy\" src=\"tbl_vline.png\"/>";
       }
       if (insertAfterName!=null && childPage.getName().equals(insertAfterName)) {
         total++;
@@ -3626,7 +3626,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
   private byte[] makeLangRedirect(String p) {
     StringBuilder b  = new StringBuilder();
-    b.append("<html><body>\r\n");
+    b.append("<html lang=\"en\"><body>\r\n");
     b.append("<!--ReleaseHeader--><p id=\"publish-box\">Publish Box goes here</p><!--EndReleaseHeader-->\r\n");
     b.append("<script type=\"text/javascript\">\r\n");
     b.append("// "+ HierarchicalTableGenerator.uuid+"\r\n");
@@ -6671,7 +6671,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
 
   private String pageWrap(String content, String title) {
-    return "<html>\r\n"+
+    return "<html lang=\"en\">\r\n"+
             "<head>\r\n"+
             "  <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"/>\r\n"+
             "  <title>"+title+"</title>\r\n"+

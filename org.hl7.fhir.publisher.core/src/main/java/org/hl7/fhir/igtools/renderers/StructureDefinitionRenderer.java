@@ -288,9 +288,12 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     boolean isMod = ProfileUtilities.isModifierExtension(sd);
     if (ProfileUtilities.isSimpleExtension(sd)) {
       ElementDefinition value = sd.getSnapshot().getElementByPath("Extension.value");
+      // the description can be several blocks (paragraphs, lists...). Only the first paragraph
+      // goes into the summary sentence; the rest follows it, or the </p> is left unmatched
+      String[] parts = splitFirstPara(processMarkdown("ext-desc", sd.getDescriptionElement()));
       return "<p>"+
-          gen.formatPhrase(isMod ? RenderingI18nContext.SDR_EXTENSION_SUMMARY_MODIFIER : RenderingI18nContext.SDR_EXTENSION_SUMMARY , value.typeSummary(), Utilities.stripPara(processMarkdown("ext-desc", sd.getDescriptionElement())))+
-          "</p>";
+          gen.formatPhrase(isMod ? RenderingI18nContext.SDR_EXTENSION_SUMMARY_MODIFIER : RenderingI18nContext.SDR_EXTENSION_SUMMARY , value.typeSummary(), parts[0])+
+          "</p>"+parts[1];
     } else {
       List<ElementDefinition> subs = new ArrayList<>();
       ElementDefinition slice = null;
@@ -309,12 +312,37 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       for (ElementDefinition ed : subs) {
         ElementDefinition defn = (ElementDefinition) ed.getUserData(UserDataNames.render_extension_slice);
         if (defn != null) {
-          b.append("<li>"+(defn.getSliceName())+": "+ed.typeSummary()+": "+Utilities.stripPara(processMarkdown("ext-desc", defn.getDefinition()))+"</li>\r\n");
+          String[] parts = splitFirstPara(processMarkdown("ext-desc", defn.getDefinition()));
+          b.append("<li>"+(defn.getSliceName())+": "+ed.typeSummary()+": "+parts[0]+parts[1]+"</li>\r\n");
         }
       }
       b.append("</ul>");
       return b.toString();
     }
+  }
+
+  /**
+   * Splits rendered markdown into [inline content of the first paragraph, everything after it].
+   * If the html doesn't start with a paragraph (e.g. it starts with a list), the first part is empty
+   */
+  private static String[] splitFirstPara(String html) {
+    if (Utilities.noString(html)) {
+      return new String[] { "", "" };
+    }
+    html = html.trim();
+    if (html.startsWith("<p>")) {
+      int i = html.indexOf("</p>");
+      if (i > -1) {
+        return new String[] { html.substring(3, i).trim(), html.substring(i + 4).trim() };
+      }
+      return new String[] { html.substring(3), "" };
+    }
+    for (String tag : new String[] { "<ul", "<ol", "<table", "<div", "<pre", "<blockquote", "<h" }) {
+      if (html.startsWith(tag)) {
+        return new String[] { "", html };
+      }
+    }
+    return new String[] { html, "" };
   }
 
   private boolean parentChainHasOptional(ElementDefinition ed, StructureDefinition profile) {
@@ -1013,10 +1041,10 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           td.markdown(br.display, "binding");
         } else if (Utilities.isAbsoluteUrlLinkable(br.url)) {
           td.ah(br.url).style("opacity: "+opacityStr(inherited)).tx(br.display);
-          td.button("btn-copy", gen.formatPhrase(RenderingI18nContext.SDR_CLICK_COPY)).setAttribute("data-clipboard-text", tx.getValueSet());
+          td.button("btn-copy", "copy", gen.formatPhrase(RenderingI18nContext.SDR_CLICK_COPY)).setAttribute("data-clipboard-text", tx.getValueSet());
         } else {
           td.ah(prefix + br.url).style("opacity: "+opacityStr(inherited)).tx(br.display);
-          td.button("btn-copy", gen.formatPhrase(RenderingI18nContext.SDR_CLICK_COPY)).setAttribute("data-clipboard-text", tx.getValueSet());
+          td.button("btn-copy", "copy", gen.formatPhrase(RenderingI18nContext.SDR_CLICK_COPY)).setAttribute("data-clipboard-text", tx.getValueSet());
         }
         showVersion(tr.td(), uri, resolutionMethod,null);
         tr.td().tx("Unknown");
@@ -1028,7 +1056,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       } else {
         td.ah(p).style("opacity: "+opacityStr(inherited)).tx(gen.getTranslated(vs.getTitleElement(), vs.getNameElement()));
       }
-      td.button("btn-copy", gen.formatPhrase(RenderingI18nContext.SDR_CLICK_COPY)).setAttribute("data-clipboard-text", tx.getValueSet());
+      td.button("btn-copy", "copy", gen.formatPhrase(RenderingI18nContext.SDR_CLICK_COPY)).setAttribute("data-clipboard-text", tx.getValueSet());
       if (vs.hasUserData(UserDataNames.render_external_link)) {
         td.img("external.png", ".");
       }
@@ -1150,7 +1178,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
   private String opacityStr(boolean inherited) {
-    return inherited ? "0.5" : "1.0";
+    return inherited ? HierarchicalTableGenerator.STANDARD_OPACITY : "1.0";
   }
 
   private String getSpecialValueSetName(String uri) {
@@ -2729,10 +2757,11 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         b.append(", ");
       }
 
+      // the values are plain text (titles, names), not html - e.g. "Concept Look Up & Decomposition"
       if (s == null) {
-        b.append(base.get(s));
+        b.append(Utilities.escapeXml(base.get(s)));
       } else {
-        b.append("<a href=\"" + s + "\">" + base.get(s) + "</a>");
+        b.append("<a href=\"" + Utilities.escapeXml(s) + "\">" + Utilities.escapeXml(base.get(s)) + "</a>");
       }
       if (c % 80 == 0) {
         b.append("\r\n");

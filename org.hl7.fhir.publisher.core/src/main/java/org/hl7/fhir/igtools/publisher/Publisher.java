@@ -158,7 +158,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   public static final String FHIR_SETTINGS_PARAM = "-fhir-settings";
   public static final int FMM_DERIVATION_MAX = 5;
   public static final String IG_NAME = "!ig!";
-  public static final String REDIRECT_SOURCE = "<html>\r\n<head>\r\n<meta http-equiv=\"Refresh\" content=\"0; url=site/index.html\"/>\r\n</head>\r\n"+
+  public static final String REDIRECT_SOURCE = "<html lang=\"en\">\r\n<head>\r\n<meta http-equiv=\"Refresh\" content=\"0; url=site/index.html\"/>\r\n</head>\r\n"+
           "<body>\r\n<p>See here: <a href=\"site/index.html\">this link</a>.</p>\r\n</body>\r\n</html>\r\n";
   public static final long JEKYLL_TIMEOUT = 60000 * 5; // 5 minutes....
   public static final long FSH_TIMEOUT = 60000 * 5; // 5 minutes....

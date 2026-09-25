@@ -607,7 +607,7 @@ public class CrossViewRenderer extends Renderer {
       b.append("<td>");
       if (types.size() == base.size() && allMSAreSame(types)) {
         if (types.size() > 0 && types.get(0).ms) {
-          b.append(" <span style=\"color:white; background-color: #D50000; font-weight:bold\">S</span> ");
+          b.append(" <span style=\"color:white; background-color: #B60000; font-weight:bold\">S</span> ");
         }
         b.append("(all)");
       } else {
@@ -615,7 +615,7 @@ public class CrossViewRenderer extends Renderer {
         boolean first = true;
         for (UsedType t : types) {
           if (!doMS && first && t.ms) {
-            b.append(" <span style=\"color:white; background-color: #D50000; font-weight:bold\">S</span> ");
+            b.append(" <span style=\"color:white; background-color: #B60000; font-weight:bold\">S</span> ");
           }
           if (first) first = false;
           else b.append(" | ");
@@ -626,7 +626,7 @@ public class CrossViewRenderer extends Renderer {
             b.append(t.name);
           }
           if (doMS && t.ms) {
-            b.append(" <span style=\"color:white; background-color: #D50000; font-weight:bold\">S</span>");
+            b.append(" <span style=\"color:white; background-color: #B60000; font-weight:bold\">S</span>");
           }
         }
       }
@@ -966,7 +966,7 @@ public class CrossViewRenderer extends Renderer {
     x.para().tx("" + (tbl.getChildNodes().size() - 1) + " Extensions");
     x.jsSrc("assets/js/table.js");
 
-    x.button(null, null).attribute("onclick", "clearAllFilters()").style("padding: 8px 16px; background-color: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;").tx("Clear All Filters");
+    x.button(null, "copy", null).attribute("onclick", "clearAllFilters()").style("padding: 8px 16px; background-color: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;").tx("Clear All Filters");
     return new XhtmlComposer(false, true).compose(x.getChildNodes());
   }
 
