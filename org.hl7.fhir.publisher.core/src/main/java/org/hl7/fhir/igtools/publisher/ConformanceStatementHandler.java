@@ -431,23 +431,24 @@ class ConformanceStatementHandler {
       header.th().id("fcl-rule").style("text-align: center;").tx(rc.formatPhrase(RenderingContext.CSTABLE_HEAD_RULE));
       
       XhtmlNode filters = thead.tr().style("background-color: WhiteSmoke;");
-      filters.td().input("filterid", "text", " ", 4).attribute("title", rc.formatPhrase(RenderingContext.CSTABLE_TITLE_ID));
+      filters.td().input("filterid","filterid", "text", " ", 4).attribute("title", rc.formatPhrase(RenderingContext.CSTABLE_TITLE_ID));
       XhtmlNode expectFilter = filters.td();
       expectFilter.attribute("title", rc.formatPhrase(RenderingContext.CSTABLE_TITLE_EXPECT));
       int count=1;
       for (String expect: foundExpectations) {
         if (count!=1)
           expectFilter.br();
-        expectFilter.input("expect" + count++,  "checkbox",  null, 0).nbsp().tx(translateExpectationEnglish(expect));
+        String name = "expect" + count++;
+        expectFilter.input(name, name,  "checkbox",  null, 0).nbsp().tx(translateExpectationEnglish(expect));
       }
       if (hasConditionalTrue && hasConditionalFalse) {
         XhtmlNode conditionFilter = filters.td();
         conditionFilter.attribute("title", rc.formatPhrase(RenderingContext.CSTABLE_TITLE_COND));
-        conditionFilter.input("conditionFilter", "radio",  null, 0).attribute("id", "conditionYes").attribute("value", "true").nbsp().tx(rc.formatPhrase(RenderingContext.CSTABLE_COND_YES));
+        conditionFilter.input("conditionFilter", "conditionFilter", "radio",  null, 0).attribute("id", "conditionYes").attribute("value", "true").nbsp().tx(rc.formatPhrase(RenderingContext.CSTABLE_COND_YES));
         conditionFilter.br();
-        conditionFilter.input("conditionFilter", "radio",  null, 0).attribute("id", "conditionNo").attribute("value", "false").nbsp().tx(rc.formatPhrase(RenderingContext.CSTABLE_COND_NO));
+        conditionFilter.input("conditionFilter", "conditionFilter", "radio",  null, 0).attribute("id", "conditionNo").attribute("value", "false").nbsp().tx(rc.formatPhrase(RenderingContext.CSTABLE_COND_NO));
         conditionFilter.br();
-        conditionFilter.input("conditionFilter", "radio",  null, 0).nbsp().attribute("id", "conditionAny").attribute("value", "").attribute("checked", "true").tx(rc.formatPhrase(RenderingContext.CSTABLE_COND_ANY));
+        conditionFilter.input("conditionFilter", "conditionFilter", "radio",  null, 0).nbsp().attribute("id", "conditionAny").attribute("value", "").attribute("checked", "true").tx(rc.formatPhrase(RenderingContext.CSTABLE_COND_ANY));
       }
       if (!usedActors.isEmpty()) {
         XhtmlNode actorFilter = filters.td();
@@ -465,7 +466,7 @@ class ConformanceStatementHandler {
           ActorDefinition actor = actorLookup.get(title);
           if (count!=1)
             actorFilter.br();
-          XhtmlNode actorInput = actorFilter.input("actor" + count++,  "checkbox",  null, 1);
+          XhtmlNode actorInput = actorFilter.input("actor" + count++, "Actor", "checkbox",  null, 1);
           actorInput.nbsp();
           rr.renderCanonical(new RenderingStatus(), ResourceWrapper.forResource(rc, actor), actorInput,  ActorDefinition.class, new CanonicalType(actor.getUrl()), lang);
         }
@@ -486,14 +487,14 @@ class ConformanceStatementHandler {
           Coding category = codingLookup.get(display);
           if (count!=1)
             categoryFilter.br();
-          XhtmlNode categoryInput = categoryFilter.input("category" + count++,  "checkbox",  null, 1);
+          XhtmlNode categoryInput = categoryFilter.input("category" + count++, "Category", "checkbox",  null, 1);
           categoryInput.nbsp();
           categoryInput.tx(rr.displayCoding(ResourceWrapper.forType(rc.getContextUtilities(), category)));
         }
       }
       XhtmlNode filterRule = filters.td();
-      filterRule.input("filterrule", "text", " ", 20).attribute("title", rc.formatPhrase(RenderingContext.CSTABLE_TITLE_RULE));
-      filterRule.input("clearFilters", "button", null, 10).style("float:right").attribute("value", rc.formatPhrase(RenderingContext.CSTABLE_CLEAR_FILTERS)).attribute("title", rc.formatPhrase(RenderingContext.CSTABLE_TITLE_CLEAR));
+      filterRule.input("filterrule", "Rule", "text", " ", 20).attribute("title", rc.formatPhrase(RenderingContext.CSTABLE_TITLE_RULE));
+      filterRule.input("clearFilters", "Clear", "button", null, 10).style("float:right").attribute("value", rc.formatPhrase(RenderingContext.CSTABLE_CLEAR_FILTERS)).attribute("title", rc.formatPhrase(RenderingContext.CSTABLE_TITLE_CLEAR));
       
       Set<LoadedFile> sources = new HashSet<>();
       sources.add(info.source);

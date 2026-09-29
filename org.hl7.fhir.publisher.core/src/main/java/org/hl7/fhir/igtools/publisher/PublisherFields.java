@@ -281,6 +281,12 @@ public class PublisherFields {
      * numbering of any template whose CSS counters are still keyed to h2/h3/h4.
      */
     int pageHeadingLevel = 0;
+    /**
+     * Whether HTMLInspector runs the static accessibility checks (the HTML_A11Y_* warnings), from the IG
+     * parameter 'accessibility-checks'. Off unless the IG turns it on. Doesn't affect the older checks
+     * (headings, page language).
+     */
+    boolean accessibilityChecks = false;
     long maxMemory = 0;
     String oidRoot;
     IniFile oidIni;

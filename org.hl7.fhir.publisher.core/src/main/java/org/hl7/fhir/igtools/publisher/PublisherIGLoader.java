@@ -305,6 +305,7 @@ public class PublisherIGLoader extends PublisherBase {
     } catch (Exception e) {
       throw new Exception("Error Parsing File "+ pf.igName +": "+e.getMessage(), e);
     }
+    pf.templateManager.loadTemplateOverrides(ini, pf.rootDir);
     pf.template = pf.templateManager.loadTemplate(templateName, pf.rootDir, pf.packageId(), settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD, pf.logOptions.contains("template"), settings.isRapidoMode());
     if (pf.template.hasExtraTemplates()) {
       processExtraTemplates(pf.template.getExtraTemplates());
@@ -763,6 +764,12 @@ public class PublisherIGLoader extends PublisherBase {
             throw new FHIRException("Unknown value for 'page-heading-level' of '"+p.getValue()+"': it must be a heading level from 1 to 6");
           }
           break;
+        case "accessibility-checks":
+          if (!Utilities.existsInList(p.getValue(), "true", "false")) {
+            throw new FHIRException("Unknown value for 'accessibility-checks' of '"+p.getValue()+"': it must be true or false");
+          }
+          pf.accessibilityChecks = "true".equals(p.getValue());
+          break;
         case "viewDefinition":
           pf.viewDefinitions.add(p.getValue());
           break;
@@ -1151,6 +1158,11 @@ public class PublisherIGLoader extends PublisherBase {
     pf.inspector.getManual().add("qa-ipreview.html");
     pf.inspector.setExemptHtmlPatterns(pf.getExemptHtmlPatterns());
     pf.inspector.setPageHeadingLevel(pf.pageHeadingLevel);
+    pf.inspector.setAccessibilityChecks(pf.accessibilityChecks);
+    // the in-page accessibility check panel is for authors looking at their own local build: never on the
+    // ci-build, the web server, or a publication build
+    // (a normal local build has no mode set at all - null means manual, as elsewhere in the publisher)
+    pf.inspector.setAccessibilityPanel(pf.accessibilityChecks && (settings.getMode() == null || settings.getMode() == PublisherUtils.IGBuildMode.MANUAL));
     pf.inspector.setPcm(pf.pcm);
 
     for (String name : pf.customResourceNames) {
@@ -1249,7 +1261,6 @@ public class PublisherIGLoader extends PublisherBase {
     pf.pvalidator = new ProfileValidator(pf.context, pf.validator.getSettings(), pf.context.getXVer(), pf.validatorSession);
     pf.csvalidator = new CodeSystemValidator(pf.context, pf.validator.getSettings(), pf.context.getXVer(), pf.validatorSession);
     pf.pvalidator.setCheckAggregation(pf.checkAggregation);
-    pf.pvalidator.setCheckMustSupport(pf.hintAboutNonMustSupport);
     pf.validator.setShowMessagesFromReferences(pf.showReferenceMessages);
     pf.validator.getExtensionDomains().addAll(extensionDomains);
     pf.validator.setNoExperimentalContent(pf.noExperimentalContent);

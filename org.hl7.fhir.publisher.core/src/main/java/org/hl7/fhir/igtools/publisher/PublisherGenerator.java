@@ -3626,7 +3626,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
   private byte[] makeLangRedirect(String p) {
     StringBuilder b  = new StringBuilder();
-    b.append("<html lang=\"en\"><body>\r\n");
+    b.append("<html lang=\"en\"><title>Redirect File</title><body>\r\n");
     b.append("<!--ReleaseHeader--><p id=\"publish-box\">Publish Box goes here</p><!--EndReleaseHeader-->\r\n");
     b.append("<script type=\"text/javascript\">\r\n");
     b.append("// "+ HierarchicalTableGenerator.uuid+"\r\n");
@@ -5224,17 +5224,17 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     tr.th().tx("Description");
 
     tr = tbl.tr();
-    tr.td().input(null, "text", null, 10).attribute("id", "filter-identity").clss("filter-input");
-    tr.td().input(null, "text", null, 30).attribute("id", "filter-name").clss("filter-input");
-    tr.td().input(null, "text", null, 4).attribute("id", "filter-version").clss("filter-input");
-    tr.td().input(null, "text", null, 4).attribute("id", "filter-status").clss("filter-input");
+    tr.td().input(null, "identity", "text", null, 10).attribute("id", "filter-identity").clss("filter-input");
+    tr.td().input(null, "name", "text", null, 30).attribute("id", "filter-name").clss("filter-input");
+    tr.td().input(null, "version", "text", null, 4).attribute("id", "filter-version").clss("filter-input");
+    tr.td().input(null, "status", "text", null, 4).attribute("id", "filter-status").clss("filter-input");
     if (cs) {
-      tr.td().input(null, "text", null, 6).attribute("id", "filter-content").clss("filter-input");
+      tr.td().input(null, "content", "text", null, 6).attribute("id", "filter-content").clss("filter-input");
     }
-    tr.td().input(null, "text", null, 5).attribute("id", "filter-owner").clss("filter-input");
-    tr.td().input(null, "text", null, 5).attribute("id", "filter-copyright").clss("filter-input");
-    tr.td().input(null, "text", null, 6).attribute("id", "filter-date").clss("filter-input");
-    tr.td().input(null, "text", null, 30).attribute("id", "filter-desc").clss("filter-input");
+    tr.td().input(null, "owner", "text", null, 5).attribute("id", "filter-owner").clss("filter-input");
+    tr.td().input(null, "copyright", "text", null, 5).attribute("id", "filter-copyright").clss("filter-input");
+    tr.td().input(null, "date", "text", null, 6).attribute("id", "filter-date").clss("filter-input");
+    tr.td().input(null, "description", "text", null, 30).attribute("id", "filter-desc").clss("filter-input");
     return cs;
   }
 

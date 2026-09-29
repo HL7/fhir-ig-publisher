@@ -140,9 +140,12 @@ public class IPStatementsRenderer {
         key1++;
         b.append("<li>");
         b.append(stmt);
-        b.append("<div data-fhir=\"generated\" id=\"ipp_"+key1+"\" onClick=\"if (document.getElementById('ipp2_"+key1+"').innerHTML != '') {document.getElementById('ipp_"+key1+"').innerHTML = document.getElementById('ipp2_"+key1+"').innerHTML; document.getElementById('ipp2_"+key1+"').innerHTML = ''}\">"+
-            " <span style=\"cursor: pointer; border: 1px grey solid; background-color: #fcdcb3; padding-left: 3px; padding-right: 3px; color: black\">"+
-            "Show Usage</span></div><div id=\"ipp2_"+key1+"\" style=\"display: none\">");
+        // a real button so it can be used from the keyboard; after the swap, focus goes to the first link in the
+        // content shown, since the button that had focus is gone (and keyboard users would be sent to the top of the page)
+        b.append("<div data-fhir=\"generated\" id=\"ipp_"+key1+"\"> "+
+            "<button type=\"button\" style=\"cursor: pointer; border: 1px grey solid; background-color: #fcdcb3; padding: 0 3px; margin: 0; color: black; font: inherit\" "+
+            "onClick=\"var t = document.getElementById('ipp_"+key1+"'); var s = document.getElementById('ipp2_"+key1+"'); if (s.innerHTML != '') { t.innerHTML = s.innerHTML; s.innerHTML = ''; var a = t.querySelector('a, button'); if (a) a.focus(); }\">"+
+            "Show Usage</button></div><div id=\"ipp2_"+key1+"\" style=\"display: none\">");
         b.append("\r\n<ul>\r\n");
         List<SystemUsage> v = usages.get(stmt);
         Collections.sort(v, new SystemUsageSorter());        
@@ -176,9 +179,11 @@ public class IPStatementsRenderer {
             c++;
             if (c == MAX_LIST_DISPLAY && links.size() > MAX_LIST_DISPLAY + 2) {
               closeSpan = true;
-              b.append("<span id=\"ips_"+key2+"\" onClick=\"document.getElementById('ips_"+key2+"').innerHTML = document.getElementById('ips2_"+key2+"').innerHTML\">..."+
-                  " <span style=\"cursor: pointer; border: 1px grey solid; background-color: #fcdcb3; padding-left: 3px; padding-right: 3px; color: black\">"+
-                  "Show "+(links.size()-MAX_LIST_DISPLAY+1)+" more</span></span><span id=\"ips2_"+key2+"\" style=\"display: none\">");
+              // as above: a button, and focus to the first newly shown link
+              b.append("<span id=\"ips_"+key2+"\">... "+
+                  "<button type=\"button\" style=\"cursor: pointer; border: 1px grey solid; background-color: #fcdcb3; padding: 0 3px; margin: 0; color: black; font: inherit\" "+
+                  "onClick=\"var s = document.getElementById('ips_"+key2+"'); s.innerHTML = document.getElementById('ips2_"+key2+"').innerHTML; var a = s.querySelector('a'); if (a) a.focus();\">"+
+                  "Show "+(links.size()-MAX_LIST_DISPLAY+1)+" more</button></span><span id=\"ips2_"+key2+"\" style=\"display: none\">");
             }
             if (c == links.size() && c != 1) {
               b.append(" and ");

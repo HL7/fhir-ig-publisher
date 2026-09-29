@@ -807,14 +807,14 @@ public class CrossViewRenderer extends Renderer {
     }
 
     tr = tbl.tr();
-    tr.td().input(null, "text", null, 15).attribute("class", "filter-input").attribute("id", "filter-identity");
-    tr.td().input(null, "text", null, 3).attribute("class", "filter-input").attribute("id", "filter-card");
-    tr.td().input(null, "text", null, 8).attribute("class", "filter-input").attribute("id", "filter-type");
-    tr.td().input(null, "text", null, 20).attribute("class", "filter-input").attribute("id", "filter-context");
-    tr.td().input(null, "text", null, 3).attribute("class", "filter-input").attribute("id", "filter-wg");
-    tr.td().input(null, "text", null, 6).attribute("class", "filter-input").attribute("id", "filter-status");
+    tr.td().input(null, "identity", "text", null, 15).attribute("class", "filter-input").attribute("id", "filter-identity");
+    tr.td().input(null, "cardinality","text", null, 3).attribute("class", "filter-input").attribute("id", "filter-card");
+    tr.td().input(null, "type","text", null, 8).attribute("class", "filter-input").attribute("id", "filter-type");
+    tr.td().input(null, "context","text", null, 20).attribute("class", "filter-input").attribute("id", "filter-context");
+    tr.td().input(null, "wg","text", null, 3).attribute("class", "filter-input").attribute("id", "filter-wg");
+    tr.td().input(null, "status","text", null, 6).attribute("class", "filter-input").attribute("id", "filter-status");
     if (context.getChangeVersion() != null) {
-      tr.td().input(null, "checkbox", null, 0).attribute("id", "hideUnchanged");
+      tr.td().input(null, "Hide Unchanged","checkbox", null, 0).attribute("id", "hideUnchanged");
     }
 
     if (type != null) {
