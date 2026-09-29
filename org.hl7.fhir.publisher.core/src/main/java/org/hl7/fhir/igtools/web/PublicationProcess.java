@@ -452,6 +452,9 @@ public class PublicationProcess {
     
     check(res, pl.list().size() > 0, "Destination package-list has no existent version (should have ci-build entry)");
     check(res, vPub == null, "Found an entry in the publication package-list for v"+version+" - it looks like it has already been published");
+    // the publication request drives where the IG is published to; if it wasn't updated along with the IG, the new
+    // version would be published over the folder of whatever version the request still names
+    check(res, version.equals(prSrc.asString("version")), "The publication request is for version '"+prSrc.asString("version")+"' but the IG is version '"+version+"' - update publication-request.json");
     check(res, prSrc.has("desc") || prSrc.has("descmd"), "Source publication request has no description for v"+version);
     String pathVer = prSrc.asString("path");
     String vCode = pathVer.substring(pathVer.lastIndexOf("/")+1);
@@ -466,9 +469,10 @@ public class PublicationProcess {
     check(res, npm.fhirVersion().equals(qa.asString("version")), "Generated IG has wrong FHIR version "+qa.asString("version"));
     check(res, qa.asString("url").startsWith(canonical) || qa.asString("url").startsWith(npm.canonical()), "Generated IG has wrong Canonical "+qa.asString("url"));
     
-    src.needOptionalFolder(vCode, false);
-    
     String destVer = Utilities.path(destination, vCode);
+    // bring the version folder into the working root if it exists in the web source, so the 'already exists' check
+    // below can see it. The path is relative to the web root, not the IG's folder
+    src.needOptionalFolder(FileUtilities.getRelativePath(workingRoot, destVer), false);
     if (!check(res, new File(destination).exists(), "Destination '"+destVer+"' not found - must be set up manually for first publication")) {
       return res;
     }    
