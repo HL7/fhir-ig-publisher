@@ -30,11 +30,14 @@ import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.utilities.FileUtilities;
+import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonElement;
@@ -57,14 +60,63 @@ public class TemplateManager {
   List<String> templateList = new ArrayList<>();
   Set<String> antScripts = new HashSet<>();
   private boolean autoMode;
+  private Map<String, String> templateOverrides = new LinkedHashMap<>(); // template id (name#version, or just name) -> local folder
+  private boolean usedOverride;
 
   public TemplateManager(FilesystemPackageCacheManager pcm, ILoggingService logger) {
     this.pcm = pcm;
     this.logger = logger;
   }
 
+  /**
+   * For debugging templates: in the [IG] section of ig.ini, any property whose name is a package id,
+   * with or without a version, nominates a local folder to load that template from instead of the
+   * package cache. This applies to the template itself and to any of its base templates, e.g.
+   *
+   *   template = hl7.fhir.template#current
+   *   hl7.fhir.template#current = /Users/me/work/templates/hl7.fhir.template
+   *   hl7.base.template = ../templates/hl7.base.template
+   *
+   * Relative folders are relative to the IG root folder. Ignored in auto-build mode
+   */
+  public void loadTemplateOverrides(IniFile ini, String rootFolder) throws IOException {
+    templateOverrides.clear();
+    if (ini == null || !ini.hasSection("IG")) {
+      return;
+    }
+    for (String name : ini.getPropertyNames("IG")) {
+      if (name.matches(FilesystemPackageCacheManager.PACKAGE_VERSION_REGEX) || name.matches(FilesystemPackageCacheManager.PACKAGE_REGEX)) {
+        String folder = ini.getStringProperty("IG", name);
+        if (!Utilities.noString(folder)) {
+          File f = new File(folder);
+          if (!f.isAbsolute()) {
+            f = new File(Utilities.path(rootFolder, folder));
+          }
+          templateOverrides.put(name, f.getAbsolutePath());
+        }
+      }
+    }
+  }
+
+  private String findTemplateOverride(String template) {
+    if (templateOverrides.isEmpty()) {
+      return null;
+    }
+    String res = templateOverrides.get(template);
+    if (res == null && template.contains("#")) {
+      res = templateOverrides.get(template.substring(0, template.indexOf("#")));
+    }
+    return res;
+  }
+
   public Template loadTemplate(String template, String rootFolder, String packageId, boolean autoMode, boolean wantLog, boolean rapidoMode) throws FHIRException, IOException {
     this.autoMode = autoMode;
+    this.usedOverride = false;
+    if (autoMode && !templateOverrides.isEmpty()) {
+      // overrides would let an IG substitute arbitrary content for a trusted template id
+      logger.logMessage("Template overrides in ig.ini are ignored in auto-build mode: "+String.join(", ", templateOverrides.keySet()));
+      templateOverrides.clear();
+    }
     String templateDir = Utilities.path(rootFolder, "template");
     boolean inPlace = template.equals("#template");
     if (!inPlace) {
@@ -85,7 +137,7 @@ public class TemplateManager {
     if (!canExecute) {
       logger.logMessage("IG template '"+templateThatCantExecute+"' is not trusted.  No scripts will be executed");
     }
-    return new Template(rootFolder, canExecute, templateThatCantExecute, templateReason, wantLog, rapidoMode, isDevMode(template));
+    return new Template(rootFolder, canExecute, templateThatCantExecute, templateReason, wantLog, rapidoMode, usedOverride || isDevMode(template));
   }
 
   private boolean isDevMode(String template) {
@@ -93,8 +145,24 @@ public class TemplateManager {
   }
 
   private void installTemplate(String template, String rootFolder, String templateDir, List<String> scriptIds, ArrayList<String> loadedIds, int level) throws FHIRException, IOException {
-    logger.logMessage(Utilities.padLeft("", ' ', level) + "Load Template from "+template);
-    NpmPackage npm = loadPackage(template, rootFolder);
+    String override = findTemplateOverride(template);
+    NpmPackage npm;
+    if (override != null) {
+      logger.logMessage(Utilities.padLeft("", ' ', level) + "Load Template "+template+" from local folder "+override+" (override in ig.ini)");
+      File f = new File(override);
+      if (!f.exists() || !f.isDirectory()) {
+        throw new FHIRException("The ig.ini override for template "+template+" names the folder "+override+" which does not exist");
+      }
+      npm = NpmPackage.fromFolder(f.getAbsolutePath(), PackageType.IG_TEMPLATE, "output", ".git");
+      usedOverride = true;
+      String id = template.contains("#") ? template.substring(0, template.indexOf("#")) : template;
+      if (!id.equals(npm.name())) {
+        logger.logMessage(Utilities.padLeft("", ' ', level) + "  Warning: the template in "+override+" is "+npm.name()+", not "+id);
+      }
+    } else {
+      logger.logMessage(Utilities.padLeft("", ' ', level) + "Load Template from "+template);
+      npm = loadPackage(template, rootFolder);
+    }
     if (!npm.isType(PackageType.IG_TEMPLATE))
       throw new FHIRException("The referenced package '"+template+"' does not have the correct type - is "+npm.type()+" but should be a template");
     templateList.add(npm.name()+"#"+npm.version());

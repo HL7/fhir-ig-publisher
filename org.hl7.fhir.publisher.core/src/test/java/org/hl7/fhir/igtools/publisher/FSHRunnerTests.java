@@ -83,20 +83,22 @@ public class FSHRunnerTests {
 
 	public static Stream<Arguments> npmPathExecStringParams () {
 		List<Arguments> output = List.of(
-				Arguments.of(PublisherUtils.IGBuildMode.PUBLICATION, null, "bash -c sushi --require-latest . -o ."),
-				Arguments.of(PublisherUtils.IGBuildMode.AUTOBUILD, null, "bash -c sushi --require-latest . -o ."),
-				Arguments.of(PublisherUtils.IGBuildMode.MANUAL, null, "bash -c sushi . -o ."),
-				Arguments.of(PublisherUtils.IGBuildMode.PUBLICATION, "1.2.3", "bash -c npx fsh-sushi@1.2.3 --require-latest . -o ."),
-				Arguments.of(PublisherUtils.IGBuildMode.AUTOBUILD, "1.2.3", "bash -c npx fsh-sushi@1.2.3 --require-latest . -o ."),
-				Arguments.of(PublisherUtils.IGBuildMode.MANUAL, "1.2.3", "bash -c npx fsh-sushi@1.2.3 . -o .")
+				Arguments.of(PublisherUtils.IGBuildMode.PUBLICATION, null, "sushi --require-latest . -o ."),
+				Arguments.of(PublisherUtils.IGBuildMode.AUTOBUILD, null, "sushi --require-latest . -o ."),
+				Arguments.of(PublisherUtils.IGBuildMode.MANUAL, null, "sushi . -o ."),
+				Arguments.of(PublisherUtils.IGBuildMode.PUBLICATION, "1.2.3", "npx fsh-sushi@1.2.3 --require-latest . -o ."),
+				Arguments.of(PublisherUtils.IGBuildMode.AUTOBUILD, "1.2.3", "npx fsh-sushi@1.2.3 --require-latest . -o ."),
+				Arguments.of(PublisherUtils.IGBuildMode.MANUAL, "1.2.3", "npx fsh-sushi@1.2.3 . -o .")
 		);
 		return output.stream();
 	}
 	@ParameterizedTest
 	@MethodSource("npmPathExecStringParams")
-	public void testNpmPathExecString(PublisherUtils.IGBuildMode mode, String fshVersion, String expectedExecString) {
+	public void testNpmPathExecString(PublisherUtils.IGBuildMode mode, String fshVersion, String expectedScript) {
 		FSHRunner fshRunner = new FSHRunner(Mockito.mock(ILoggingService.class));
 		final CommandLine actualCommandLine = fshRunner.getNpmPathCommandLine(fshVersion, mode);
-		assertIsEqual(CommandLine.parse(expectedExecString), actualCommandLine);
+		// bash -c must get the whole sushi command as a single, unquoted argument
+		assertEquals("bash", actualCommandLine.getExecutable());
+		assertArrayEquals(new String[] {"-c", expectedScript}, actualCommandLine.getArguments());
 	}
 }

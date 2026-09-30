@@ -44,7 +44,7 @@ import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider {
 
   private final static String HEADER=
-      "<html>\r\n"+
+      "<html lang=\"en\">\r\n"+
           "<head>\r\n"+
           "  <title>$title$</title>\r\n"+
           "  <link href=\"fhir.css\" rel=\"stylesheet\"/>\r\n"+

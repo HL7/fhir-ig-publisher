@@ -285,7 +285,7 @@ public class DependencyRenderer {
         if (info.versions.size()!=1)
           b.append(" rowspan=\"" + info.versions.size() + "\"");
         b.append("><span class=\"copy-text\" title=\"canonical: " + info.p.canonical() + "\"><a style=\"font-size: 11px; font-family: verdana; font-weight:" + (info.direct ? "bold" : "normal") + "\"");
-        b.append(" href=\"" + info.p.url() + "\">" + Utilities.escapeXml(name) + "</a><button class=\"btn-copy\" title=\"Click to copy URL\" data-clipboard-text=\"" + info.p.canonical() + "\"/></span></td><td>");
+        b.append(" href=\"" + info.p.url() + "\">" + Utilities.escapeXml(name) + "</a><button class=\"btn-copy\" aria-label=\"copy\" title=\"Click to copy URL\" data-clipboard-text=\"" + info.p.canonical() + "\"/></span></td><td>");
         boolean first = true;
         List<String> versions = new ArrayList<String>(info.versions.keySet());
         Collections.sort(versions, Collections.reverseOrder());
@@ -294,7 +294,7 @@ public class DependencyRenderer {
           if (!first)
             b.append(newRow + ">");
           b.append("<span class=\"copy-text\" title=\"package: " + verInfo.p.id() + "#" + version + "\"><a style=\"font-size: 11px; font-family: verdana; font-weight: " + (verInfo.direct ? "bold" : "normal") + "\"");
-          b.append(" href=\"https://simplifier.net/packages/" + info.p.name() + "/" + version + "\">" + version + "</a><button class=\"btn-copy\" title=\"Click to copy package\" data-clipboard-text=\"" + verInfo.p.id() + "#" + version + "\"/></span>");
+          b.append(" href=\"https://simplifier.net/packages/" + info.p.name() + "/" + version + "\">" + version + "</a><button class=\"btn-copy\" aria-label=\"copy\" title=\"Click to copy package\" data-clipboard-text=\"" + verInfo.p.id() + "#" + version + "\"/></span>");
           b.append("</td><td" + (verInfo.direct ? "" : " style=\"font-style: italic;\"") + ">" + (verInfo.hasReason() ? verInfo.getReason() : "") + "</td></tr>");
 
           first = false;

@@ -607,7 +607,7 @@ public class CrossViewRenderer extends Renderer {
       b.append("<td>");
       if (types.size() == base.size() && allMSAreSame(types)) {
         if (types.size() > 0 && types.get(0).ms) {
-          b.append(" <span style=\"color:white; background-color: #D50000; font-weight:bold\">S</span> ");
+          b.append(" <span style=\"color:white; background-color: #B60000; font-weight:bold\">S</span> ");
         }
         b.append("(all)");
       } else {
@@ -615,7 +615,7 @@ public class CrossViewRenderer extends Renderer {
         boolean first = true;
         for (UsedType t : types) {
           if (!doMS && first && t.ms) {
-            b.append(" <span style=\"color:white; background-color: #D50000; font-weight:bold\">S</span> ");
+            b.append(" <span style=\"color:white; background-color: #B60000; font-weight:bold\">S</span> ");
           }
           if (first) first = false;
           else b.append(" | ");
@@ -626,7 +626,7 @@ public class CrossViewRenderer extends Renderer {
             b.append(t.name);
           }
           if (doMS && t.ms) {
-            b.append(" <span style=\"color:white; background-color: #D50000; font-weight:bold\">S</span>");
+            b.append(" <span style=\"color:white; background-color: #B60000; font-weight:bold\">S</span>");
           }
         }
       }
@@ -807,14 +807,14 @@ public class CrossViewRenderer extends Renderer {
     }
 
     tr = tbl.tr();
-    tr.td().input(null, "text", null, 15).attribute("class", "filter-input").attribute("id", "filter-identity");
-    tr.td().input(null, "text", null, 3).attribute("class", "filter-input").attribute("id", "filter-card");
-    tr.td().input(null, "text", null, 8).attribute("class", "filter-input").attribute("id", "filter-type");
-    tr.td().input(null, "text", null, 20).attribute("class", "filter-input").attribute("id", "filter-context");
-    tr.td().input(null, "text", null, 3).attribute("class", "filter-input").attribute("id", "filter-wg");
-    tr.td().input(null, "text", null, 6).attribute("class", "filter-input").attribute("id", "filter-status");
+    tr.td().input(null, "identity", "text", null, 15).attribute("class", "filter-input").attribute("id", "filter-identity");
+    tr.td().input(null, "cardinality","text", null, 3).attribute("class", "filter-input").attribute("id", "filter-card");
+    tr.td().input(null, "type","text", null, 8).attribute("class", "filter-input").attribute("id", "filter-type");
+    tr.td().input(null, "context","text", null, 20).attribute("class", "filter-input").attribute("id", "filter-context");
+    tr.td().input(null, "wg","text", null, 3).attribute("class", "filter-input").attribute("id", "filter-wg");
+    tr.td().input(null, "status","text", null, 6).attribute("class", "filter-input").attribute("id", "filter-status");
     if (context.getChangeVersion() != null) {
-      tr.td().input(null, "checkbox", null, 0).attribute("id", "hideUnchanged");
+      tr.td().input(null, "Hide Unchanged","checkbox", null, 0).attribute("id", "hideUnchanged");
     }
 
     if (type != null) {
@@ -966,7 +966,7 @@ public class CrossViewRenderer extends Renderer {
     x.para().tx("" + (tbl.getChildNodes().size() - 1) + " Extensions");
     x.jsSrc("assets/js/table.js");
 
-    x.button(null, null).attribute("onclick", "clearAllFilters()").style("padding: 8px 16px; background-color: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;").tx("Clear All Filters");
+    x.button(null, "copy", null).attribute("onclick", "clearAllFilters()").style("padding: 8px 16px; background-color: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;").tx("Clear All Filters");
     return new XhtmlComposer(false, true).compose(x.getChildNodes());
   }
 

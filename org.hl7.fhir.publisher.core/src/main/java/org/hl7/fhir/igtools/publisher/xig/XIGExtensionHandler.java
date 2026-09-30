@@ -117,7 +117,7 @@ public class XIGExtensionHandler {
 
   private StringBuilder header(String title) {
     StringBuilder b = new StringBuilder();
-    b.append("<html>\r\n"+
+    b.append("<html lang=\"en\">\r\n"+
         "<head>\r\n"+
         "<title>"+title+"</title>\r\n"+
         "<link href=\"fhir.css\" rel=\"stylesheet\"/>\r\n"+

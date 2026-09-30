@@ -42,6 +42,7 @@ public class IPViewRenderer {
   public String execute() throws IOException {
     XhtmlNode doc = new XhtmlNode(NodeType.Document);
     XhtmlNode html = doc.addTag("html");
+    html.attribute("lang", "en");
     XhtmlNode head = html.addTag("head");
     head.addTag("title").tx("IP Review");
     head.link("stylesheet", "fhir.css");

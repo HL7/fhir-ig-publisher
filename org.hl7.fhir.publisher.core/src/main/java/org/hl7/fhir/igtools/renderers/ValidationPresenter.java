@@ -75,6 +75,7 @@ import org.stringtemplate.v4.ST;
 
 public class ValidationPresenter implements Comparator<FetchedFile> {
 
+  public static final String BG_COLOR_ERROR = "#ffdddd";
   private int vmid = 0;
 
   public enum LanguagePopulationPolicy {
@@ -1504,15 +1505,15 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       if (Utilities.isInteger(s)) {
         int y = Integer.parseInt(s);
         if (y > Calendar.getInstance().get(Calendar.YEAR)) {
-          return "<br/><br/><span style=\"background-color: #ffcccc\">The copyrightYear parameter ('"+copyrightYear+"') in the IG resource looks wrong - should not be after this year</span>";                  
+          return "<br/><br/><span style=\"background-color: #ffdddd\">The copyrightYear parameter ('"+copyrightYear+"') in the IG resource looks wrong - should not be after this year</span>";                  
         } else {
           return "<br/><br/>The copyrightYear parameter ('"+copyrightYear+"') in the IG resource is good";          
         }
       } else {
-        return "<br/><br/><span style=\"background-color: #ffcccc\">The copyrightYear parameter ('"+copyrightYear+"') in the IG resource can't be understood - expecting YYYY+</span>";        
+        return "<br/><br/><span style=\"background-color: #ffdddd\">The copyrightYear parameter ('"+copyrightYear+"') in the IG resource can't be understood - expecting YYYY+</span>";        
       }
     } else {
-      return "<br/><br/><span style=\"background-color: #ffcccc\">The copyrightYear parameter ('"+copyrightYear+"') in the IG resource can't be understood - expecting YYYY+</span>";        
+      return "<br/><br/><span style=\"background-color: #ffdddd\">The copyrightYear parameter ('"+copyrightYear+"') in the IG resource can't be understood - expecting YYYY+</span>";        
     }
   }
     
@@ -1906,7 +1907,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     }
     switch (level) {
     case ERROR:
-      return "#ffcccc";
+      return BG_COLOR_ERROR;
     case FATAL:
       return "#ff9999";
     case WARNING:
@@ -1924,7 +1925,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     case ERROR:
       return "#ffeeee";
     case FATAL:
-      return "#ffcccc";
+      return BG_COLOR_ERROR;
     case WARNING:
       return "#fff4ee";
     default: // INFORMATION:
@@ -1968,7 +1969,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       b.append("</span>");
     } else {
       if (!toolsVersion.equals(currentToolsVersion)) {
-        b.append("<span style=\"background-color: #ffcccc\">IG Publisher Version: ");
+        b.append("<span style=\"background-color: #ffdddd\">IG Publisher Version: ");
       } else {
         b.append("<span>IG Publisher Version: ");
       }

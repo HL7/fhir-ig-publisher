@@ -25,6 +25,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -264,6 +265,17 @@ public class HTMLInspector {
    * IG parameter. 0 means the IG did not set it, and heading levels are left exactly as generated.
    */
   @Getter @Setter private int pageHeadingLevel = 0;
+  /**
+   * Whether to run the static accessibility checks in checkAccessibility (the HTML_A11Y_* warnings), from
+   * the 'accessibility-checks' IG parameter. The heading structure and page language checks are not
+   * affected by this.
+   */
+  @Getter @Setter private boolean accessibilityChecks = false;
+  /**
+   * Whether to add the in-page accessibility check panel (a button that runs axe-core on the page in the
+   * browser) to the bottom of every page. Local builds only, and not if the IG turns 'accessibility-checks' off.
+   */
+  @Getter @Setter private boolean accessibilityPanel = false;
   private List<String> parseProblems = new ArrayList<>();
   private List<String> publishBoxProblems = new ArrayList<>();
   private Set<String> exceptions = new HashSet<>();
@@ -352,6 +364,9 @@ public class HTMLInspector {
         checkNarrativeLinks(f, r, Utilities.path(rootFolder, r.getPath()));
       }
     }
+    if (accessibilityPanel) {
+      writeAccessibilityScripts();
+    }
     log.logDebugMessage(ILoggingService.LogCategory.HTML, "Checking Files");
     links = 0;
     // check links
@@ -417,15 +432,24 @@ public class HTMLInspector {
         DuplicateAnchorTracker dat = new DuplicateAnchorTracker();
         Stack<XhtmlNode> stack = new Stack<XhtmlNode>();
         checkVisibleFragments(lf.path, stack, x);
+        checkLanguage(s, x, messages);
         boolean headingsShifted = false;
         if (!isBuildReportPage(lf.path)) {
           // both of these run before checkLinks, which mutates the tree as it walks
+          if (accessibilityChecks) {
+            checkAccessibility(s, x, messages);
+          }
           boolean singleRoot = checkHeadingStructure(s, x, messages);
           if (singleRoot) {
             headingsShifted = applyPageHeadingLevel(s, x, messages);
           }
         }
-        if (checkLinks(lf, s, "", x, null, messages, false, dat, null) != NodeChangeType.NONE || bh.ok() || headingsShifted) { // returns true if changed
+        boolean changed = checkLinks(lf, s, "", x, null, messages, false, dat, null) != NodeChangeType.NONE || bh.ok() || headingsShifted; // returns true if changed
+        // after all the checks, so the panel's own markup is never checked
+        if (accessibilityPanel && addAccessibilityPanel(lf, x)) {
+          changed = true;
+        }
+        if (changed) {
           saveFile(lf, x);
         }
         if (dat.hasDuplicates()) {
@@ -831,6 +855,488 @@ public class HTMLInspector {
   }
 
   /**
+   * A page must declare its language on the root html element (WCAG 3.1.1, Language of Page). Screen
+   * readers use it to choose the voice and pronunciation rules, and without it they fall back to the
+   * user's default language, which mangles the page for anyone reading it in a different one.
+   * <p>
+   * It has to be the html lang attribute: xml:lang on its own doesn't count, since browsers only
+   * use it when the page is served as XML, and IG pages are served as text/html. Files with a div
+   * root are fragments that get composed into some other page, and take that page's language.
+   */
+  private void checkLanguage(String s, XhtmlNode x, List<ValidationMessage> messages) {
+    if (x.getNodeType() == NodeType.Document) {
+      x = x.getFirstElement();
+    }
+    if (x == null || !"html".equals(x.getName())) {
+      return;
+    }
+    String lang = x.getAttribute("lang");
+    if (lang == null || lang.trim().isEmpty()) {
+      String xmlLang = x.getAttribute("xml:lang");
+      messages.add(located(new ValidationMessage(Source.HtmlChecker, IssueType.STRUCTURE, s,
+              "The html element has no lang attribute, so the language of the page is not known"
+              + (xmlLang != null && !xmlLang.trim().isEmpty() ? " (it has xml:lang=\""+xmlLang+"\", but browsers ignore that on pages served as html - add lang=\""+xmlLang+"\" as well)" : "")
+              + ". Every page must declare its language on the root element (WCAG compliance test)",
+              IssueSeverity.ERROR).setMessageId("HTML_NO_LANGUAGE"), s, x, null));
+    }
+  }
+
+  // ---- Static accessibility checks (HHS Section 508 checklist items that can be tested from the markup) ----------
+
+  private static final java.util.regex.Pattern LANG_PATTERN = java.util.regex.Pattern.compile("^[a-zA-Z]{2,8}(-[a-zA-Z0-9]{1,8})*$");
+  private static final Set<String> ARIA_IDREF_ATTRIBUTES = new HashSet<>(Arrays.asList(
+          "aria-labelledby", "aria-describedby", "aria-controls", "aria-owns", "aria-activedescendant", "aria-details", "aria-errormessage", "aria-flowto"));
+  private static final Set<String> WIDGET_ROLES = new HashSet<>(Arrays.asList(
+          "button", "link", "checkbox", "radio", "switch", "tab", "menuitem", "menuitemcheckbox", "menuitemradio", "option",
+          "textbox", "searchbox", "combobox", "slider", "spinbutton", "treeitem", "gridcell"));
+  private static final Set<String> PLACEHOLDER_ALT_TEXT = new HashSet<>(Arrays.asList(
+          ".", "-", "icon", "image", "img", "picture", "graphic", "photo", "spacer", "logo"));
+  // only phrases that are never names: words like 'link' or 'this' are also element names (Bundle.link), where the
+  // link text is exactly the name of the thing linked to
+  private static final Set<String> GENERIC_LINK_TEXT = new HashSet<>(Arrays.asList(
+          "here", "click here", "more", "read more", "this link", "click this link"));
+
+  /** an idref attribute (aria-labelledby etc, label for) found on the page, checked once all the ids are known */
+  private static class A11yRef {
+    private String attribute;
+    private String ref;
+    private XhtmlNode node;
+    private String anchor;
+    private String heading;
+    private A11yRef(String attribute, String ref, XhtmlNode node, String anchor, String heading) {
+      this.attribute = attribute;
+      this.ref = ref;
+      this.node = node;
+      this.anchor = anchor;
+      this.heading = heading;
+    }
+  }
+
+  /** what the walk over a page collects for the checks that need the whole page (ids, references, labels) */
+  private static class A11yScan {
+    private Map<String, Integer> ids = new HashMap<>();
+    private List<A11yRef> idRefs = new ArrayList<>();
+    private Set<String> labelFors = new HashSet<>();
+    private Map<XhtmlNode, String[]> unlabelledControls = new java.util.LinkedHashMap<>(); // controls not labelled by an attribute or an enclosing label -> anchor, heading
+    private String title;
+    private String heading; // the text of the most recent heading in the walk, so messages can say where on the page they are
+  }
+
+  /**
+   * Checks for the parts of the HHS Section 508 checklist that can be decided from the markup alone:
+   * images without alternative text, form controls without labels, links without names, click handlers
+   * on things a keyboard cannot reach, broken aria references, missing page title, and
+   * so on. Things that need a browser (colour contrast, focus order, anything the scripts build at
+   * run time) or a person (whether alt text, titles and link text are meaningful) are out of scope.
+   * <p>
+   * These are all warnings for now: many of them come from the publisher, core renderers or the
+   * templates rather than anything an IG author wrote.
+   * <p>
+   * Only whole pages are checked; div rooted files are fragments that are checked as part of the
+   * pages they end up in.
+   */
+  private void checkAccessibility(String s, XhtmlNode x, List<ValidationMessage> messages) {
+    if (x.getNodeType() == NodeType.Document) {
+      x = x.getFirstElement();
+    }
+    if (x == null || !"html".equals(x.getName())) {
+      return;
+    }
+    A11yScan scan = new A11yScan();
+    scanA11y(s, x, messages, scan, null, false, false, null);
+
+    if (scan.title == null || scan.title.trim().isEmpty()) {
+      a11yWarning(messages, s, null, null, null, "HTML_A11Y_NO_TITLE", "The page has no title (HHS 9D, WCAG 2.4.2)");
+    }
+    // duplicate ids are already reported by the DuplicateAnchorTracker in checkLinks
+    for (A11yRef ref : scan.idRefs) {
+      if (!scan.ids.containsKey(ref.ref)) {
+        if ("for".equals(ref.attribute)) {
+          String text = ref.node.allText() == null ? "" : ref.node.allText().replaceAll("[\\s\\n]+", " ").trim();
+          a11yWarning(messages, s, ref.node, ref.anchor, ref.heading, "HTML_A11Y_BROKEN_IDREF", "The label "+(text.isEmpty() ? "" : "'"+text+"' ")+"says it is for the element with id '"+ref.ref+"' (for=\""+ref.ref+"\"), but nothing on the page has that id, so the label is not connected to any form control. Usually the for and the control's id have got out of step (HHS 13B, WCAG 4.1.2)");
+        } else {
+          a11yWarning(messages, s, ref.node, ref.anchor, ref.heading, "HTML_A11Y_BROKEN_IDREF", "The "+a11yDesc(ref.node)+" has "+ref.attribute+"=\""+ref.ref+"\", but nothing on the page has the id '"+ref.ref+"', so assistive technology cannot follow the reference (HHS 13B, WCAG 4.1.2)");
+        }
+      }
+    }
+    for (Map.Entry<XhtmlNode, String[]> e : scan.unlabelledControls.entrySet()) {
+      XhtmlNode c = e.getKey();
+      String id = c.getAttribute("id");
+      if (id == null || !scan.labelFors.contains(id)) {
+        a11yWarning(messages, s, c, e.getValue()[0], e.getValue()[1], "HTML_A11Y_CONTROL_NO_LABEL", "The form control "+a11yDesc(c)+" has no label: use a <label>, aria-label or aria-labelledby (HHS 4G, WCAG 1.3.1/4.1.2)");
+      }
+    }
+  }
+
+  private void scanA11y(String s, XhtmlNode x, List<ValidationMessage> messages, A11yScan scan, XhtmlNode interactiveAncestor, boolean inHidden, boolean inLabel, String nearestId) {
+    if (x.getNodeType() != NodeType.Element) {
+      return;
+    }
+    String name = x.getName();
+    if ("svg".equals(name)) {
+      return; // svg has its own rules for all of this, and the checks below don't apply
+    }
+    String id = a11yAttr(x, "id");
+    if (id != null && !id.isEmpty()) {
+      scan.ids.put(id, scan.ids.getOrDefault(id, 0) + 1);
+    }
+    // messages link to the closest element that can be linked to - this one, or its nearest ancestor with an id
+    String here = id != null && !id.isEmpty() ? id : nearestId;
+    for (String an : ARIA_IDREF_ATTRIBUTES) {
+      String v = a11yAttr(x, an);
+      if (v != null) {
+        for (String ref : v.trim().split("\\s+")) {
+          if (!ref.isEmpty()) {
+            scan.idRefs.add(new A11yRef(an, ref, x, here, scan.heading));
+          }
+        }
+      }
+    }
+    if ("title".equals(name) && scan.title == null) {
+      scan.title = x.allText();
+    }
+    if (name.length() == 2 && name.charAt(0) == 'h' && name.charAt(1) >= '1' && name.charAt(1) <= '6') {
+      String ht = a11yText(x);
+      if (!ht.isEmpty()) {
+        scan.heading = ht;
+      }
+    }
+    if ("label".equals(name) && a11yAttr(x, "for") != null) {
+      scan.labelFors.add(a11yAttr(x, "for"));
+      scan.idRefs.add(new A11yRef("for", a11yAttr(x, "for"), x, here, scan.heading));
+    }
+    String lang = a11yAttr(x, "lang");
+    if (lang != null && !lang.isEmpty() && !LANG_PATTERN.matcher(lang).matches()) {
+      a11yWarning(messages, s, x, here, scan.heading, "HTML_A11Y_BAD_LANG", "The "+a11yDesc(x)+" has lang='"+lang+"', which is not a valid language code (HHS 10B, WCAG 3.1.2)");
+    }
+    if (a11yAttr(x, "accesskey") != null) {
+      a11yWarning(messages, s, x, here, scan.heading, "HTML_A11Y_ACCESSKEY", "The "+a11yDesc(x)+" has an accesskey, which can conflict with browser and screen reader shortcuts (HHS 6B, WCAG 2.1.1)");
+    }
+    if ("meta".equals(name) && "refresh".equalsIgnoreCase(a11yAttr(x, "http-equiv"))) {
+      String content = a11yAttr(x, "content");
+      String delay = content == null ? "" : content.split(";")[0].trim();
+      if (!delay.isEmpty() && !delay.matches("0+(\\.0*)?")) {
+        a11yWarning(messages, s, x, here, scan.heading, "HTML_A11Y_META_REFRESH", "The page refreshes or redirects itself after a delay ("+content+"), which users cannot pause or stop (HHS 7C, WCAG 2.2.1)");
+      }
+    }
+    if ("video".equals(name) && !hasCaptionTrack(x)) {
+      a11yWarning(messages, s, x, here, scan.heading, "HTML_A11Y_VIDEO_NO_CAPTIONS", "The "+a11yDesc(x)+" has no captions track (HHS 3D, WCAG 1.2.2)");
+    }
+    if (("iframe".equals(name) || "frame".equals(name)) && a11yBlank(a11yAttr(x, "title"))) {
+      a11yWarning(messages, s, x, here, scan.heading, "HTML_A11Y_FRAME_NO_TITLE", "The "+a11yDesc(x)+" has no title describing its content (HHS 2E, WCAG 4.1.2)");
+    }
+    if ("img".equals(name) || "area".equals(name) || ("input".equals(name) && "image".equalsIgnoreCase(a11yAttr(x, "type")))) {
+      String alt = a11yAttr(x, "alt");
+      if (alt == null) {
+        if (a11yBlank(a11yAttr(x, "aria-label")) && a11yBlank(a11yAttr(x, "aria-labelledby")) && !"presentation".equals(a11yAttr(x, "role")) && !"none".equals(a11yAttr(x, "role"))) {
+          a11yWarning(messages, s, x, here, scan.heading, "HTML_A11Y_IMG_NO_ALT", "The "+a11yDesc(x)+" has no alt attribute: give it alternative text, or alt=\"\" if it is decorative (HHS 2A/2B, WCAG 1.1.1)");
+        }
+      } else if (PLACEHOLDER_ALT_TEXT.contains(alt.trim().toLowerCase()) || isFileNameOf(alt, a11yAttr(x, "src"))) {
+        a11yWarning(messages, s, x, here, scan.heading, "HTML_A11Y_IMG_PLACEHOLDER_ALT", "The "+a11yDesc(x)+" has alt='"+alt+"', which tells a screen reader user nothing: describe the image, or use alt=\"\" if it is decorative (HHS 2A/2B, WCAG 1.1.1)");
+      }
+    }
+    if ("table".equals(name) && Utilities.existsInList(a11yAttr(x, "role"), "presentation", "none") && hasTableStructure(x)) {
+      a11yWarning(messages, s, x, here, scan.heading, "HTML_A11Y_LAYOUT_TABLE_STRUCTURE", "The "+a11yDesc(x)+" is marked as a layout table but contains header cells or a caption (HHS 4F, WCAG 1.3.1)");
+    }
+
+    boolean interactive = isA11yInteractive(x);
+    boolean focusable = isA11yFocusable(x);
+    if (interactive && interactiveAncestor != null) {
+      a11yWarning(messages, s, x, here, scan.heading, "HTML_A11Y_NESTED_INTERACTIVE", "The "+a11yDesc(x)+" is inside another interactive element ("+a11yDesc(interactiveAncestor)+"); screen readers may not announce it and focus can misbehave (HHS 13B, WCAG 4.1.2)");
+    }
+    if (focusable && inHidden) {
+      a11yWarning(messages, s, x, here, scan.heading, "HTML_A11Y_FOCUSABLE_HIDDEN", "The "+a11yDesc(x)+" can take keyboard focus but is inside aria-hidden content, so screen reader users land on something they cannot hear (HHS 2F, WCAG 4.1.2)");
+    }
+    String onclick = a11yAttr(x, "onclick");
+    if (onclick != null && !interactive && !onclick.trim().startsWith("tableRowAction")) {
+      // tableRowAction (the expand/collapse control in the hierarchical tables) is deliberately not reported for now
+      a11yWarning(messages, s, x, here, scan.heading, "HTML_A11Y_CLICK_NOT_KEYBOARD", "The "+a11yDesc(x)+" has a click handler ("+(onclick.length() > 40 ? onclick.substring(0, 40)+"..." : onclick).replace("\"", "'")+") but cannot be reached or used from the keyboard (HHS 6A/6D, WCAG 2.1.1)");
+    }
+    if ("a".equals(name) && a11yAttr(x, "href") != null) {
+      String text = x.allText() == null ? "" : x.allText().trim();
+      boolean named = !text.isEmpty() || !a11yBlank(a11yAttr(x, "aria-label")) || !a11yBlank(a11yAttr(x, "aria-labelledby")) || !a11yBlank(a11yAttr(x, "title")) || hasImageWithAlt(x);
+      if (!named) {
+        a11yWarning(messages, s, x, here, scan.heading, "HTML_A11Y_EMPTY_LINK", "The "+a11yDesc(x)+" has no text, so a screen reader cannot say where it goes (HHS 9G, WCAG 2.4.4)");
+      } else if (GENERIC_LINK_TEXT.contains(text.toLowerCase()) && a11yBlank(a11yAttr(x, "aria-label")) && !isLinkToNamedTarget(text, a11yAttr(x, "href"))) {
+        a11yWarning(messages, s, x, here, scan.heading, "HTML_A11Y_GENERIC_LINK_TEXT", "The link "+a11yDesc(x)+" does not say where it goes when read out of context (HHS 9G, WCAG 2.4.4)");
+      }
+    }
+    if (isA11yFormControl(x) && !inLabel && a11yBlank(a11yAttr(x, "aria-label")) && a11yBlank(a11yAttr(x, "aria-labelledby")) && a11yBlank(a11yAttr(x, "title"))) {
+      scan.unlabelledControls.put(x, new String[] { here, scan.heading }); // decided at the end: a <label for> may come later in the page
+    }
+
+    boolean hidden = inHidden || "true".equals(a11yAttr(x, "aria-hidden"));
+    boolean label = inLabel || "label".equals(name);
+    XhtmlNode ia = interactive ? x : interactiveAncestor;
+    if (x.hasChildren()) {
+      for (XhtmlNode c : x.getChildNodes()) {
+        scanA11y(s, c, messages, scan, ia, hidden, label, here);
+      }
+    }
+  }
+
+  private void a11yWarning(List<ValidationMessage> messages, String s, XhtmlNode node, String anchor, String heading, String id, String msg) {
+    // each message ends with the checklist reference "(HHS nn, WCAG n.n.n)"; mark it as a compliance test like the heading checks.
+    // Say which section of the page it's in: the line/column and anchor are not much help to someone looking at the rendered page
+    String where = node == null ? "" : heading == null ? " (it is before the first heading on the page)" : " (it is in the section headed '"+heading+"')";
+    messages.add(located(new ValidationMessage(Source.HtmlChecker, IssueType.STRUCTURE, s, msg.replace(" (HHS ", where+" (WCAG compliance test - HHS "), IssueSeverity.WARNING).setMessageId(id), s, node, anchor));
+  }
+
+  /** the visible text of an element, whitespace collapsed, shortened to something that fits in a message */
+  private String a11yText(XhtmlNode x) {
+    String t = x.allText();
+    t = t == null ? "" : t.replaceAll("[\\s\\n]+", " ").trim();
+    return t.length() > 50 ? t.substring(0, 47)+"..." : t;
+  }
+
+  /**
+   * Make a message about a page clickable in the QA report: link it to the page (qa.html sits in the
+   * output folder, so the page's path relative to that works), to the given anchor on it if there is one,
+   * and record the line and column the parser saw the node at
+   */
+  private ValidationMessage located(ValidationMessage vm, String s, XhtmlNode node, String anchor) {
+    vm.setLocationLink(makeLocal(s) + (Utilities.noString(anchor) ? "" : "#"+anchor));
+    if (node != null && node.getLocation() != null) {
+      vm.setLine(node.getLocation().getLine());
+      vm.setCol(node.getLocation().getColumn());
+    }
+    return vm;
+  }
+
+  /** attribute lookup ignoring case - the parser keeps attribute names as written (onClick, onclick) */
+  private String a11yAttr(XhtmlNode x, String name) {
+    if (!x.hasAttributes()) {
+      return null;
+    }
+    for (Map.Entry<String, String> e : x.getAttributes().entrySet()) {
+      if (name.equalsIgnoreCase(e.getKey())) {
+        return e.getValue() == null ? "" : e.getValue();
+      }
+    }
+    return null;
+  }
+
+  private boolean a11yBlank(String v) {
+    return v == null || v.trim().isEmpty();
+  }
+
+  private boolean isA11yFocusable(XhtmlNode x) {
+    String tabindex = a11yAttr(x, "tabindex");
+    if (tabindex != null) {
+      return !tabindex.trim().startsWith("-");
+    }
+    switch (x.getName()) {
+      case "a": return a11yAttr(x, "href") != null;
+      case "button":
+      case "select":
+      case "textarea":
+      case "summary": return a11yAttr(x, "disabled") == null;
+      case "input": return a11yAttr(x, "disabled") == null && !"hidden".equalsIgnoreCase(a11yAttr(x, "type"));
+      default: return false;
+    }
+  }
+
+  private boolean isA11yInteractive(XhtmlNode x) {
+    String role = a11yAttr(x, "role");
+    return isA11yFocusable(x) || (role != null && WIDGET_ROLES.contains(role.trim()));
+  }
+
+  private boolean isA11yFormControl(XhtmlNode x) {
+    switch (x.getName()) {
+      case "select":
+      case "textarea": return true;
+      case "input": return !Utilities.existsInList(a11yAttr(x, "type") == null ? "text" : a11yAttr(x, "type").toLowerCase(), "hidden", "submit", "reset", "button", "image");
+      default: return false;
+    }
+  }
+
+  private boolean hasCaptionTrack(XhtmlNode x) {
+    if (x.hasChildren()) {
+      for (XhtmlNode c : x.getChildNodes()) {
+        if (c.getNodeType() == NodeType.Element && "track".equals(c.getName()) && Utilities.existsInList(a11yAttr(c, "kind"), "captions", "subtitles")) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  private boolean hasImageWithAlt(XhtmlNode x) {
+    if (x.hasChildren()) {
+      for (XhtmlNode c : x.getChildNodes()) {
+        if (c.getNodeType() == NodeType.Element) {
+          if ("img".equals(c.getName()) && !a11yBlank(a11yAttr(c, "alt"))) {
+            return true;
+          }
+          if ("svg".equals(c.getName()) || hasImageWithAlt(c)) {
+            return true; // an inline svg is assumed to carry its own title
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  private boolean hasTableStructure(XhtmlNode x) {
+    if (x.hasChildren()) {
+      for (XhtmlNode c : x.getChildNodes()) {
+        if (c.getNodeType() == NodeType.Element) {
+          if (Utilities.existsInList(c.getName(), "th", "caption", "thead")) {
+            return true;
+          }
+          if (!"table".equals(c.getName()) && hasTableStructure(c)) { // a nested table answers for itself
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  /** true if the link text is the name of what the link points to, e.g. <a href="bundle.html#Bundle.link">link</a> */
+  private boolean isLinkToNamedTarget(String text, String href) {
+    if (href == null || !href.contains("#")) {
+      return false;
+    }
+    String frag = href.substring(href.indexOf('#') + 1).toLowerCase();
+    String t = text.toLowerCase();
+    return frag.equals(t) || frag.endsWith("."+t);
+  }
+
+  private boolean isFileNameOf(String alt, String src) {
+    if (a11yBlank(alt) || a11yBlank(src) || src.startsWith("data:")) {
+      return false;
+    }
+    String fn = src.contains("/") ? src.substring(src.lastIndexOf('/') + 1) : src;
+    return alt.trim().equalsIgnoreCase(fn);
+  }
+
+  private String a11yDesc(XhtmlNode x) {
+    StringBuilder b = new StringBuilder("<"+x.getName());
+    for (String an : new String[] { "id", "name", "type", "href", "src", "class" }) {
+      String v = a11yAttr(x, an);
+      if (v != null && !v.startsWith("data:")) {
+        b.append(" "+an+"=\""+(v.length() > 60 ? v.substring(0, 60)+"..." : v)+"\"");
+        break;
+      }
+    }
+    b.append(">");
+    // and its text, if it's the sort of element whose text identifies it (a button, a link, a label...)
+    if (!Utilities.existsInList(x.getName(), "html", "body", "div", "table", "tbody", "thead", "tr", "ul", "ol", "dl", "section", "nav", "main", "header", "footer", "form", "select", "iframe", "frame", "img", "input", "textarea")) {
+      String t = a11yText(x);
+      if (!t.isEmpty()) {
+        b.append(" '"+t+"'");
+      }
+    }
+    return b.toString();
+  }
+
+  // ---- In-page accessibility check (local builds) -------------------------------------------------------
+
+  private static final String A11Y_PANEL_ID = "fhir-a11y-panel";
+  private static final String A11Y_CHECK_SCRIPT = "a11y-check.js";
+  private static final String A11Y_AXE_SCRIPT = "a11y-axe.min.js";
+
+  /**
+   * Copy the two scripts the panel uses into the root of the output: our own a11y-check.js, and axe-core
+   * (https://github.com/dequelabs/axe-core, MPL-2.0), which the page only loads when the button is pressed.
+   */
+  private void writeAccessibilityScripts() {
+    try {
+      copyResource("/a11y/a11y-check.js", A11Y_CHECK_SCRIPT);
+      copyResource("/a11y/axe.min.js", A11Y_AXE_SCRIPT);
+    } catch (Exception e) {
+      log.logMessage("Unable to write the accessibility check scripts - the check panel will not be added: "+e.getMessage());
+      accessibilityPanel = false;
+    }
+  }
+
+  private void copyResource(String resource, String name) throws IOException {
+    try (InputStream is = HTMLInspector.class.getResourceAsStream(resource)) {
+      if (is == null) {
+        throw new IOException("resource "+resource+" not found");
+      }
+      FileUtilities.streamToFile(is, Utilities.path(rootFolder, name));
+    }
+  }
+
+  /**
+   * Add the accessibility check panel to the end of the page body: a button that loads axe-core and checks
+   * the page as the browser has it (after the scripts have run), reporting against the HHS checklist - see
+   * a11y-check.js. Only whole content pages get it: not fragments, redirects, or the build reports.
+   *
+   * @return true if the panel was added (so the page needs saving)
+   */
+  private boolean addAccessibilityPanel(LoadedFile lf, XhtmlNode x) {
+    XhtmlNode root = x.getNodeType() == NodeType.Document ? x.getFirstElement() : x;
+    if (root == null || !"html".equals(root.getName()) || lf.isLangRedirect || isBuildReportPage(lf.path) || hasMetaRefresh(root)) {
+      return false;
+    }
+    XhtmlNode body = root.getElement("body");
+    if (body == null || findById(body, A11Y_PANEL_ID) != null) {
+      return false; // no body, or already added (an earlier iteration of a watched build)
+    }
+    String prefix = "";
+    for (char c : lf.path.toCharArray()) {
+      if (c == '/') {
+        prefix = prefix + "../";
+      }
+    }
+    XhtmlNode panel = body.div();
+    panel.setAttribute("id", A11Y_PANEL_ID);
+    panel.setAttribute("data-axe", prefix+A11Y_AXE_SCRIPT);
+    panel.setAttribute("lang", "en");
+    panel.style("clear: both; margin: 20px 10px; padding: 8px; border: 1px solid #888888; background-color: #f4f4f4; color: #000000; font-size: 13px; font-family: sans-serif");
+    XhtmlNode p = panel.para();
+    p.style("margin: 0");
+    p.b().tx("Accessibility check");
+    p.tx(" (local builds only - checks this page as it is now against WCAG 2.0 A/AA, reported by HHS 508 checklist item) ");
+    XhtmlNode btn = p.addTag("button");
+    btn.setAttribute("type", "button");
+    btn.setAttribute("class", "fhir-a11y-run");
+    btn.tx("Check this page");
+    p.tx(" ");
+    p.span().setAttribute("class", "fhir-a11y-status").setAttribute("role", "status");
+    panel.div().setAttribute("class", "fhir-a11y-results");
+    XhtmlNode script = body.addTag("script");
+    script.setAttribute("type", "text/javascript");
+    script.setAttribute("src", prefix+A11Y_CHECK_SCRIPT);
+    return true;
+  }
+
+  /** a redirect page (meta http-equiv=refresh) - note that hasHTTPRedirect is true for any meta http-equiv, including Content-Type */
+  private boolean hasMetaRefresh(XhtmlNode x) {
+    if ("meta".equals(x.getName()) && "refresh".equalsIgnoreCase(x.getAttribute("http-equiv"))) {
+      return true;
+    }
+    if (x.hasChildren()) {
+      for (XhtmlNode c : x.getChildNodes()) {
+        if (c.getNodeType() == NodeType.Element && hasMetaRefresh(c)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  private XhtmlNode findById(XhtmlNode x, String id) {
+    if (id.equals(x.getAttribute("id"))) {
+      return x;
+    }
+    if (x.hasChildren()) {
+      for (XhtmlNode c : x.getChildNodes()) {
+        if (c.getNodeType() == NodeType.Element) {
+          XhtmlNode r = findById(c, id);
+          if (r != null) {
+            return r;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
    * The publisher's own build reports (qa.html and friends). These are not IG content - they are
    * generated here, they are not produced through the template, and an IG author cannot change
    * their structure, so it is not useful to raise heading structure errors against them.
@@ -893,22 +1399,22 @@ public class HTMLInspector {
         // that is, is the author's call - not something to guess at per offending heading
         should = root;
         singleRoot = false;
-        messages.add(new ValidationMessage(Source.HtmlChecker, IssueType.STRUCTURE, s,
+        messages.add(located(new ValidationMessage(Source.HtmlChecker, IssueType.STRUCTURE, s,
                 "The heading <"+h.getName()+"> "+headingDesc(h)+" is at a higher level than the first heading on the page (<h"+root+"> "+headingDesc(first)+"). The first heading on a page must be its top level heading (WCAG compliance test)",
-                IssueSeverity.ERROR).setMessageId("HTML_HEADING_ABOVE_ROOT"));
+                IssueSeverity.ERROR).setMessageId("HTML_HEADING_ABOVE_ROOT"), s, h, h.getAttribute("id")));
       } else if (level == root) {
         should = root;
         singleRoot = false;
-        messages.add(new ValidationMessage(Source.HtmlChecker, IssueType.STRUCTURE, s,
+        messages.add(located(new ValidationMessage(Source.HtmlChecker, IssueType.STRUCTURE, s,
                 "The page has more than one top level heading: <"+h.getName()+"> "+headingDesc(h)+" is at the same level as the first heading on the page (<h"+root+"> "+headingDesc(first)+"). A page must have exactly one top level heading, with every other heading beneath it (WCAG compliance test)",
-                IssueSeverity.ERROR).setMessageId("HTML_HEADING_MULTIPLE_ROOTS"));
+                IssueSeverity.ERROR).setMessageId("HTML_HEADING_MULTIPLE_ROOTS"), s, h, h.getAttribute("id")));
       } else if (level > prev + 1) {
         // here the correction IS computable, and carrying it forward is what stops one misplaced
         // heading reporting again for every heading under it
         should = prev + 1;
-        messages.add(new ValidationMessage(Source.HtmlChecker, IssueType.STRUCTURE, s,
+        messages.add(located(new ValidationMessage(Source.HtmlChecker, IssueType.STRUCTURE, s,
                 "The page skips a heading level: <"+h.getName()+"> "+headingDesc(h)+" follows <h"+prev+"> "+headingDesc(prevNode)+", so it should be <h"+should+">. Heading levels must not skip a level going down (WCAG compliance test)",
-                IssueSeverity.ERROR).setMessageId("HTML_HEADING_LEVEL_SKIPPED"));
+                IssueSeverity.ERROR).setMessageId("HTML_HEADING_LEVEL_SKIPPED"), s, h, h.getAttribute("id")));
       }
       prevNode = h;
       prev = should;
@@ -944,10 +1450,10 @@ public class HTMLInspector {
       x.ensureTopHeadingIs(pageHeadingLevel);
       return was != null && !was.equals(before.get(0).getName());
     } catch (FHIRException e) {
-      messages.add(new ValidationMessage(Source.HtmlChecker, IssueType.STRUCTURE, s,
+      messages.add(located(new ValidationMessage(Source.HtmlChecker, IssueType.STRUCTURE, s,
               "The headings on this page cannot be moved to start at <h"+pageHeadingLevel+"> as the IG's 'page-heading-level' asks: "+e.getMessage()+
                       ". The page has been left as it is",
-              IssueSeverity.WARNING).setMessageId("HTML_HEADING_LEVEL_UNSHIFTABLE"));
+              IssueSeverity.WARNING).setMessageId("HTML_HEADING_LEVEL_UNSHIFTABLE"), s, null, null));
       return false;
     }
   }

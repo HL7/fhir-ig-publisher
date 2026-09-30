@@ -102,7 +102,7 @@ public class DownloadBuilder {
   }
 
   private byte[] makeRedirect() throws IOException {
-    String html = "<html>\n" + 
+    String html = "<html lang=\"en\">\n" +
         "<head>\n" + 
         "<meta http-equiv=\"Refresh\" content=\"0; url=site/index.html\" />\n" + 
         "</head>\n" + 

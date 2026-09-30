@@ -288,9 +288,12 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     boolean isMod = ProfileUtilities.isModifierExtension(sd);
     if (ProfileUtilities.isSimpleExtension(sd)) {
       ElementDefinition value = sd.getSnapshot().getElementByPath("Extension.value");
+      // the description can be several blocks (paragraphs, lists...). Only the first paragraph
+      // goes into the summary sentence; the rest follows it, or the </p> is left unmatched
+      String[] parts = splitFirstPara(processMarkdown("ext-desc", sd.getDescriptionElement()));
       return "<p>"+
-          gen.formatPhrase(isMod ? RenderingI18nContext.SDR_EXTENSION_SUMMARY_MODIFIER : RenderingI18nContext.SDR_EXTENSION_SUMMARY , value.typeSummary(), Utilities.stripPara(processMarkdown("ext-desc", sd.getDescriptionElement())))+
-          "</p>";
+          gen.formatPhrase(isMod ? RenderingI18nContext.SDR_EXTENSION_SUMMARY_MODIFIER : RenderingI18nContext.SDR_EXTENSION_SUMMARY , value.typeSummary(), parts[0])+
+          "</p>"+parts[1];
     } else {
       List<ElementDefinition> subs = new ArrayList<>();
       ElementDefinition slice = null;
@@ -309,12 +312,37 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       for (ElementDefinition ed : subs) {
         ElementDefinition defn = (ElementDefinition) ed.getUserData(UserDataNames.render_extension_slice);
         if (defn != null) {
-          b.append("<li>"+(defn.getSliceName())+": "+ed.typeSummary()+": "+Utilities.stripPara(processMarkdown("ext-desc", defn.getDefinition()))+"</li>\r\n");
+          String[] parts = splitFirstPara(processMarkdown("ext-desc", defn.getDefinition()));
+          b.append("<li>"+(defn.getSliceName())+": "+ed.typeSummary()+": "+parts[0]+parts[1]+"</li>\r\n");
         }
       }
       b.append("</ul>");
       return b.toString();
     }
+  }
+
+  /**
+   * Splits rendered markdown into [inline content of the first paragraph, everything after it].
+   * If the html doesn't start with a paragraph (e.g. it starts with a list), the first part is empty
+   */
+  private static String[] splitFirstPara(String html) {
+    if (Utilities.noString(html)) {
+      return new String[] { "", "" };
+    }
+    html = html.trim();
+    if (html.startsWith("<p>")) {
+      int i = html.indexOf("</p>");
+      if (i > -1) {
+        return new String[] { html.substring(3, i).trim(), html.substring(i + 4).trim() };
+      }
+      return new String[] { html.substring(3), "" };
+    }
+    for (String tag : new String[] { "<ul", "<ol", "<table", "<div", "<pre", "<blockquote", "<h" }) {
+      if (html.startsWith(tag)) {
+        return new String[] { "", html };
+      }
+    }
+    return new String[] { html, "" };
   }
 
   private boolean parentChainHasOptional(ElementDefinition ed, StructureDefinition profile) {
@@ -634,7 +662,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           edCopy.copyUserData(ed);
           if (edCopy.hasExample())
             edCopy.getExampleList().clear();
-          if (!edCopy.getMustSupport()) {
+          if (!isMustSupport(ed)) {
             if (edCopy.getPath().contains(".")) {
               edCopy.setUserData(UserDataNames.render_opaque, true);
             }
@@ -709,8 +737,44 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     return diffElements;
   }
 
+  private Map<String, ElementDefinition> snapshotById;
+
+  /**
+   * The rules on a slicer (including its children) apply to all its slices - including must-support - but they
+   * are not repeated in the slices. So an element in a slice is must-support if it is marked as such, or if the
+   * matching element on the slicer is
+   */
+  protected boolean isMustSupport(ElementDefinition ed) {
+    if (ed.hasMustSupport() && ed.getMustSupport()) {
+      return true;
+    }
+    if (!ed.hasId() || !ed.getId().contains(":")) {
+      return false;
+    }
+    if (snapshotById == null) {
+      snapshotById = new HashMap<>();
+      for (ElementDefinition t : sd.getSnapshot().getElementList()) {
+        if (t.hasId()) {
+          snapshotById.put(t.getId(), t);
+        }
+      }
+    }
+    String[] parts = ed.getId().split("\\.");
+    for (int i = parts.length - 1; i >= 0; i--) {
+      if (parts[i].contains(":")) {
+        String[] np = parts.clone();
+        np[i] = np[i].substring(0, np[i].indexOf(":"));
+        ElementDefinition sed = snapshotById.get(String.join(".", np));
+        if (sed != null && sed != ed && isMustSupport(sed)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   private void scanForMustSupport(Map<String, ElementDefinition> mustSupport, List<ElementDefinition> elements, ElementDefinition element, List<ElementDefinition> parents) {
-    if (parents.isEmpty() || element.hasMustSupport() && element.getMustSupport()) {
+    if (parents.isEmpty() || isMustSupport(element)) {
       mustSupport.put(element.getId(), element);
       for (ElementDefinition parent : parents) {
         mustSupport.put(parent.getId(), parent);
@@ -916,7 +980,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     boolean hasDesc = false; // this is currently unused - have to figure out whether we want to try and show descriptions or not
     Map<String, ElementDefinition> txmap = new HashMap<String, ElementDefinition>();
     for (ElementDefinition ed : keyOnly? getKeyElements() : sd.getSnapshot().getElementList()) {
-      if (ed.hasBinding() && !"0".equals(ed.getMax()) && (!mustSupportOnly || ed.getMustSupport())) {
+      if (ed.hasBinding() && !"0".equals(ed.getMax()) && (!mustSupportOnly || isMustSupport(ed))) {
         String id = ed.getId();
         if (ed.hasFixed()) {
           hasFixed = true;
@@ -1013,10 +1077,10 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           td.markdown(br.display, "binding");
         } else if (Utilities.isAbsoluteUrlLinkable(br.url)) {
           td.ah(br.url).style("opacity: "+opacityStr(inherited)).tx(br.display);
-          td.button("btn-copy", gen.formatPhrase(RenderingI18nContext.SDR_CLICK_COPY)).setAttribute("data-clipboard-text", tx.getValueSet());
+          td.button("btn-copy", "copy", gen.formatPhrase(RenderingI18nContext.SDR_CLICK_COPY)).setAttribute("data-clipboard-text", tx.getValueSet());
         } else {
           td.ah(prefix + br.url).style("opacity: "+opacityStr(inherited)).tx(br.display);
-          td.button("btn-copy", gen.formatPhrase(RenderingI18nContext.SDR_CLICK_COPY)).setAttribute("data-clipboard-text", tx.getValueSet());
+          td.button("btn-copy", "copy", gen.formatPhrase(RenderingI18nContext.SDR_CLICK_COPY)).setAttribute("data-clipboard-text", tx.getValueSet());
         }
         showVersion(tr.td(), uri, resolutionMethod,null);
         tr.td().tx("Unknown");
@@ -1028,9 +1092,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       } else {
         td.ah(p).style("opacity: "+opacityStr(inherited)).tx(gen.getTranslated(vs.getTitleElement(), vs.getNameElement()));
       }
-      td.button("btn-copy", gen.formatPhrase(RenderingI18nContext.SDR_CLICK_COPY)).setAttribute("data-clipboard-text", tx.getValueSet());
+      td.button("btn-copy", "copy", gen.formatPhrase(RenderingI18nContext.SDR_CLICK_COPY)).setAttribute("data-clipboard-text", tx.getValueSet());
       if (vs.hasUserData(UserDataNames.render_external_link)) {
-        td.img("external.png", ".");
+        td.img("external.png", "");
       }
       showVersion(tr.td(), uri, resolutionMethod, vs);
 
@@ -1150,7 +1214,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
   private String opacityStr(boolean inherited) {
-    return inherited ? "0.5" : "1.0";
+    return inherited ? HierarchicalTableGenerator.STANDARD_OPACITY : "1.0";
   }
 
   private String getSpecialValueSetName(String uri) {
@@ -1392,9 +1456,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   public String dict(boolean incProfiledOut, int mode, String anchorPrefix) throws Exception {
     XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
     var p = x.para();
-    p.tx(gen.formatPhrase(RenderingI18nContext.SDR_GUIDANCE_PFX));   
+    p.tx(gen.formatPhrase(RenderingI18nContext.SDR_GUIDANCE_PFX)+" ");
     p.ah("https://build.fhir.org/ig/FHIR/ig-guidance/readingIgs.html#data-dictionaries").tx(gen.formatPhrase(RenderingI18nContext.SDR_GUIDANCE_HERE));
-    p.tx(gen.formatPhrase(RenderingI18nContext.SDR_GUIDANCE_SFX));   
+    p.tx(" "+gen.formatPhrase(RenderingI18nContext.SDR_GUIDANCE_SFX));
     XhtmlNode t = x.table("dict", false).markGenerated(true);
 
     List<ElementDefinition> elements = elementsForMode(mode);
@@ -2719,9 +2783,13 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       c++;
       if (c == MAX_DEF_SHOW && base.size() > MAX_DEF_SHOW) {
         showLink = true;
-        b.append("<span id=\"rr_"+key+"\" onClick=\"document.getElementById('rr_"+key+"').innerHTML = document.getElementById('rr2_"+key+"').innerHTML\">..."+
-            " <span style=\"cursor: pointer; border: 1px grey solid; background-color: #fcdcb3; padding-left: 3px; padding-right: 3px; color: black\">"+
-            "Show "+(base.size()-MAX_DEF_SHOW+1)+" more</span></span><span id=\"rr2_"+key+"\" style=\"display: none\">");
+        // a real button so it can be used from the keyboard; after the swap, focus goes to the first newly
+        // shown link - otherwise the element that had focus (the button) is gone and keyboard users are sent
+        // back to the top of the page
+        b.append("<span id=\"rr_"+key+"\">... "+
+            "<button type=\"button\" style=\"cursor: pointer; border: 1px grey solid; background-color: #fcdcb3; padding: 0 3px; margin: 0; color: black; font: inherit\" "+
+            "onClick=\"var s = document.getElementById('rr_"+key+"'); s.innerHTML = document.getElementById('rr2_"+key+"').innerHTML; var a = s.querySelector('a'); if (a) a.focus();\">"+
+            "Show "+(base.size()-MAX_DEF_SHOW+1)+" more</button></span><span id=\"rr2_"+key+"\" style=\"display: none\">");
       }
       if (c == base.size() && c != 1) {
         b.append(" and ");
@@ -2729,10 +2797,11 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         b.append(", ");
       }
 
+      // the values are plain text (titles, names), not html - e.g. "Concept Look Up & Decomposition"
       if (s == null) {
-        b.append(base.get(s));
+        b.append(Utilities.escapeXml(base.get(s)));
       } else {
-        b.append("<a href=\"" + s + "\">" + base.get(s) + "</a>");
+        b.append("<a href=\"" + Utilities.escapeXml(s) + "\">" + Utilities.escapeXml(base.get(s)) + "</a>");
       }
       if (c % 80 == 0) {
         b.append("\r\n");

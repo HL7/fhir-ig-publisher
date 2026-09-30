@@ -488,11 +488,11 @@ public class PublicationChecker {
   }
   
   private String mkError() {
-    return " <img src=\"icon-error.gif\" height=\"16px\" width=\"16px\"/>";
+    return " <img src=\"icon-error.gif\" height=\"16px\" alt=\"ERROR!\" width=\"16px\"/>";
   }
 
   private String mkWarning() {
-    return " <img src=\"icon-warning.png\" height=\"16px\" width=\"16px\"/>";
+    return " <img src=\"icon-warning.png\" alt=\"WARNING\" height=\"16px\" width=\"16px\"/>";
   }
 
   private String mkInfo() {

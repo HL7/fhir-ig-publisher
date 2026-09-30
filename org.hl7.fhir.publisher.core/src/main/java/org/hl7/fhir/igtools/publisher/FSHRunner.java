@@ -77,12 +77,8 @@ public class FSHRunner {
             if (SystemUtils.IS_OS_WINDOWS) {
                 exec.execute(getWindowsCommandLine(fshVersion, mode));
             } else if (FhirSettings.hasNpmPath()) {
-                ProcessBuilder processBuilder = new ProcessBuilder(new String("bash -c "+ getSushiCommandString(fshVersion,mode)));
-                Map<String, String> env = processBuilder.environment();
-                Map<String, String> vars = new HashMap<>();
-                vars.putAll(env);
-                String path = FhirSettings.getNpmPath()+":"+env.get("PATH");
-                vars.put("PATH", path);
+                Map<String, String> vars = new HashMap<>(System.getenv());
+                vars.put("PATH", FhirSettings.getNpmPath()+":"+vars.get("PATH"));
 
                 exec.execute(getNpmPathCommandLine(fshVersion, mode), vars);
             } else {
@@ -117,12 +113,11 @@ public class FSHRunner {
 
     @Nonnull
     protected CommandLine getNpmPathCommandLine(String fshVersion, PublisherUtils.IGBuildMode mode) {
-        CommandLine commandLine = new CommandLine("bash").addArgument("-c");
-        for (String argument : getSushiCommandList(fshVersion,mode)) {
-            commandLine.addArgument(argument);
-        }
-        commandLine.addArgument(".").addArgument("-o").addArgument(".");
-        return commandLine;
+        // bash -c takes a single script argument: anything after it becomes $0, $1... and is ignored.
+        // So the whole sushi command must be one argument, passed unquoted
+        return new CommandLine("bash")
+          .addArgument("-c")
+          .addArgument(getSushiCommandString(fshVersion, mode) + " . -o .", false);
     }
 
     @Nonnull
