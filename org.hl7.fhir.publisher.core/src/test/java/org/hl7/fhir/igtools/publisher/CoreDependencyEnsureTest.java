@@ -30,13 +30,17 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * Pins the publisher's broad FHIR-core-dependency safety net (feature slot {@code 0709-05}).
  * <p>
- * FHIR core's {@code NPMPackageGenerator.packageForVersion} auto-adds the core dependency for
- * R2..R4B but returns {@code null} for R5/R6, so an R5 IG's base/{@code .r5}/per-language packages
- * ship with no {@code hl7.fhir.r5.core}. {@link PublisherBase#patchMissingCoreDependency} patches
- * the expected core dep into a finished manifest <b>only when none is present</b>, so it fixes
- * R5/R6 today and auto-no-ops (never duplicating a key) once upstream core is fixed to add it
- * itself. These tests pin the two static resolvers plus the patch's add/no-op/idempotency/round-trip
- * behaviour, hermetically (JUnit {@code @TempDir}, no network).
+ * FHIR core's {@code NPMPackageGenerator} used to add the core dependency for R2..R4B only, so an
+ * R5 IG's base/{@code .r5}/per-language packages shipped with no {@code hl7.fhir.r5.core}.
+ * {@link PublisherBase#patchMissingCoreDependency} patches the expected core dep into a finished
+ * manifest <b>only when none is present</b>, and auto-no-ops (never duplicating a key) when core
+ * adds it itself. Core's R6 generator has done so since 2026-09-22 (core b02f4bc738, via
+ * {@code PackageDependencyPlanner}), so a freshly generated R5 package no longer shows the defect:
+ * the tests that exercise the add path strip the core dep from the finished package first
+ * ({@link #stripCoreDeps}), simulating a package from an older core, and
+ * {@link #patch_r5Package_fromCurrentCore_noOp} pins the upstream fix itself. These tests pin the
+ * two static resolvers plus the patch's add/no-op/idempotency/round-trip behaviour, hermetically
+ * (JUnit {@code @TempDir}, no network).
  */
 class CoreDependencyEnsureTest {
 
@@ -84,6 +88,7 @@ class CoreDependencyEnsureTest {
   void patch_r5Package_addsR5Core(@TempDir File tempDir) throws Exception {
     NPMPackageGenerator gen = generatorFor("5.0.0", tempDir, "package.tgz");
     gen.finish();
+    stripCoreDeps(gen); // what core generated before it added the R5 core dep itself
     JsonObject manifest = gen.getPackageJ();
     assertFalse(PublisherBase.hasFhirCoreDependency(manifest.getJsonObject("dependencies")),
         "precondition: an R5 package has no core dep (the defect this fixes)");
@@ -97,6 +102,22 @@ class CoreDependencyEnsureTest {
     assertEquals("5.0.0", deps.asString("hl7.fhir.r5.core"), "patched .tgz declares hl7.fhir.r5.core#5.0.0");
     assertEquals("5.0.0", manifest.getJsonObject("dependencies").asString("hl7.fhir.r5.core"),
         "in-memory manifest is mirrored to agree with disk");
+  }
+
+  @Test
+  void patch_r5Package_fromCurrentCore_noOp(@TempDir File tempDir) throws Exception {
+    NPMPackageGenerator gen = generatorFor("5.0.0", tempDir, "package.tgz");
+    gen.finish();
+    JsonObject manifest = gen.getPackageJ();
+    // core adds hl7.fhir.r5.core itself now (core b02f4bc738) - the safety net must stand aside
+    assertEquals("5.0.0", manifest.getJsonObject("dependencies").asString("hl7.fhir.r5.core"),
+        "precondition: core now declares the R5 core dep itself");
+
+    assertFalse(PublisherBase.patchMissingCoreDependency(manifest, gen.filename(), null), "R5 package from current core is a no-op");
+
+    JsonObject deps = reload(gen.filename()).getNpm().getJsonObject("dependencies");
+    assertEquals("5.0.0", deps.asString("hl7.fhir.r5.core"));
+    assertEquals(1, countCoreDeps(deps), "exactly one core dep survives (no duplicate-key crash)");
   }
 
   @Test
@@ -134,6 +155,7 @@ class CoreDependencyEnsureTest {
     gen.addFile(NPMPackageGenerator.Category.RESOURCE, "Patient-example.json",
         "{\"resourceType\":\"Patient\",\"id\":\"example\"}".getBytes(StandardCharsets.UTF_8));
     gen.finish();
+    stripCoreDeps(gen); // so there is something to patch
 
     assertTrue(PublisherBase.patchMissingCoreDependency(gen.getPackageJ(), gen.filename(), null));
 
@@ -152,6 +174,7 @@ class CoreDependencyEnsureTest {
   void patch_wrongFamilyCore_correctedWithWarning(@TempDir File tempDir) throws Exception {
     NPMPackageGenerator gen = generatorFor("5.0.0", tempDir, "package.tgz");
     gen.finish();
+    stripCoreDeps(gen);
     injectDep(gen, "hl7.fhir.r4.core", "4.0.1"); // stale/foreign-family core on an R5 package
 
     List<ValidationMessage> messages = new ArrayList<>();
@@ -170,6 +193,7 @@ class CoreDependencyEnsureTest {
   void patch_bothExpectedAndWrongFamily_removesWrongLeavesOne(@TempDir File tempDir) throws Exception {
     NPMPackageGenerator gen = generatorFor("5.0.0", tempDir, "package.tgz");
     gen.finish();
+    stripCoreDeps(gen);
     injectDep(gen, "hl7.fhir.r5.core", "5.0.0"); // the expected core...
     injectDep(gen, "hl7.fhir.r4.core", "4.0.1"); // ...plus a stale wrong-family one
 
@@ -206,6 +230,7 @@ class CoreDependencyEnsureTest {
   void patch_r6Version_addsR6Core_roundTrip(@TempDir File tempDir) throws Exception {
     NPMPackageGenerator gen = generatorFor("5.0.0", tempDir, "package.tgz");
     gen.finish();
+    stripCoreDeps(gen);
     JsonObject manifest = gen.getPackageJ();
     manifest.remove("fhirVersions");
     manifest.add("fhirVersions", List.of("6.0.0"));
@@ -260,6 +285,39 @@ class CoreDependencyEnsureTest {
       tgz.save(out);
     }
     gen.getPackageJ().forceObject("dependencies").add(id, version);
+  }
+
+  /**
+   * Remove every FHIR core dependency from a finished {@code .tgz}'s {@code package.json} and from the
+   * generator's in-memory manifest - i.e. make the package look like one from a core that didn't add the
+   * core dependency for R5/R6, which is the defect {@link PublisherBase#patchMissingCoreDependency} exists
+   * for. Keeps the add-path tests independent of what the current core generator emits.
+   */
+  private void stripCoreDeps(NPMPackageGenerator gen) throws Exception {
+    NpmPackage tgz;
+    try (FileInputStream in = new FileInputStream(gen.filename())) {
+      tgz = NpmPackage.fromPackage(in);
+    }
+    removeCoreDeps(tgz.getNpm().getJsonObject("dependencies"));
+    try (FileOutputStream out = new FileOutputStream(gen.filename())) {
+      tgz.save(out);
+    }
+    removeCoreDeps(gen.getPackageJ().getJsonObject("dependencies"));
+  }
+
+  private void removeCoreDeps(JsonObject deps) {
+    if (deps == null) {
+      return;
+    }
+    List<String> names = new ArrayList<>();
+    for (JsonProperty p : deps.getProperties()) {
+      if (p.getName() != null && p.getName().matches("^hl7\\.fhir\\.r\\d+b?\\.core$")) {
+        names.add(p.getName());
+      }
+    }
+    for (String n : names) {
+      deps.remove(n);
+    }
   }
 
   private int countCoreDeps(JsonObject deps) {
