@@ -84,6 +84,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   private static final int EXAMPLE_UPPER_LIMIT = 50;
   private boolean noXigLink;
+  // the urls used by each resource in the IG (see listUsedUrls()), shared by all the SDs rendered in a pass, since
+  // finding them means walking every resource. The elements must not change while the cache is in use
+  private Map<Element, Set<String>> usageCache;
 
   public class BindingResolutionDetails {
     private String vss;
@@ -2495,7 +2498,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
               searches.put(igp.getLinkFor(r, true), sp.present()); // the title if there is one (FetchedResource.title is the name)
             }
           }
-          if (usesSD(r.getElement())) {
+          if (usesSD(r.getElement(), true)) {
             String p = igp.getLinkFor(r, true);
             if (p != null) {
               if (examples.size() < EXAMPLE_UPPER_LIMIT) {
@@ -2510,7 +2513,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
     for (RelatedIG ig : relatedIgs) {
       for (Element r : ig.loadE(context, sd.getType())) {
-        if (usesSD(r)) {
+        if (usesSD(r, false)) {
           if (examples.size() < EXAMPLE_UPPER_LIMIT) {
             examples.put(r.getWebPath(), r.getUserString(UserDataNames.renderer_title));
           }
@@ -2760,7 +2763,16 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
 
-  private boolean usesSD(Element resource) {
+  private boolean usesSD(Element resource, boolean cacheable) {
+    if (cacheable && usageCache != null) {
+      Set<String> urls = usageCache.get(resource);
+      if (urls == null) {
+        urls = new HashSet<>();
+        listUsedUrls(resource, urls);
+        usageCache.put(resource, urls);
+      }
+      return urls.contains(sd.getUrl());
+    }
     if (resource.hasChild("meta")) {
       Element meta = resource.getNamedChild("meta");
       for (Element p : meta.getChildrenByName("profile")) {
@@ -2779,6 +2791,35 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         return true;
     }
     return false;
+  }
+
+  /**
+   * The urls (without any version) that usesSD() compares with the url of this SD: the meta.profile values, and
+   * the url of every extension anywhere in the resource
+   */
+  private void listUsedUrls(Element resource, Set<String> urls) {
+    if (resource.hasChild("meta")) {
+      Element meta = resource.getNamedChild("meta");
+      for (Element p : meta.getChildrenByName("profile")) {
+        addUsedUrl(urls, p.getValue());
+      }
+    }
+    listExtensionUrls(resource, urls);
+  }
+
+  private void listExtensionUrls(Element focus, Set<String> urls) {
+    for (Element child : focus.getChildList()) {
+      if (child.getName().equals("extension")) {
+        addUsedUrl(urls, child.getChildValue("url"));
+      }
+      listExtensionUrls(child, urls);
+    }
+  }
+
+  private void addUsedUrl(Set<String> urls, String url) {
+    if (url != null) {
+      urls.add(url.contains("|") ? url.substring(0, url.indexOf("|")) : url);
+    }
   }
 
 
@@ -3220,6 +3261,10 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   public void setNoXigLink(boolean noXigLink) {
     this.noXigLink = noXigLink;
+  }
+
+  public void setUsageCache(Map<Element, Set<String>> usageCache) {
+    this.usageCache = usageCache;
   }
 
 
