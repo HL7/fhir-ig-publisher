@@ -3674,7 +3674,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     } else {
       Map<String, String> vars = makeVars(r);
       String outputName = determineOutputName(pf.igpkp.getProperty(r, "base"), r, vars, null, "");
-      addPageDataRow(pages, outputName, title, getLangTitles(page.getTitleElement(), ""), label, breadcrumb + breadCrumbForPage(page, false), breadcrumbs, r.getStatedExamples(), r.getFoundTestPlans(), r.getFoundTestScripts(), page);
+      addPageDataRow(pages, outputName, title, getLangTitles(page.getTitleElement(), ""), label, breadcrumb + breadCrumbForPage(page, false), addToBreadcrumbs(breadcrumbs, page, false), r.getStatedExamples(), r.getFoundTestPlans(), r.getFoundTestScripts(), page);
       //      addPageDataRow(pages, source, title, label, breadcrumb + breadCrumbForPage(page, false), r.getStatedExamples());
       for (String templateName: pf.extraTemplateList) {
         if (r.getConfig() !=null && r.getConfig().get("template-"+templateName)!=null && !r.getConfig().get("template-"+templateName).asString().isEmpty()) {
