@@ -673,7 +673,7 @@ public class PublisherProcessor extends PublisherBase  {
         pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE, "ImplementationGuide", "Unable to check auto-oid-root because "+e.getMessage(), ValidationMessage.IssueSeverity.INFORMATION));
       }
     }
-    String oidHint = " (OIDs are easy to assign - see https://build.fhir.org/ig/FHIR/fhir-tools-ig/CodeSystem-ig-parameters.html#ig-parameters-auto-oid-root)";
+    String oidHint = " (OIDs are easy to assign - see https://build.fhir.org/ig/FHIR/ig-guidance/oids.html)";
     Map<String, FetchedResource> oidMap = new HashMap<>();
     for (FetchedFile f : pf.fileList) {
       for (FetchedResource r : f.getResources()) {
@@ -728,7 +728,7 @@ public class PublisherProcessor extends PublisherBase  {
         if (cE + cI == 0) {
           f.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no examples for this profile", ValidationMessage.IssueSeverity.WARNING));
           r.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no examples for this profile", ValidationMessage.IssueSeverity.WARNING));
-        } else if (cE == 0) {
+        } else if (cE == 0 && !ExtensionUtilities.readBoolExtension(sd, ExtensionDefinitions.EXT_ADDITIONAL_RESOURCE)) {
           f.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no explicitly linked examples for this profile", ValidationMessage.IssueSeverity.INFORMATION));
           r.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no explicitly linked examples for this profile", ValidationMessage.IssueSeverity.INFORMATION));
         }
