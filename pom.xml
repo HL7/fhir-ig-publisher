@@ -23,9 +23,9 @@
         <maven.compiler.testRelease>17</maven.compiler.testRelease>
         <maven.compiler.testSource>17</maven.compiler.testSource>
         <maven.compiler.testTarget>17</maven.compiler.testTarget>
-        <logback.version>1.6.3</logback.version>
+        <logback.version>1.6.5</logback.version>
         <log4jVersion>2.26.1</log4jVersion>
-        <jackson_version>2.22.2</jackson_version>
+        <jackson_version>2.22.3</jackson_version>
         <jackson_annotations_version>2.22</jackson_annotations_version>
         <nedap-healthcare-archie.version>3.19.0</nedap-healthcare-archie.version>
     </properties>
@@ -171,7 +171,7 @@
             <dependency>
                 <groupId>org.apache.thrift</groupId>
                 <artifactId>libthrift</artifactId>
-                <version>0.24.0</version>
+                <version>0.25.0</version>
             </dependency>
             <dependency>
                 <groupId>io.opentelemetry</groupId>
