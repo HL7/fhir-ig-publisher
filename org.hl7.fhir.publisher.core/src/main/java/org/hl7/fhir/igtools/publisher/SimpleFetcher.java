@@ -346,7 +346,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
       File file = new File(s);
       if (file.exists()) {
         for (File f : file.listFiles()) {
-          if (!f.isDirectory() && !exemptions.contains(f.getAbsolutePath())) {
+          if (!f.isDirectory() && !exemptions.contains(f.getAbsolutePath()) && !isExemptFileType(f.getName())) {
 //            System.out.println("scanning: "+f.getAbsolutePath());
             String fn = f.getCanonicalPath();
             String ext = Utilities.getFileExtension(fn);
@@ -415,7 +415,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
                   count++;
                   ok = true;
                 } catch (Exception e) {
-                  e.printStackTrace();
+//                  e.printStackTrace();
                   if (!f.getName().startsWith("Binary-")) { // we don't notify here because Binary is special. 
                     if (report) {
                       log.logMessage("Error loading "+f+": "+e.getMessage());
@@ -451,6 +451,10 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
     }
     Collections.sort(res, new FetchedFileSorter());
     return res;
+  }
+
+  private boolean isExemptFileType(String name) {
+    return name.endsWith(".svg");
   }
 
   private List<String> fixedFileTypes() {

@@ -296,7 +296,8 @@ public class CanonicalRenderer extends BaseRenderer {
       if (comp.getChangedMetadata() == ChangeAnalysisState.CannotEvaluate) {
         b.append("<li>"+gen.formatPhrase(RenderingI18nContext.SDR_META_CH_NO)+"</li>\r\n"); 
       } else if (comp.getChangedMetadata() == ChangeAnalysisState.Changed) {
-        b.append("<li>"+gen.formatPhrase(RenderingI18nContext.SDR_META_CH_DET, comp.getMetadataFieldsAsText())+"</li>\r\n");           
+        // say so when metadata is all that has changed - reviewers can usually skip those
+        b.append("<li>"+gen.formatPhrase(comp.onlyMetadataChanged() ? RenderingI18nContext.SDR_META_CH_ONLY : RenderingI18nContext.SDR_META_CH_DET, Utilities.escapeXml(comp.getMetadataFieldsAsText()))+"</li>\r\n");           
       }
       
       if (comp.getChangedContent() == ChangeAnalysisState.CannotEvaluate) {
@@ -308,7 +309,11 @@ public class CanonicalRenderer extends BaseRenderer {
       if (comp.getChangedDefinitions() == ChangeAnalysisState.CannotEvaluate) {
         b.append("<li>"+gen.formatPhrase(RenderingI18nContext.SDR_DEFN_CH_NO)+"</li>\r\n"); 
       } else if (comp.getChangedDefinitions() == ChangeAnalysisState.Changed) {
-        b.append("<li>"+gen.formatPhrase(defDetailsCode)+"</li>\r\n");           
+        if (comp.getDefinitionItems().isEmpty()) {
+          b.append("<li>"+gen.formatPhrase(defDetailsCode)+"</li>\r\n");
+        } else {
+          b.append("<li>"+gen.formatPhrase(defDetailsCode)+" ("+Utilities.escapeXml(comp.getDefinitionItemsAsText())+")</li>\r\n");
+        }
       }
 
       if (interpCode1 != null) {

@@ -792,7 +792,13 @@ public class CrossViewRenderer extends Renderer {
     } else {
       kind = "data type";
     }
+    // several of these tables can be on one page (e.g. extensions-datatypes.html has one per type),
+    // so every id is prefixed with one that is unique to the table; table.js finds the controls by
+    // their data-filter attribute within the table, not by id
+    String prefix = "ext-" + (type == null ? "all" : type.replaceAll("[^A-Za-z0-9_-]", "_"));
     var tbl = x.table("list", false).markGenerated(!context.forValidResource());
+    tbl.attribute("id", prefix);
+    tbl.attribute("data-filter-table", prefix);
     var tr = tbl.tr();
     tr.td().tx("Identity");
     tr.td().tx("Card.");
@@ -807,14 +813,14 @@ public class CrossViewRenderer extends Renderer {
     }
 
     tr = tbl.tr();
-    tr.td().input(null, "identity", "text", null, 15).attribute("class", "filter-input").attribute("id", "filter-identity");
-    tr.td().input(null, "cardinality","text", null, 3).attribute("class", "filter-input").attribute("id", "filter-card");
-    tr.td().input(null, "type","text", null, 8).attribute("class", "filter-input").attribute("id", "filter-type");
-    tr.td().input(null, "context","text", null, 20).attribute("class", "filter-input").attribute("id", "filter-context");
-    tr.td().input(null, "wg","text", null, 3).attribute("class", "filter-input").attribute("id", "filter-wg");
-    tr.td().input(null, "status","text", null, 6).attribute("class", "filter-input").attribute("id", "filter-status");
+    tr.td().input(null, "identity", "text", null, 15).attribute("class", "filter-input").attribute("id", prefix+"-filter-identity").attribute("data-filter", "identity");
+    tr.td().input(null, "cardinality","text", null, 3).attribute("class", "filter-input").attribute("id", prefix+"-filter-card").attribute("data-filter", "card");
+    tr.td().input(null, "type","text", null, 8).attribute("class", "filter-input").attribute("id", prefix+"-filter-type").attribute("data-filter", "type");
+    tr.td().input(null, "context","text", null, 20).attribute("class", "filter-input").attribute("id", prefix+"-filter-context").attribute("data-filter", "context");
+    tr.td().input(null, "wg","text", null, 3).attribute("class", "filter-input").attribute("id", prefix+"-filter-wg").attribute("data-filter", "wg");
+    tr.td().input(null, "status","text", null, 6).attribute("class", "filter-input").attribute("id", prefix+"-filter-status").attribute("data-filter", "status");
     if (context.getChangeVersion() != null) {
-      tr.td().input(null, "Hide Unchanged","checkbox", null, 0).attribute("id", "hideUnchanged");
+      tr.td().input(null, "Hide Unchanged","checkbox", null, 0).attribute("id", prefix+"-hideUnchanged").attribute("data-filter", "hideUnchanged");
     }
 
     if (type != null) {
@@ -966,7 +972,7 @@ public class CrossViewRenderer extends Renderer {
     x.para().tx("" + (tbl.getChildNodes().size() - 1) + " Extensions");
     x.jsSrc("assets/js/table.js");
 
-    x.button(null, "copy", null).attribute("onclick", "clearAllFilters()").style("padding: 8px 16px; background-color: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;").tx("Clear All Filters");
+    x.button(null, "copy", null).attribute("onclick", "clearAllFilters('"+prefix+"')").style("padding: 8px 16px; background-color: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;").tx("Clear All Filters");
     return new XhtmlComposer(false, true).compose(x.getChildNodes());
   }
 
