@@ -3565,14 +3565,11 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
   }
 
   private String createTocPage(ImplementationGuide.ImplementationGuideDefinitionPageComponent page, ImplementationGuide.ImplementationGuideDefinitionPageComponent insertPage, String insertAfterName, String insertOffset, String currentOffset, String indents, String label, boolean last, String idPrefix, int position, String lang) throws FHIRException {
-    if (position > 222) {
-      position = 222;
-      if (!pf.tocSizeWarning) {
-        System.out.println("Table of contents has a section with more than 222 entries.  Collapsing will not work reliably");
-        pf.tocSizeWarning = true;
-      }
-    }
-    String id = idPrefix + (char)(position+33);
+    // fhir-table-scripts.js finds a row's descendants with row.id.startsWith(parent.id), so each
+    // level's segment must be prefix-free. It used to be one character, (char)(position+33), which
+    // ran out at 223 entries in a section - every later entry got the same id. A number terminated
+    // by '.' is prefix-free at any size (toc0.3. vs toc0.3.12.)
+    String id = (Utilities.noString(idPrefix) ? "toc" : idPrefix) + position + ".";
     String s = "<tr style=\"border:0px;padding:0px;vertical-align:top;background-color:inherit;\" id=\"" + Utilities.escapeXml(id) + "\">";
     s = s + "<td style=\"vertical-align:top;text-align:var(--ig-left,left);background-color:inherit;padding:0px 4px 0px 4px;white-space:nowrap;background-image:url(tbl_bck0.png)\" class=\"hierarchy\">";
     s = s + "<img style=\"background-color:inherit\" alt=\"\" class=\"hierarchy\" src=\"tbl_spacer.png\"/>";
@@ -3748,11 +3745,14 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     JsonObject jsonBreadcrumb = new JsonObject();
     jsonPage.add("breadcrumblang", jsonBreadcrumb);
     for (String l : allLangs()) {
-      String tBreadcrumb = breadcrumbs.get(l);
+      // a page that is also a resource is passed its parent's breadcrumbs, and the root page's parent
+      // breadcrumbs are empty (no entry for any language) - that's the case when the IG resource
+      // itself is rendered as index.html
+      String tBreadcrumb = breadcrumbs.containsKey(l) ? breadcrumbs.get(l) : "";
       // the title is raw here (titlelang is data, and the templates escape it themselves), but a
       // breadcrumb is pre-rendered html - an & or < in a title made the page malformed XHTML.
       // breadCrumbForPage and addToBreadcrumbs escape for the same reason
-      if (tBreadcrumb.endsWith("</a></li>")) {
+      if (tBreadcrumb.isEmpty() || tBreadcrumb.endsWith("</a></li>")) {
         tBreadcrumb += "<li><b>" + Utilities.escapeXml(titles.get(l)) + "</b></li>";
       }
       jsonBreadcrumb.add(l, tBreadcrumb);

@@ -255,7 +255,6 @@ public class PublisherFields {
     List<DependencyAnalyser.ArtifactDependency> dependencyList;
     Map<String, List<String>> trackedFragments = new HashMap<String, List<String>>();
     PackageInformation packageInfo;
-    boolean tocSizeWarning = false;
     CSVWriter allProfilesCsv;
     StructureDefinitionSpreadsheetGenerator allProfilesXlsx;
     boolean produceJekyllData;
