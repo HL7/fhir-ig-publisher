@@ -68,6 +68,7 @@ import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.hl7.fhir.utilities.npm.NpmPackage.NpmPackageFolder;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.validation.instance.advisor.BasePolicyAdvisorForFullValidation;
 
@@ -255,6 +256,21 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
       Element resr = getResourceFromMap(url, sp.getSpm());
       if (resr != null) return resr;
     }
+
+    // still haven't found it?
+    if (Utilities.charCount(url, '/') == 1) {
+      String type = url.substring(0, url.indexOf("/"));
+      String id = url.substring(url.indexOf("/")+1);
+      for (NpmPackage npm : packages) {
+        for (NpmPackageFolder folder : npm.getFolders().values()) {
+          InputStream s = folder.getResource(type, id);
+          if (s != null) {
+            return Manager.makeParser(context, FhirFormat.JSON).parseSingle(s, null);
+          }
+        }
+      }
+    }
+
     return null;
   }
 

@@ -153,7 +153,15 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     this.resE = ResourceWrapper.forResource(gen.getContextUtilities(), sd);
   }
 
+  /**
+   * The summary is generated from the resource (including its description), so it's marked as
+   * generated: the conformance statement scanner skips it, as it does the narrative and the tables
+   */
   public String summary(boolean all) {
+    return "<div data-fhir=\"generated\">"+summaryContent(all)+"</div>";
+  }
+
+  private String summaryContent(boolean all) {
     try {
       if (sd.hasExtension(ExtensionDefinitions.EXT_SUMMARY)) {
         return processMarkdown("Profile Summary", (PrimitiveType) sd.getExtensionByUrl(ExtensionDefinitions.EXT_SUMMARY).getValue());
@@ -2484,7 +2492,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
             SearchParameter sp = (SearchParameter) r.getResource();
             String exp = sp.getExpression();
             if (exp != null && exp.contains("extension('"+sd.getUrl()+"')")) {
-              searches.put(igp.getLinkFor(r, true), r.getTitle());
+              searches.put(igp.getLinkFor(r, true), sp.present()); // the title if there is one (FetchedResource.title is the name)
             }
           }
           if (usesSD(r.getElement())) {
