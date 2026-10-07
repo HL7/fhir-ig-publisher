@@ -261,7 +261,7 @@ public class AIProcessor {
   private int produceMDForPage(StringBuilder llms, Page p, ZipGenerator zip, NpmPackage npm) throws IOException {
 //    System.out.println("Processing "+p.f.getAbsolutePath());
     try {
-      XhtmlNode xhtml = new XhtmlParser().setMustBeWellFormed(false).parse(new FileInputStream(p.f), "html");
+      XhtmlNode xhtml = new XhtmlParser().setMustBeWellFormed(false).parseFile(p.f, "html");
       XhtmlNode x = xhtml.firstNamedDescendent("head");
       x = x == null ? x : x.firstNamedDescendent("title");
       String title = x == null ? "Untitled" : x.allText();
@@ -300,7 +300,7 @@ public class AIProcessor {
     try {
       String md;
       if (p != null) {
-        XhtmlNode xhtml = new XhtmlParser().setMustBeWellFormed(false).parse(new FileInputStream(p.f), "html");
+        XhtmlNode xhtml = new XhtmlParser().setMustBeWellFormed(false).parseFile(p.f, "html");
         switch (r.resource.asString("resourceType")) {
           case "CodeSystem":
             stripDiv(xhtml, "defines the following code");
