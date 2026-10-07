@@ -1058,7 +1058,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   private final String headerTemplate = 
       "<!DOCTYPE HTML>\r\n"+
       "<html xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\" lang=\"en\">\r\n"+
-      "<!-- broken links = $links$, errors = $err$, warn = $warn$, info = $info$-->\r\n"+
+      "<!-- broken links = $brokenLinks$, errors = $err$, warn = $warn$, info = $info$-->\r\n"+
       "<head>\r\n"+
       "  <title>$title$ : Validation Results</title>\r\n"+
       "  <link href=\"fhir.css\" rel=\"stylesheet\"/>\r\n"+
@@ -1131,7 +1131,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       "$noNarrative$"+
       "$noValidation$"+
       "$fragments$"+
-      " <tr><td>Summary:</td><td> errors = $err$, warn = $warn$, info = $info$, broken links = $links$, pinned = $pinned$.  <button onclick=\"toggleCodes()\">Show Message Ids</button></td></tr>\r\n"+
+      " <tr><td>Summary:</td><td> errors = $err$, warn = $warn$, info = $info$, broken links = $brokenLinks$, pinned = $pinned$.  <button onclick=\"toggleCodes()\">Show Message Ids</button></td></tr>\r\n"+
       "</table>\r\n"+
       " <table class=\"grid\">\r\n"+
       "   <tr>\r\n"+
@@ -1242,7 +1242,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   private final String headerTemplateText = 
       "$title$ : Validation Results\r\n"+
       "=========================================\r\n\r\n"+
-      "err = $err$, warn = $warn$, info = $info$, broken links = $links$\r\n"+
+      "err = $err$, warn = $warn$, info = $info$, broken links = $brokenLinks$\r\n"+
       "$versionCheck$\r\n"+
       "Generated $time$. FHIR version $version$ for $packageId$#$igversion$ (canonical = $canonical$)\r\n$warning$\r\n";
   
@@ -1268,7 +1268,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     return new ST(t, '$', '$');
   }
 
-  private String genHeader(String title, int err, int warn, int info, int links, int msgCount, boolean allIssues, String path, Object pinned) {
+  private String genHeader(String title, int err, int warn, int info, int brokenLinks, int msgCount, boolean allIssues, String path, Object pinned) {
     ST t = template(headerTemplate);
     t.add("version", statedVersion);
     t.add("igversion", igVersion);
@@ -1279,7 +1279,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     t.add("err", Integer.toString(err));
     t.add("warn", Integer.toString(warn));
     t.add("info", Integer.toString(info));
-    t.add("links", Integer.toString(links));
+    t.add("brokenLinks", Integer.toString(brokenLinks));
     t.add("pinned", pinned);
     t.add("packageId", packageId);
     t.add("canonical", provider.getCanonical());
@@ -1428,9 +1428,9 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     return b.toString();
   }
 
-  private String genHeaderTxt(String title, int err, int warn, int info, int links) {
+  private String genHeaderTxt(String title, int err, int warn, int info, int brokenLinks) {
     ST t = template(headerTemplateText);
-    t.add("links", Integer.toString(links));
+    t.add("brokenLinks", Integer.toString(brokenLinks));
     t.add("version", statedVersion);
     t.add("toolsVersion", toolsVersion);
     t.add("versionCheck", versionCheckText());
@@ -1469,9 +1469,9 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     return t.render();
   }
 
-  private String genHeaderTxtForCompare(String title, int err, int warn, int info, int links) {
+  private String genHeaderTxtForCompare(String title, int err, int warn, int info, int brokenLinks) {
     ST t = template(headerTemplateText);
-    t.add("links", Integer.toString(links));
+    t.add("brokenLinks", Integer.toString(brokenLinks));
     t.add("version", "$--");
     t.add("toolsVersion", "$--");
     t.add("versionCheck", "$--");
