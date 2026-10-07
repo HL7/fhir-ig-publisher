@@ -704,6 +704,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         j.add("errs", val.getErr());
         j.add("warnings", val.getWarn());
         j.add("hints", val.getInfo());
+        j.add("broken-links", val.getBrokenLinks());
         j.add("suppressed-hints", val.getSuppressedInfo());
         j.add("suppressed-warnings", val.getSuppressedWarnings());
       }
