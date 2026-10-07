@@ -22,6 +22,7 @@ package org.hl7.fhir.igtools.publisher;
 
 
 import java.io.File;
+import org.hl7.fhir.utilities.xhtml.XhtmlDocument;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -413,7 +414,7 @@ public class HTMLInspector {
           checkFragmentMarkers(FileUtilities.fileToString(lf.getFilename()));
         }
         XhtmlParser parser = new XhtmlParser().setMustBeWellFormed(strict);
-        XhtmlNode x = parser.parse(new FileInputStream(lf.filename), null);
+        XhtmlNode x = parseAndClose(parser, new FileInputStream(lf.filename), null);
         // The parse is lenient so that a page with broken markup still gets link checked, heading
         // checked and so on. But the markup IS broken - IG output is XHTML - so report whatever the
         // parser had to fix up to get here, with the line and column it happened at.
@@ -683,7 +684,7 @@ public class HTMLInspector {
     XhtmlNode x = null;
     boolean htmlName = f.getName().endsWith(".html") || f.getName().endsWith(".xhtml") || f.getName().endsWith(".svg");
     try {
-      x = new XhtmlParser().setMustBeWellFormed(strict).parse(new FileInputStream(f), null);
+      x = parseAndClose(new XhtmlParser().setMustBeWellFormed(strict), new FileInputStream(f), null);
       if (x.getElement("html")==null && x.getElement("svg")==null && !htmlName) {
         // We don't want resources being treated as HTML.  We'll check the HTML of the narrative in the page representation
         x = null;
@@ -720,7 +721,7 @@ public class HTMLInspector {
           }
           FileUtilities.stringToFile(src, f);
         }
-        x = new XhtmlParser().setMustBeWellFormed(strict).parse(new FileInputStream(f), null);
+        x = parseAndClose(new XhtmlParser().setMustBeWellFormed(strict), new FileInputStream(f), null);
       } catch (Exception e1) {
         hl7State = false;
       }
@@ -2136,4 +2137,12 @@ public class HTMLInspector {
   public Set<String> getComparisonFiles() {
     return comparisonFiles;
   }
+
+  // XhtmlParser.parse(InputStream) reads to the end but leaves closing the stream to the caller
+  private static XhtmlDocument parseAndClose(XhtmlParser parser, InputStream input, String entryName) throws FHIRFormatError, IOException {
+    try (InputStream in = input) {
+      return parser.parse(in, entryName);
+    }
+  }
+
 }
