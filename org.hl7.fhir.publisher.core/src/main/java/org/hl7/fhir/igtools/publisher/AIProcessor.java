@@ -17,9 +17,6 @@ import org.hl7.fhir.utilities.xhtml.XhtmlParser;
 import org.hl7.fhir.utilities.xhtml.XhtmlToMarkdownConverter;
 
 import java.io.File;
-import org.hl7.fhir.exceptions.FHIRFormatError;
-import org.hl7.fhir.utilities.xhtml.XhtmlDocument;
-import java.io.InputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.*;
@@ -264,7 +261,7 @@ public class AIProcessor {
   private int produceMDForPage(StringBuilder llms, Page p, ZipGenerator zip, NpmPackage npm) throws IOException {
 //    System.out.println("Processing "+p.f.getAbsolutePath());
     try {
-      XhtmlNode xhtml = parseAndClose(new XhtmlParser().setMustBeWellFormed(false), new FileInputStream(p.f), "html");
+      XhtmlNode xhtml = XhtmlParsing.parseAndClose(new XhtmlParser().setMustBeWellFormed(false), new FileInputStream(p.f), "html");
       XhtmlNode x = xhtml.firstNamedDescendent("head");
       x = x == null ? x : x.firstNamedDescendent("title");
       String title = x == null ? "Untitled" : x.allText();
@@ -303,7 +300,7 @@ public class AIProcessor {
     try {
       String md;
       if (p != null) {
-        XhtmlNode xhtml = parseAndClose(new XhtmlParser().setMustBeWellFormed(false), new FileInputStream(p.f), "html");
+        XhtmlNode xhtml = XhtmlParsing.parseAndClose(new XhtmlParser().setMustBeWellFormed(false), new FileInputStream(p.f), "html");
         switch (r.resource.asString("resourceType")) {
           case "CodeSystem":
             stripDiv(xhtml, "defines the following code");
@@ -476,13 +473,6 @@ public class AIProcessor {
     @Override
     public int compare(LoadedResource o1, LoadedResource o2) {
       return o1.type.compareTo(o2.type);
-    }
-  }
-
-  // XhtmlParser.parse(InputStream) reads to the end but leaves closing the stream to the caller
-  private static XhtmlDocument parseAndClose(XhtmlParser parser, InputStream input, String entryName) throws FHIRFormatError, IOException {
-    try (InputStream in = input) {
-      return parser.parse(in, entryName);
     }
   }
 
