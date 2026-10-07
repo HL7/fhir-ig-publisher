@@ -1,10 +1,7 @@
 package org.hl7.fhir.igtools.publisher;
 
 import org.apache.commons.codec.binary.Base64;
-import org.eclipse.persistence.internal.sessions.DirectCollectionChangeRecord;
 import org.hl7.fhir.exceptions.FHIRException;
-import org.hl7.fhir.igtools.publisher.utils.OldIGAIGenerator;
-import org.hl7.fhir.model.core.ImplementationGuide;
 import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 import org.hl7.fhir.utilities.json.model.JsonElement;
@@ -261,7 +258,7 @@ public class AIProcessor {
   private int produceMDForPage(StringBuilder llms, Page p, ZipGenerator zip, NpmPackage npm) throws IOException {
 //    System.out.println("Processing "+p.f.getAbsolutePath());
     try {
-      XhtmlNode xhtml = new XhtmlParser().setMustBeWellFormed(false).parseFile(p.f, "html");
+      XhtmlNode xhtml = new XhtmlParser().setMustBeWellFormed(false).parse(p.f, "html");
       XhtmlNode x = xhtml.firstNamedDescendent("head");
       x = x == null ? x : x.firstNamedDescendent("title");
       String title = x == null ? "Untitled" : x.allText();
@@ -300,7 +297,7 @@ public class AIProcessor {
     try {
       String md;
       if (p != null) {
-        XhtmlNode xhtml = new XhtmlParser().setMustBeWellFormed(false).parseFile(p.f, "html");
+        XhtmlNode xhtml = new XhtmlParser().setMustBeWellFormed(false).parse(p.f, "html");
         switch (r.resource.asString("resourceType")) {
           case "CodeSystem":
             stripDiv(xhtml, "defines the following code");
