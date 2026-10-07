@@ -96,7 +96,7 @@ public class CanonicalRenderer extends BaseRenderer {
         b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.GENERAL_TITLE))+":</td><td>"+Utilities.escapeXml(title)+"</td></tr>\r\n");
       }
     }
-    if (hasSummaryRow(rows, "status")) {
+    if (hasSummaryRow(rows, "status") && cr.hasStatus()) {
       b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.GENERAL_STATUS))+":</td><td>"+describeStatus(cr)+"</td></tr>\r\n");
     }
     if (hasSummaryRow(rows, "definition")) {
