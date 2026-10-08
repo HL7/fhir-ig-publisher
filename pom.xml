@@ -210,10 +210,6 @@
                 <enabled>false</enabled>
             </snapshots>
         </repository>
-        <repository>
-            <id>local</id>
-            <url>file://${basedir}/lib</url>
-        </repository>
     </repositories>
 
     <scm>
