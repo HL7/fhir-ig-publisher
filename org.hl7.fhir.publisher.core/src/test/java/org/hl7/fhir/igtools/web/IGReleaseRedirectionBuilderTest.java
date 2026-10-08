@@ -52,6 +52,9 @@ class IGReleaseRedirectionBuilderTest {
     rb.buildNewAspRedirections(false, false);
     String webConfig = FileUtilities.fileToString(new File(stagingFolder, "web.config"));
     assertTrue(webConfig.contains("<rule name=\"ig.test.StructureDefinition\">"), webConfig);
+    String asp = FileUtilities.fileToString(new File(stagingFolder, "crstructuredefinition.asp"));
+    String publishedAsp = String.join(File.separator, "", "ig", "test", "crstructuredefinition.asp");
+    assertTrue(asp.contains("(from " + publishedAsp + ")"), asp);
   }
 
   @Test

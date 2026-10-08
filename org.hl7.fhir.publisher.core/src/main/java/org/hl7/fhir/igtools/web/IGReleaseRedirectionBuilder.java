@@ -155,7 +155,8 @@ public class IGReleaseRedirectionBuilder {
   }
 
   /**
-   * @param folder the folder the redirection files are written to
+   * @param folder the folder whose content (spec.internals, package.tgz) the redirections are built from,
+   *   and where the redirection files are written
    * @param publishedFolder where the content of folder ends up in the website. This differs from folder
    *   when the redirections are built in a staging folder (e.g. the IG build output) that is copied into
    *   the website afterwards
