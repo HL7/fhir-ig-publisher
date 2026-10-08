@@ -8,6 +8,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -18,6 +19,7 @@ import com.nedap.archie.rminfo.MetaModels;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.services.context.IWorkerContext;
 import org.hl7.fhir.model.extensions.ExtensionDefinitions;
+import org.hl7.fhir.model.Property;
 import org.hl7.fhir.model.core.*;
 import org.hl7.fhir.model.core.Bundle.BundleType;
 import org.hl7.fhir.model.core.CodeSystem.ConceptDefinitionComponent;
@@ -198,8 +200,10 @@ public class ArchetypeImporter {
         sd.setPurpose(lang.getPurpose());
       }
       sd.setCopyright(getCopyright(lang));
-      for (String s : lang.getKeywords()) {
-        sd.addKeyword().setDisplay(s);
+      if(lang.getKeywords()!=null) {
+        for (String s : lang.getKeywords()) {
+          sd.addKeyword().setDisplay(s);
+        }
       }
     }
     addResource(sd);
@@ -456,23 +460,32 @@ public class ArchetypeImporter {
   private boolean bindingGoesOnParent(String rmTypeName, String name) {
     switch (rmTypeName+"."+name) {
     case "DV_CODED_TEXT.defining_code": return true;
+    case "DV_MULTIMEDIA.media_type": return true;
     default:
       throw new Error("unknown element "+rmTypeName+"."+name);
     }
   }
 
   private boolean isSingleton(String rmTypeName, String name) {
-    switch (rmTypeName+"."+name) {
-    case "HISTORY.events": return false;
-    case "ITEM_TREE.items": return false;
-    case "CLUSTER.items": return false;
-    case "ELEMENT.value": return true;
-    case "DV_QUANTITY.magnitude" : return true;
-      case "DV_QUANTITY.units" : return true;
-      case "DV_QUANTITY.precision" : return true;
-    default:
-      throw new Error("unknown element "+rmTypeName+"."+name);
-    }
+    StructureDefinition type = context.fetchTypeDefinition("http://openehr.org/fhir/StructureDefinition/" + rmTypeName);
+    if (type == null) throw new Error("unknown type " + rmTypeName);
+
+    Optional<ElementDefinition> child = type.getSnapshot().getElementList().stream().filter(e -> e.getId().equals(rmTypeName+"."+name.replace("_","-"))).findAny();
+    if(child.isEmpty()) throw new Error("unknown element " + rmTypeName + "." + name);
+    
+    return child.get().getMaxAsInt()==1 && child.get().getMin()>=0;
+
+//    switch (rmTypeName + "." + name) {
+//    case "HISTORY.events": return false;
+//    case "ITEM_TREE.items": return false;
+//    case "CLUSTER.items": return false;
+//    case "ELEMENT.value": return true;
+//    case "DV_QUANTITY.magnitude": return true;
+//    case "DV_QUANTITY.units": return true;
+//    case "DV_QUANTITY.precision": return true;
+//    default:
+//    throw new Error("unknown element " + rmTypeName + "." + name);
+//    }
   }
 
   public void buildDefinition(CObject source, ElementDefinition defn) {
