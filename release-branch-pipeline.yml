@@ -62,6 +62,9 @@ steps:
             <id>central</id>
             <username>$(MAVEN_CENTRAL_USER)</username>
             <password>$(MAVEN_CENTRAL_PASS)</password>
+            <repositoryOrigins>
+              <repositoryOrigin>https://central.sonatype.com</repositoryOrigin>
+            </repositoryOrigins>
           </server>
           <server>
             <id>github-releases</id>
