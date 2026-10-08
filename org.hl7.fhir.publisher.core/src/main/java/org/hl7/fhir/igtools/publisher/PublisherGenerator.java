@@ -560,20 +560,18 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       int bl = 0;
       int lf = 0;
       for (ValidationMessage m : ValidationPresenter.filterMessages(null, linkmsgs, true, pf.suppressedMessages)) {
-        if (m.getLevel() == ValidationMessage.IssueSeverity.ERROR) {
-          if (m.getType() == ValidationMessage.IssueType.NOTFOUND) {
-            bl++;
-          } else {
-            lf++;
-          }
+        if (ValidationPresenter.isBrokenLink(m)) {
+          bl++;
+        } else if (m.getLevel() == ValidationMessage.IssueSeverity.ERROR && m.getType() != ValidationMessage.IssueType.NOTFOUND) {
+          lf++;
         } else if (m.getLevel() == ValidationMessage.IssueSeverity.FATAL) {
           throw new Exception(m.getMessage());
         }
       }
       log("  ... "+Integer.toString(pf.inspector.total())+" html "+checkPlural("file", pf.inspector.total())+", "+Integer.toString(lf)+" "+checkPlural("page", lf)+" invalid xhtml ("+Integer.toString((lf*100)/(pf.inspector.total() == 0 ? 1 : pf.inspector.total()))+"%)");
-      log("  ... "+Integer.toString(pf.inspector.links())+" "+checkPlural("link", pf.inspector.links())+", "+Integer.toString(bl)+" broken "+checkPlural("link", lf)+" ("+Integer.toString((bl*100)/(pf.inspector.links() == 0 ? 1 : pf.inspector.links()))+"%)");
+      log("  ... "+Integer.toString(pf.inspector.links())+" "+checkPlural("link", pf.inspector.links())+", "+Integer.toString(bl)+" broken "+checkPlural("link", bl)+" ("+Integer.toString((bl*100)/(pf.inspector.links() == 0 ? 1 : pf.inspector.links()))+"%)");
       pf.errors.addAll(linkmsgs);
-      if (pf.brokenLinksError && linkmsgs.size() > 0) {
+      if (pf.brokenLinksError && bl > 0) {
         throw new Error("Halting build because broken links have been found, and these are disallowed in the IG control file");
       }
       if (settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD && !pf.inspector.getPublishBoxOK()) {
