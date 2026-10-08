@@ -27,13 +27,16 @@ import org.hl7.fhir.igtools.spreadsheets.MappingSpace;
 import org.hl7.fhir.igtools.templates.TemplateManager;
 import org.hl7.fhir.model.Base;
 import org.hl7.fhir.model.ModelContext;
+import org.hl7.fhir.model.core.Enumerations.PublicationStatus;
 import org.hl7.fhir.model.utilities.ResourceUtilities;
 import org.hl7.fhir.model.utilities.formats.OutputStyle;
 import org.hl7.fhir.r4.formats.FormatUtilities;
+import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.services.conformance.R5ExtensionsLoader;
 import org.hl7.fhir.services.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.services.context.ContextUtilities;
 import org.hl7.fhir.services.context.IContextResourceLoaderN;
+import org.hl7.fhir.services.fhirpath.TypeDetails;
 import org.hl7.fhir.services.fml.StructureMapTools;
 import org.hl7.fhir.services.renderers.igs.testing.TestingRenderers;
 import org.hl7.fhir.services.utilities.MappingSheetParser;
@@ -1316,6 +1319,21 @@ public class PublisherIGLoader extends PublisherBase {
       pf.extensionTracker.setoptIn(!ini.getBooleanProperty("IG", "usage-stats-opt-out"));
 
     log("Initialization complete");
+  }
+
+  /**
+   * In the extensions pack, new extensions must follow the standard naming pattern (FHIR-43753)
+   */
+  private void checkExtensionNaming(FetchedFile f, CanonicalResource bc) {
+    if (bc instanceof StructureDefinition && ExtensionNamingChecker.EXTENSIONS_PACKAGE_ID.equals(pf.packageId())) {
+      StructureDefinition sd = (StructureDefinition) bc;
+      if ("Extension".equals(sd.getType()) && sd.getDerivation() == StructureDefinition.TypeDerivationRule.CONSTRAINT) {
+        String msg = new ExtensionNamingChecker(pf.context).check(sd);
+        if (msg != null) {
+          f.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE, "StructureDefinition.id", msg, ValidationMessage.IssueSeverity.WARNING));
+        }
+      }
+    }
   }
 
   private boolean isExemptFromExtensions() {
@@ -3273,7 +3291,21 @@ public class PublisherIGLoader extends PublisherBase {
         throw new Exception("Unable to determine file type for "+name);
       }
       return VersionConvertorFactory_43_N.convertResource(res);
-    } else if (VersionUtilities.isR5Plus(parseVersion)) {
+    } else if (VersionUtilities.isR5Ver(parseVersion)) {
+      org.hl7.fhir.r5.model.Resource res;
+      if (contentType.contains("json")) {
+        res = new org.hl7.fhir.r5.formats.JsonParser(true).parse(source);
+      } else if (contentType.contains("xml")) {
+        res = new org.hl7.fhir.r5.formats.XmlParser(true).parse(source);
+      } else if (contentType.contains("fml")) {
+        // don't need a context to parse, which is good since we don't have one
+        StructureMapUtilities mu = new StructureMapUtilities(null, null, null);
+        res = mu.parse(new String(source), "");
+      } else {
+        throw new Exception("Unable to determine file type for "+name);
+      }
+      return VersionConvertorFactory_50_N.convertResource(res);
+    } else if (VersionUtilities.isR6Plus(parseVersion)) {
       if (contentType.contains("json")) {
         return new JsonParser(pf.context.getModelContext(), true, true).parse(source);
       } else if (contentType.contains("xml")) {
@@ -3756,10 +3788,26 @@ public class PublisherIGLoader extends PublisherBase {
             String code = res.getNamedChildValue("code");
             String nameForParam = Utilities.makeNameFromCode(code);
             String idForParam = Utilities.makeId(code);
-            res.forceElement("id").setValue(baseName+"-"+idForParam);
-            res.forceElement("url").setValue(getIgpkp().getCanonical()+"/SearchParameter/"+baseName+"-"+idForParam);
-            res.forceElement("name").setValue(baseName+Utilities.capitalize(nameForParam)+"SearchParam");
-            res.forceElement("title").setValue(baseName+" "+Utilities.capitalize(code)+" Search Parameter");
+            res.forceElement("id").setValue(baseName + "-" + idForParam);
+            if (!res.hasChild("url") || Utilities.noString(res.getNamedChildValue("url"))) {
+              res.forceElement("url").setValue(getIgpkp().getCanonical() + "/SearchParameter/" + baseName + "-" + idForParam);
+            }
+            res.forceElement("name").setValue(baseName + Utilities.capitalize(nameForParam) + "SearchParam");
+            res.forceElement("title").setValue(baseName + " " + Utilities.capitalize(code) + " Search Parameter");
+            if (!res.hasChild("multipleOr") || !res.hasChild("multipleAnd")) {
+              if (!res.hasChild("multipleOr")) {
+                res.forceElement("multipleOr").setValue("true");
+              }
+              String expression = res.getNamedChildValue("expression");
+              if (expression != null) {
+                try {
+                  TypeDetails td = pf.validator.getFHIRPathEngine().check(null, baseName, baseName, baseName, expression);
+                  res.forceElement("multipleAnd").setValue(td.isList() ? "true" : "false");
+                } catch (Exception e) {
+                  e.printStackTrace();
+                }
+              }
+            }
           }
           r.setId(res.getIdBase());
           List<Element> profiles = new ArrayList<Element>();
@@ -4669,6 +4717,7 @@ public class PublisherIGLoader extends PublisherBase {
         } else {
           throw new Exception("Error: conformance resource "+f.getPath()+" has neither id nor url");
         }
+        checkExtensionNaming(f, bc);
         if (replaceLiquidTags(bc)) {
           altered = true;
         }
@@ -4766,8 +4815,17 @@ public class PublisherIGLoader extends PublisherBase {
         }
         if (!bc.hasStatus()) {
           altered = true;
-          b.append("status=draft");
-          bc.setStatus(Enumerations.PublicationStatus.DRAFT);
+          StandardsStatus sStatus = ExtensionUtilities.getStandardsStatus(bc);
+          if (sStatus == StandardsStatus.TRIAL_USE || sStatus == StandardsStatus.NORMATIVE) {
+            b.append("status=active");
+            bc.setStatus(PublicationStatus.ACTIVE);
+          } else if (sStatus == StandardsStatus.WITHDRAWN || sStatus == StandardsStatus.DEPRECATED) {
+            b.append("status=retired");
+            bc.setStatus(PublicationStatus.RETIRED);
+          } else {
+            b.append("status=draft");
+            bc.setStatus(Enumerations.PublicationStatus.DRAFT);
+          }
         }
         if (new AdjunctFileLoader(this.pf.binaryPaths, this.pf.cql).replaceAttachments2(f, r)) {
           altered = true;
@@ -4817,6 +4875,11 @@ public class PublisherIGLoader extends PublisherBase {
             // configuration, so it has no web path, and every property link rendered from those
             // instances comes out as "null#Type.element". Give it the path we just worked out
             sdTemp.setWebPath(bc.getWebPath());
+            // the IG's own copy of the definition is what gets published and what replaces the
+            // pre-registration in the context, so it has to carry the additional-resource flag too.
+            // It usually is the pre-registered instance (see isCustomResource), but if the file was
+            // parsed afresh the flag - which the source isn't required to have - would be lost
+            markAsAdditionalResource(bc, r.getElement());
             this.pf.context.dropResource(sdTemp);
           }
           this.pf.context.cacheResourceFromPackage(bc, this.pf.packageInfo);
@@ -4886,6 +4949,29 @@ public class PublisherIGLoader extends PublisherBase {
   }
 
   /**
+   * Ensure that the definition of an additional resource carries the additional-resource flag (true),
+   * both on the resource and on its element model (which is what is published). The flag is a fact
+   * about how the IG is configured, not something the source definition is expected to say
+   */
+  private void markAsAdditionalResource(CanonicalResource bc, Element e) {
+    if (!ExtensionUtilities.readBoolExtension(bc, ExtensionDefinitions.EXT_ADDITIONAL_RESOURCE)) {
+      if (bc.hasExtension(ExtensionDefinitions.EXT_ADDITIONAL_RESOURCE)) {
+        bc.getExtensionByUrl(ExtensionDefinitions.EXT_ADDITIONAL_RESOURCE).setValue(new BooleanType(true));
+      } else {
+        bc.addExtension(ExtensionDefinitions.EXT_ADDITIONAL_RESOURCE, new BooleanType(true));
+      }
+    }
+    if (e != null) {
+      Element ext = e.getExtension(ExtensionDefinitions.EXT_ADDITIONAL_RESOURCE);
+      if (ext == null) {
+        ext = e.addElement("extension");
+        ext.setChildValue("url", ExtensionDefinitions.EXT_ADDITIONAL_RESOURCE);
+      }
+      ext.setChildValue("value[x]", new BooleanType(true));
+    }
+  }
+
+  /**
    * The pre-registered definition of an additional resource, matched on url alone rather than on
    * the versioned url. checkAdditionalResourceVersions makes the two versions agree, so the
    * versioned url would work as well - but the url is the identity here (an IG declares at most
@@ -4908,7 +4994,7 @@ public class PublisherIGLoader extends PublisherBase {
       }
     }
     for (String fn : pf.additionalResourceFiles) {
-      if (Utilities.path(pf.rootDir, fn).equals(f.getPath())) {
+      if (ManagedFileAccess.file(Utilities.path(pf.rootDir, fn)).getCanonicalPath().equals(f.getPath())) { // fetched files have canonical paths
         return true;
       }
     }

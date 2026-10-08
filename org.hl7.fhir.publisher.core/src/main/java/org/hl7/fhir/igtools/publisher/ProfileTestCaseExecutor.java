@@ -11,6 +11,8 @@ import java.util.List;
 import org.apache.tools.ant.filters.StringInputStream;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.ProfileTestCaseExecutor.Fetched;
+import org.hl7.fhir.model.core.Resource;
+import org.hl7.fhir.model.fml.StructureMap;
 import org.hl7.fhir.standalone.context.SimpleWorkerContext;
 import org.hl7.fhir.services.elementmodel.Element;
 import org.hl7.fhir.services.elementmodel.Manager;
@@ -34,12 +36,12 @@ public class ProfileTestCaseExecutor {
 
   public class Fetched {
 
-    private FetchedFile f;
-    private FetchedResource r;
+    private FetchedFile file;
+    private StructureDefinition profile;
 
-    public Fetched(FetchedFile f, FetchedResource r) {
-      this.f = f;
-      this.r = r;
+    public Fetched(FetchedFile file, StructureDefinition profile) {
+      this.file = file;
+      this.profile = profile;
     }
 
   }
@@ -62,10 +64,14 @@ public class ProfileTestCaseExecutor {
     localDir = FileUtilities.getDirectoryForFile(localFile);
     JsonObject testCases = JsonParser.parseObjectFromFile(localFile);
     JsonObject output = new JsonObject();
-    for (JsonObject p : testCases.forceArray("profiles").asJsonObjects()) {
-      executeProfile(p, output.forceArray("profiles").addObject());
+    try {
+      for (JsonObject p : testCases.forceArray("profiles").asJsonObjects()) {
+        executeProfile(p, output.forceArray("profiles").addObject());
+      }
+    } finally {
+      // written even when a test case fails hard, since it's the only place the actual outcome can be seen
+      JsonParser.compose(output, new File(FileUtilities.changeFileExt(localFile, ".out.json")), true);
     }
-    JsonParser.compose(output, new File(FileUtilities.changeFileExt(localFile, ".out.json")), true);
   }
 
   private void executeProfile(JsonObject p, JsonObject output) throws JsonException, IOException {
@@ -84,9 +90,13 @@ public class ProfileTestCaseExecutor {
     for (FetchedFile f : files) {
       for (FetchedResource r : f.getResources()) {
         if (r.getResource() != null && r.getResource() instanceof StructureDefinition && url.equals(((StructureDefinition) r.getResource()).getUrl())) {
-          return new Fetched(f, r);
+          return new Fetched(f, (StructureDefinition) r.getResource());
         }
       }
+    }
+    StructureDefinition sd = context.fetchResource(StructureDefinition.class, url);
+    if (sd != null) {
+      return new Fetched(null, sd);
     }
     return null;
   }
@@ -97,7 +107,7 @@ public class ProfileTestCaseExecutor {
     output.set("description", tc.asString("description"));
     List<ValidationMessage> messages = new ArrayList<>();
     List<StructureDefinition> profiles = new ArrayList<>();
-    profiles.add((StructureDefinition) profile.r.getResource());
+    profiles.add(profile.profile);
     
     FhirFormat fmt = tc.asString("source").contains(".xml") ? FhirFormat.XML : FhirFormat.JSON;
     validator.validate(null, messages, cnt, fmt, profiles);
@@ -116,6 +126,7 @@ public class ProfileTestCaseExecutor {
     if (passes != tc.asBoolean("valid")) {
       passesTest = false;
     }
+    boolean outcomeMatches = true;
     if (tc.has("outcome")) {
       MatchetypeValidator mv = new MatchetypeValidator(validator.getFHIRPathEngine());
       Element actual = Manager.parseSingle(context, new StringInputStream(js), FhirFormat.JSON);
@@ -125,11 +136,10 @@ public class ProfileTestCaseExecutor {
       mv.setPatternMode(true);
       mv.compare(messages, "outcome", expected, actual);
       OperationOutcome moo = OperationOutcomeUtilities.createOutcome(messages);
-      passes = true;
       for (ValidationMessage vm : messages) {
-        passes = passes && !vm.isError();
+        outcomeMatches = outcomeMatches && !vm.isError();
       }
-      if (!passes) {
+      if (!outcomeMatches) {
         passesTest = false;
         js = new org.hl7.fhir.model.core.formats.JsonParser(context.getModelContext()).composeString(moo);
         ooj = JsonParser.parseObject(js);
@@ -137,8 +147,16 @@ public class ProfileTestCaseExecutor {
       }
     }
     if (!passesTest) {
-      profile.f.getErrors().add(new ValidationMessage(Source.InstanceValidator, org.hl7.fhir.utilities.validation.ValidationMessage.IssueType.INVALID, "StructureDefinition",
-          "Profile test case failed - test for "+tc.asString("source")+" "+b(passes)+ " but it should have "+b(tc.asBoolean("valid")), IssueSeverity.ERROR));
+      // 'passes' is whether the instance validated; the outcome comparison is reported separately
+      String msg = passes != tc.asBoolean("valid")
+          ? "Profile test case failed - test for " + tc.asString("source") + " " + b(passes) + " but it should have " + b(tc.asBoolean("valid"))
+          : "Profile test case failed - test for " + tc.asString("source") + " " + b(passes) + " as expected, but the issues reported did not match the expected outcome (see 'outcome' and 'outcome-test' in the .out.json file)";
+      if (profile.file == null) {
+        throw new FHIRException(msg);
+      } else {
+        profile.file.getErrors().add(new ValidationMessage(Source.InstanceValidator, org.hl7.fhir.utilities.validation.ValidationMessage.IssueType.INVALID, "StructureDefinition",
+                msg, IssueSeverity.ERROR));
+      }
     }
   }
 

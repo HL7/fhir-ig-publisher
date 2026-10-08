@@ -163,7 +163,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   public static final long JEKYLL_TIMEOUT = 60000 * 5; // 5 minutes....
   public static final long FSH_TIMEOUT = 60000 * 5; // 5 minutes....
   public static final int PRISM_SIZE_LIMIT = 16384;
-  public static final String TOOLING_IG_CURRENT_RELEASE = "1.2.0";
+  public static final String TOOLING_IG_CURRENT_RELEASE = "1.3.0";
   public static final String PACKAGE_CACHE_FOLDER_PARAM = "-package-cache-folder";
 
   private PublisherIGLoader loader;
@@ -704,6 +704,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         j.add("errs", val.getErr());
         j.add("warnings", val.getWarn());
         j.add("hints", val.getInfo());
+        j.add("broken-links", val.getBrokenLinks());
         j.add("suppressed-hints", val.getSuppressedInfo());
         j.add("suppressed-warnings", val.getSuppressedWarnings());
       }

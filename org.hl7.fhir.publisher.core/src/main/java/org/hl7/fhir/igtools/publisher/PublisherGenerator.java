@@ -560,20 +560,18 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       int bl = 0;
       int lf = 0;
       for (ValidationMessage m : ValidationPresenter.filterMessages(null, linkmsgs, true, pf.suppressedMessages)) {
-        if (m.getLevel() == ValidationMessage.IssueSeverity.ERROR) {
-          if (m.getType() == ValidationMessage.IssueType.NOTFOUND) {
-            bl++;
-          } else {
-            lf++;
-          }
+        if (ValidationPresenter.isBrokenLink(m)) {
+          bl++;
+        } else if (m.getLevel() == ValidationMessage.IssueSeverity.ERROR && m.getType() != ValidationMessage.IssueType.NOTFOUND) {
+          lf++;
         } else if (m.getLevel() == ValidationMessage.IssueSeverity.FATAL) {
           throw new Exception(m.getMessage());
         }
       }
       log("  ... "+Integer.toString(pf.inspector.total())+" html "+checkPlural("file", pf.inspector.total())+", "+Integer.toString(lf)+" "+checkPlural("page", lf)+" invalid xhtml ("+Integer.toString((lf*100)/(pf.inspector.total() == 0 ? 1 : pf.inspector.total()))+"%)");
-      log("  ... "+Integer.toString(pf.inspector.links())+" "+checkPlural("link", pf.inspector.links())+", "+Integer.toString(bl)+" broken "+checkPlural("link", lf)+" ("+Integer.toString((bl*100)/(pf.inspector.links() == 0 ? 1 : pf.inspector.links()))+"%)");
+      log("  ... "+Integer.toString(pf.inspector.links())+" "+checkPlural("link", pf.inspector.links())+", "+Integer.toString(bl)+" broken "+checkPlural("link", bl)+" ("+Integer.toString((bl*100)/(pf.inspector.links() == 0 ? 1 : pf.inspector.links()))+"%)");
       pf.errors.addAll(linkmsgs);
-      if (pf.brokenLinksError && linkmsgs.size() > 0) {
+      if (pf.brokenLinksError && bl > 0) {
         throw new Error("Halting build because broken links have been found, and these are disallowed in the IG control file");
       }
       if (settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD && !pf.inspector.getPublishBoxOK()) {
@@ -3565,14 +3563,11 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
   }
 
   private String createTocPage(ImplementationGuide.ImplementationGuideDefinitionPageComponent page, ImplementationGuide.ImplementationGuideDefinitionPageComponent insertPage, String insertAfterName, String insertOffset, String currentOffset, String indents, String label, boolean last, String idPrefix, int position, String lang) throws FHIRException {
-    if (position > 222) {
-      position = 222;
-      if (!pf.tocSizeWarning) {
-        System.out.println("Table of contents has a section with more than 222 entries.  Collapsing will not work reliably");
-        pf.tocSizeWarning = true;
-      }
-    }
-    String id = idPrefix + (char)(position+33);
+    // fhir-table-scripts.js finds a row's descendants with row.id.startsWith(parent.id), so each
+    // level's segment must be prefix-free. It used to be one character, (char)(position+33), which
+    // ran out at 223 entries in a section - every later entry got the same id. A number terminated
+    // by '.' is prefix-free at any size (toc0.3. vs toc0.3.12.)
+    String id = (Utilities.noString(idPrefix) ? "toc" : idPrefix) + position + ".";
     String s = "<tr style=\"border:0px;padding:0px;vertical-align:top;background-color:inherit;\" id=\"" + Utilities.escapeXml(id) + "\">";
     s = s + "<td style=\"vertical-align:top;text-align:var(--ig-left,left);background-color:inherit;padding:0px 4px 0px 4px;white-space:nowrap;background-image:url(tbl_bck0.png)\" class=\"hierarchy\">";
     s = s + "<img style=\"background-color:inherit\" alt=\"\" class=\"hierarchy\" src=\"tbl_spacer.png\"/>";
@@ -3674,7 +3669,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     } else {
       Map<String, String> vars = makeVars(r);
       String outputName = determineOutputName(pf.igpkp.getProperty(r, "base"), r, vars, null, "");
-      addPageDataRow(pages, outputName, title, getLangTitles(page.getTitleElement(), ""), label, breadcrumb + breadCrumbForPage(page, false), breadcrumbs, r.getStatedExamples(), r.getFoundTestPlans(), r.getFoundTestScripts(), page);
+      addPageDataRow(pages, outputName, title, getLangTitles(page.getTitleElement(), ""), label, breadcrumb + breadCrumbForPage(page, false), addToBreadcrumbs(breadcrumbs, page, false), r.getStatedExamples(), r.getFoundTestPlans(), r.getFoundTestScripts(), page);
       //      addPageDataRow(pages, source, title, label, breadcrumb + breadCrumbForPage(page, false), r.getStatedExamples());
       for (String templateName: pf.extraTemplateList) {
         if (r.getConfig() !=null && r.getConfig().get("template-"+templateName)!=null && !r.getConfig().get("template-"+templateName).asString().isEmpty()) {
@@ -3748,11 +3743,14 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     JsonObject jsonBreadcrumb = new JsonObject();
     jsonPage.add("breadcrumblang", jsonBreadcrumb);
     for (String l : allLangs()) {
-      String tBreadcrumb = breadcrumbs.get(l);
+      // a page that is also a resource is passed its parent's breadcrumbs, and the root page's parent
+      // breadcrumbs are empty (no entry for any language) - that's the case when the IG resource
+      // itself is rendered as index.html
+      String tBreadcrumb = breadcrumbs.containsKey(l) ? breadcrumbs.get(l) : "";
       // the title is raw here (titlelang is data, and the templates escape it themselves), but a
       // breadcrumb is pre-rendered html - an & or < in a title made the page malformed XHTML.
       // breadCrumbForPage and addToBreadcrumbs escape for the same reason
-      if (tBreadcrumb.endsWith("</a></li>")) {
+      if (tBreadcrumb.isEmpty() || tBreadcrumb.endsWith("</a></li>")) {
         tBreadcrumb += "<li><b>" + Utilities.escapeXml(titles.get(l)) + "</b></li>";
       }
       jsonBreadcrumb.add(l, tBreadcrumb);

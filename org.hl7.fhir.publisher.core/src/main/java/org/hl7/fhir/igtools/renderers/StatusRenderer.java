@@ -216,7 +216,7 @@ public class StatusRenderer {
 
 
   private static String readStatus(DomainResource resource) {
-    if (resource instanceof CanonicalResource) {
+    if (resource instanceof CanonicalResource && ((CanonicalResource) resource).hasStatus()) {
       return ((CanonicalResource) resource).getStatus().getDisplay();
     }
     return null;

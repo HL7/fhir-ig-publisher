@@ -890,9 +890,12 @@ public class PublicationProcess {
   }
 
   public void delTempFolder(File temp, String s) throws IOException {
-    File gitFolder = new File(temp, s);
-    if (gitFolder.exists()) {
-      FileUtils.deleteDirectory(gitFolder);
+    File f = new File(temp, s);
+    if (f.isDirectory()) {
+      FileUtils.deleteDirectory(f);
+    } else if (f.exists()) {
+      // e.g. .git is a file (not a folder) when the IG is a git submodule or worktree
+      FileUtils.forceDelete(f);
     }
   }
 

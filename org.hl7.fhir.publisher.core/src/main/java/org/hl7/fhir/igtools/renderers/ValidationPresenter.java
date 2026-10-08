@@ -334,7 +334,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   int err = 0;
   int warn = 0;
   int info = 0;
-  int link = 0;
+  int brokenLinks = 0;
   private String root;
   private String packageId;
   private String altPackageId;
@@ -477,6 +477,17 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     return false;
   }
 
+  /**
+   * True if the message reports a link (or image source) that the HTML checker could not resolve.
+   * Other HTML checker messages (well-formedness, duplicate ids, WCAG checks, publish box etc.)
+   * are not broken links - they count as ordinary errors, warnings or hints at their own level.
+   * This is the single definition shared by the build log, qa.html/qa.txt and qa.json.
+   */
+  public static boolean isBrokenLink(ValidationMessage vm) {
+    return vm.getSource() == Source.HtmlChecker && vm.getMessageId() != null &&
+        (vm.getMessageId().equals("HTML_LINK_CHECK_FAILED") || vm.getMessageId().equals("HTML_IMG_SRC_CHECK_FAILED"));
+  }
+
   public String generate(String title, List<ValidationMessage> allErrors, List<FetchedFile> files, String path, SuppressedMessageInformation filteredMessages, String pinned) throws IOException {
     for (FetchedFile f : files) {
       for (FetchedResource r: f.getResources()) {
@@ -499,8 +510,8 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     
     List<ValidationMessage> linkErrors = filterMessages(null, allErrors, true, filteredMessages); 
     for (ValidationMessage vm : linkErrors) {
-      if (vm.getSource() == Source.HtmlChecker) {
-        link++;
+      if (isBrokenLink(vm)) {
+        brokenLinks++;
       } else if (vm.getLevel() == null) {
         err++;
       } else if (vm.getLevel().equals(ValidationMessage.IssueSeverity.FATAL)||vm.getLevel().equals(ValidationMessage.IssueSeverity.ERROR))
@@ -548,7 +559,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     genQAESLintCompactText(title, files, path, filteredMessages, linkErrors);
     genTXServerQA(title, path);
     
-    String summary = "Errors: " + err + ", Warnings: " + warn + ", Info: " + info+", Broken Links: "+link;
+    String summary = "Errors: " + err + ", Warnings: " + warn + ", Info: " + info+", Broken Links: "+brokenLinks;
     return path + "\r\n" + summary;
   }
 
@@ -792,7 +803,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     }
 
     b.append("\n");
-    b.append("err = " + err + ", warn = " + warn + ", info = " + info + "\n");
+    b.append("err = " + err + ", warn = " + warn + ", info = " + info + ", broken links = " + brokenLinks + "\n");
     b.append("IG Publisher Version: " + toolsVersion);
 
     FileUtilities.stringToFile(b.toString(), FileUtilities.changeFileExt(path, "-eslintcompact.txt"));
@@ -801,7 +812,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   public void genQAText(String title, List<FetchedFile> files, String path, SuppressedMessageInformation filteredMessages, List<ValidationMessage> linkErrors)
       throws IOException {
     StringBuilder b = new StringBuilder();
-    b.append(genHeaderTxt(title, err, warn, info));
+    b.append(genHeaderTxt(title, err, warn, info, brokenLinks));
     b.append(genSummaryRowTxtInternal(linkErrors));
     files = sorted(files);
     for (FetchedFile f : files) {
@@ -829,7 +840,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   public void genQATextForCompare(String title, List<FetchedFile> files, String path, SuppressedMessageInformation filteredMessages, List<ValidationMessage> linkErrors)
       throws IOException {
     StringBuilder b = new StringBuilder();
-    b.append(genHeaderTxtForCompare(title, err, warn, info));
+    b.append(genHeaderTxtForCompare(title, err, warn, info, brokenLinks));
     b.append(genSummaryRowTxtInternal(linkErrors));
     files = sorted(files);
     for (FetchedFile f : files) {
@@ -856,7 +867,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
 
   public List<FetchedFile> genQAHtml(String title, List<FetchedFile> files, String path, SuppressedMessageInformation filteredMessages, List<ValidationMessage> linkErrors, boolean allIssues, Object pinned) throws IOException {
     StringBuilder b = new StringBuilder();
-    b.append(genHeader(title, err, warn, info, link, filteredMessages.count(), allIssues, path, pinned));
+    b.append(genHeader(title, err, warn, info, brokenLinks, filteredMessages.count(), allIssues, path, pinned));
     b.append(genSummaryRowInteral(linkErrors));
 
     files = sorted(files);
@@ -1047,7 +1058,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   private final String headerTemplate = 
       "<!DOCTYPE HTML>\r\n"+
       "<html xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\" lang=\"en\">\r\n"+
-      "<!-- broken links = $links$, errors = $err$, warn = $warn$, info = $info$-->\r\n"+
+      "<!-- broken links = $brokenLinks$, errors = $err$, warn = $warn$, info = $info$-->\r\n"+
       "<head>\r\n"+
       "  <title>$title$ : Validation Results</title>\r\n"+
       "  <link href=\"fhir.css\" rel=\"stylesheet\"/>\r\n"+
@@ -1120,7 +1131,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       "$noNarrative$"+
       "$noValidation$"+
       "$fragments$"+
-      " <tr><td>Summary:</td><td> errors = $err$, warn = $warn$, info = $info$, broken links = $links$, pinned = $pinned$.  <button onclick=\"toggleCodes()\">Show Message Ids</button></td></tr>\r\n"+
+      " <tr><td>Summary:</td><td> errors = $err$, warn = $warn$, info = $info$, broken links = $brokenLinks$, pinned = $pinned$.  <button onclick=\"toggleCodes()\">Show Message Ids</button></td></tr>\r\n"+
       "</table>\r\n"+
       " <table class=\"grid\">\r\n"+
       "   <tr>\r\n"+
@@ -1231,7 +1242,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   private final String headerTemplateText = 
       "$title$ : Validation Results\r\n"+
       "=========================================\r\n\r\n"+
-      "err = $err$, warn = $warn$, info = $info$\r\n"+
+      "err = $err$, warn = $warn$, info = $info$, broken links = $brokenLinks$\r\n"+
       "$versionCheck$\r\n"+
       "Generated $time$. FHIR version $version$ for $packageId$#$igversion$ (canonical = $canonical$)\r\n$warning$\r\n";
   
@@ -1257,7 +1268,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     return new ST(t, '$', '$');
   }
 
-  private String genHeader(String title, int err, int warn, int info, int links, int msgCount, boolean allIssues, String path, Object pinned) {
+  private String genHeader(String title, int err, int warn, int info, int brokenLinks, int msgCount, boolean allIssues, String path, Object pinned) {
     ST t = template(headerTemplate);
     t.add("version", statedVersion);
     t.add("igversion", igVersion);
@@ -1268,7 +1279,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     t.add("err", Integer.toString(err));
     t.add("warn", Integer.toString(warn));
     t.add("info", Integer.toString(info));
-    t.add("links", Integer.toString(links));
+    t.add("brokenLinks", Integer.toString(brokenLinks));
     t.add("pinned", pinned);
     t.add("packageId", packageId);
     t.add("canonical", provider.getCanonical());
@@ -1417,8 +1428,9 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     return b.toString();
   }
 
-  private String genHeaderTxt(String title, int err, int warn, int info) {
+  private String genHeaderTxt(String title, int err, int warn, int info, int brokenLinks) {
     ST t = template(headerTemplateText);
+    t.add("brokenLinks", Integer.toString(brokenLinks));
     t.add("version", statedVersion);
     t.add("toolsVersion", toolsVersion);
     t.add("versionCheck", versionCheckText());
@@ -1457,8 +1469,9 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     return t.render();
   }
 
-  private String genHeaderTxtForCompare(String title, int err, int warn, int info) {
+  private String genHeaderTxtForCompare(String title, int err, int warn, int info, int brokenLinks) {
     ST t = template(headerTemplateText);
+    t.add("brokenLinks", Integer.toString(brokenLinks));
     t.add("version", "$--");
     t.add("toolsVersion", "$--");
     t.add("versionCheck", "$--");
@@ -1948,6 +1961,10 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
 
   public int getInfo() {
     return info;
+  }
+
+  public int getBrokenLinks() {
+    return brokenLinks;
   }  
   
   private String versionCheckText() {
