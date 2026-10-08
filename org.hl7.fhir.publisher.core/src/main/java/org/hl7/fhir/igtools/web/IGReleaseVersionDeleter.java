@@ -45,6 +45,8 @@ public class IGReleaseVersionDeleter {
     List<String> igs = listIgs(folder);
     List<String> hist = listHistoryFolder(historyRepo);
     hist.add("package-list.json");
+    hist.add(DynamicPublishBoxSupport.PACKAGE_LIST_JS);
+    hist.add(DynamicPublishBoxSupport.PUBLISH_BOX_JS);
     hist.add("publish.ini");
     int i = 0;
     for (File f : new File(folder).listFiles()) {
