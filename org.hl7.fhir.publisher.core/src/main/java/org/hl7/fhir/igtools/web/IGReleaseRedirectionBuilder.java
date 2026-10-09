@@ -141,6 +141,7 @@ public class IGReleaseRedirectionBuilder {
       "</configuration>";
   
   private String folder;
+  private String publishedFolder;
   private String canonical;
   private String vpath;
   private String localFolder;
@@ -150,14 +151,26 @@ public class IGReleaseRedirectionBuilder {
   private NpmPackage pkg;
 
   public IGReleaseRedirectionBuilder(String folder, String canonical, String vpath, String websiteRootFolder) {
-   this.folder = folder; 
+    this(folder, folder, canonical, vpath, websiteRootFolder);
+  }
+
+  /**
+   * @param folder the folder whose content (spec.internals, package.tgz) the redirections are built from,
+   *   and where the redirection files are written
+   * @param publishedFolder where the content of folder ends up in the website. This differs from folder
+   *   when the redirections are built in a staging folder (e.g. the IG build output) that is copied into
+   *   the website afterwards
+   */
+  public IGReleaseRedirectionBuilder(String folder, String publishedFolder, String canonical, String vpath, String websiteRootFolder) {
+   this.folder = folder;
+   this.publishedFolder = publishedFolder;
    this.canonical = canonical;
    this.vpath = vpath.replace("http://", "https://");
    this.websiteRootFolder = websiteRootFolder;
-   if (!folder.startsWith(websiteRootFolder)) {
-     throw new Error("The folder "+folder+" is not inside the website root folder "+websiteRootFolder);
+   if (!publishedFolder.startsWith(websiteRootFolder)) {
+     throw new Error("The folder "+publishedFolder+" is not inside the website root folder "+websiteRootFolder);
    }
-   localFolder = folder.substring(websiteRootFolder.length());
+   localFolder = publishedFolder.substring(websiteRootFolder.length());
    countTotal = 0;
    countUpdated = 0;
   }
@@ -309,10 +322,10 @@ public class IGReleaseRedirectionBuilder {
   }
 
   private String rulePrefix() {
-    if (folder.equals(websiteRootFolder)) {
+    if (publishedFolder.equals(websiteRootFolder)) {
       throw new Error("This is wrong!");
     }
-    String t = folder.substring(websiteRootFolder.length()+1);
+    String t = publishedFolder.substring(websiteRootFolder.length()+1);
     t = t.replace("/", ".").replace("\\", ".");
     return t+".";
   }
