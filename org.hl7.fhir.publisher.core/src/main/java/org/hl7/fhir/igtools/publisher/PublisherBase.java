@@ -559,7 +559,9 @@ public class PublisherBase implements ILoggingService {
     res.add("SubscriptionTopic");
     res.add("Requirements");
     for (String s : pf.customResourceNames) {
-      res.remove(s);
+      if (!pf.context.getModelContext().getContextInformation().hasResource(s)) {
+        res.remove(s);
+      }
     }
     return res;
   }
