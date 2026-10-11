@@ -687,7 +687,7 @@ public class PublicationProcess {
       System.out.println("Update "+Utilities.path(destination, "package-list.json"));    
       PackageListEntry plVer = updatePackageList(pl, fSource.getAbsolutePath(), prSrc, pathVer,  Utilities.path(destination, "package-list.json"), mode, date,
               npm.fhirVersion(), Utilities.pathURL(pubSetup.asString("url"), tcName), subPackages, prSrc.asString("previouslyPublishedAs"));
-      updatePublishBox(pl, plVer, destVer, pathVer, destination, fRoot.getAbsolutePath(), false, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null, url, jsonXmlClones);
+      updatePublishBox(pl, plVer, destVer, destVer, pathVer, destination, fRoot.getAbsolutePath(), false, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null, url, jsonXmlClones);
 
       if (mode != PublicationProcessMode.WORKING || prSrc.has("movedFrom")) {
         String igSrc = tempM == null ? null : Utilities.path(tempM.getAbsolutePath(), "output");
@@ -719,7 +719,7 @@ public class PublicationProcess {
                 String vCode = pv.substring(pv.lastIndexOf("/")+1);
                 String dv = Utilities.path(fRoot, relPath);
                 System.out.println("Update publish box for version "+v.version()+" @ "+v.path());
-                updatePublishBox(pl, v, dv, pv, destination, fRoot.getAbsolutePath(), false, null, null, null, url, jsonXmlClones);
+                updatePublishBox(pl, v, dv, dv, pv, destination, fRoot.getAbsolutePath(), false, null, null, null, url, jsonXmlClones);
               }
             }
           }
@@ -741,11 +741,11 @@ public class PublicationProcess {
           }
           String vCode = tcPath.substring(tcPath.lastIndexOf("/")+1);
           String dv = Utilities.path(destination, vCode);
-          updatePublishBox(pl, tcVer, dv, tcPath, destination, fRoot.getAbsolutePath(), false, null, null, null, url, jsonXmlClones);
+          updatePublishBox(pl, tcVer, dv, dv, tcPath, destination, fRoot.getAbsolutePath(), false, null, null, null, url, jsonXmlClones);
         }
         // we do this first in the output so we can get a proper diff
         if (igSrc != null) {
-          updatePublishBox(pl, plVer, igSrc, pathVer, igSrc, fRoot.getAbsolutePath(), true, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null, url, jsonXmlClones);
+          updatePublishBox(pl, plVer, igSrc, destination, pathVer, igSrc, fRoot.getAbsolutePath(), true, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null, url, jsonXmlClones);
 
           System.out.println("Check for Files to delete");
           List<String> newFiles = igSrc == null ? new ArrayList<>() : FileUtilities.listAllFiles(igSrc, null);
@@ -773,7 +773,7 @@ public class PublicationProcess {
               ignoreList.add(Utilities.path(dpath, v.path().substring(path.length()+1)));
             }
           }
-          updatePublishBox(pl, pl.current(), dpath, path, dpath, fRoot.getAbsolutePath(), true, null, null, ignoreList, url, jsonXmlClones);
+          updatePublishBox(pl, pl.current(), dpath, dpath, path, dpath, fRoot.getAbsolutePath(), true, null, null, ignoreList, url, jsonXmlClones);
         }
       } else {
         src.cleanFolder(relDest);
@@ -1117,7 +1117,7 @@ public class PublicationProcess {
     return sdf.format(date);
   }
 
-  private void updatePublishBox(PackageList pl, PackageListEntry plVer, String destVer, String pathVer, String destination, String rootFolder, boolean current, ServerType serverType, File sft, List<String> ignoreList, String url, boolean jsonXmlClones) throws FileNotFoundException, IOException {
+  private void updatePublishBox(PackageList pl, PackageListEntry plVer, String destVer, String publishedVer, String pathVer, String destination, String rootFolder, boolean current, ServerType serverType, File sft, List<String> ignoreList, String url, boolean jsonXmlClones) throws FileNotFoundException, IOException {
     IGReleaseVersionUpdater igvu = new IGReleaseVersionUpdater(destVer, url, rootFolder, ignoreList, null, plVer.json(), destination);
     String fragment = PublishBoxStatementGenerator.genFragment(pl, plVer, pl.current(), pl.canonical(), current, false);
     System.out.println("Publish Box Statement: "+fragment);
@@ -1129,7 +1129,7 @@ public class PublicationProcess {
       System.out.println("  .. "+igvu.getClonedTotal()+" clones checked, "+igvu.getClonedCount()+" updated");
     }
     if (serverType != null) {
-      IGReleaseRedirectionBuilder rb = new IGReleaseRedirectionBuilder(destVer, pl.canonical(), plVer.path(), rootFolder);
+      IGReleaseRedirectionBuilder rb = new IGReleaseRedirectionBuilder(destVer, publishedVer, pl.canonical(), plVer.path(), rootFolder);
       if (serverType == ServerType.APACHE) {
         rb.buildApacheRedirections();
       } else if (serverType == ServerType.CLOUD) {
@@ -1423,7 +1423,7 @@ public class PublicationProcess {
         String vCode = pv.substring(pv.lastIndexOf("/")+1);
         String dv = Utilities.path(destination, vCode);
         System.out.println("Update publish box for version "+v.version()+" @ "+v.path());
-        updatePublishBox(pl, v, dv, pv, destination, fRoot.getAbsolutePath(), false, null, null, null, url, false);
+        updatePublishBox(pl, v, dv, dv, pv, destination, fRoot.getAbsolutePath(), false, null, null, null, url, false);
       }
     }
 
