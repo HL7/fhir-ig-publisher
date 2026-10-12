@@ -45,6 +45,7 @@ import org.hl7.fhir.convertors.factory.VersionConvertorFactory_50_N;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.model.core.*;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.logging.ILoggingService;
 import org.hl7.fhir.utilities.npm.NpmPackage;
@@ -958,7 +959,7 @@ public class CqlSubSystem {
     // TODO: Consider whether we want to add logic definitions to the library?
     // TODO: Consider whether library processing should be done in the same way as all other artifact processing now that that code path exists?
     boolean annotationsEnabled = options.getCqlCompilerOptions().getOptions().contains(CqlCompilerOptions.Options.EnableAnnotations);
-    Library moduleDefinitionLibrary = drp.gatherDataRequirements(
+    org.hl7.fhir.r5.model.Library moduleDefinitionLibrary = drp.gatherDataRequirements(
         libraryManager,
         library,
         options.getCqlCompilerOptions(),
@@ -967,7 +968,12 @@ public class CqlSubSystem {
         false
     );
 
-    return moduleDefinitionLibrary.getDataRequirement();
+    // TODO: The CQL translator needs to be refactored to make use of the R6 normative client but that requires
+    // a new release of the translator to take the new core org.hl7.fhir.core dependency. Using this conversion
+    // should work until that new translator release is available.
+    Library coreLibrary = (Library)VersionConvertorFactory_50_N.convertResource(moduleDefinitionLibrary);
+
+    return coreLibrary.getDataRequirementList();
   }
 
   private List<DataRequirement> extractDataRequirements(List<org.hl7.elm.r1.Retrieve> retrieves, CompiledLibrary library, LibraryManager libraryManager) {
