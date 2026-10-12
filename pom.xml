@@ -16,6 +16,7 @@
         <lombok_version>1.18.38</lombok_version>
         <okhttp.version>5.3.2</okhttp.version>
         <okio.version>3.18.2</okio.version>
+        <kotlin.version>2.4.20</kotlin.version>
         <junit_jupiter_version>5.7.1</junit_jupiter_version>
         <maven.compiler.release>17</maven.compiler.release>
         <maven.compiler.source>17</maven.compiler.source>
@@ -165,6 +166,18 @@
                 <groupId>com.squareup.okhttp3</groupId>
                 <artifactId>okhttp-bom</artifactId>
                 <version>${okhttp.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!-- Aligns the kotlin-stdlib family on kotlin.version. Transitive consumers
+                 (okhttp, okio, kotlinx-*, cqframework, bignum-jvm) each declare their own
+                 stdlib between 1.9.24 and 2.3.10, and bignum-jvm additionally pulls
+                 stdlib-jdk8/jdk7 2.0.0. Note the BOM manages stdlib-common as type=pom only,
+                 so the stdlib-common *jar* is excluded in the core module instead. -->
+            <dependency>
+                <groupId>org.jetbrains.kotlin</groupId>
+                <artifactId>kotlin-bom</artifactId>
+                <version>${kotlin.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -383,7 +396,7 @@
         <dependency>
             <groupId>org.jetbrains.kotlin</groupId>
             <artifactId>kotlin-stdlib</artifactId>
-            <version>2.4.20</version>
+            <version>${kotlin.version}</version>
         </dependency>
 
         <dependency>

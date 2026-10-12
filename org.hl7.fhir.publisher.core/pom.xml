@@ -47,6 +47,16 @@
             <groupId>org.cqframework</groupId>
             <artifactId>cql-to-elm-jvm</artifactId>
             <version>${info_cqframework_version}</version>
+            <exclusions>
+                <!-- com.ionspin.kotlin:bignum-jvm drags in the kotlin-stdlib-common 2.0.0 jar.
+                     It holds only .kotlin_metadata (no classes), kotlin-bom manages it as
+                     type=pom so the jar escapes management, and no stdlib-common jar is
+                     published past 2.0.0 - so it cannot be aligned, only dropped. -->
+                <exclusion>
+                    <groupId>org.jetbrains.kotlin</groupId>
+                    <artifactId>kotlin-stdlib-common</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.cqframework</groupId>
