@@ -10,32 +10,31 @@ import java.util.List;
 import java.util.Set;
 
 import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_30_50;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_50;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_N;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_N;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_50_N;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.PastProcessHackerUtilities;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.igtools.publisher.loaders.PublisherLoader;
 import org.hl7.fhir.igtools.publisher.modules.NullModule;
-import org.hl7.fhir.r5.comparison.ComparisonRenderer;
-import org.hl7.fhir.r5.comparison.ComparisonSession;
-import org.hl7.fhir.r5.conformance.profile.ProfileKnowledgeProvider;
-import org.hl7.fhir.r5.context.ILoggingService;
-import org.hl7.fhir.r5.context.SimpleWorkerContext;
-import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.DomainResource;
-import org.hl7.fhir.r5.model.ImplementationGuide;
-import org.hl7.fhir.r5.model.Resource;
+import org.hl7.fhir.model.ModelContext;
+import org.hl7.fhir.model.extensions.ExtensionDefinitions;
 import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.http.ManagedWebAccess;
 import org.hl7.fhir.utilities.i18n.RenderingI18nContext;
+import org.hl7.fhir.utilities.logging.ILoggingService;
 import org.hl7.fhir.utilities.npm.BasePackageCacheManager;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.PackageList;
 import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
+import org.hl7.fhir.model.core.*;
+import org.hl7.fhir.services.comparison.ComparisonRenderer;
+import org.hl7.fhir.services.comparison.ComparisonSession;
+import org.hl7.fhir.services.conformance.profile.ProfileKnowledgeProvider;
+import org.hl7.fhir.standalone.context.SimpleWorkerContext;
 
 
 public class PreviousVersionComparator {
@@ -211,15 +210,15 @@ public class PreviousVersionComparator {
             }
           }
           NpmPackage core = pcm.loadPackage(VersionUtilities.packageForVersion(current.fhirVersion()), VersionUtilities.getCurrentVersion(current.fhirVersion()));
-          vi.context = new SimpleWorkerContext.SimpleWorkerContextBuilder().withTerminologyCachePath(Utilities.path(context.getTxCache().getFolder(), vi.version)).fromPackage(core,
-                  new PublisherLoader(core, SpecMapManager.fromPackage(core), core.getWebLocation(), null, false).makeLoader(), true);
+          vi.context = new SimpleWorkerContext.SimpleWorkerContextBuilder(ModelContext.fullCoreContext()).withTerminologyCachePath(Utilities.path(context.getTxCache().getFolder(), vi.version)).fromPackage(core,
+                  new PublisherLoader(core, SpecMapManager.fromPackage(core), core.getWebLocation(), null, false, ModelContext.fullCoreContext()).makeLoader(), true);
           vi.context.connectToTSServer(context.getTxClientManager().getFactory(), context.getTxClientManager().getMasterClient(), false);
           vi.context.setAllowLoadingDuplicates(true);
           vi.context.setExpansionParameters(context.getExpansionParameters());
           vi.context.setUcumService(context.getUcumService());
           vi.context.setLocale(context.getLocale());
           vi.context.setLogger(context.getLogger());
-          vi.context.loadFromPackageAndDependencies(current, new PublisherLoader(current, SpecMapManager.fromPackage(current), current.getWebLocation(), null, false).makeLoader(), pcm);
+          vi.context.loadFromPackageAndDependencies(current, new PublisherLoader(current, SpecMapManager.fromPackage(current), current.getWebLocation(), null, false, vi.context.getModelContext()).makeLoader(), pcm);
           vi.pkp = new IGKnowledgeProvider(vi.context, current.getWebLocation(), current.canonical(), null, null, false, null, null, null, null, new NullModule(), null);
         } catch (Exception e) {
           vi.errMsg = "Unable to find load package "+pid+"#"+vi.version+" ("+e.getMessage()+" on file "+filename+")";
@@ -232,11 +231,13 @@ public class PreviousVersionComparator {
   private Resource loadResourceFromPackage(NpmPackage uscore, String filename, String version) throws FHIRException, IOException {
     InputStream s = uscore.loadResource(filename);
     if (VersionUtilities.isR3Ver(version)) {
-      return VersionConvertorFactory_30_50.convertResource(new org.hl7.fhir.dstu3.formats.JsonParser().parse(s), new BaseAdvisor_30_50(false));
+      return VersionConvertorFactory_30_N.convertResource(new org.hl7.fhir.dstu3.formats.JsonParser().parse(s), new BaseAdvisor_30_50(false));
     } else if (VersionUtilities.isR4Ver(version)) {
-      return VersionConvertorFactory_40_50.convertResource(new org.hl7.fhir.r4.formats.JsonParser().parse(s));
+      return VersionConvertorFactory_40_N.convertResource(new org.hl7.fhir.r4.formats.JsonParser().parse(s));
+    } else if (VersionUtilities.isR5Ver(version)) {
+      return VersionConvertorFactory_50_N.convertResource(new org.hl7.fhir.r5.formats.JsonParser().parse(s));
     } else if (VersionUtilities.isR5Plus(version)) {
-      return new org.hl7.fhir.r5.formats.JsonParser().parse(s);
+      return new org.hl7.fhir.model.core.formats.JsonParser(ModelContext.fullCoreContext()).parse(s);
     } else {
       return null;
     }

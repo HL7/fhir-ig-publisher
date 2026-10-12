@@ -11,17 +11,17 @@ import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
-import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.elementmodel.Element;
-import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.model.*;
-import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
-import org.hl7.fhir.r5.renderers.IMarkdownProcessor;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceWithReference;
-import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
+import org.hl7.fhir.services.conformance.profile.ProfileUtilities;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.services.elementmodel.Element;
+import org.hl7.fhir.model.extensions.ExtensionDefinitions;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.model.core.*;
+import org.hl7.fhir.model.core.CodeSystem.ConceptDefinitionComponent;
+import org.hl7.fhir.services.renderers.IMarkdownProcessor;
+import org.hl7.fhir.services.renderers.utils.RenderingContext;
+import org.hl7.fhir.services.renderers.utils.Resolver.ResourceWithReference;
+import org.hl7.fhir.model.utilities.CodeSystemUtilities;
 import org.hl7.fhir.utilities.UserDataNames;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.StringPair;
@@ -105,7 +105,7 @@ public class BaseRenderer implements IMarkdownProcessor {
       
 
       if (url == null) {
-        Resource r = context.fetchResource(Resource.class, parts[0], IWorkerContext.VersionResolutionRules.defaultRule());
+        Resource r = context.fetchResource(Resource.class, parts[0], VersionResolutionRules.defaultRule());
         if (r == null && Utilities.isAbsoluteUrl(parts[0])) {
           ResourceWithReference rr = gen.getResolver().resolve(gen, parts[0], null);
           if (rr != null) {
@@ -199,7 +199,7 @@ public class BaseRenderer implements IMarkdownProcessor {
       if (url != null)
         return new StringPair(Utilities.pathURL(map.getBase(), url), null);
     }      
-    CanonicalResource cr = (CanonicalResource) context.fetchResource(Resource.class, linkText, IWorkerContext.VersionResolutionRules.defaultRule());
+    CanonicalResource cr = (CanonicalResource) context.fetchResource(Resource.class, linkText, VersionResolutionRules.defaultRule());
     if (cr != null && cr.hasWebPath()) {
       return new StringPair(cr.getWebPath(), cr.present());
     }
@@ -218,11 +218,11 @@ public class BaseRenderer implements IMarkdownProcessor {
 
   protected String renderCommitteeLink(CanonicalResource cr) {
     String code = ExtensionUtilities.readStringExtension(cr, ExtensionDefinitions.EXT_WORKGROUP);
-    CodeSystem cs = context.fetchCodeSystem("http://terminology.hl7.org/CodeSystem/hl7-work-group", IWorkerContext.VersionResolutionRules.defaultRule());
+    CodeSystem cs = context.fetchCodeSystem("http://terminology.hl7.org/CodeSystem/hl7-work-group", VersionResolutionRules.defaultRule());
     if (cs == null || !cs.hasWebPath())
       return code;
     else {
-      ConceptDefinitionComponent cd = CodeSystemUtilities.findCode(cs.getConcept(), code);
+      ConceptDefinitionComponent cd = CodeSystemUtilities.findCode(cs.getConceptList(), code);
       if (cd == null) {
         return code;        
       } else {

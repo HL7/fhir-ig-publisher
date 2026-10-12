@@ -9,10 +9,10 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.model.Extension;
-import org.hl7.fhir.r5.model.ImplementationGuide;
-import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnComponent;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.model.core.Extension;
+import org.hl7.fhir.model.core.ImplementationGuide;
+import org.hl7.fhir.model.core.ImplementationGuide.ImplementationGuideDependsOnComponent;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.junit.jupiter.api.Test;
 
@@ -135,12 +135,12 @@ class VersionTokenValidationTest {
     ImplementationGuideDependsOnComponent d = dep("test.mixed.r5", "1.0.0");
     addOccurrence(d, "44", "test.mixed.bogus", "0.0.0", null);
     addOccurrence(d, "4.0.1", "test.mixed.r4", "9.9.9", null);
-    ig.getDependsOn().add(d);
+    ig.getDependsOnList().add(d);
 
     assertDoesNotThrow(() -> PublisherIGLoader.applyPerVersionDeps(ig, "r4", "5.0.0"));
-    assertEquals(1, ig.getDependsOn().size());
-    assertEquals("test.mixed.r4", ig.getDependsOn().get(0).getPackageId());
-    assertEquals("9.9.9", ig.getDependsOn().get(0).getVersion());
+    assertEquals(1, ig.getDependsOnList().size());
+    assertEquals("test.mixed.r4", ig.getDependsOnList().get(0).getPackageId());
+    assertEquals("9.9.9", ig.getDependsOnList().get(0).getVersion());
   }
 
   @Test
@@ -151,10 +151,10 @@ class VersionTokenValidationTest {
     ImplementationGuideDependsOnComponent d = dep("test.unk.r5", "1.0.0");
     addOccurrence(d, "4.2.0", "test.unk.bogus", "0.0.0", null);
     addOccurrence(d, "4.0.1", "test.unk.r4", "9.9.9", null);
-    ig.getDependsOn().add(d);
+    ig.getDependsOnList().add(d);
 
     assertDoesNotThrow(() -> PublisherIGLoader.applyPerVersionDeps(ig, "r4", "5.0.0"));
-    assertEquals("test.unk.r4", ig.getDependsOn().get(0).getPackageId());
+    assertEquals("test.unk.r4", ig.getDependsOnList().get(0).getPackageId());
   }
 
   // --- validateDependencyVersionTokens (ingestion warning, once per build) ---
@@ -166,8 +166,8 @@ class VersionTokenValidationTest {
     addOccurrence(bad, "44", null, null, null);
     ImplementationGuideDependsOnComponent good = dep("test.good", "1.0.0");
     addOccurrence(good, "4.0.1", null, null, null);
-    ig.getDependsOn().add(bad);
-    ig.getDependsOn().add(good);
+    ig.getDependsOnList().add(bad);
+    ig.getDependsOnList().add(good);
 
     List<ValidationMessage> errors = new ArrayList<>();
     PublisherIGLoader.validateDependencyVersionTokens(ig, errors);

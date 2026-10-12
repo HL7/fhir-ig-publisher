@@ -3,46 +3,46 @@ package org.hl7.fhir.igtools.publisher;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.model.ActivityDefinition;
-import org.hl7.fhir.r5.model.CanonicalType;
-import org.hl7.fhir.r5.model.CapabilityStatement;
-import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestComponent;
-import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceComponent;
-import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceOperationComponent;
-import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceSearchParamComponent;
-import org.hl7.fhir.r5.model.CodeSystem;
-import org.hl7.fhir.r5.model.CompartmentDefinition;
-import org.hl7.fhir.r5.model.ConceptMap;
-import org.hl7.fhir.r5.model.ConceptMap.ConceptMapGroupComponent;
-import org.hl7.fhir.r5.model.DeviceDefinition;
-import org.hl7.fhir.r5.model.ElementDefinition;
-import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
-import org.hl7.fhir.r5.model.EventDefinition;
-import org.hl7.fhir.r5.model.ExampleScenario;
-import org.hl7.fhir.r5.model.GraphDefinition;
-import org.hl7.fhir.r5.model.ImplementationGuide;
-import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideGlobalComponent;
-import org.hl7.fhir.r5.model.MessageDefinition;
-import org.hl7.fhir.r5.model.NamingSystem;
-import org.hl7.fhir.r5.model.ObservationDefinition;
-import org.hl7.fhir.r5.model.OperationDefinition;
-import org.hl7.fhir.r5.model.OperationDefinition.OperationDefinitionParameterComponent;
-import org.hl7.fhir.r5.model.PlanDefinition;
-import org.hl7.fhir.r5.model.Questionnaire;
-import org.hl7.fhir.r5.model.Questionnaire.QuestionnaireItemComponent;
-import org.hl7.fhir.r5.model.Resource;
-import org.hl7.fhir.r5.model.SearchParameter;
-import org.hl7.fhir.r5.model.SearchParameter.SearchParameterComponentComponent;
-import org.hl7.fhir.r5.model.SpecimenDefinition;
-import org.hl7.fhir.r5.model.StructureDefinition;
-import org.hl7.fhir.r5.model.StructureMap;
-import org.hl7.fhir.r5.model.StructureMap.StructureMapStructureComponent;
-import org.hl7.fhir.r5.model.TerminologyCapabilities;
-import org.hl7.fhir.r5.model.ValueSet;
-import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
-import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionContainsComponent;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.model.core.ActivityDefinition;
+import org.hl7.fhir.model.core.CanonicalType;
+import org.hl7.fhir.model.core.CapabilityStatement;
+import org.hl7.fhir.model.core.CapabilityStatement.CapabilityStatementRestComponent;
+import org.hl7.fhir.model.core.CapabilityStatement.CapabilityStatementRestResourceComponent;
+import org.hl7.fhir.model.core.CapabilityStatement.CapabilityStatementRestResourceOperationComponent;
+import org.hl7.fhir.model.core.CapabilityStatement.CapabilityStatementRestResourceSearchParamComponent;
+import org.hl7.fhir.model.core.CodeSystem;
+import org.hl7.fhir.model.core.CompartmentDefinition;
+import org.hl7.fhir.model.core.ConceptMap;
+import org.hl7.fhir.model.core.ConceptMap.ConceptMapGroupComponent;
+import org.hl7.fhir.model.core.DeviceDefinition;
+import org.hl7.fhir.model.core.ElementDefinition;
+import org.hl7.fhir.model.core.ElementDefinition.TypeRefComponent;
+import org.hl7.fhir.model.core.EventDefinition;
+import org.hl7.fhir.model.core.ExampleScenario;
+import org.hl7.fhir.model.api.GraphDefinition;
+import org.hl7.fhir.model.core.ImplementationGuide;
+import org.hl7.fhir.model.core.ImplementationGuide.ImplementationGuideGlobalComponent;
+import org.hl7.fhir.model.core.MessageDefinition;
+import org.hl7.fhir.model.core.NamingSystem;
+import org.hl7.fhir.model.core.ObservationDefinition;
+import org.hl7.fhir.model.core.OperationDefinition;
+import org.hl7.fhir.model.core.OperationDefinition.OperationDefinitionParameterComponent;
+import org.hl7.fhir.model.core.PlanDefinition;
+import org.hl7.fhir.model.core.Questionnaire;
+import org.hl7.fhir.model.core.Questionnaire.QuestionnaireItemComponent;
+import org.hl7.fhir.model.core.Resource;
+import org.hl7.fhir.model.core.SearchParameter;
+import org.hl7.fhir.model.core.SearchParameter.SearchParameterComponentComponent;
+import org.hl7.fhir.model.core.SpecimenDefinition;
+import org.hl7.fhir.model.core.StructureDefinition;
+import org.hl7.fhir.model.fml.StructureMap;
+import org.hl7.fhir.model.fml.StructureMap.StructureMapStructureComponent;
+import org.hl7.fhir.model.core.TerminologyCapabilities;
+import org.hl7.fhir.model.core.ValueSet;
+import org.hl7.fhir.model.core.ValueSet.ConceptSetComponent;
+import org.hl7.fhir.model.core.ValueSet.ValueSetExpansionContainsComponent;
 
 public class DependencyAnalyser {
 
@@ -135,23 +135,23 @@ public class DependencyAnalyser {
   }
 
   private void analyseVS(ValueSet vs) {
-    for (ConceptSetComponent inc : vs.getCompose().getInclude()) {
+    for (ConceptSetComponent inc : vs.getCompose().getIncludeList()) {
       if (inc.hasSystem()) {
         dep(vs, "includes from", context.fetchResource(CodeSystem.class, inc.getSystem(), ExtensionUtilities.getVersionResolutionRules(inc)));
       }
-      for (CanonicalType imp : inc.getValueSet()) {
+      for (CanonicalType imp : inc.getValueSetList()) {
         dep(vs, "imports", context.fetchResource(ValueSet.class, imp.asStringValue(), ExtensionUtilities.getVersionResolutionRules(imp)));
       }
     }
-    for (ConceptSetComponent exc : vs.getCompose().getExclude()) {
+    for (ConceptSetComponent exc : vs.getCompose().getExcludeList()) {
       if (exc.hasSystem()) {
         dep(vs, "excludes from", context.fetchResource(CodeSystem.class, exc.getSystem(), ExtensionUtilities.getVersionResolutionRules(exc)));
       }
-      for (CanonicalType imp : exc.getValueSet()) {
+      for (CanonicalType imp : exc.getValueSetList()) {
         dep(vs, "unimports", context.fetchResource(ValueSet.class, imp.asStringValue(), ExtensionUtilities.getVersionResolutionRules(imp)));
       }
     }
-    for (ValueSetExpansionContainsComponent cc : vs.getExpansion().getContains()) {
+    for (ValueSetExpansionContainsComponent cc : vs.getExpansion().getContainsList()) {
       if (cc.hasSystem()) {
         dep(vs, "contains", context.fetchResource(CodeSystem.class, cc.getSystem(), ExtensionUtilities.getVersionResolutionRules(cc.getSystemElement())));
       }
@@ -165,7 +165,7 @@ public class DependencyAnalyser {
     if (cm.hasTargetScope()) {
       dep(cm, "has target", context.fetchResource(ValueSet.class, cm.getTargetScope().primitiveValue(), ExtensionUtilities.getVersionResolutionRules(cm.getTargetScope())));
     }
-    for (ConceptMapGroupComponent g : cm.getGroup()) {
+    for (ConceptMapGroupComponent g : cm.getGroupList()) {
       if (g.hasSource()) {
         dep(cm, "has scope", context.fetchResource(CodeSystem.class, g.getSource(), ExtensionUtilities.getVersionResolutionRules(g.getSourceElement())));
       }
@@ -176,29 +176,29 @@ public class DependencyAnalyser {
   }
 
   private void analyseCPS(CapabilityStatement cs) {
-    for (CanonicalType imp : cs.getInstantiates()) {
+    for (CanonicalType imp : cs.getInstantiatesList()) {
       dep(cs, "instantiates", context.fetchResource(CapabilityStatement.class, imp.getValue(), ExtensionUtilities.getVersionResolutionRules(imp)));
     }
-    for (CanonicalType imp : cs.getImports()) {
+    for (CanonicalType imp : cs.getImportsList()) {
       dep(cs, "imports", context.fetchResource(CapabilityStatement.class, imp.getValue(), ExtensionUtilities.getVersionResolutionRules(imp)));
     }
-    for (CapabilityStatementRestComponent rest : cs.getRest()) {
-      for (CapabilityStatementRestResourceComponent r : rest.getResource()) {
+    for (CapabilityStatementRestComponent rest : cs.getRestList()) {
+      for (CapabilityStatementRestResourceComponent r : rest.getResourceList()) {
         dep(cs, "uses profile", context.fetchResource(StructureDefinition.class, r.getProfile(), ExtensionUtilities.getVersionResolutionRules(r.getProfileElement())));
-        for (CanonicalType sp : r.getSupportedProfile()) {          
+        for (CanonicalType sp : r.getSupportedProfileList()) {          
           dep(cs, "uses profile", context.fetchResource(StructureDefinition.class, sp.asStringValue(), ExtensionUtilities.getVersionResolutionRules(sp)));
         }
-        for (CapabilityStatementRestResourceSearchParamComponent cp : r.getSearchParam()) {
+        for (CapabilityStatementRestResourceSearchParamComponent cp : r.getSearchParamList()) {
           dep(cs, "uses", context.fetchResource(SearchParameter.class, cp.getDefinition(), ExtensionUtilities.getVersionResolutionRules(cp.getDefinitionElement())));
         }
-        for (CapabilityStatementRestResourceOperationComponent cp : r.getOperation()) {
+        for (CapabilityStatementRestResourceOperationComponent cp : r.getOperationList()) {
           dep(cs, "uses", context.fetchResource(OperationDefinition.class, cp.getDefinition(), ExtensionUtilities.getVersionResolutionRules(cp.getDefinitionElement())));
         }
       }
-      for (CapabilityStatementRestResourceSearchParamComponent cp : rest.getSearchParam()) {
+      for (CapabilityStatementRestResourceSearchParamComponent cp : rest.getSearchParamList()) {
         dep(cs, "uses", context.fetchResource(SearchParameter.class, cp.getDefinition(), ExtensionUtilities.getVersionResolutionRules(cp.getDefinitionElement())));
       }
-      for (CapabilityStatementRestResourceOperationComponent cp : rest.getOperation()) {
+      for (CapabilityStatementRestResourceOperationComponent cp : rest.getOperationList()) {
         dep(cs, "uses", context.fetchResource(OperationDefinition.class, cp.getDefinition(), ExtensionUtilities.getVersionResolutionRules(cp.getDefinitionElement())));
       }
     }
@@ -208,15 +208,15 @@ public class DependencyAnalyser {
     if (sd.hasBaseDefinition()) {
       dep(sd, "derives from", context.fetchResource(StructureDefinition.class, sd.getBaseDefinition(), ExtensionUtilities.getVersionResolutionRules(sd.getBaseDefinitionElement())));
     } 
-    for (ElementDefinition ed : sd.getDifferential().getElement()) {
+    for (ElementDefinition ed : sd.getDifferential().getElementList()) {
       if (ed.getBinding().hasValueSet()) {
         dep(sd, "binds to", context.fetchResource(ValueSet.class, ed.getBinding().getValueSet(), ExtensionUtilities.getVersionResolutionRules(ed.getBinding().getValueSetElement())));
       }
-      for (TypeRefComponent tr : ed.getType()) {
-        for (CanonicalType p : tr.getProfile()) {
+      for (TypeRefComponent tr : ed.getTypeList()) {
+        for (CanonicalType p : tr.getProfileList()) {
           dep(sd, "uses", context.fetchResource(Resource.class, p.asStringValue(), ExtensionUtilities.getVersionResolutionRules(p)));
         }
-        for (CanonicalType p : tr.getTargetProfile()) {
+        for (CanonicalType p : tr.getTargetProfileList()) {
           dep(sd, "refers to", context.fetchResource(Resource.class, p.asStringValue(), ExtensionUtilities.getVersionResolutionRules(p)));
         }
       }
@@ -224,7 +224,7 @@ public class DependencyAnalyser {
   }
 
   private void analyseIG(ImplementationGuide ig) {
-    for (ImplementationGuideGlobalComponent g : ig.getGlobal()) {
+    for (ImplementationGuideGlobalComponent g : ig.getGlobalList()) {
       dep(ig, "makes global", context.fetchResource(StructureDefinition.class, g.getProfile(), ExtensionUtilities.getVersionResolutionRules(g.getProfileElement())));
     } 
   }
@@ -233,7 +233,7 @@ public class DependencyAnalyser {
     if (sp.hasDerivedFrom()) {
       dep(sp, "derives from", context.fetchResource(SearchParameter.class, sp.getDerivedFrom(), ExtensionUtilities.getVersionResolutionRules(sp.getDerivedFromElement())));
     } 
-    for (SearchParameterComponentComponent c : sp.getComponent()) {
+    for (SearchParameterComponentComponent c : sp.getComponentList()) {
       dep(sp, "derives from", context.fetchResource(SearchParameter.class, c.getDefinition(), ExtensionUtilities.getVersionResolutionRules(c.getDefinitionElement())));
     }
   }
@@ -251,11 +251,11 @@ public class DependencyAnalyser {
     if (opd.hasOutputProfile()) {
       dep(opd, "uses", context.fetchResource(StructureDefinition.class, opd.getOutputProfile(), ExtensionUtilities.getVersionResolutionRules(opd.getOutputProfileElement())));
     } 
-    for (OperationDefinitionParameterComponent c : opd.getParameter()) {
+    for (OperationDefinitionParameterComponent c : opd.getParameterList()) {
       if (c.getBinding().hasValueSet()) {
         dep(opd, "binds to", context.fetchResource(ValueSet.class, c.getBinding().getValueSet(), ExtensionUtilities.getVersionResolutionRules(c.getBinding().getValueSetElement())));
       }
-      for (CanonicalType ct : c.getTargetProfile()) {
+      for (CanonicalType ct : c.getTargetProfileList()) {
         dep(opd, "refers to", context.fetchResource(StructureDefinition.class, ct.getValue(), ExtensionUtilities.getVersionResolutionRules(ct)));
       }
     }
@@ -266,10 +266,10 @@ public class DependencyAnalyser {
   }
 
   private void analyseSM(StructureMap sm) {
-    for (StructureMapStructureComponent ref : sm.getStructure()) {
+    for (StructureMapStructureComponent ref : sm.getStructureList()) {
       dep(sm, "refers to", context.fetchResource(StructureDefinition.class, ref.getUrl(), ExtensionUtilities.getVersionResolutionRules(ref.getUrlElement())));
     }
-    for (CanonicalType ct : sm.getImport()) {
+    for (CanonicalType ct : sm.getImportList()) {
       dep(sm, "imports", context.fetchResource(StructureMap.class, ct.getValue(), ExtensionUtilities.getVersionResolutionRules(ct)));
     }
   }
@@ -307,10 +307,10 @@ public class DependencyAnalyser {
   }
 
   private void analyseQ(Questionnaire q) {
-    for (CanonicalType ct : q.getDerivedFrom()) {
+    for (CanonicalType ct : q.getDerivedFromList()) {
       dep(q, "derives from", context.fetchResource(Questionnaire.class, ct.getValue(), ExtensionUtilities.getVersionResolutionRules(ct)));
     } 
-    for (QuestionnaireItemComponent item : q.getItem()) {
+    for (QuestionnaireItemComponent item : q.getItemList()) {
       analyseQItem(q, item);
     }
   }
@@ -319,7 +319,7 @@ public class DependencyAnalyser {
     if (item.hasAnswerValueSet()) {
       dep(q, "binds to", context.fetchResource(ValueSet.class, item.getAnswerValueSet(), ExtensionUtilities.getVersionResolutionRules(item.getAnswerValueSetElement())));
     }    
-    for (QuestionnaireItemComponent i : item.getItem()) {
+    for (QuestionnaireItemComponent i : item.getItemList()) {
       analyseQItem(q, i);
     }
   }

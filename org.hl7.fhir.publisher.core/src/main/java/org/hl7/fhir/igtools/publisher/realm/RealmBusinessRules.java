@@ -6,9 +6,9 @@ import java.util.Set;
 import org.hl7.fhir.exceptions.DefinitionException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.FetchedFile;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.ImplementationGuide;
-import org.hl7.fhir.r5.model.StructureDefinition;
+import org.hl7.fhir.model.core.CanonicalResource;
+import org.hl7.fhir.model.core.ImplementationGuide;
+import org.hl7.fhir.model.core.StructureDefinition;
 
 public abstract class RealmBusinessRules {
 

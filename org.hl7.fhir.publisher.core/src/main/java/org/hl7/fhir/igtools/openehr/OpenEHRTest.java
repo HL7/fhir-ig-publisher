@@ -7,9 +7,10 @@ import java.io.IOException;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.hl7.fhir.igtools.openehr.ArchetypeImporter.ProcessedArchetype;
-import org.hl7.fhir.r5.formats.IParser.OutputStyle;
-import org.hl7.fhir.r5.formats.JsonParser;
-import org.hl7.fhir.r5.model.Bundle;
+import org.hl7.fhir.model.ModelContext;
+import org.hl7.fhir.model.utilities.formats.OutputStyle;
+import org.hl7.fhir.model.core.formats.JsonParser;
+import org.hl7.fhir.model.core.Bundle;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.xml.sax.SAXException;
 
@@ -25,7 +26,7 @@ public class OpenEHRTest {
     ArchetypeImporter ai = new ArchetypeImporter(null, "http://openehr.org/fhir/uv/test");
     ProcessedArchetype pa = ai.importArchetype(new FileInputStream("/Users/grahamegrieve/Downloads/openEHR-EHR-OBSERVATION.blood_pressure.v2.adl"), "openEHR-EHR-OBSERVATION.blood_pressure.v2.adl");
     System.out.println();
-    String json = new JsonParser().setOutputStyle(OutputStyle.PRETTY).composeString(pa.getBnd());
+    String json = new JsonParser(ModelContext.fullCoreContext()).setOutputStyle(OutputStyle.PRETTY).composeString(pa.getBnd());
     FileUtilities.stringToFile(json, "/Users/grahamegrieve/temp/igs/FHIR-sample-ig#master/input/resources/Bundle-openEHR-EHR-OBSERVATION.blood-pressure.v2.json");
     System.out.println("Done");
   }

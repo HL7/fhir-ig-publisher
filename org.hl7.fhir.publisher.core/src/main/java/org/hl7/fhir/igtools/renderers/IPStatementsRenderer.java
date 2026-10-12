@@ -11,22 +11,16 @@ import java.util.Map;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.elementmodel.Element;
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.model.CodeSystem;
-import org.hl7.fhir.r5.model.ElementDefinition;
-import org.hl7.fhir.r5.model.OperationDefinition;
-import org.hl7.fhir.r5.model.OperationDefinition.OperationDefinitionParameterComponent;
-import org.hl7.fhir.r5.model.Questionnaire;
-import org.hl7.fhir.r5.model.Questionnaire.QuestionnaireItemComponent;
-import org.hl7.fhir.r5.model.Resource;
-import org.hl7.fhir.r5.model.StructureDefinition;
-import org.hl7.fhir.r5.model.ValueSet;
-import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
-import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionContainsComponent;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext.RenderingContextLangs;
+import org.hl7.fhir.model.core.*;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.services.elementmodel.Element;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.model.core.OperationDefinition.OperationDefinitionParameterComponent;
+import org.hl7.fhir.model.core.Questionnaire.QuestionnaireItemComponent;
+import org.hl7.fhir.model.core.ValueSet.ConceptSetComponent;
+import org.hl7.fhir.model.core.ValueSet.ValueSetExpansionContainsComponent;
+import org.hl7.fhir.services.renderers.utils.RenderingContext;
+import org.hl7.fhir.services.renderers.utils.RenderingContext.RenderingContextLangs;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.i18n.I18nConstants;
@@ -74,7 +68,7 @@ public class IPStatementsRenderer {
       if (su == null) {
         su = new SystemUsage();
         su.system = url;
-        su.cs = ctxt.fetchCodeSystem(url, IWorkerContext.VersionResolutionRules.defaultRule());
+        su.cs = ctxt.fetchCodeSystem(url, VersionResolutionRules.defaultRule());
         systems.put(url, su);
       }
       if (!su.uses.contains(source)) {
@@ -146,9 +140,12 @@ public class IPStatementsRenderer {
         key1++;
         b.append("<li>");
         b.append(stmt);
-        b.append("<div data-fhir=\"generated\" id=\"ipp_"+key1+"\" onClick=\"if (document.getElementById('ipp2_"+key1+"').innerHTML != '') {document.getElementById('ipp_"+key1+"').innerHTML = document.getElementById('ipp2_"+key1+"').innerHTML; document.getElementById('ipp2_"+key1+"').innerHTML = ''}\">"+
-            " <span style=\"cursor: pointer; border: 1px grey solid; background-color: #fcdcb3; padding-left: 3px; padding-right: 3px; color: black\">"+
-            "Show Usage</span></div><div id=\"ipp2_"+key1+"\" style=\"display: none\">");
+        // a real button so it can be used from the keyboard; after the swap, focus goes to the first link in the
+        // content shown, since the button that had focus is gone (and keyboard users would be sent to the top of the page)
+        b.append("<div data-fhir=\"generated\" id=\"ipp_"+key1+"\"> "+
+            "<button type=\"button\" style=\"cursor: pointer; border: 1px grey solid; background-color: #fcdcb3; padding: 0 3px; margin: 0; color: black; font: inherit\" "+
+            "onClick=\"var t = document.getElementById('ipp_"+key1+"'); var s = document.getElementById('ipp2_"+key1+"'); if (s.innerHTML != '') { t.innerHTML = s.innerHTML; s.innerHTML = ''; var a = t.querySelector('a, button'); if (a) a.focus(); }\">"+
+            "Show Usage</button></div><div id=\"ipp2_"+key1+"\" style=\"display: none\">");
         b.append("\r\n<ul>\r\n");
         List<SystemUsage> v = usages.get(stmt);
         Collections.sort(v, new SystemUsageSorter());        
@@ -182,9 +179,11 @@ public class IPStatementsRenderer {
             c++;
             if (c == MAX_LIST_DISPLAY && links.size() > MAX_LIST_DISPLAY + 2) {
               closeSpan = true;
-              b.append("<span id=\"ips_"+key2+"\" onClick=\"document.getElementById('ips_"+key2+"').innerHTML = document.getElementById('ips2_"+key2+"').innerHTML\">..."+
-                  " <span style=\"cursor: pointer; border: 1px grey solid; background-color: #fcdcb3; padding-left: 3px; padding-right: 3px; color: black\">"+
-                  "Show "+(links.size()-MAX_LIST_DISPLAY+1)+" more</span></span><span id=\"ips2_"+key2+"\" style=\"display: none\">");
+              // as above: a button, and focus to the first newly shown link
+              b.append("<span id=\"ips_"+key2+"\">... "+
+                  "<button type=\"button\" style=\"cursor: pointer; border: 1px grey solid; background-color: #fcdcb3; padding: 0 3px; margin: 0; color: black; font: inherit\" "+
+                  "onClick=\"var s = document.getElementById('ips_"+key2+"'); s.innerHTML = document.getElementById('ips2_"+key2+"').innerHTML; var a = s.querySelector('a'); if (a) a.focus();\">"+
+                  "Show "+(links.size()-MAX_LIST_DISPLAY+1)+" more</button></span><span id=\"ips2_"+key2+"\" style=\"display: none\">");
             }
             if (c == links.size() && c != 1) {
               b.append(" and ");
@@ -281,7 +280,7 @@ public class IPStatementsRenderer {
   }
   
   private void listAllCodeSystemsQ(FetchedResource source, Questionnaire q) {
-    for (QuestionnaireItemComponent i : q.getItem()) {
+    for (QuestionnaireItemComponent i : q.getItemList()) {
       listAllCodeSystemsQ(source, i);
     }
   }
@@ -293,7 +292,7 @@ public class IPStatementsRenderer {
         listAllCodeSystemsVS(source, vs);
       }
     }
-    for (QuestionnaireItemComponent ii : i.getItem()) {
+    for (QuestionnaireItemComponent ii : i.getItemList()) {
       listAllCodeSystemsQ(source, ii);
     }    
   }
@@ -302,26 +301,26 @@ public class IPStatementsRenderer {
   }
   
   private void listAllCodeSystemsVS(FetchedResource source, ValueSet vs) {
-    for (ConceptSetComponent inc : vs.getCompose().getInclude()) {
+    for (ConceptSetComponent inc : vs.getCompose().getIncludeList()) {
       seeSystem(inc.getSystem(), source);
     }
-    for (ConceptSetComponent exc : vs.getCompose().getExclude()) {
+    for (ConceptSetComponent exc : vs.getCompose().getExcludeList()) {
       seeSystem(exc.getSystem(), source);
     }
-    for (ValueSetExpansionContainsComponent c : vs.getExpansion().getContains()) {
+    for (ValueSetExpansionContainsComponent c : vs.getExpansion().getContainsList()) {
       listAllCodeSystemsVS(source, c);
     }
   }
   
   private void listAllCodeSystemsVS(FetchedResource source, ValueSetExpansionContainsComponent c) {
     seeSystem(c.getSystem(), source);    
-    for (ValueSetExpansionContainsComponent cc : c.getContains()) {
+    for (ValueSetExpansionContainsComponent cc : c.getContainsList()) {
       listAllCodeSystemsVS(source, cc);
     }
     
   }
   private void listAllCodeSystemsOD(FetchedResource source, OperationDefinition opd) {
-    for (OperationDefinitionParameterComponent p : opd.getParameter()) {
+    for (OperationDefinitionParameterComponent p : opd.getParameterList()) {
       if (p.getBinding().hasValueSet()) {
         ValueSet vs = ctxt.fetchResource(ValueSet.class, p.getBinding().getValueSet(), ExtensionUtilities.getVersionResolutionRules(p.getBinding().getValueSetElement()));
         if (vs != null) {
@@ -332,7 +331,7 @@ public class IPStatementsRenderer {
   }
   
   private void listAllCodeSystemsSD(FetchedResource source, StructureDefinition sd) {
-    for (ElementDefinition ed : sd.getDifferential().getElement()) {
+    for (ElementDefinition ed : sd.getDifferential().getElementList()) {
       if (ed.getBinding().hasValueSet()) {
         ValueSet vs = ctxt.fetchResource(ValueSet.class, ed.getBinding().getValueSet(), ExtensionUtilities.getVersionResolutionRules(ed.getBinding().getValueSetElement()));
         if (vs != null) {
@@ -349,7 +348,7 @@ public class IPStatementsRenderer {
     if ("Quantity".equals(element.fhirType())) {
       seeSystem(element.getChildValue("system"), source);
     }
-    for (Element child : element.getChildren()) {
+    for (Element child : element.getChildList()) {
       listAllCodeSystems(source, child);
     }    
   }

@@ -10,21 +10,21 @@ import java.util.Set;
 import org.hl7.fhir.exceptions.DefinitionException;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.model.*;
-import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
-import org.hl7.fhir.r5.model.ConceptMap.TargetElementComponent;
-import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionContainsComponent;
-import org.hl7.fhir.r5.renderers.DataRenderer;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
-import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
-import org.hl7.fhir.r5.terminologies.ConceptMapUtilities;
-import org.hl7.fhir.r5.terminologies.ConceptMapUtilities.MappingTriple;
-import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
-import org.hl7.fhir.r5.terminologies.utilities.VCLParser;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.model.extensions.ExtensionDefinitions;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.model.core.*;
+import org.hl7.fhir.model.core.CodeSystem.ConceptDefinitionComponent;
+import org.hl7.fhir.model.core.ConceptMap.TargetElementComponent;
+import org.hl7.fhir.model.core.ValueSet.ValueSetExpansionContainsComponent;
+import org.hl7.fhir.services.renderers.DataRenderer;
+import org.hl7.fhir.services.renderers.utils.RenderingContext;
+import org.hl7.fhir.services.renderers.utils.ResourceWrapper;
+import org.hl7.fhir.model.utilities.CodeSystemUtilities;
+import org.hl7.fhir.model.utilities.ConceptMapUtilities;
+import org.hl7.fhir.model.utilities.ConceptMapUtilities.MappingTriple;
+import org.hl7.fhir.services.terminology.ValueSetExpansionOutcome;
+import org.hl7.fhir.model.utilities.VCLParser;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.xhtml.NodeType;
@@ -51,7 +51,7 @@ public class MultiMapBuilder extends DataRenderer {
       if (!vse.isOk()) {
         throw new FHIRException(vse.getError());
       }
-      for (ValueSetExpansionContainsComponent ce : vse.getValueset().getExpansion().getContains()) {
+      for (ValueSetExpansionContainsComponent ce : vse.getValueset().getExpansion().getContainsList()) {
         codings.add(new Coding().setSystem(ce.getSystem()).setVersion(ce.getVersion()).setCode(ce.getCode()));
       }
     }
@@ -84,13 +84,13 @@ public class MultiMapBuilder extends DataRenderer {
     
     public void populate() {
       if (cs != null) {
-        makeCodings(cs.getConcept());
+        makeCodings(cs.getConceptList());
       } else {
         ValueSetExpansionOutcome vse = context.getContext().expandVS(vs, true, false);
         if (!vse.isOk()) {
           throw new FHIRException(vse.getError());
         }
-        for (ValueSetExpansionContainsComponent ce : vse.getValueset().getExpansion().getContains()) {
+        for (ValueSetExpansionContainsComponent ce : vse.getValueset().getExpansion().getContainsList()) {
           codings.add(new Coding().setSystem(ce.getSystem()).setVersion(ce.getVersion()).setCode(ce.getCode()));
         }
       }
@@ -99,7 +99,7 @@ public class MultiMapBuilder extends DataRenderer {
       for (ConceptDefinitionComponent cd : list) {
         codings.add(new Coding().setSystem(cs.getUrl()).setVersion(cs.getVersion()).setCode(cd.getCode()));
         if (cd.hasConcept()) {
-          makeCodings(cd.getConcept());
+          makeCodings(cd.getConceptList());
         }
       }
     }
@@ -319,7 +319,7 @@ public class MultiMapBuilder extends DataRenderer {
     @Override
     protected void cell(XhtmlNode td, Coding c, RenderingStatus status) throws FHIRFormatError, DefinitionException, IOException {
       List<ConceptDefinitionComponent> list = new ArrayList<CodeSystem.ConceptDefinitionComponent>();
-      findMatchingConcepts(list, c, cs.getConcept());
+      findMatchingConcepts(list, c, cs.getConceptList());
       if (list.size() > 0) {
         if (list.size() == 1) {
           cellTgt(td, list.get(0), status);
@@ -343,7 +343,7 @@ public class MultiMapBuilder extends DataRenderer {
           list.add(cd);
         }
         if (cd.hasConcept()) {
-          findMatchingConcepts(list, c, cd.getConcept());
+          findMatchingConcepts(list, c, cd.getConceptList());
         }
       }
     }
@@ -372,14 +372,14 @@ public class MultiMapBuilder extends DataRenderer {
       for (JsonObject o : config.forceArray("columns").asJsonObjects()) {
         String t = o.asString("type");
         if ("ConceptMap".equals(t)) {
-          ConceptMap map = context.getContext().fetchResource(ConceptMap.class, o.asString("url"), IWorkerContext.VersionResolutionRules.defaultRule());
+          ConceptMap map = context.getContext().fetchResource(ConceptMap.class, o.asString("url"), VersionResolutionRules.defaultRule());
           if (map == null) {
             throw new FHIRException("Unable to find conceptmap "+o.asString("url"));
           } else {
             maps.add(new ConceptMapMappingProvider(o, map));
           }
         } else if ("CodeSystem".equals(t)) {
-          CodeSystem cs = context.getContext().fetchResource(CodeSystem.class, o.asString("url"), IWorkerContext.VersionResolutionRules.defaultRule());
+          CodeSystem cs = context.getContext().fetchResource(CodeSystem.class, o.asString("url"), VersionResolutionRules.defaultRule());
           if (cs == null) {
             throw new FHIRException("Unable to find CodeSystem "+o.asString("url"));
           } else {
@@ -391,9 +391,9 @@ public class MultiMapBuilder extends DataRenderer {
         scanAllMaps(maps, source);
       }
 
-      csRel = getContext().getWorker().fetchCodeSystem("http://hl7.org/fhir/concept-map-relationship", IWorkerContext.VersionResolutionRules.defaultRule());
+      csRel = getContext().getWorker().fetchCodeSystem("http://hl7.org/fhir/concept-map-relationship", VersionResolutionRules.defaultRule());
       if (csRel == null)
-        csRel = getContext().getWorker().fetchCodeSystem("http://hl7.org/fhir/concept-map-equivalence", IWorkerContext.VersionResolutionRules.defaultRule());
+        csRel = getContext().getWorker().fetchCodeSystem("http://hl7.org/fhir/concept-map-equivalence", VersionResolutionRules.defaultRule());
       RenderingStatus status = new RenderingStatus();
         
       XhtmlNode node = new XhtmlNode(NodeType.Element, "div");
@@ -482,19 +482,19 @@ public class MultiMapBuilder extends DataRenderer {
     SourceDataProvider source = new SourceDataProvider();
     source.title = config.asString("title");
     if (config.has("vcl")) {
-      source.vs = VCLParser.parseAndId(config.asString("vcl"));
+      source.vs = VCLParser.parseAndId(config.asString("vcl"), context.getContext().getModelContext());
     } else if (config.has("CodeSystem")) {
-      source.cs = context.getContext().fetchResource(CodeSystem.class, config.asString("CodeSystem"), IWorkerContext.VersionResolutionRules.defaultRule());
+      source.cs = context.getContext().fetchResource(CodeSystem.class, config.asString("CodeSystem"), VersionResolutionRules.defaultRule());
       if (source.cs == null) {
         throw new FHIRException("Source not found: " + config.asString("CodeSystem"));
       }
     } else if (config.has("ValueSet")) {
-      source.vs = context.getContext().fetchResource(ValueSet.class, config.asString("ValueSet"), IWorkerContext.VersionResolutionRules.defaultRule());
+      source.vs = context.getContext().fetchResource(ValueSet.class, config.asString("ValueSet"), VersionResolutionRules.defaultRule());
       if (source.vs == null) {
         throw new FHIRException("Source not found: " + config.asString("ValueSet"));
       }
     } else if (config.has("vcl")) {
-      source.vs = VCLParser.parseAndId(config.asString("vcl"));
+      source.vs = VCLParser.parseAndId(config.asString("vcl"), context.getContext().getModelContext());
     } else {
       throw new FHIRException("no Source provided");
 //        ConceptMap cm = (ConceptMap) res;
@@ -528,9 +528,9 @@ public class MultiMapBuilder extends DataRenderer {
         SourceSection ss = new SourceSection();
         ss.title = o.asString("title");
         if (o.has("vcl")) {
-          ss.vs = VCLParser.parseAndId(o.asString("vcl"));
+          ss.vs = VCLParser.parseAndId(o.asString("vcl"), context.getContext().getModelContext());
         } else {
-          ss.vs = getContext().getContext().fetchResource(ValueSet.class, o.asString("url"), IWorkerContext.VersionResolutionRules.defaultRule() );
+          ss.vs = getContext().getContext().fetchResource(ValueSet.class, o.asString("url"), VersionResolutionRules.defaultRule() );
           if (ss.vs == null) {
             throw new FHIRException("Value set not found: " + o.asString("url"));
           }

@@ -31,13 +31,13 @@ import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.RelatedIG;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.model.ExampleScenario;
-import org.hl7.fhir.r5.renderers.Renderer.RenderingStatus;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext.ExampleScenarioRendererMode;
-import org.hl7.fhir.r5.utils.EOperationOutcome;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.model.core.ExampleScenario;
+import org.hl7.fhir.services.renderers.Renderer.RenderingStatus;
+import org.hl7.fhir.services.renderers.utils.RenderingContext;
+import org.hl7.fhir.services.renderers.utils.ResourceWrapper;
+import org.hl7.fhir.services.renderers.utils.RenderingContext.ExampleScenarioRendererMode;
+import org.hl7.fhir.model.utilities.EOperationOutcome;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
@@ -59,13 +59,13 @@ public class ExampleScenarioRenderer extends CanonicalRenderer {
   }
 
   public String render(ExampleScenarioRendererMode mode) throws IOException, FHIRFormatError, DefinitionException, FHIRException, EOperationOutcome {
-    org.hl7.fhir.r5.renderers.ExampleScenarioRenderer sr = new org.hl7.fhir.r5.renderers.ExampleScenarioRenderer(gen);
+    org.hl7.fhir.services.renderers.ExampleScenarioRenderer sr = new org.hl7.fhir.services.renderers.ExampleScenarioRenderer(gen);
     gen.setScenarioMode(mode);
     return new XhtmlComposer(XhtmlComposer.HTML).compose(sr.buildNarrative(ResourceWrapper.forResource(gen.getContextUtilities(), scen)));
   }
 
   public String renderDiagram() throws IOException, FHIRFormatError, DefinitionException, FHIRException, EOperationOutcome {
-    org.hl7.fhir.r5.renderers.ExampleScenarioRenderer sr = new org.hl7.fhir.r5.renderers.ExampleScenarioRenderer(gen);
+    org.hl7.fhir.services.renderers.ExampleScenarioRenderer sr = new org.hl7.fhir.services.renderers.ExampleScenarioRenderer(gen);
     return sr.renderDiagram(new RenderingStatus(), ResourceWrapper.forResource(gen.getContextUtilities(), scen), scen);
   }
 }

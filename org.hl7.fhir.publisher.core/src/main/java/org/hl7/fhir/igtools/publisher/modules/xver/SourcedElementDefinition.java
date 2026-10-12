@@ -4,9 +4,9 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 
-import org.hl7.fhir.r5.model.Coding;
-import org.hl7.fhir.r5.model.ElementDefinition;
-import org.hl7.fhir.r5.model.StructureDefinition;
+import org.hl7.fhir.model.core.Coding;
+import org.hl7.fhir.model.core.ElementDefinition;
+import org.hl7.fhir.model.core.StructureDefinition;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.VersionUtilities;
 

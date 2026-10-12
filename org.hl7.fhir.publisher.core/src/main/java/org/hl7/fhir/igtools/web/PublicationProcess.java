@@ -19,8 +19,8 @@ import org.hl7.fhir.igtools.publisher.PastProcessHackerUtilities;
 import org.hl7.fhir.igtools.publisher.Publisher;
 import org.hl7.fhir.igtools.web.IGRegistryMaintainer.ImplementationGuideEntry;
 import org.hl7.fhir.igtools.web.IGReleaseUpdater.ServerType;
-import org.hl7.fhir.r5.model.ImplementationGuide;
-import org.hl7.fhir.r5.utils.NPMPackageGenerator;
+import org.hl7.fhir.model.core.ImplementationGuide;
+import org.hl7.fhir.services.utilities.NPMPackageGenerator;
 import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
 import org.hl7.fhir.utilities.json.JsonException;
@@ -180,6 +180,19 @@ public class PublicationProcess {
 
   public List<ValidationMessage> publishInner(String source, String web, String date, Date dd, String registrySource, String history, String templateSrc, String temp, String igBuildZipParam, PublisherConsoleLogger logger, String[] args) throws Exception {
     List<ValidationMessage> res = new ArrayList<>();
+
+    // the documentation requires all path parameters to be absolute. Enforce it: the process mixes paths
+    // derived from these parameters with File.getAbsolutePath() values and compares/substrings them
+    checkAbsolute(res, source, "-source");
+    checkAbsolute(res, web, "-web");
+    checkAbsolute(res, registrySource, "-registry");
+    checkAbsolute(res, history, "-history");
+    checkAbsolute(res, templateSrc, "-templates");
+    checkAbsolute(res, temp, "-temp");
+    checkAbsolute(res, igBuildZipParam, "-zips");
+    if (res.size() > 0) {
+      return res;
+    }
 
     if (temp == null) {
       temp = "[tmp]";
@@ -439,6 +452,9 @@ public class PublicationProcess {
     
     check(res, pl.list().size() > 0, "Destination package-list has no existent version (should have ci-build entry)");
     check(res, vPub == null, "Found an entry in the publication package-list for v"+version+" - it looks like it has already been published");
+    // the publication request drives where the IG is published to; if it wasn't updated along with the IG, the new
+    // version would be published over the folder of whatever version the request still names
+    check(res, version.equals(prSrc.asString("version")), "The publication request is for version '"+prSrc.asString("version")+"' but the IG is version '"+version+"' - update publication-request.json");
     check(res, prSrc.has("desc") || prSrc.has("descmd"), "Source publication request has no description for v"+version);
     String pathVer = prSrc.asString("path");
     String vCode = pathVer.substring(pathVer.lastIndexOf("/")+1);
@@ -453,9 +469,10 @@ public class PublicationProcess {
     check(res, npm.fhirVersion().equals(qa.asString("version")), "Generated IG has wrong FHIR version "+qa.asString("version"));
     check(res, qa.asString("url").startsWith(canonical) || qa.asString("url").startsWith(npm.canonical()), "Generated IG has wrong Canonical "+qa.asString("url"));
     
-    src.needOptionalFolder(vCode, false);
-    
     String destVer = Utilities.path(destination, vCode);
+    // bring the version folder into the working root if it exists in the web source, so the 'already exists' check
+    // below can see it. The path is relative to the web root, not the IG's folder
+    src.needOptionalFolder(FileUtilities.getRelativePath(workingRoot, destVer), false);
     if (!check(res, new File(destination).exists(), "Destination '"+destVer+"' not found - must be set up manually for first publication")) {
       return res;
     }    
@@ -589,6 +606,16 @@ public class PublicationProcess {
     return f;
   }
 
+  /**
+   * Paths may be omitted (null) or use a [tmp]/[user] style prefix (expanded by Utilities.path to an absolute path);
+   * otherwise they must be absolute
+   */
+  private void checkAbsolute(List<ValidationMessage> res, String path, String param) {
+    if (path != null && !path.startsWith("[")) {
+      check(res, new File(path).isAbsolute(), "The parameter "+param+" must be an absolute path, but is '"+path+"'");
+    }
+  }
+
   private boolean check(List<ValidationMessage> res, boolean b, String message) {
     if (!b)  {
       ValidationMessage msg = new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, "parameters", message, IssueSeverity.ERROR);
@@ -660,7 +687,7 @@ public class PublicationProcess {
       System.out.println("Update "+Utilities.path(destination, "package-list.json"));    
       PackageListEntry plVer = updatePackageList(pl, fSource.getAbsolutePath(), prSrc, pathVer,  Utilities.path(destination, "package-list.json"), mode, date,
               npm.fhirVersion(), Utilities.pathURL(pubSetup.asString("url"), tcName), subPackages, prSrc.asString("previouslyPublishedAs"));
-      updatePublishBox(pl, plVer, destVer, pathVer, destination, fRoot.getAbsolutePath(), false, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null, url, jsonXmlClones);
+      updatePublishBox(pl, plVer, destVer, destVer, pathVer, destination, fRoot.getAbsolutePath(), false, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null, url, jsonXmlClones);
 
       if (mode != PublicationProcessMode.WORKING || prSrc.has("movedFrom")) {
         String igSrc = tempM == null ? null : Utilities.path(tempM.getAbsolutePath(), "output");
@@ -692,7 +719,7 @@ public class PublicationProcess {
                 String vCode = pv.substring(pv.lastIndexOf("/")+1);
                 String dv = Utilities.path(fRoot, relPath);
                 System.out.println("Update publish box for version "+v.version()+" @ "+v.path());
-                updatePublishBox(pl, v, dv, pv, destination, fRoot.getAbsolutePath(), false, null, null, null, url, jsonXmlClones);
+                updatePublishBox(pl, v, dv, dv, pv, destination, fRoot.getAbsolutePath(), false, null, null, null, url, jsonXmlClones);
               }
             }
           }
@@ -714,11 +741,11 @@ public class PublicationProcess {
           }
           String vCode = tcPath.substring(tcPath.lastIndexOf("/")+1);
           String dv = Utilities.path(destination, vCode);
-          updatePublishBox(pl, tcVer, dv, tcPath, destination, fRoot.getAbsolutePath(), false, null, null, null, url, jsonXmlClones);
+          updatePublishBox(pl, tcVer, dv, dv, tcPath, destination, fRoot.getAbsolutePath(), false, null, null, null, url, jsonXmlClones);
         }
         // we do this first in the output so we can get a proper diff
         if (igSrc != null) {
-          updatePublishBox(pl, plVer, igSrc, pathVer, igSrc, fRoot.getAbsolutePath(), true, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null, url, jsonXmlClones);
+          updatePublishBox(pl, plVer, igSrc, destination, pathVer, igSrc, fRoot.getAbsolutePath(), true, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null, url, jsonXmlClones);
 
           System.out.println("Check for Files to delete");
           List<String> newFiles = igSrc == null ? new ArrayList<>() : FileUtilities.listAllFiles(igSrc, null);
@@ -746,7 +773,7 @@ public class PublicationProcess {
               ignoreList.add(Utilities.path(dpath, v.path().substring(path.length()+1)));
             }
           }
-          updatePublishBox(pl, pl.current(), dpath, path, dpath, fRoot.getAbsolutePath(), true, null, null, ignoreList, url, jsonXmlClones);
+          updatePublishBox(pl, pl.current(), dpath, dpath, path, dpath, fRoot.getAbsolutePath(), true, null, null, ignoreList, url, jsonXmlClones);
         }
       } else {
         src.cleanFolder(relDest);
@@ -863,9 +890,12 @@ public class PublicationProcess {
   }
 
   public void delTempFolder(File temp, String s) throws IOException {
-    File gitFolder = new File(temp, s);
-    if (gitFolder.exists()) {
-      FileUtils.deleteDirectory(gitFolder);
+    File f = new File(temp, s);
+    if (f.isDirectory()) {
+      FileUtils.deleteDirectory(f);
+    } else if (f.exists()) {
+      // e.g. .git is a file (not a folder) when the IG is a git submodule or worktree
+      FileUtils.forceDelete(f);
     }
   }
 
@@ -1087,7 +1117,7 @@ public class PublicationProcess {
     return sdf.format(date);
   }
 
-  private void updatePublishBox(PackageList pl, PackageListEntry plVer, String destVer, String pathVer, String destination, String rootFolder, boolean current, ServerType serverType, File sft, List<String> ignoreList, String url, boolean jsonXmlClones) throws FileNotFoundException, IOException {
+  private void updatePublishBox(PackageList pl, PackageListEntry plVer, String destVer, String publishedVer, String pathVer, String destination, String rootFolder, boolean current, ServerType serverType, File sft, List<String> ignoreList, String url, boolean jsonXmlClones) throws FileNotFoundException, IOException {
     IGReleaseVersionUpdater igvu = new IGReleaseVersionUpdater(destVer, url, rootFolder, ignoreList, null, plVer.json(), destination);
     String fragment = PublishBoxStatementGenerator.genFragment(pl, plVer, pl.current(), pl.canonical(), current, false);
     System.out.println("Publish Box Statement: "+fragment);
@@ -1099,7 +1129,7 @@ public class PublicationProcess {
       System.out.println("  .. "+igvu.getClonedTotal()+" clones checked, "+igvu.getClonedCount()+" updated");
     }
     if (serverType != null) {
-      IGReleaseRedirectionBuilder rb = new IGReleaseRedirectionBuilder(destVer, pl.canonical(), plVer.path(), rootFolder);
+      IGReleaseRedirectionBuilder rb = new IGReleaseRedirectionBuilder(destVer, publishedVer, pl.canonical(), plVer.path(), rootFolder);
       if (serverType == ServerType.APACHE) {
         rb.buildApacheRedirections();
       } else if (serverType == ServerType.CLOUD) {
@@ -1393,7 +1423,7 @@ public class PublicationProcess {
         String vCode = pv.substring(pv.lastIndexOf("/")+1);
         String dv = Utilities.path(destination, vCode);
         System.out.println("Update publish box for version "+v.version()+" @ "+v.path());
-        updatePublishBox(pl, v, dv, pv, destination, fRoot.getAbsolutePath(), false, null, null, null, url, false);
+        updatePublishBox(pl, v, dv, dv, pv, destination, fRoot.getAbsolutePath(), false, null, null, null, url, false);
       }
     }
 

@@ -2,14 +2,14 @@ package org.hl7.fhir.igtools.publisher.loaders;
 
 import java.io.IOException;
 
-import org.hl7.fhir.convertors.loaders.loaderR5.ILoaderKnowledgeProviderR5;
+import org.hl7.fhir.convertors.loaders.loaderRN.ILoaderKnowledgeProviderRN;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
-import org.hl7.fhir.r5.model.Resource;
+import org.hl7.fhir.model.core.Resource;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 
 import com.google.gson.JsonSyntaxException;
 
-public class PatchLoaderKnowledgeProvider extends LoaderUtils implements ILoaderKnowledgeProviderR5 {
+public class PatchLoaderKnowledgeProvider extends LoaderUtils implements ILoaderKnowledgeProviderRN {
 
   public PatchLoaderKnowledgeProvider(NpmPackage npm, SpecMapManager spm) {
     super(npm, spm, npm.getWebLocation());
@@ -39,7 +39,7 @@ public class PatchLoaderKnowledgeProvider extends LoaderUtils implements ILoader
   }
 
   @Override
-  public ILoaderKnowledgeProviderR5 forNewPackage(NpmPackage npm) throws JsonSyntaxException, IOException {
+  public ILoaderKnowledgeProviderRN forNewPackage(NpmPackage npm) throws JsonSyntaxException, IOException {
     return null;
   }
 

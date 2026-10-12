@@ -32,78 +32,77 @@ import java.util.Set;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.FetchedFile;
-import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
-import org.hl7.fhir.r5.context.ContextUtilities;
-import org.hl7.fhir.r5.context.SimpleWorkerContext;
-import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.fhirpath.FHIRPathEngine;
-import org.hl7.fhir.r5.formats.JsonParser;
-import org.hl7.fhir.r5.formats.XmlParser;
-import org.hl7.fhir.r5.model.Base64BinaryType;
-import org.hl7.fhir.r5.model.BooleanType;
-import org.hl7.fhir.r5.model.Bundle;
-import org.hl7.fhir.r5.model.Bundle.BundleEntryComponent;
-import org.hl7.fhir.r5.model.Bundle.BundleType;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.CanonicalType;
-import org.hl7.fhir.r5.model.CodeSystem;
-import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
-import org.hl7.fhir.r5.model.CodeType;
-import org.hl7.fhir.r5.model.CodeableConcept;
-import org.hl7.fhir.r5.model.Constants;
-import org.hl7.fhir.r5.model.ContactPoint.ContactPointSystem;
-import org.hl7.fhir.r5.model.DataType;
-import org.hl7.fhir.r5.model.DateTimeType;
-import org.hl7.fhir.r5.model.DateType;
-import org.hl7.fhir.r5.model.DecimalType;
-import org.hl7.fhir.r5.model.ElementDefinition;
-import org.hl7.fhir.r5.model.ElementDefinition.ConstraintSeverity;
-import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
-import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionConstraintComponent;
-import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionMappingComponent;
-import org.hl7.fhir.r5.model.ElementDefinition.PropertyRepresentation;
-import org.hl7.fhir.r5.model.ElementDefinition.SlicingRules;
-import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
-import org.hl7.fhir.r5.model.Enumerations;
-import org.hl7.fhir.r5.model.Enumerations.BindingStrength;
-import org.hl7.fhir.r5.model.Enumerations.CodeSystemContentMode;
-import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
-import org.hl7.fhir.r5.model.Enumerations.QuantityComparator;
-import org.hl7.fhir.r5.model.Enumerations.SearchParamType;
-import org.hl7.fhir.r5.model.Enumerations.VersionIndependentResourceTypesAll;
-import org.hl7.fhir.r5.model.Extension;
-import org.hl7.fhir.r5.model.Factory;
-import org.hl7.fhir.r5.model.IdType;
-import org.hl7.fhir.r5.model.Identifier;
-import org.hl7.fhir.r5.model.InstantType;
-import org.hl7.fhir.r5.model.IntegerType;
-import org.hl7.fhir.r5.model.OidType;
-import org.hl7.fhir.r5.model.OperationDefinition;
-import org.hl7.fhir.r5.model.OperationDefinition.OperationDefinitionParameterComponent;
-import org.hl7.fhir.r5.model.Period;
-import org.hl7.fhir.r5.model.PositiveIntType;
-import org.hl7.fhir.r5.model.Quantity;
-import org.hl7.fhir.r5.model.Reference;
-import org.hl7.fhir.r5.model.SearchParameter;
-import org.hl7.fhir.r5.model.StringType;
-import org.hl7.fhir.r5.model.StructureDefinition;
-import org.hl7.fhir.r5.model.StructureDefinition.ExtensionContextType;
-import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionContextComponent;
-import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
-import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionMappingComponent;
-import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
-import org.hl7.fhir.r5.model.TimeType;
-import org.hl7.fhir.r5.model.UnsignedIntType;
-import org.hl7.fhir.r5.model.UriType;
-import org.hl7.fhir.r5.model.UrlType;
-import org.hl7.fhir.r5.model.UuidType;
-import org.hl7.fhir.r5.model.ValueSet;
-import org.hl7.fhir.r5.model.ValueSet.ConceptReferenceComponent;
-import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
-import org.hl7.fhir.r5.model.ValueSet.ValueSetComposeComponent;
-import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
-import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
+import org.hl7.fhir.services.conformance.profile.ProfileUtilities;
+import org.hl7.fhir.services.context.ContextUtilities;
+import org.hl7.fhir.standalone.context.SimpleWorkerContext;
+import org.hl7.fhir.model.extensions.ExtensionDefinitions;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.services.fhirpath.FHIRPathEngine;
+import org.hl7.fhir.model.core.formats.JsonParser;
+import org.hl7.fhir.model.core.formats.XmlParser;
+import org.hl7.fhir.model.core.Base64BinaryType;
+import org.hl7.fhir.model.core.BooleanType;
+import org.hl7.fhir.model.core.Bundle;
+import org.hl7.fhir.model.core.Bundle.BundleEntryComponent;
+import org.hl7.fhir.model.core.Bundle.BundleType;
+import org.hl7.fhir.model.core.CanonicalResource;
+import org.hl7.fhir.model.core.CanonicalType;
+import org.hl7.fhir.model.core.CodeSystem;
+import org.hl7.fhir.model.core.CodeSystem.ConceptDefinitionComponent;
+import org.hl7.fhir.model.core.CodeType;
+import org.hl7.fhir.model.core.CodeableConcept;
+import org.hl7.fhir.model.core.Constants;
+import org.hl7.fhir.model.core.ContactPoint.ContactPointSystem;
+import org.hl7.fhir.model.core.DataType;
+import org.hl7.fhir.model.core.DateTimeType;
+import org.hl7.fhir.model.core.DateType;
+import org.hl7.fhir.model.core.DecimalType;
+import org.hl7.fhir.model.core.ElementDefinition;
+import org.hl7.fhir.model.core.ElementDefinition.ConstraintSeverity;
+import org.hl7.fhir.model.core.ElementDefinition.ElementDefinitionBindingComponent;
+import org.hl7.fhir.model.core.ElementDefinition.ElementDefinitionConstraintComponent;
+import org.hl7.fhir.model.core.ElementDefinition.ElementDefinitionMappingComponent;
+import org.hl7.fhir.model.core.ElementDefinition.PropertyRepresentation;
+import org.hl7.fhir.model.core.ElementDefinition.SlicingRules;
+import org.hl7.fhir.model.core.ElementDefinition.TypeRefComponent;
+import org.hl7.fhir.model.core.Enumerations;
+import org.hl7.fhir.model.core.Enumerations.BindingStrength;
+import org.hl7.fhir.model.core.Enumerations.CodeSystemContentMode;
+import org.hl7.fhir.model.core.Enumerations.PublicationStatus;
+import org.hl7.fhir.model.core.Enumerations.QuantityComparator;
+import org.hl7.fhir.model.core.Enumerations.SearchParamType;
+import org.hl7.fhir.model.core.Extension;
+import org.hl7.fhir.model.Factory;
+import org.hl7.fhir.model.core.IdType;
+import org.hl7.fhir.model.core.Identifier;
+import org.hl7.fhir.model.core.InstantType;
+import org.hl7.fhir.model.core.IntegerType;
+import org.hl7.fhir.model.core.OidType;
+import org.hl7.fhir.model.core.OperationDefinition;
+import org.hl7.fhir.model.core.OperationDefinition.OperationDefinitionParameterComponent;
+import org.hl7.fhir.model.core.Period;
+import org.hl7.fhir.model.core.PositiveIntType;
+import org.hl7.fhir.model.core.Quantity;
+import org.hl7.fhir.model.core.Reference;
+import org.hl7.fhir.model.core.SearchParameter;
+import org.hl7.fhir.model.core.StringType;
+import org.hl7.fhir.model.core.StructureDefinition;
+import org.hl7.fhir.model.core.StructureDefinition.ExtensionContextType;
+import org.hl7.fhir.model.core.StructureDefinition.StructureDefinitionContextComponent;
+import org.hl7.fhir.model.core.StructureDefinition.StructureDefinitionKind;
+import org.hl7.fhir.model.core.StructureDefinition.StructureDefinitionMappingComponent;
+import org.hl7.fhir.model.core.StructureDefinition.TypeDerivationRule;
+import org.hl7.fhir.model.core.TimeType;
+import org.hl7.fhir.model.core.UnsignedIntType;
+import org.hl7.fhir.model.core.UriType;
+import org.hl7.fhir.model.core.UrlType;
+import org.hl7.fhir.model.core.UuidType;
+import org.hl7.fhir.model.core.ValueSet;
+import org.hl7.fhir.model.core.ValueSet.ConceptReferenceComponent;
+import org.hl7.fhir.model.core.ValueSet.ConceptSetComponent;
+import org.hl7.fhir.model.core.ValueSet.ValueSetComposeComponent;
+import org.hl7.fhir.model.utilities.CodeSystemUtilities;
+import org.hl7.fhir.model.utilities.ValueSetUtilities;
 import org.hl7.fhir.utilities.UserDataNames;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
@@ -241,7 +240,7 @@ public class IgSpreadsheetParser {
 //    StringBuilder sh = new StringBuilder();
 //    sb.append("Resources generated by processing "+path.getName()+":");
 //    sh.append("<p>Resources generated by processing "+path.getName()+":</p></ul>");
-    for (BundleEntryComponent be : bundle.getEntry()) {
+    for (BundleEntryComponent be : bundle.getEntryList()) {
       CanonicalResource b = (CanonicalResource) be.getResource();
       if (!tail(b.getUrl()).equals(b.getId()))
         throw new Exception("resource id/url mismatch: "+b.getId()+" vs "+b.getUrl());
@@ -273,18 +272,18 @@ public class IgSpreadsheetParser {
     for (int row = 0; row < sheet.rows.size(); row++) {
       ElementDefinition e = processLine(sd, sheet, row, invariants, true, row == 0);
       if (e != null)
-        for (TypeRefComponent t : e.getType()) {
-          if (t.hasProfile() && !"Extension".equals(t.getWorkingCode()) && t.getProfile().get(0).getValue().startsWith("#")) {
-            if (!namedSheets.contains(t.getProfile().get(0).getValue().substring(1)))
-              namedSheets.add(t.getProfile().get(0).getValue().substring(1));
+        for (TypeRefComponent t : e.getTypeList()) {
+          if (t.hasProfile() && !"Extension".equals(t.getWorkingCode()) && t.getProfileList().get(0).getValue().startsWith("#")) {
+            if (!namedSheets.contains(t.getProfileList().get(0).getValue().substring(1)))
+              namedSheets.add(t.getProfileList().get(0).getValue().substring(1));
           }
         }
     }
 
     if (logical) {
       sd.setKind(StructureDefinitionKind.LOGICAL);
-      sd.setId(sd.getDifferential().getElement().get(0).getPath());
-      sd.getDifferential().getElementFirstRep().getType().clear();
+      sd.setId(sd.getDifferential().getElementList().get(0).getPath());
+      sd.getDifferential().getElementFirstRep().getTypeList().clear();
       sd.setType(sd.getDifferential().getElementFirstRep().getPath());
       sd.setBaseDefinition("http://hl7.org/fhir/StructureDefinition/Element");
       sd.setDerivation(TypeDerivationRule.SPECIALIZATION);
@@ -299,14 +298,14 @@ public class IgSpreadsheetParser {
         sd.setName(sd.getDifferential().getElementFirstRep().getSliceName());
         sd.getDifferential().getElementFirstRep().setSliceName(null);
       }
-      if (sd.getDifferential().getElementFirstRep().getType().size() == 1 && sd.getDifferential().getElementFirstRep().getType().get(0).hasProfile())
-        sd.setBaseDefinition(sd.getDifferential().getElementFirstRep().getType().get(0).getProfile().get(0).getValue());
+      if (sd.getDifferential().getElementFirstRep().getTypeList().size() == 1 && sd.getDifferential().getElementFirstRep().getTypeList().get(0).hasProfile())
+        sd.setBaseDefinition(sd.getDifferential().getElementFirstRep().getTypeList().get(0).getProfileList().get(0).getValue());
       else
         sd.setBaseDefinition("http://hl7.org/fhir/StructureDefinition/"+sd.getType());
       if (!context.getResourceNames().contains(sd.getType()) && !new ContextUtilities(context).getTypeNames().contains(sd.getType()))
         throw new Exception("Unknown Resource "+sd.getType());
     }
-    sd.getDifferential().getElementFirstRep().getType().clear();
+    sd.getDifferential().getElementFirstRep().getTypeList().clear();
     sd.setUrl(base+"/StructureDefinition/"+sd.getId());
     if ("http://hl7.org/fhir".equals(base))
       sd.setVersion(Constants.VERSION);
@@ -351,7 +350,7 @@ public class IgSpreadsheetParser {
           throw new Exception("Profile "+sd.getId()+" Invariant "+inv.getId()+" has no context");
         else {
           ElementDefinition ed = findContext(sd, inv.getUserString(UserDataNames.pub_excel_inv_context), "Profile "+sd.getId()+" Invariant "+inv.getId()+" Context");
-          ed.getConstraint().add(inv);
+          ed.getConstraintList().add(inv);
 //          if (Utilities.noString(inv.getXpath())) {
 //            throw new Exception("Profile "+sd.getId()+" Invariant "+inv.getId()+" ("+inv.getHuman()+") has no XPath statement");
 //          }
@@ -368,7 +367,7 @@ public class IgSpreadsheetParser {
     if (Utilities.noString(metadata("experimental")))
       sd.setExperimental("true".equals(metadata("experimental")));
     if (hasMetadata("author.reference"))
-      sd.addContact().getTelecom().add(Factory.newContactPoint(ContactPointSystem.URL, metadata("author.reference")));
+      sd.addContact().getTelecomList().add(Factory.newContactPoint(ContactPointSystem.URL, metadata("author.reference")));
     if (hasMetadata("date"))
       sd.setDateElement(Factory.newDateTime(metadata("date").substring(0, 10)));
     else
@@ -388,7 +387,7 @@ public class IgSpreadsheetParser {
   }
 
   private ElementDefinition findContext(StructureDefinition sd, String context, String message) throws Exception {
-    for (ElementDefinition ed : sd.getDifferential().getElement())
+    for (ElementDefinition ed : sd.getDifferential().getElementList())
       if (ed.getPath().equals(context))
         return ed;
     throw new Exception("No Context found for "+context+" at "+message);
@@ -812,14 +811,14 @@ public class IgSpreadsheetParser {
       if (types.size() == 1 && types.get(0).getName().startsWith("@"))
         e.setContentReference("#"+types.get(0).getName().substring(1));
       else if (types.size() > 0)
-        e.getType().addAll(tp.convert(context, e.getPath(), types, true, e));
+        e.getTypeList().addAll(tp.convert(context, e.getPath(), types, true, e));
     }
     String regex = sheet.getColumn(row, "Regex");
     if (!Utilities.noString(regex) && e.hasType())
       ExtensionUtilities.addStringExtension(e, ExtensionDefinitions.EXT_REGEX, regex);
 
-    if ((path.endsWith(".extension") || path.endsWith(".modifierExtension")) && e.hasType() && e.getType().get(0).hasProfile() && Utilities.noString(profileName))
-        throw new Exception("need to have a profile name if a profiled extension is referenced for "+ e.getType().get(0).getProfile());
+    if ((path.endsWith(".extension") || path.endsWith(".modifierExtension")) && e.hasType() && e.getTypeList().get(0).hasProfile() && Utilities.noString(profileName))
+        throw new Exception("need to have a profile name if a profiled extension is referenced for "+ e.getTypeList().get(0).getProfileList());
 
     String bindingName = sheet.getColumn(row, "Binding");
     if (!Utilities.noString(bindingName)) {
@@ -849,7 +848,7 @@ public class IgSpreadsheetParser {
         map.setIdentity(m.getId());
         map.setMap(sm);
         boolean found = false;
-        for (StructureDefinitionMappingComponent mm : sd.getMapping()) {
+        for (StructureDefinitionMappingComponent mm : sd.getMappingList()) {
           if (mm.getIdentity().equals(m.getId()))
             found = true;
         }
@@ -956,22 +955,22 @@ public class IgSpreadsheetParser {
   private DataType processValue(Sheet sheet, int row, String column, String source, ElementDefinition e) throws Exception {
     if (Utilities.noString(source))
       return null;
-    if (e.getType().size() != 1)
+    if (e.getTypeList().size() != 1)
       throw new Exception("Unable to process "+column+" unless a single type is specified @ "+getLocation(row)+", type = \""+e.typeSummary()+"\", column = "+column);
-    String type = e.getType().get(0).getWorkingCode();
+    String type = e.getTypeList().get(0).getWorkingCode();
     StructureDefinition sd = context.fetchTypeDefinition(type);
     if (sd != null && sd.hasBaseDefinition() && sd.getDerivation() == TypeDerivationRule.CONSTRAINT)
       type = sd.getType();
 
     if (source.startsWith("{")) {
-      JsonParser json = new JsonParser();
+      JsonParser json = new JsonParser(context.getModelContext());
       try {
         return json.parseType(source, type);
       } catch (Exception e2) {
         throw new Exception("Unable to parse json string: " + source+" as "+type+" because "+e2.getMessage(), e2);
       }
     } else if (source.startsWith("<")) {
-      XmlParser xml = new XmlParser();
+      XmlParser xml = new XmlParser(context.getModelContext());
       try {
         return xml.parseType(source, type);
       } catch (Exception e2) {
@@ -1136,15 +1135,15 @@ public class IgSpreadsheetParser {
     ElementDefinition exu = ex.getDifferential().addElement();
     exu.setPath("Extension.url");
     exu.setFixed(new UriType(ex.getUrl()));
-    TypeRefComponent tc = new TypeRefComponent("uri");
+    TypeRefComponent tc = new TypeRefComponent(this.context.getModelContext(),"uri");
     List<TypeRefComponent> tcList = new ArrayList<TypeRefComponent>();
     tcList.add(tc);
-    exu.setType(tcList);
+    exu.setTypeList(tcList);
 
     if (invariants != null) {
       for (ElementDefinitionConstraintComponent inv : invariants.values()) {
         if (inv.getKey().equals(name))
-          exe.getConstraint().add(inv);
+          exe.getConstraintList().add(inv);
       }
     }
 
@@ -1169,7 +1168,7 @@ public class IgSpreadsheetParser {
     if (Utilities.noString(metadata("experimental")))
       ex.setExperimental("true".equals(metadata("experimental")));
     if (hasMetadata("author.reference"))
-      ex.addContact().getTelecom().add(Factory.newContactPoint(ContactPointSystem.URL, metadata("author.reference")));
+      ex.addContact().getTelecomList().add(Factory.newContactPoint(ContactPointSystem.URL, metadata("author.reference")));
     //  <code> opt Zero+ Coding assist with indexing and finding</code>
     if (hasMetadata("date"))
       ex.setDateElement(Factory.newDateTime(metadata("date").substring(0, 10)));
@@ -1194,14 +1193,14 @@ public class IgSpreadsheetParser {
       if (invariants != null) {
         for (ElementDefinitionConstraintComponent inv : invariants.values()) {
           if (inv.getKey().equals(n))
-            child.getConstraint().add(inv);
+            child.getConstraintList().add(inv);
         }
       }
       row++;
     }
     if (hasChild) {
       boolean found = false;
-      for (ElementDefinition exv : ex.getDifferential().getElement())
+      for (ElementDefinition exv : ex.getDifferential().getElementList())
         if (exv.getPath().startsWith("Extension.value")) {
           found = true;
           exv.setMax("0");
@@ -1210,7 +1209,7 @@ public class IgSpreadsheetParser {
         ex.getDifferential().addElement().setPath("Extension.value[x]").setMax("0");
       }
     }
-    ex.getDifferential().getElementFirstRep().getType().clear();
+    ex.getDifferential().getElementFirstRep().getTypeList().clear();
     if (ex.getDifferential().getElementFirstRep().hasRequirements()) {
       ex.setPurpose(ex.getDifferential().getElementFirstRep().getRequirements());
       ex.getDifferential().getElementFirstRep().setRequirements(null);
@@ -1220,8 +1219,8 @@ public class IgSpreadsheetParser {
       ex.getDifferential().getElementFirstRep().setLabel(null);
     }
     if (ex.getDifferential().getElementFirstRep().hasCode()) {
-      ex.getKeyword().addAll(ex.getDifferential().getElementFirstRep().getCode());
-      ex.getDifferential().getElementFirstRep().getCode().clear();
+      ex.getKeywordList().addAll(ex.getDifferential().getElementFirstRep().getCodeList());
+      ex.getDifferential().getElementFirstRep().getCodeList().clear();
     }
 
     StructureDefinition base = this.context.fetchResource(StructureDefinition.class, "http://hl7.org/fhir/StructureDefinition/Extension");
@@ -1271,7 +1270,7 @@ public class IgSpreadsheetParser {
       String[] parts = ec.getExpression().split("\\.");
       StructureDefinition sd = this.context.fetchTypeDefinition(parts[0]);
       if (sd != null) {
-        for (ElementDefinition ed : sd.getSnapshot().getElement())
+        for (ElementDefinition ed : sd.getSnapshot().getElementList())
           if (ed.getPath().equals(ec.getExpression()))
             return;
       }
@@ -1322,25 +1321,25 @@ public class IgSpreadsheetParser {
     }
     if (nested && exe.getIsModifier())
       throw new Exception("Cannot create a nested extension that is a modifier @"+getLocation(row));
-    exe.getType().add(new TypeRefComponent().setCode("Extension"));
+    exe.getTypeList().add(new TypeRefComponent().setCode("Extension"));
 
     // things that go on Extension.value
     if (!Utilities.noString(sheet.getColumn(row, "Type"))) {
       ElementDefinition exv = new ElementDefinition();
       TypeParser tp = new TypeParser();
       List<TypeRef> types = tp.parse(sheet.getColumn(row, "Type"), true, metadata("extension.uri"), context, false);
-      exv.getType().addAll(tp.convert(context, exv.getPath(), types, false, exv));
-      if (exv.getType().size()>1) {
+      exv.getTypeList().addAll(tp.convert(context, exv.getPath(), types, false, exv));
+      if (exv.getTypeList().size()>1) {
 //        exv.setPath(exe.getPath()+".valueReference");
         exv.setPath(exe.getPath()+".value[x]");
-        for (TypeRefComponent t : exv.getType()) {
+        for (TypeRefComponent t : exv.getTypeList()) {
           if (!t.getWorkingCode().equals("Reference")) {
             exv.setPath(exe.getPath()+".value[x]");
             break;
           }
         }
       } else {
-        TypeRefComponent type = exv.getType().get(0);
+        TypeRefComponent type = exv.getTypeList().get(0);
 /*        if (type.getCode().equals("*") || type.get.getParams().size()>1)
           exv.setName("value[x]");
         else {*/
@@ -1350,7 +1349,7 @@ public class IgSpreadsheetParser {
 //        }
       }
 
-      sd.getDifferential().getElement().add(exv);
+      sd.getDifferential().getElementList().add(exv);
       String bindingName = sheet.getColumn(row, "Binding");
       if (!Utilities.noString(bindingName)) {
         ElementDefinitionBindingComponent binding = bindings.get(bindingName);
@@ -1480,7 +1479,7 @@ public class IgSpreadsheetParser {
             op.setVersion(Constants.VERSION);
             String s = sheet.getColumn(row, "Type");
             if (!Utilities.noString(s)) {
-              op.addResource(VersionIndependentResourceTypesAll.fromCode(s));
+              op.addResource(s);
               op.setType(true);
             }
             s = sheet.getColumn(row, "Title");
@@ -1506,14 +1505,14 @@ public class IgSpreadsheetParser {
                 throw new Exception("Tuple parameter '"+context+"' not found at "+getLocation(row));
               if (!param.getType().equals("Tuple"))
                 throw new Exception("Tuple parameter '"+context+"' type must be Tuple at "+getLocation(row));
-              plist = param.getPart();
+              plist = param.getPartList();
             } else {
               if (!use.equals("in") && !use.equals("out"))
                 throw new Exception("Only allowed use is 'in' or 'out' at "+getLocation(row));
               operation = ops.get(context);
               if (operation == null)
                 throw new Exception("Unknown Operation '"+context+"' at "+getLocation(row));
-              plist = operation.getParameter();
+              plist = operation.getParameterList();
             }
             String profile = sheet.getColumn(row, "Profile");
             String min = sheet.getColumn(row, "Min");
@@ -1524,7 +1523,7 @@ public class IgSpreadsheetParser {
             p.setDocumentation(doco);
             p.setMin(Integer.parseInt(min));
             p.setMax(max);
-            p.setType(Enumerations.FHIRTypes.fromCode(type));
+            p.setType(type);
             p.getSearchTypeElement().setValueAsString(sheet.getColumn(row, "Search Type"));
             p.addTargetProfile(profile);
             String bs = sheet.getColumn(row, "Binding");

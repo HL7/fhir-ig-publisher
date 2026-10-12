@@ -5,7 +5,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.apache.commons.lang3.StringUtils;
-import org.hl7.fhir.r5.model.CanonicalResource;
+import org.hl7.fhir.model.core.CanonicalResource;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;

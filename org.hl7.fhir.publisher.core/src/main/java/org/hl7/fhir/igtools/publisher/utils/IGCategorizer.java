@@ -6,15 +6,14 @@ import java.io.IOException;
 import java.io.InputStream;
 
 import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_30_50;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_10_50;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_50;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
+import org.hl7.fhir.convertors.factory.*;
 import org.hl7.fhir.exceptions.FHIRException;
-import org.hl7.fhir.r5.model.ElementDefinition;
-import org.hl7.fhir.r5.model.Resource;
-import org.hl7.fhir.r5.model.StructureDefinition;
-import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
-import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
+import org.hl7.fhir.model.ModelContext;
+import org.hl7.fhir.model.core.ElementDefinition;
+import org.hl7.fhir.model.core.Resource;
+import org.hl7.fhir.model.core.StructureDefinition;
+import org.hl7.fhir.model.core.StructureDefinition.StructureDefinitionKind;
+import org.hl7.fhir.model.core.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
@@ -479,12 +478,12 @@ public class IGCategorizer {
   }
 
   private boolean hasDocumentType(StructureDefinition sd) {
-    for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+    for (ElementDefinition ed : sd.getSnapshot().getElementList()) {
       if (ed.getPath().equals("Bundle.type") && ed.hasFixed() && "document".equals(ed.getFixed().primitiveValue())) {
         return true;
       }
     }
-    for (ElementDefinition ed : sd.getDifferential().getElement()) {
+    for (ElementDefinition ed : sd.getDifferential().getElementList()) {
       if (ed.getPath().equals("Bundle.type") && ed.hasFixed() && "document".equals(ed.getFixed().primitiveValue())) {
         return true;
       }
@@ -494,13 +493,15 @@ public class IGCategorizer {
 
   private Resource loadResourceFromPackage(InputStream s, String version) throws FHIRException, IOException {
     if (VersionUtilities.isR3Ver(version)) {
-      return VersionConvertorFactory_30_50.convertResource(new org.hl7.fhir.dstu3.formats.JsonParser().parse(s), new BaseAdvisor_30_50(false));
+      return VersionConvertorFactory_30_N.convertResource(new org.hl7.fhir.dstu3.formats.JsonParser().parse(s), new BaseAdvisor_30_50(false));
     } else if (VersionUtilities.isR4Ver(version)) {
-      return VersionConvertorFactory_40_50.convertResource(new org.hl7.fhir.r4.formats.JsonParser().parse(s));
+      return VersionConvertorFactory_40_N.convertResource(new org.hl7.fhir.r4.formats.JsonParser().parse(s));
     } else if (VersionUtilities.isR2Ver(version)) {
-      return VersionConvertorFactory_10_50.convertResource(new org.hl7.fhir.dstu2.formats.JsonParser().parse(s));
-    } else if (VersionUtilities.isR5Plus(version)) {
-      return new org.hl7.fhir.r5.formats.JsonParser().parse(s);
+      return VersionConvertorFactory_10_N.convertResource(new org.hl7.fhir.dstu2.formats.JsonParser().parse(s));
+    } else if (VersionUtilities.isR5Ver(version)) {
+      return VersionConvertorFactory_50_N.convertResource(new org.hl7.fhir.r5.formats.JsonParser().parse(s));
+    } else if (VersionUtilities.isR6Plus(version)) {
+      return new org.hl7.fhir.model.core.formats.JsonParser(ModelContext.fullCoreContext()).parse(s);
     } else {
       throw new FHIRException("Unsupported version: "+version);
     }

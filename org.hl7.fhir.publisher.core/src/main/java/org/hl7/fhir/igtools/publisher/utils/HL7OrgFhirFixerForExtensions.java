@@ -5,8 +5,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.Resource;
+import org.hl7.fhir.model.core.CanonicalResource;
+import org.hl7.fhir.model.core.Resource;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 

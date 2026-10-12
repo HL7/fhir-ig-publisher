@@ -7,15 +7,16 @@ import java.util.List;
 import java.util.Set;
 
 import org.hl7.fhir.igtools.publisher.FetchedResource;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.elementmodel.Element;
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
-import org.hl7.fhir.r5.model.Resource;
-import org.hl7.fhir.r5.utils.ElementVisitor;
-import org.hl7.fhir.r5.utils.ElementVisitor.ElementVisitorInstruction;
-import org.hl7.fhir.r5.utils.ElementVisitor.IElementVisitor;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.services.elementmodel.Element;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.model.core.CanonicalResource;
+import org.hl7.fhir.model.core.Enumerations.PublicationStatus;
+import org.hl7.fhir.model.core.Resource;
+import org.hl7.fhir.model.utilities.ElementVisitor;
+import org.hl7.fhir.model.utilities.ElementVisitor.ElementVisitorInstruction;
+import org.hl7.fhir.model.utilities.ElementVisitor.IElementVisitor;
+import org.hl7.fhir.services.elementmodel.ElementModelUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
@@ -60,7 +61,7 @@ public class DraftDependenciesRenderer implements IElementVisitor {
   }
 
   private void scanReferences(FetchedResource resource, Element element) {
-    for (Element child : element.getChildren()) {
+    for (Element child : element.getChildList()) {
       scanReferences(resource, child);
     }
     if (element.fhirType().equals("Coding")) {
@@ -83,7 +84,7 @@ public class DraftDependenciesRenderer implements IElementVisitor {
       url = url.substring(0, url.indexOf("#"));
     }
     if (Utilities.isAbsoluteUrl(url)) {
-      CanonicalResource tgt = (CanonicalResource) context.fetchResource(Resource.class, url, ExtensionUtilities.getVersionResolutionRules(urlE));
+      CanonicalResource tgt = (CanonicalResource) context.fetchResource(Resource.class, url, ElementModelUtilities.getVersionResolutionRules(urlE));
       if (tgt != null && tgt.hasSourcePackage() && !thisPackage.equals(tgt.getSourcePackage().getVID())) {
         if (tgt.getStatus() == PublicationStatus.DRAFT || tgt.getExperimental()) {
           DraftReference dr = new DraftReference(resource, url, tgt);
@@ -95,7 +96,7 @@ public class DraftDependenciesRenderer implements IElementVisitor {
     }
   }
 
-  private void checkReference(FetchedResource resource, org.hl7.fhir.r5.model.Element urlE) {
+  private void checkReference(FetchedResource resource, org.hl7.fhir.model.core.Element urlE) {
     String url = urlE.primitiveValue();
     if (url == null) {
       return;
@@ -133,7 +134,7 @@ public class DraftDependenciesRenderer implements IElementVisitor {
   }
 
   @Override
-  public ElementVisitorInstruction visit(Object context, org.hl7.fhir.r5.model.Element element) {
+  public ElementVisitorInstruction visit(Object context, org.hl7.fhir.model.core.Element element) {
     if (element.isPrimitive()) {
       checkReference((FetchedResource) context, element);
     }

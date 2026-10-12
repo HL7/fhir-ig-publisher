@@ -5,8 +5,8 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import org.hl7.fhir.r5.model.Coding;
-import org.hl7.fhir.r5.model.ValueSet;
+import org.hl7.fhir.model.core.Coding;
+import org.hl7.fhir.model.core.ValueSet;
 
 public class VSPair {
 

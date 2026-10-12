@@ -51,43 +51,43 @@ public class XIGExtensionUsageProcessor {
     }
   }
 
-  public static class ExtensionVisitorR5 extends BaseVisitor implements org.hl7.fhir.r5.utils.ElementVisitor.IElementVisitor {
+  public static class ExtensionVisitorR5 extends BaseVisitor implements org.hl7.fhir.model.utilities.ElementVisitor.IElementVisitor {
     public ExtensionVisitorR5(int userKey, Map<String, Integer> definitions, PreparedStatement psql, PreparedStatement psql2) {
       super(userKey, definitions, psql, psql2);
     }
 
     @Override
-    public org.hl7.fhir.r5.utils.ElementVisitor.ElementVisitorInstruction visit(Object context, org.hl7.fhir.r5.model.Resource resource) {
-      if (resource instanceof org.hl7.fhir.r5.model.DomainResource) {
-        org.hl7.fhir.r5.model.DomainResource dr = (org.hl7.fhir.r5.model.DomainResource) resource;
-        for (org.hl7.fhir.r5.model.Extension ex : dr.getExtension()) {
+    public org.hl7.fhir.model.utilities.ElementVisitor.ElementVisitorInstruction visit(Object context, org.hl7.fhir.model.core.Resource resource) {
+      if (resource instanceof org.hl7.fhir.model.core.DomainResource) {
+        org.hl7.fhir.model.core.DomainResource dr = (org.hl7.fhir.model.core.DomainResource) resource;
+        for (org.hl7.fhir.model.core.Extension ex : dr.getExtensionList()) {
           seeExtension(ex.getUrl());
         }
-        for (org.hl7.fhir.r5.model.Extension ex : dr.getModifierExtension()) {
+        for (org.hl7.fhir.model.core.Extension ex : dr.getModifierExtensionList()) {
           seeExtension(ex.getUrl());
         }
       }
-      return org.hl7.fhir.r5.utils.ElementVisitor.ElementVisitorInstruction.VISIT_CHILDREN;
+      return org.hl7.fhir.model.utilities.ElementVisitor.ElementVisitorInstruction.VISIT_CHILDREN;
     }
 
     @Override
-    public org.hl7.fhir.r5.utils.ElementVisitor.ElementVisitorInstruction visit(Object context, org.hl7.fhir.r5.model.Element element) {
-      for (org.hl7.fhir.r5.model.Extension ex : element.getExtension()) {
+    public org.hl7.fhir.model.utilities.ElementVisitor.ElementVisitorInstruction visit(Object context, org.hl7.fhir.model.core.Element element) {
+      for (org.hl7.fhir.model.core.Extension ex : element.getExtensionList()) {
         seeExtension(ex.getUrl());
       }
-      if (element instanceof org.hl7.fhir.r5.model.BackboneElement) {
-        org.hl7.fhir.r5.model.BackboneElement be = (org.hl7.fhir.r5.model.BackboneElement) element;
-        for (org.hl7.fhir.r5.model.Extension ex : be.getModifierExtension()) {
+      if (element instanceof org.hl7.fhir.model.core.BackboneElement) {
+        org.hl7.fhir.model.core.BackboneElement be = (org.hl7.fhir.model.core.BackboneElement) element;
+        for (org.hl7.fhir.model.core.Extension ex : be.getModifierExtensionList()) {
           seeExtension(ex.getUrl());
         }
       }
-      if (element instanceof org.hl7.fhir.r5.model.BackboneType) {
-        org.hl7.fhir.r5.model.BackboneType be = (org.hl7.fhir.r5.model.BackboneType) element;
-        for (org.hl7.fhir.r5.model.Extension ex : be.getModifierExtension()) {
+      if (element instanceof org.hl7.fhir.model.core.BackboneType) {
+        org.hl7.fhir.model.core.BackboneType be = (org.hl7.fhir.model.core.BackboneType) element;
+        for (org.hl7.fhir.model.core.Extension ex : be.getModifierExtensionList()) {
           seeExtension(ex.getUrl());
         }
       }
-      return org.hl7.fhir.r5.utils.ElementVisitor.ElementVisitorInstruction.VISIT_CHILDREN;
+      return org.hl7.fhir.model.utilities.ElementVisitor.ElementVisitorInstruction.VISIT_CHILDREN;
     }
   }
 

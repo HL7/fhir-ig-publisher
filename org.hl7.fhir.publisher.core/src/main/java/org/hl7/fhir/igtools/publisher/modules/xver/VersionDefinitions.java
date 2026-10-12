@@ -3,11 +3,11 @@ package org.hl7.fhir.igtools.publisher.modules.xver;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.CodeSystem;
-import org.hl7.fhir.r5.model.StructureDefinition;
-import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
-import org.hl7.fhir.r5.model.ValueSet;
+import org.hl7.fhir.model.core.CanonicalResource;
+import org.hl7.fhir.model.core.CodeSystem;
+import org.hl7.fhir.model.core.StructureDefinition;
+import org.hl7.fhir.model.core.StructureDefinition.TypeDerivationRule;
+import org.hl7.fhir.model.core.ValueSet;
 import org.hl7.fhir.utilities.FhirPublication;
 
 public class VersionDefinitions {

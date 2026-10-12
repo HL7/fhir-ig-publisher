@@ -11,8 +11,8 @@ import java.util.Set;
 import org.hl7.fhir.igtools.publisher.PublisherIGLoader;
 import org.hl7.fhir.igtools.publisher.RelatedIG;
 import org.hl7.fhir.igtools.web.PublicationProcess.PublicationProcessMode;
-import org.hl7.fhir.r5.model.ImplementationGuide;
-import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnComponent;
+import org.hl7.fhir.model.core.ImplementationGuide;
+import org.hl7.fhir.model.core.ImplementationGuide.ImplementationGuideDependsOnComponent;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.StringPair;
@@ -77,9 +77,9 @@ public class PublicationChecker {
           style = " style=\"background-color: #ffe6cc;\"";
         }
         if ("descmd".equals(name)) {
-          bs.append(" <tr"+style+"><td>"+Utilities.escapeXml(name)+"</d><td>"+p.getValue()+"</td></tr>\r\n");
+          bs.append(" <tr"+style+"><td>"+Utilities.escapeXml(name)+"</td><td>"+p.getValue()+"</td></tr>\r\n");
         } else {
-          bs.append(" <tr"+style+"><td>"+Utilities.escapeXml(name)+"</d><td>"+Utilities.escapeXml(p.getValue())+"</td></tr>\r\n");
+          bs.append(" <tr"+style+"><td>"+Utilities.escapeXml(name)+"</td><td>"+Utilities.escapeXml(p.getValue())+"</td></tr>\r\n");
         }
       }      
       bs.append("</table>\r\n");
@@ -151,9 +151,9 @@ public class PublicationChecker {
   }
 
   private void checkIg(List<String> messages, List<StringPair> summary) {
-    String baseVer = ig.hasFhirVersion() && ig.getFhirVersion().get(0).getValue() != null
-        ? PublisherIGLoader.canonicalTarget(ig.getFhirVersion().get(0).getValue().toCode()) : null;
-    for (ImplementationGuideDependsOnComponent dep : ig.getDependsOn()) {
+    String baseVer = ig.hasFhirVersion() && ig.getFhirVersionList().get(0).getValue() != null
+        ? PublisherIGLoader.canonicalTarget(ig.getFhirVersionList().get(0).getValue().toCode()) : null;
+    for (ImplementationGuideDependsOnComponent dep : ig.getDependsOnList()) {
       if (baseVer != null && !PublisherIGLoader.isDepApplicableForVersion(dep, baseVer)) {
         continue; // version-scoped dependency that does not apply to this IG's own FHIR version
       }
@@ -488,11 +488,11 @@ public class PublicationChecker {
   }
   
   private String mkError() {
-    return " <img src=\"icon-error.gif\" height=\"16px\" width=\"16px\"/>";
+    return " <img src=\"icon-error.gif\" height=\"16px\" alt=\"ERROR!\" width=\"16px\"/>";
   }
 
   private String mkWarning() {
-    return " <img src=\"icon-warning.png\" height=\"16px\" width=\"16px\"/>";
+    return " <img src=\"icon-warning.png\" alt=\"WARNING\" height=\"16px\" width=\"16px\"/>";
   }
 
   private String mkInfo() {

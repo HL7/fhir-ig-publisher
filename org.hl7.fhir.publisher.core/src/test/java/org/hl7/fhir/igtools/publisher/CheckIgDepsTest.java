@@ -3,12 +3,12 @@ package org.hl7.fhir.igtools.publisher;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.model.Enumeration;
-import org.hl7.fhir.r5.model.Enumerations;
-import org.hl7.fhir.r5.model.Extension;
-import org.hl7.fhir.r5.model.ImplementationGuide;
-import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnComponent;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.model.core.Enumeration;
+import org.hl7.fhir.model.core.Enumerations;
+import org.hl7.fhir.model.core.Extension;
+import org.hl7.fhir.model.core.ImplementationGuide;
+import org.hl7.fhir.model.core.ImplementationGuide.ImplementationGuideDependsOnComponent;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -24,7 +24,7 @@ class CheckIgDepsTest {
 
   private ImplementationGuide sampleIg() {
     ImplementationGuide ig = new ImplementationGuide();
-    ig.getFhirVersion().add(new Enumeration<>(new Enumerations.FHIRVersionEnumFactory(), R5));
+    ig.getFhirVersionList().add(new Enumeration<>(new Enumerations.FHIRVersionEnumFactory(), R5));
 
     // (a) plain dep, no extension -> legacy suffix rename for variants, unchanged for the base
     ImplementationGuideDependsOnComponent plain = ig.addDependsOn();
@@ -75,7 +75,7 @@ class CheckIgDepsTest {
   }
 
   private ImplementationGuideDependsOnComponent byUri(ImplementationGuide ig, String uri) {
-    for (ImplementationGuideDependsOnComponent d : ig.getDependsOn()) {
+    for (ImplementationGuideDependsOnComponent d : ig.getDependsOnList()) {
       if (uri.equals(d.getUri())) {
         return d;
       }
@@ -87,7 +87,7 @@ class CheckIgDepsTest {
   void baseView_dropsR4OnlyAdd_keepsOthersAsAuthored() {
     ImplementationGuide ig = sampleIg();
     PublisherIGLoader.applyPerVersionDeps(ig, R5, R5);
-    assertEquals(3, ig.getDependsOn().size());
+    assertEquals(3, ig.getDependsOnList().size());
     assertEquals("test.plain.r5", byUri(ig, "http://example.org/plain").getPackageId());
     assertEquals("test.over.r5", byUri(ig, "http://example.org/override").getPackageId());
     assertEquals("test.rem.r5", byUri(ig, "http://example.org/remove").getPackageId());
@@ -98,7 +98,7 @@ class CheckIgDepsTest {
   void r4View_appliesRenameOverrideAndAdd() {
     ImplementationGuide ig = sampleIg();
     PublisherIGLoader.applyPerVersionDeps(ig, "r4", R5);
-    assertEquals(4, ig.getDependsOn().size());
+    assertEquals(4, ig.getDependsOnList().size());
     assertEquals("test.plain.r4", byUri(ig, "http://example.org/plain").getPackageId()); // legacy suffix rename
     ImplementationGuideDependsOnComponent over = byUri(ig, "http://example.org/override");
     assertEquals("test.over.explicit.r4", over.getPackageId());
@@ -113,7 +113,7 @@ class CheckIgDepsTest {
   void r4bView_forcesSuffixToR4_andHonoursRemove() {
     ImplementationGuide ig = sampleIg();
     PublisherIGLoader.applyPerVersionDeps(ig, "r4b", R5);
-    assertEquals(1, ig.getDependsOn().size());
+    assertEquals(1, ig.getDependsOnList().size());
     assertEquals("test.plain.r4", byUri(ig, "http://example.org/plain").getPackageId()); // r4b->r4 forcing preserved
     assertNull(byUri(ig, "http://example.org/override")); // version-scoped, no R4B occurrence
     assertNull(byUri(ig, "http://example.org/remove"));   // use=remove for 4.3.0

@@ -29,16 +29,16 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.RelatedIG;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.model.StructureDefinition;
-import org.hl7.fhir.r5.model.StructureMap;
-import org.hl7.fhir.r5.renderers.Renderer.RenderingStatus;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
-import org.hl7.fhir.r5.utils.EOperationOutcome;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.model.core.StructureDefinition;
+import org.hl7.fhir.model.fml.StructureMap;
+import org.hl7.fhir.services.fml.StructureMapTools;
+import org.hl7.fhir.services.renderers.Renderer.RenderingStatus;
+import org.hl7.fhir.services.renderers.utils.RenderingContext;
+import org.hl7.fhir.services.renderers.utils.ResourceWrapper;
+import org.hl7.fhir.model.utilities.EOperationOutcome;
 import org.hl7.fhir.utilities.UserDataNames;
-import org.hl7.fhir.r5.utils.structuremap.StructureMapAnalysis;
-import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
+import org.hl7.fhir.services.fml.StructureMapAnalysis;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
@@ -49,7 +49,7 @@ import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 public class StructureMapRenderer extends CanonicalRenderer {
 
 
-  private StructureMapUtilities utils;
+  private StructureMapTools utils;
   private StructureMap map;
   private StructureMapAnalysis analysis;
   private String destDir;
@@ -58,7 +58,7 @@ public class StructureMapRenderer extends CanonicalRenderer {
     super(context, corePath, map, destDir, igp, maps, allTargets, markdownEngine, packge, gen, versionToAnnotate, relatedIgs, resolver);
     this.map = map;
     this.destDir = destDir;
-    utils = new StructureMapUtilities(context, null, igp);
+    utils = new StructureMapTools(context, null, igp);
     analysis = (StructureMapAnalysis) map.getUserData(UserDataNames.pub_analysis);
   }
 
@@ -82,7 +82,7 @@ public class StructureMapRenderer extends CanonicalRenderer {
 
   public String script(boolean plainText) throws FHIRException, IOException, EOperationOutcome {
     if (plainText) {
-      return StructureMapUtilities.render(map);
+      return StructureMapTools.render(map);
     } else {
       XhtmlNode node = new XhtmlNode(NodeType.Element, "div");
       gen.getRendererFactory().factory(map, gen).buildNarrative(new RenderingStatus(), node, ResourceWrapper.forResource(gen.getContextUtilities(), map));

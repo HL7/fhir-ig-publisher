@@ -30,22 +30,23 @@ import java.util.Set;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.*;
-import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.CanonicalResourceComparison;
-import org.hl7.fhir.r5.comparison.VersionComparisonAnnotation;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.elementmodel.Element;
-import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.model.*;
-import org.hl7.fhir.r5.model.Enumerations.CodeSystemContentMode;
-import org.hl7.fhir.r5.model.NamingSystem.NamingSystemUniqueIdComponent;
-import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
-import org.hl7.fhir.r5.renderers.NamingSystemRenderer;
-import org.hl7.fhir.r5.renderers.RendererFactory;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
-import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
-import org.hl7.fhir.r5.utils.EOperationOutcome;
+import org.hl7.fhir.model.Base;
+import org.hl7.fhir.services.comparison.CanonicalResourceComparer.CanonicalResourceComparison;
+import org.hl7.fhir.services.comparison.VersionComparisonAnnotation;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.services.elementmodel.Element;
+import org.hl7.fhir.model.extensions.ExtensionDefinitions;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.model.core.*;
+import org.hl7.fhir.model.core.Enumerations.CodeSystemContentMode;
+import org.hl7.fhir.model.core.NamingSystem.NamingSystemUniqueIdComponent;
+import org.hl7.fhir.model.core.ValueSet.ConceptSetComponent;
+import org.hl7.fhir.services.renderers.NamingSystemRenderer;
+import org.hl7.fhir.services.renderers.RendererFactory;
+import org.hl7.fhir.services.renderers.utils.RenderingContext;
+import org.hl7.fhir.services.renderers.utils.ResourceWrapper;
+import org.hl7.fhir.model.utilities.CodeSystemUtilities;
+import org.hl7.fhir.model.utilities.EOperationOutcome;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.graphql.Value;
@@ -115,7 +116,7 @@ public class CodeSystemRenderer extends CanonicalRenderer {
   }
 
   public String content(Set<String> outputTracker) throws EOperationOutcome, FHIRException, IOException, org.hl7.fhir.exceptions.FHIRException {
-    CodeSystem csc = cs.copy();
+    CodeSystem csc = cs.copy(Base.COPY_DATA);
 
     csc.setId(cs.getId()); // because that's not copied
     csc.setText(null);
@@ -134,10 +135,10 @@ public class CodeSystemRenderer extends CanonicalRenderer {
     for (CanonicalResource cr : scanAllLocalResources(ValueSet.class, "ValueSet")) {
       ValueSet vs = (ValueSet) cr;
       if (cs.getContent() != CodeSystemContentMode.SUPPLEMENT) {
-        for (ConceptSetComponent ed : vs.getCompose().getInclude()) {
+        for (ConceptSetComponent ed : vs.getCompose().getIncludeList()) {
           first = addLink(b, first, vs, ed, processed);
         }
-        for (ConceptSetComponent ed : vs.getCompose().getExclude()) {
+        for (ConceptSetComponent ed : vs.getCompose().getExcludeList()) {
           first = addLink(b, first, vs, ed, processed);
         }
       } else {
@@ -185,12 +186,12 @@ public class CodeSystemRenderer extends CanonicalRenderer {
 
     Set<String> processed = new HashSet<String>();
     for (String url : vsurls) {
-      ValueSet vc = context.findTxResource(ValueSet.class, url, IWorkerContext.VersionResolutionRules.defaultRule());
+      ValueSet vc = context.findTxResource(ValueSet.class, url, VersionResolutionRules.defaultRule());
       if (cs.getContent() != CodeSystemContentMode.SUPPLEMENT) {
-        for (ConceptSetComponent ed : vc.getCompose().getInclude()) {
+        for (ConceptSetComponent ed : vc.getCompose().getIncludeList()) {
           first = addLink(b, first, vc, ed, processed);
         }
-        for (ConceptSetComponent ed : vc.getCompose().getExclude()) {
+        for (ConceptSetComponent ed : vc.getCompose().getExcludeList()) {
           first = addLink(b, first, vc, ed, processed);
         }
       } else {
@@ -212,7 +213,7 @@ public class CodeSystemRenderer extends CanonicalRenderer {
   }
 
   private boolean isNSforCS(NamingSystem t) {
-    for (NamingSystemUniqueIdComponent ui : t.getUniqueId()) {
+    for (NamingSystemUniqueIdComponent ui : t.getUniqueIdList()) {
       if (ui.hasValue() && ui.getValue().equals(cs.getUrl())) {
         return true;
       }

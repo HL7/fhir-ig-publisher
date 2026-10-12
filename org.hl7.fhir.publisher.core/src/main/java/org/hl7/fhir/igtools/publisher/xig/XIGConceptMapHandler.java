@@ -7,12 +7,12 @@ import java.util.List;
 import java.util.Set;
 
 import org.hl7.fhir.igtools.publisher.xig.XIGInformation.UsageType;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.ConceptMap;
-import org.hl7.fhir.r5.model.ConceptMap.ConceptMapGroupComponent;
-import org.hl7.fhir.r5.model.ConceptMap.OtherElementComponent;
-import org.hl7.fhir.r5.model.ConceptMap.SourceElementComponent;
-import org.hl7.fhir.r5.model.ConceptMap.TargetElementComponent;
+import org.hl7.fhir.model.core.CanonicalResource;
+import org.hl7.fhir.model.core.ConceptMap;
+import org.hl7.fhir.model.core.ConceptMap.ConceptMapGroupComponent;
+import org.hl7.fhir.model.core.ConceptMap.OtherElementComponent;
+import org.hl7.fhir.model.core.ConceptMap.SourceElementComponent;
+import org.hl7.fhir.model.core.ConceptMap.TargetElementComponent;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 
 
@@ -29,7 +29,7 @@ public class XIGConceptMapHandler extends XIGHandler {
   public void fillOutJson(ConceptMap cm, JsonObject j) {
     if (cm.hasSourceScope()) {        j.add("sourceScope", cm.getSourceScope().primitiveValue()); }
     if (cm.hasTargetScope()) {        j.add("targetScope", cm.getTargetScope().primitiveValue()); }
-    for (ConceptMapGroupComponent g : cm.getGroup()) {
+    for (ConceptMapGroupComponent g : cm.getGroupList()) {
       if (g.hasSource()) {    
         j.forceArray("sources").add(g.getSource()); 
       }
@@ -46,7 +46,7 @@ public class XIGConceptMapHandler extends XIGHandler {
         if (cr instanceof ConceptMap) {
           ConceptMap cm = (ConceptMap) cr;
           Set<String> systems = new HashSet<>();
-          for (ConceptMapGroupComponent g : cm.getGroup()) {
+          for (ConceptMapGroupComponent g : cm.getGroupList()) {
             if (g.hasSource()) {
               systems.add(g.getSource());
             }
@@ -84,17 +84,17 @@ public class XIGConceptMapHandler extends XIGHandler {
     if (cm.hasTargetScopeCanonicalType()) {
       info.recordUsage(cm, cm.getTargetScopeCanonicalType().getValue(), UsageType.CM_SCOPE);
     }
-    for (ConceptMapGroupComponent g : cm.getGroup()) {
+    for (ConceptMapGroupComponent g : cm.getGroupList()) {
       info.recordUsage(cm, g.getSource(), UsageType.CM_SCOPE);
       info.recordUsage(cm, g.getSource(), UsageType.CM_SCOPE);
-      for (SourceElementComponent e : g.getElement()) {
+      for (SourceElementComponent e : g.getElementList()) {
         info.recordUsage(cm, e.getValueSet(), UsageType.CM_MAP);
-        for (TargetElementComponent t : e.getTarget()) {
+        for (TargetElementComponent t : e.getTargetList()) {
           info.recordUsage(cm, t.getValueSet(), UsageType.CM_MAP);
-          for (OtherElementComponent p : t.getProduct()) {
+          for (OtherElementComponent p : t.getProductList()) {
             info.recordUsage(cm, p.getValueSet(), UsageType.CM_MAP);
           }
-          for (OtherElementComponent d : t.getDependsOn()) {
+          for (OtherElementComponent d : t.getDependsOnList()) {
             info.recordUsage(cm, d.getValueSet(), UsageType.CM_MAP);
           }
         }

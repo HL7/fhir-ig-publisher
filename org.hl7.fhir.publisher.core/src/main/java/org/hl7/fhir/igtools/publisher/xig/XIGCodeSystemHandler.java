@@ -8,9 +8,9 @@ import java.util.Map;
 
 import org.hl7.fhir.igtools.publisher.xig.XIGInformation.CanonicalResourceUsage;
 import org.hl7.fhir.igtools.publisher.xig.XIGInformation.UsageType;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.CodeSystem;
-import org.hl7.fhir.r5.model.Enumerations.CodeSystemContentMode;
+import org.hl7.fhir.model.core.CanonicalResource;
+import org.hl7.fhir.model.core.CodeSystem;
+import org.hl7.fhir.model.core.Enumerations.CodeSystemContentMode;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 

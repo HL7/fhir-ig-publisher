@@ -4,9 +4,9 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.hl7.fhir.igtools.publisher.modules.xver.XVerAnalysisEngine.XVersions;
-import org.hl7.fhir.r5.model.Coding;
-import org.hl7.fhir.r5.model.ConceptMap;
-import org.hl7.fhir.r5.model.Enumerations.ConceptMapRelationship;
+import org.hl7.fhir.model.core.Coding;
+import org.hl7.fhir.model.core.ConceptMap;
+import org.hl7.fhir.model.core.Enumerations.ConceptMapRelationship;
 
 public class ElementDefinitionLink {
   private XVersions versions;

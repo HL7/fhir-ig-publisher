@@ -5,12 +5,8 @@ import java.util.Collections;
 import java.util.List;
 
 import org.hl7.fhir.igtools.publisher.xig.XIGInformation.UsageType;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.CanonicalType;
-import org.hl7.fhir.r5.model.Enumeration;
-import org.hl7.fhir.r5.model.Enumerations.VersionIndependentResourceTypesAll;
-import org.hl7.fhir.r5.model.OperationDefinition;
-import org.hl7.fhir.r5.model.OperationDefinition.OperationDefinitionParameterComponent;
+import org.hl7.fhir.model.core.*;
+import org.hl7.fhir.model.core.OperationDefinition.OperationDefinitionParameterComponent;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 
 public class XIGOperationDefinitionHandler extends XIGHandler {
@@ -30,8 +26,8 @@ public class XIGOperationDefinitionHandler extends XIGHandler {
     if (od.hasSystem()) {          j.add("system", od.getSystem()); }
     if (od.hasType())     {        j.add("type", od.getType()); }
     if (od.hasInstance()) {        j.add("instance", od.getInstance()); }
-    for (Enumeration<VersionIndependentResourceTypesAll> t : od.getResource()) {
-      j.forceArray("resources").add(t.getCode()); 
+    for (UriType t : od.getResourceList()) {
+      j.forceArray("resources").add(t.primitiveValue());
       info.getOpr().add(t.toString());
     }
   }
@@ -43,8 +39,8 @@ public class XIGOperationDefinitionHandler extends XIGHandler {
         if (cr instanceof OperationDefinition) {
           OperationDefinition od = (OperationDefinition) cr;
           boolean ok = false;
-          for (Enumeration<VersionIndependentResourceTypesAll> c : od.getResource()) {
-            if (r.equals(c.getCode())) {
+          for (UriType c : od.getResourceList()) {
+            if (r.equals(c.primitiveValue())) {
               ok = true;
             }
           }
@@ -75,8 +71,8 @@ public class XIGOperationDefinitionHandler extends XIGHandler {
     info.recordUsage(od, od.getBase(), UsageType.DERIVATION);
     info.recordUsage(od, od.getInputProfile(), UsageType.OP_PROFILE);
     info.recordUsage(od, od.getOutputProfile(), UsageType.OP_PROFILE);
-    for (OperationDefinitionParameterComponent t : od.getParameter()) {
-      for (CanonicalType c : t.getTargetProfile()) {
+    for (OperationDefinitionParameterComponent t : od.getParameterList()) {
+      for (CanonicalType c : t.getTargetProfileList()) {
         info.recordUsage(od, c.getValue(), UsageType.TARGET);
       }
       if (t.hasBinding()) {

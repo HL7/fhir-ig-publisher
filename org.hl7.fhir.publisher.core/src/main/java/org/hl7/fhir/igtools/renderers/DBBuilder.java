@@ -16,23 +16,24 @@ import java.util.Set;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
-import org.hl7.fhir.r5.context.ContextUtilities;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.model.*;
-import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
-import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionDesignationComponent;
-import org.hl7.fhir.r5.model.CodeSystem.ConceptPropertyComponent;
-import org.hl7.fhir.r5.model.CodeSystem.PropertyComponent;
-import org.hl7.fhir.r5.model.ConceptMap.ConceptMapGroupComponent;
-import org.hl7.fhir.r5.model.ConceptMap.SourceElementComponent;
-import org.hl7.fhir.r5.model.ConceptMap.TargetElementComponent;
-import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionContainsComponent;
-import org.hl7.fhir.r5.renderers.DataRenderer;
-import org.hl7.fhir.r5.renderers.Renderer.RenderingStatus;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
-import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
+import org.hl7.fhir.model.core.formats.JsonParser;
+import org.hl7.fhir.services.context.ContextUtilities;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.model.core.*;
+import org.hl7.fhir.model.core.CodeSystem.ConceptDefinitionComponent;
+import org.hl7.fhir.model.core.CodeSystem.ConceptDefinitionDesignationComponent;
+import org.hl7.fhir.model.core.CodeSystem.ConceptPropertyComponent;
+import org.hl7.fhir.model.core.CodeSystem.PropertyComponent;
+import org.hl7.fhir.model.core.ConceptMap.ConceptMapGroupComponent;
+import org.hl7.fhir.model.core.ConceptMap.SourceElementComponent;
+import org.hl7.fhir.model.core.ConceptMap.TargetElementComponent;
+import org.hl7.fhir.model.core.ValueSet.ValueSetExpansionContainsComponent;
+import org.hl7.fhir.services.renderers.DataRenderer;
+import org.hl7.fhir.services.renderers.Renderer.RenderingStatus;
+import org.hl7.fhir.services.renderers.utils.RenderingContext;
+import org.hl7.fhir.services.renderers.utils.ResourceWrapper;
+import org.hl7.fhir.services.terminology.ValueSetExpansionOutcome;
 import org.hl7.fhir.utilities.UserDataNames;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
@@ -513,7 +514,7 @@ public class DBBuilder {
   private void addCodeSystemContent(CodeSystem cs) throws SQLException {
     PreparedStatement psql = con.prepareStatement("Insert into Properties (Key, ResourceKey, Code, Uri, Description, Type) "+
         "values (?, ?, ?, ?, ?, ?)");
-    for (PropertyComponent p : cs.getProperty()) {
+    for (PropertyComponent p : cs.getPropertyList()) {
       psql.setInt(1, ++lastPropKey);
       psql.setInt(2, ((Integer) cs.getUserData(UserDataNames.db_key)).intValue());
       bindString(psql, 3, p.getCode());
@@ -527,17 +528,17 @@ public class DBBuilder {
 
     psql = con.prepareStatement("Insert into Concepts (Key, ResourceKey, ParentKey,  Code, Display, Definition) "+
         "values (?, ?, ?, ?, ?, ?)");
-    addConcepts(cs, cs.getConcept(), psql, 0);
+    addConcepts(cs, cs.getConceptList(), psql, 0);
     psql.executeBatch();
 
     psql = con.prepareStatement("Insert into ConceptProperties (Key, ResourceKey, ConceptKey, PropertyKey, Code, Value) "+
         "values (?, ?, ?, ?, ?, ?)");
-    addConceptProperties(cs, cs.getConcept(), psql);
+    addConceptProperties(cs, cs.getConceptList(), psql);
     psql.executeBatch();
 
     psql = con.prepareStatement("Insert into Designations (Key, ResourceKey, ConceptKey, UseSystem, UseCode, Lang, Value) "+
         "values (?, ?, ?, ?, ?, ?, ?)");
-    addConceptDesignations(cs, cs.getConcept(), psql);
+    addConceptDesignations(cs, cs.getConceptList(), psql);
     psql.executeBatch();
   }
 
@@ -546,9 +547,9 @@ public class DBBuilder {
     PreparedStatement psql = con.prepareStatement("Insert into ConceptMappings (Key, ResourceKey, SourceSystem, SourceVersion, SourceCode, Relationship, TargetSystem, TargetVersion, TargetCode) "+
         "values (?, ?, ?, ?, ?, ?, ?, ?, ?)");
     for (ConceptMap cm : mappings) {
-      for (ConceptMapGroupComponent grp : cm.getGroup()) {
-        for (SourceElementComponent src : grp.getElement()) {
-          for (TargetElementComponent tgt : src.getTarget()) {
+      for (ConceptMapGroupComponent grp : cm.getGroupList()) {
+        for (SourceElementComponent src : grp.getElementList()) {
+          for (TargetElementComponent tgt : src.getTargetList()) {
             psql.setInt(1, ++lastMapKey);
             psql.setInt(2, ((Integer) cm.getUserData(UserDataNames.db_key)).intValue());
             bindString(psql, 3, grp.getSourceElement().baseUrl());
@@ -578,7 +579,7 @@ public class DBBuilder {
       time(start);
       return;
     }
-    CodeSystem cs = context.fetchResource(CodeSystem.class, url, IWorkerContext.VersionResolutionRules.defaultRule());
+    CodeSystem cs = context.fetchResource(CodeSystem.class, url, VersionResolutionRules.defaultRule());
     if (cs == null) {
       errors.add("The code system '"+url+"' was named in an SQL codeSystems list, but it could not be found");
       time(start);
@@ -591,7 +592,7 @@ public class DBBuilder {
       return;
     }
     try {
-      byte[] json = new org.hl7.fhir.r5.formats.JsonParser().composeBytes(cs);
+      byte[] json = new JsonParser(context.getModelContext()).composeBytes(cs);
       boolean origAutoCommit = con.getAutoCommit();
       try {
         con.setAutoCommit(false);
@@ -640,7 +641,7 @@ public class DBBuilder {
         }
         long start = System.currentTimeMillis();
         try {
-          for (ValueSetExpansionContainsComponent e : de.exp.getValueset().getExpansion().getContains()) {
+          for (ValueSetExpansionContainsComponent e : de.exp.getValueset().getExpansion().getContainsList()) {
             batchCount = addContainsBatch(de.vs, e, psql, batchCount);
           }
         } catch (SQLException e) {
@@ -678,7 +679,7 @@ public class DBBuilder {
       if (batchCount % 5000 == 0) {
         psql.executeBatch();
       }
-      for (ValueSetExpansionContainsComponent c : e.getContains()) {
+      for (ValueSetExpansionContainsComponent c : e.getContainsList()) {
         batchCount = addContainsBatch(vs, c, psql, batchCount);
       }
     }
@@ -700,7 +701,7 @@ public class DBBuilder {
       bindString(psql, 6, cd.getDefinition());
       psql.addBatch();
       cd.setUserData(UserDataNames.db_key, lastConceptKey);   
-      addConcepts(cs, cd.getConcept(), psql, lastConceptKey);
+      addConcepts(cs, cd.getConceptList(), psql, lastConceptKey);
     }
     }
   }
@@ -708,7 +709,7 @@ public class DBBuilder {
   private void addConceptProperties(CodeSystem cs, List<ConceptDefinitionComponent> list, PreparedStatement psql) throws SQLException {
     if (cs.hasUserData(UserDataNames.db_key)) {
        for (ConceptDefinitionComponent cd : list) {
-      for (ConceptPropertyComponent p : cd.getProperty()) { 
+      for (ConceptPropertyComponent p : cd.getPropertyList()) { 
         psql.setInt(1, ++lastCPropKey);
         psql.setInt(2, ((Integer) cs.getUserData(UserDataNames.db_key)).intValue());
         psql.setInt(3, ((Integer) cd.getUserData(UserDataNames.db_key)).intValue());
@@ -723,7 +724,7 @@ public class DBBuilder {
         psql.addBatch();
         p.setUserData(UserDataNames.db_key, lastCPropKey);   
       }
-      addConceptProperties(cs, cd.getConcept(), psql);
+      addConceptProperties(cs, cd.getConceptList(), psql);
     }
     }
   }
@@ -731,7 +732,7 @@ public class DBBuilder {
   private void addConceptDesignations(CodeSystem cs, List<ConceptDefinitionComponent> list, PreparedStatement psql) throws SQLException {
     if (cs.hasUserData(UserDataNames.db_key)) {
       for (ConceptDefinitionComponent cd : list) {
-        for (ConceptDefinitionDesignationComponent p : cd.getDesignation()) { 
+        for (ConceptDefinitionDesignationComponent p : cd.getDesignationList()) { 
           psql.setInt(1, ++lastDesgKey);
           psql.setInt(2, ((Integer) cs.getUserData(UserDataNames.db_key)).intValue());
           psql.setInt(3, ((Integer) cd.getUserData(UserDataNames.db_key)).intValue());  
@@ -747,7 +748,7 @@ public class DBBuilder {
           psql.addBatch();
           p.setUserData(UserDataNames.db_key, lastDesgKey);   
         }
-        addConceptDesignations(cs, cd.getConcept(), psql);
+        addConceptDesignations(cs, cd.getConceptList(), psql);
       }
     }
   }
@@ -765,7 +766,7 @@ public class DBBuilder {
     if (code == null) {
       return null;
     }
-    for (PropertyComponent p : cs.getProperty()) {
+    for (PropertyComponent p : cs.getPropertyList()) {
       if (code.equals(p.getCode())) {
         return p;
       }
@@ -1065,7 +1066,7 @@ public class DBBuilder {
           if (!Utilities.noString(s)) {
             switch (col.getType()) {
             case Auto: 
-              Resource r = context.fetchResource(Resource.class, s, IWorkerContext.VersionResolutionRules.defaultRule());
+              Resource r = context.fetchResource(Resource.class, s, VersionResolutionRules.defaultRule());
               if (r != null && r instanceof CanonicalResource && r.hasWebPath()) {
                 String d = ((CanonicalResource) r).present();
                 if (Utilities.noString(d)) {
@@ -1081,7 +1082,7 @@ public class DBBuilder {
               }
               break;
             case Canonical:
-              r = context.fetchResource(Resource.class, s, IWorkerContext.VersionResolutionRules.defaultRule());
+              r = context.fetchResource(Resource.class, s, VersionResolutionRules.defaultRule());
               if (r != null && r instanceof CanonicalResource && r.hasWebPath()) {
                 String d = ((CanonicalResource) r).present();
                 if (Utilities.noString(d)) {
@@ -1125,7 +1126,7 @@ public class DBBuilder {
               td.tx(s);
               break;
             case Resource:
-              r = context.fetchResource(Resource.class, s, IWorkerContext.VersionResolutionRules.defaultRule());
+              r = context.fetchResource(Resource.class, s, VersionResolutionRules.defaultRule());
               if (r != null && r instanceof CanonicalResource && r.hasWebPath()) {
                 String d = ((CanonicalResource) r).present();
                 if (Utilities.noString(d)) {

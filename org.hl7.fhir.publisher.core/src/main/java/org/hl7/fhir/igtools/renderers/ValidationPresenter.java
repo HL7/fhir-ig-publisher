@@ -49,20 +49,20 @@ import org.hl7.fhir.igtools.publisher.comparators.IpaComparator;
 import org.hl7.fhir.igtools.publisher.comparators.IpsComparator;
 import org.hl7.fhir.igtools.publisher.comparators.PreviousVersionComparator;
 import org.hl7.fhir.igtools.publisher.realm.RealmBusinessRules;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.elementmodel.Element;
-import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.fhirpath.FHIRPathEngine;
-import org.hl7.fhir.r5.formats.XmlParser;
-import org.hl7.fhir.r5.model.*;
-import org.hl7.fhir.r5.model.Bundle.BundleEntryComponent;
-import org.hl7.fhir.r5.model.Parameters.ParametersParameterComponent;
-import org.hl7.fhir.r5.terminologies.client.TerminologyClientContext;
-import org.hl7.fhir.r5.terminologies.client.TerminologyClientContext.TerminologyClientContextUseCount;
-import org.hl7.fhir.r5.terminologies.client.TerminologyClientManager;
-import org.hl7.fhir.r5.terminologies.client.TerminologyClientManager.InternalLogEvent;
-import org.hl7.fhir.r5.utils.OperationOutcomeUtilities;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.services.elementmodel.Element;
+import org.hl7.fhir.model.extensions.ExtensionDefinitions;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.services.fhirpath.FHIRPathEngine;
+import org.hl7.fhir.model.core.formats.XmlParser;
+import org.hl7.fhir.model.core.*;
+import org.hl7.fhir.model.core.Bundle.BundleEntryComponent;
+import org.hl7.fhir.model.core.Parameters.ParametersParameterComponent;
+import org.hl7.fhir.standalone.terminology.client.TerminologyClientContext;
+import org.hl7.fhir.standalone.terminology.client.TerminologyClientContext.TerminologyClientContextUseCount;
+import org.hl7.fhir.standalone.terminology.client.TerminologyClientManager;
+import org.hl7.fhir.standalone.terminology.client.TerminologyClientManager.InternalLogEvent;
+import org.hl7.fhir.model.utilities.OperationOutcomeUtilities;
 import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.i18n.I18nConstants;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
@@ -75,6 +75,7 @@ import org.stringtemplate.v4.ST;
 
 public class ValidationPresenter implements Comparator<FetchedFile> {
 
+  public static final String BG_COLOR_ERROR = "#ffdddd";
   private int vmid = 0;
 
   public enum LanguagePopulationPolicy {
@@ -214,7 +215,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
         ok = ok || !Utilities.noString(s);
         b.append("<li>"+root+e.getPath()+": Validated against "+s+"</li>");
       }
-      for (Element c : e.getChildren()) {
+      for (Element c : e.getChildList()) {
         ok = showMessages(b, root, c) || ok;
       }
       return ok;
@@ -237,7 +238,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
           String url = s.contains(" ") ? s.substring(0, s.indexOf(" ")) : s;
           s = s.contains(" ") ? s.substring(s.indexOf(" ")) : "";
           String specName = getSpecName(url);
-          StructureDefinition sd = context.fetchResource(StructureDefinition.class, url, IWorkerContext.VersionResolutionRules.defaultRule());
+          StructureDefinition sd = context.fetchResource(StructureDefinition.class, url, VersionResolutionRules.defaultRule());
           String l = null;
           if (sd != null) {
             l = specName+"<a href=\""+sd.getWebPath()+"\">"+sd.present()+"</a>"+s;
@@ -333,7 +334,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   int err = 0;
   int warn = 0;
   int info = 0;
-  int link = 0;
+  int brokenLinks = 0;
   private String root;
   private String packageId;
   private String altPackageId;
@@ -476,6 +477,17 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     return false;
   }
 
+  /**
+   * True if the message reports a link (or image source) that the HTML checker could not resolve.
+   * Other HTML checker messages (well-formedness, duplicate ids, WCAG checks, publish box etc.)
+   * are not broken links - they count as ordinary errors, warnings or hints at their own level.
+   * This is the single definition shared by the build log, qa.html/qa.txt and qa.json.
+   */
+  public static boolean isBrokenLink(ValidationMessage vm) {
+    return vm.getSource() == Source.HtmlChecker && vm.getMessageId() != null &&
+        (vm.getMessageId().equals("HTML_LINK_CHECK_FAILED") || vm.getMessageId().equals("HTML_IMG_SRC_CHECK_FAILED"));
+  }
+
   public String generate(String title, List<ValidationMessage> allErrors, List<FetchedFile> files, String path, SuppressedMessageInformation filteredMessages, String pinned) throws IOException {
     for (FetchedFile f : files) {
       for (FetchedResource r: f.getResources()) {
@@ -498,8 +510,8 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     
     List<ValidationMessage> linkErrors = filterMessages(null, allErrors, true, filteredMessages); 
     for (ValidationMessage vm : linkErrors) {
-      if (vm.getSource() == Source.LinkChecker) {
-        link++;
+      if (isBrokenLink(vm)) {
+        brokenLinks++;
       } else if (vm.getLevel() == null) {
         err++;
       } else if (vm.getLevel().equals(ValidationMessage.IssueSeverity.FATAL)||vm.getLevel().equals(ValidationMessage.IssueSeverity.ERROR))
@@ -518,14 +530,14 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     OperationOutcome oo = new OperationOutcome();
     validationBundle.addEntry(new BundleEntryComponent().setResource(oo));
     for (ValidationMessage vm : linkErrors) {
-      if (vm.getSource() != Source.LinkChecker && vm.getLocation()!=null) {
+      if (vm.getSource() != Source.HtmlChecker && vm.getLocation()!=null) {
         FHIRPathEngine fpe = new FHIRPathEngine(provider.getContext());
         try {
           fpe.parse(vm.getLocation());
         } catch (Exception e) {
           System.out.println("Internal error in location for message: '"+e.getMessage()+"', loc = '"+subst100(vm.getLocation())+"', err = '"+subst100(vm.getMessage())+"'");
         }
-        oo.getIssue().add(OperationOutcomeUtilities.convertToIssue(vm, oo));
+        oo.getIssueList().add(OperationOutcomeUtilities.convertToIssue(vm, oo));
       }
     }
     for (FetchedFile f : files) {
@@ -534,12 +546,12 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
         validationBundle.addEntry(new BundleEntryComponent().setResource(oo));
         ExtensionUtilities.addStringExtension(oo, ExtensionDefinitions.EXT_OO_FILE, f.getStatedPath());
         for (ValidationMessage vm : filterMessages(f, f.getErrors(), false, filteredMessages)) {
-          oo.getIssue().add(OperationOutcomeUtilities.convertToIssue(vm, oo));
+          oo.getIssueList().add(OperationOutcomeUtilities.convertToIssue(vm, oo));
         }
       }
     }
     FileOutputStream s = new FileOutputStream(FileUtilities.changeFileExt(path, ".xml"));
-    new XmlParser().compose(s, validationBundle, true);
+    new XmlParser(context.getModelContext()).compose(s, validationBundle, true);
     s.close();
 
     genQAText(title, files, path, filteredMessages, linkErrors);
@@ -547,7 +559,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     genQAESLintCompactText(title, files, path, filteredMessages, linkErrors);
     genTXServerQA(title, path);
     
-    String summary = "Errors: " + err + ", Warnings: " + warn + ", Info: " + info+", Broken Links: "+link;
+    String summary = "Errors: " + err + ", Warnings: " + warn + ", Info: " + info+", Broken Links: "+brokenLinks;
     return path + "\r\n" + summary;
   }
 
@@ -561,7 +573,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       x.para("This page provides a report on which terminology servers were used while publishing this IG. Note that terminology caching reduces the server hit count - this page only reports content that wasn't cached");
       x.h2().tx("Terminology Parameters");
       XhtmlNode ul = x.ul();
-      for (ParametersParameterComponent p : context.getExpansionParameters().getParameter()) {
+      for (ParametersParameterComponent p : context.getExpansionParameters().getParameterList()) {
         XhtmlNode li = ul.li();
         li.b().tx(p.getName());
         li.tx(": ");
@@ -683,7 +695,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
           tr.td().tx(us.getExpands());
           tr.td().tx(us.getValidates());
           XhtmlNode td = tr.td();
-          CodeSystem cs = context.fetchResource(CodeSystem.class, s, IWorkerContext.VersionResolutionRules.defaultRule());
+          CodeSystem cs = context.fetchResource(CodeSystem.class, s, VersionResolutionRules.defaultRule());
           if (cs != null) {
             if (cs.hasWebPath()) {
               td.ah(cs.getWebPath()).tx(cs.present());
@@ -699,7 +711,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       for (String s : nl) { 
         TerminologyClientContextUseCount us = uc.get(s);
         if (us.getReadVS() > 0) {
-          ValueSet vs = context.fetchResource(ValueSet.class, s, IWorkerContext.VersionResolutionRules.defaultRule());
+          ValueSet vs = context.fetchResource(ValueSet.class, s, VersionResolutionRules.defaultRule());
           if (vs != null && vs.hasWebPath()) {
             ul.li().ah(vs.getWebPath()).tx(s);
           } else {
@@ -791,7 +803,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     }
 
     b.append("\n");
-    b.append("err = " + err + ", warn = " + warn + ", info = " + info + "\n");
+    b.append("err = " + err + ", warn = " + warn + ", info = " + info + ", broken links = " + brokenLinks + "\n");
     b.append("IG Publisher Version: " + toolsVersion);
 
     FileUtilities.stringToFile(b.toString(), FileUtilities.changeFileExt(path, "-eslintcompact.txt"));
@@ -800,7 +812,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   public void genQAText(String title, List<FetchedFile> files, String path, SuppressedMessageInformation filteredMessages, List<ValidationMessage> linkErrors)
       throws IOException {
     StringBuilder b = new StringBuilder();
-    b.append(genHeaderTxt(title, err, warn, info));
+    b.append(genHeaderTxt(title, err, warn, info, brokenLinks));
     b.append(genSummaryRowTxtInternal(linkErrors));
     files = sorted(files);
     for (FetchedFile f : files) {
@@ -828,7 +840,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   public void genQATextForCompare(String title, List<FetchedFile> files, String path, SuppressedMessageInformation filteredMessages, List<ValidationMessage> linkErrors)
       throws IOException {
     StringBuilder b = new StringBuilder();
-    b.append(genHeaderTxtForCompare(title, err, warn, info));
+    b.append(genHeaderTxtForCompare(title, err, warn, info, brokenLinks));
     b.append(genSummaryRowTxtInternal(linkErrors));
     files = sorted(files);
     for (FetchedFile f : files) {
@@ -855,7 +867,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
 
   public List<FetchedFile> genQAHtml(String title, List<FetchedFile> files, String path, SuppressedMessageInformation filteredMessages, List<ValidationMessage> linkErrors, boolean allIssues, Object pinned) throws IOException {
     StringBuilder b = new StringBuilder();
-    b.append(genHeader(title, err, warn, info, link, filteredMessages.count(), allIssues, path, pinned));
+    b.append(genHeader(title, err, warn, info, brokenLinks, filteredMessages.count(), allIssues, path, pinned));
     b.append(genSummaryRowInteral(linkErrors));
 
     files = sorted(files);
@@ -1046,7 +1058,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   private final String headerTemplate = 
       "<!DOCTYPE HTML>\r\n"+
       "<html xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\" lang=\"en\">\r\n"+
-      "<!-- broken links = $links$, errors = $err$, warn = $warn$, info = $info$-->\r\n"+
+      "<!-- broken links = $brokenLinks$, errors = $err$, warn = $warn$, info = $info$-->\r\n"+
       "<head>\r\n"+
       "  <title>$title$ : Validation Results</title>\r\n"+
       "  <link href=\"fhir.css\" rel=\"stylesheet\"/>\r\n"+
@@ -1119,7 +1131,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       "$noNarrative$"+
       "$noValidation$"+
       "$fragments$"+
-      " <tr><td>Summary:</td><td> errors = $err$, warn = $warn$, info = $info$, broken links = $links$, pinned = $pinned$.  <button onclick=\"toggleCodes()\">Show Message Ids</button></td></tr>\r\n"+
+      " <tr><td>Summary:</td><td> errors = $err$, warn = $warn$, info = $info$, broken links = $brokenLinks$, pinned = $pinned$.  <button onclick=\"toggleCodes()\">Show Message Ids</button></td></tr>\r\n"+
       "</table>\r\n"+
       " <table class=\"grid\">\r\n"+
       "   <tr>\r\n"+
@@ -1230,7 +1242,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   private final String headerTemplateText = 
       "$title$ : Validation Results\r\n"+
       "=========================================\r\n\r\n"+
-      "err = $err$, warn = $warn$, info = $info$\r\n"+
+      "err = $err$, warn = $warn$, info = $info$, broken links = $brokenLinks$\r\n"+
       "$versionCheck$\r\n"+
       "Generated $time$. FHIR version $version$ for $packageId$#$igversion$ (canonical = $canonical$)\r\n$warning$\r\n";
   
@@ -1256,7 +1268,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     return new ST(t, '$', '$');
   }
 
-  private String genHeader(String title, int err, int warn, int info, int links, int msgCount, boolean allIssues, String path, Object pinned) {
+  private String genHeader(String title, int err, int warn, int info, int brokenLinks, int msgCount, boolean allIssues, String path, Object pinned) {
     ST t = template(headerTemplate);
     t.add("version", statedVersion);
     t.add("igversion", igVersion);
@@ -1267,7 +1279,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     t.add("err", Integer.toString(err));
     t.add("warn", Integer.toString(warn));
     t.add("info", Integer.toString(info));
-    t.add("links", Integer.toString(links));
+    t.add("brokenLinks", Integer.toString(brokenLinks));
     t.add("pinned", pinned);
     t.add("packageId", packageId);
     t.add("canonical", provider.getCanonical());
@@ -1416,8 +1428,9 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     return b.toString();
   }
 
-  private String genHeaderTxt(String title, int err, int warn, int info) {
+  private String genHeaderTxt(String title, int err, int warn, int info, int brokenLinks) {
     ST t = template(headerTemplateText);
+    t.add("brokenLinks", Integer.toString(brokenLinks));
     t.add("version", statedVersion);
     t.add("toolsVersion", toolsVersion);
     t.add("versionCheck", versionCheckText());
@@ -1456,8 +1469,9 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     return t.render();
   }
 
-  private String genHeaderTxtForCompare(String title, int err, int warn, int info) {
+  private String genHeaderTxtForCompare(String title, int err, int warn, int info, int brokenLinks) {
     ST t = template(headerTemplateText);
+    t.add("brokenLinks", Integer.toString(brokenLinks));
     t.add("version", "$--");
     t.add("toolsVersion", "$--");
     t.add("versionCheck", "$--");
@@ -1504,15 +1518,15 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       if (Utilities.isInteger(s)) {
         int y = Integer.parseInt(s);
         if (y > Calendar.getInstance().get(Calendar.YEAR)) {
-          return "<br/><br/><span style=\"background-color: #ffcccc\">The copyrightYear parameter ('"+copyrightYear+"') in the IG resource looks wrong - should not be after this year</span>";                  
+          return "<br/><br/><span style=\"background-color: #ffdddd\">The copyrightYear parameter ('"+copyrightYear+"') in the IG resource looks wrong - should not be after this year</span>";                  
         } else {
           return "<br/><br/>The copyrightYear parameter ('"+copyrightYear+"') in the IG resource is good";          
         }
       } else {
-        return "<br/><br/><span style=\"background-color: #ffcccc\">The copyrightYear parameter ('"+copyrightYear+"') in the IG resource can't be understood - expecting YYYY+</span>";        
+        return "<br/><br/><span style=\"background-color: #ffdddd\">The copyrightYear parameter ('"+copyrightYear+"') in the IG resource can't be understood - expecting YYYY+</span>";        
       }
     } else {
-      return "<br/><br/><span style=\"background-color: #ffcccc\">The copyrightYear parameter ('"+copyrightYear+"') in the IG resource can't be understood - expecting YYYY+</span>";        
+      return "<br/><br/><span style=\"background-color: #ffdddd\">The copyrightYear parameter ('"+copyrightYear+"') in the IG resource can't be understood - expecting YYYY+</span>";        
     }
   }
     
@@ -1906,7 +1920,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     }
     switch (level) {
     case ERROR:
-      return "#ffcccc";
+      return BG_COLOR_ERROR;
     case FATAL:
       return "#ff9999";
     case WARNING:
@@ -1924,7 +1938,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     case ERROR:
       return "#ffeeee";
     case FATAL:
-      return "#ffcccc";
+      return BG_COLOR_ERROR;
     case WARNING:
       return "#fff4ee";
     default: // INFORMATION:
@@ -1947,6 +1961,10 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
 
   public int getInfo() {
     return info;
+  }
+
+  public int getBrokenLinks() {
+    return brokenLinks;
   }  
   
   private String versionCheckText() {
@@ -1968,7 +1986,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       b.append("</span>");
     } else {
       if (!toolsVersion.equals(currentToolsVersion)) {
-        b.append("<span style=\"background-color: #ffcccc\">IG Publisher Version: ");
+        b.append("<span style=\"background-color: #ffdddd\">IG Publisher Version: ");
       } else {
         b.append("<span>IG Publisher Version: ");
       }

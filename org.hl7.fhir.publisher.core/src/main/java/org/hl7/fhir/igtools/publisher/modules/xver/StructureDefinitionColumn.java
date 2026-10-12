@@ -3,7 +3,7 @@ package org.hl7.fhir.igtools.publisher.modules.xver;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.hl7.fhir.r5.model.StructureDefinition;
+import org.hl7.fhir.model.core.StructureDefinition;
 
 public class StructureDefinitionColumn {
   private StructureDefinition sd;

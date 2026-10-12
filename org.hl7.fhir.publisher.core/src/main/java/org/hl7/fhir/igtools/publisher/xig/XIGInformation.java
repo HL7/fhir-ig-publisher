@@ -7,18 +7,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.hl7.fhir.r5.context.SimpleWorkerContext;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.CapabilityStatement;
-import org.hl7.fhir.r5.model.CodeSystem;
-import org.hl7.fhir.r5.model.CodeableConcept;
-import org.hl7.fhir.r5.model.Coding;
-import org.hl7.fhir.r5.model.ConceptMap;
-import org.hl7.fhir.r5.model.NamingSystem;
-import org.hl7.fhir.r5.model.OperationDefinition;
-import org.hl7.fhir.r5.model.SearchParameter;
-import org.hl7.fhir.r5.model.StructureDefinition;
-import org.hl7.fhir.r5.model.ValueSet;
+import org.hl7.fhir.standalone.context.SimpleWorkerContext;
+import org.hl7.fhir.model.core.CanonicalResource;
+import org.hl7.fhir.model.core.CapabilityStatement;
+import org.hl7.fhir.model.core.CodeSystem;
+import org.hl7.fhir.model.core.CodeableConcept;
+import org.hl7.fhir.model.core.Coding;
+import org.hl7.fhir.model.core.ConceptMap;
+import org.hl7.fhir.model.core.NamingSystem;
+import org.hl7.fhir.model.core.OperationDefinition;
+import org.hl7.fhir.model.core.SearchParameter;
+import org.hl7.fhir.model.core.StructureDefinition;
+import org.hl7.fhir.model.core.ValueSet;
 import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 
@@ -127,8 +127,8 @@ public class XIGInformation {
     if (cr.hasExperimental()) { j.add("experimental", cr.getExperimental()); }
     if (cr.hasDescription()) {  j.add("description", cr.getDescription()); }
     if (cr.hasCopyright()) {    j.add("copyright", cr.getCopyright()); }
-    for (CodeableConcept cc : cr.getJurisdiction()) {
-      for (Coding c : cc.getCoding()) {
+    for (CodeableConcept cc : cr.getJurisdictionList()) {
+      for (Coding c : cc.getCodingList()) {
         if (c.is("http://unstats.un.org/unsd/methods/m49/m49.htm", "001"))  {
           jurisdictions.add("uv");
 

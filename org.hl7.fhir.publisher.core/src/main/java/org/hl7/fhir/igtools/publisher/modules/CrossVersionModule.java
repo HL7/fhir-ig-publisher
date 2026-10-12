@@ -24,34 +24,35 @@ import org.hl7.fhir.igtools.publisher.modules.xver.XVerAnalysisEngine;
 import org.hl7.fhir.igtools.publisher.modules.xver.XVerAnalysisEngine.MakeLinkMode;
 import org.hl7.fhir.igtools.publisher.modules.xver.XVerAnalysisEngine.MultiConceptMapType;
 import org.hl7.fhir.igtools.publisher.modules.xver.XVerAnalysisEngine.MultiRowRenderingContext;
-import org.hl7.fhir.r5.conformance.profile.BindingResolution;
-import org.hl7.fhir.r5.conformance.profile.ProfileKnowledgeProvider;
-import org.hl7.fhir.r5.context.ContextUtilities;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.formats.IParser.OutputStyle;
-import org.hl7.fhir.r5.formats.JsonParser;
-import org.hl7.fhir.r5.formats.XmlParser;
-import org.hl7.fhir.r5.model.*;
-import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
-import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
-import org.hl7.fhir.r5.model.ImplementationGuide.GuidePageGeneration;
-import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionPageComponent;
-import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionContextComponent;
-import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
-import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
-import org.hl7.fhir.r5.model.StructureMap.StructureMapModelMode;
-import org.hl7.fhir.r5.model.StructureMap.StructureMapStructureComponent;
-import org.hl7.fhir.r5.renderers.ConceptMapRenderer;
-import org.hl7.fhir.r5.renderers.ConceptMapRenderer.RenderMultiRowSortPolicy;
-import org.hl7.fhir.r5.renderers.Renderer.RenderingStatus;
-import org.hl7.fhir.r5.renderers.RendererFactory;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext.GenerationRules;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext.ResourceRendererMode;
-import org.hl7.fhir.r5.utils.ResourceSorters;
+import org.hl7.fhir.model.fml.StructureMap;
+import org.hl7.fhir.services.conformance.profile.BindingResolution;
+import org.hl7.fhir.services.conformance.profile.ProfileKnowledgeProvider;
+import org.hl7.fhir.services.context.ContextUtilities;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.model.extensions.ExtensionDefinitions;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.model.utilities.formats.OutputStyle;
+import org.hl7.fhir.model.core.formats.JsonParser;
+import org.hl7.fhir.model.core.formats.XmlParser;
+import org.hl7.fhir.model.core.*;
+import org.hl7.fhir.model.core.ElementDefinition.ElementDefinitionBindingComponent;
+import org.hl7.fhir.model.core.ElementDefinition.TypeRefComponent;
+import org.hl7.fhir.model.core.ImplementationGuide.GuidePageGeneration;
+import org.hl7.fhir.model.core.ImplementationGuide.ImplementationGuideDefinitionPageComponent;
+import org.hl7.fhir.model.core.StructureDefinition.StructureDefinitionContextComponent;
+import org.hl7.fhir.model.core.StructureDefinition.StructureDefinitionKind;
+import org.hl7.fhir.model.core.StructureDefinition.TypeDerivationRule;
+import org.hl7.fhir.model.fml.StructureMap.StructureMapModelMode;
+import org.hl7.fhir.model.fml.StructureMap.StructureMapStructureComponent;
+import org.hl7.fhir.services.renderers.ConceptMapRenderer;
+import org.hl7.fhir.services.renderers.ConceptMapRenderer.RenderMultiRowSortPolicy;
+import org.hl7.fhir.services.renderers.Renderer.RenderingStatus;
+import org.hl7.fhir.services.renderers.RendererFactory;
+import org.hl7.fhir.services.renderers.utils.RenderingContext;
+import org.hl7.fhir.services.renderers.utils.ResourceWrapper;
+import org.hl7.fhir.services.renderers.utils.RenderingContext.GenerationRules;
+import org.hl7.fhir.services.renderers.utils.RenderingContext.ResourceRendererMode;
+import org.hl7.fhir.services.utilities.ResourceSorters;
 import org.hl7.fhir.utilities.UserDataNames;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.MarkDownProcessor;
@@ -95,11 +96,11 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
     try {
       cleanup(path);
       if (engine.process(path)) {
-        ImplementationGuide ig = (ImplementationGuide) new XmlParser().parse(new FileInputStream(Utilities.path(path, "input", "xver-ig.xml")));
+        ImplementationGuide ig = (ImplementationGuide) new XmlParser(cu.getWorker().getModelContext()).parse(new FileInputStream(Utilities.path(path, "input", "xver-ig.xml")));
         ImplementationGuideDefinitionPageComponent resPage = ig.getPageByName("cross-version-resources.html");
         ImplementationGuideDefinitionPageComponent dtPage = ig.getPageByName("cross-version-types.html");
-        resPage.getPage().clear();
-        dtPage.getPage().clear();
+        resPage.getPageList().clear();
+        dtPage.getPageList().clear();
         
         cu = new ContextUtilities(engine.getVdr5());
         engine.logProgress("Generating fragments");
@@ -117,15 +118,15 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
         engine.logProgress("Generating extensions");
         FileUtilities.createDirectory(Utilities.path(path, "temp", "xver", "x-extensions"));
         for (StructureDefinition sd : engine.getExtensions()) {
-          new JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(path, "temp", "xver", "x-extensions", "StructureDefinition-"+sd.getId()+".json")), sd);
+          new JsonParser(cu.getWorker().getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(path, "temp", "xver", "x-extensions", "StructureDefinition-"+sd.getId()+".json")), sd);
           genExtensionPage(path, sd);
         }  
         for (ValueSet vs : engine.getNewValueSets().values()) {
-          new JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(path, "temp", "xver", "x-extensions", "ValueSet-"+vs.getId()+".json")), vs);
+          new JsonParser(cu.getWorker().getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(path, "temp", "xver", "x-extensions", "ValueSet-"+vs.getId()+".json")), vs);
         }
         genSummaryPages(path);
         genZips(path); 
-        new XmlParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(path, "input", "xver-ig.xml")), ig);
+        new XmlParser(cu.getWorker().getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(path, "input", "xver-ig.xml")), ig);
 
         return true;
       } else {
@@ -199,7 +200,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
     body.para().b().tx("Context of Use");
     body.para().tx("This extension may be used in the following contexts:");
     XhtmlNode ul = body.ul();
-    for (StructureDefinitionContextComponent ctxt : sd.getContext()) {
+    for (StructureDefinitionContextComponent ctxt : sd.getContextList()) {
       var li = ul.li();
       li.tx(ctxt.getType().toCode());
       li.tx(" ");
@@ -214,11 +215,11 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
     
     RenderingContext rc = new RenderingContext(engine.getVdr5(), new RendererFactory(),  new MarkDownProcessor(Dialect.COMMON_MARK), null, "http://hl7.org/fhir", "", null, ResourceRendererMode.TECHNICAL, GenerationRules.IG_PUBLISHER);
     rc.setPkp(this);
-    var sdr = new org.hl7.fhir.r5.renderers.StructureDefinitionRenderer(rc);
+    var sdr = new org.hl7.fhir.services.renderers.StructureDefinitionRenderer(rc);
     body.add(sdr.generateTable(new RenderingStatus(), "todo", sd, true,  Utilities.path(path, "temp", "xver-qa"), false, "Extension", false, "http://hl7.org/fhir", "", false, false, null, false, rc, "", ResourceWrapper.forResource(rc.getContextUtilities(), sd), "CV"));
     body.hr();
     
-    body.pre().tx(new JsonParser().setOutputStyle(OutputStyle.PRETTY).composeString(sd));
+    body.pre().tx(new JsonParser(cu.getWorker().getModelContext()).setOutputStyle(OutputStyle.PRETTY).composeString(sd));
     FileUtilities.stringToFile(new XhtmlComposer(false, true).compose(wrapPage(body, sd.getName())), fn);
   }
 
@@ -284,7 +285,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
     x1.code("http://hl7.org/fhir/"+ver+"/StructureDefinition/extension-"+ed.getEd().getPath());
 
     boolean first = true;
-    for (TypeRefComponent t : ed.getEd().getType()) {
+    for (TypeRefComponent t : ed.getEd().getTypeList()) {
       StructureDefinition sd = ctxt.fetchTypeDefinition(t.getWorkingCode());
       if (sd != null && !sd.getAbstract()) {
         if (first) {x1.tx(" : "); first = false; } else { x1.tx("|");  x1.wbr(); }
@@ -292,7 +293,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
         if (t.hasTargetProfile()) {
           x1.tx("(");
           boolean tfirst = true;
-          for (CanonicalType u : t.getTargetProfile()) {
+          for (CanonicalType u : t.getTargetProfileList()) {
             if (tfirst) {tfirst = false; } else { x1.tx("|"); x1.wbr(); }
             String rt = tail(u.getValue());
             x1.ah(prefix+"#"+rt).tx(rt);
@@ -358,7 +359,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
 
     List<List<ElementDefinitionLink>> codeChains = new ArrayList<>();
 
-    for (ElementDefinition ed : sd.getDifferential().getElement()) {
+    for (ElementDefinition ed : sd.getDifferential().getElementList()) {
       for (StructureDefinitionColumn col : columns) {
         col.clear();
       }
@@ -454,7 +455,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
   private String versionSummary(StructureMap sm) {
     String src = null;
     String tgt = null;
-    for (StructureMapStructureComponent u : sm.getStructure()) {
+    for (StructureMapStructureComponent u : sm.getStructureList()) {
       String v = VersionUtilities.getNameForVersion(VersionUtilities.getMajMin(u.getUrl()));
       if (u.getMode() == StructureMapModelMode.SOURCE) {
         src = v;
@@ -470,7 +471,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
     String v = VersionUtilities.getMajMin(fhirVersion);
     String url = "http://hl7.org/fhir/"+v+"/"+type;
     for (StructureMap sm : engine.getStructureMaps().values()) {
-      for (StructureMapStructureComponent u : sm.getStructure()) {
+      for (StructureMapStructureComponent u : sm.getStructureList()) {
         if (u.getUrl().equals(url)) {
           if ((inwards && u.getMode() == StructureMapModelMode.SOURCE) ||
               (!inwards && u.getMode() == StructureMapModelMode.TARGET)) {
@@ -485,7 +486,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
 
   public Set<StructureDefinition> findLinkedStructures(StructureDefinition sd) {
     Set<StructureDefinition> res = new HashSet<>();
-    for (ElementDefinition ed : sd.getDifferential().getElement()) {
+    for (ElementDefinition ed : sd.getDifferential().getElementList()) {
       SourcedElementDefinition sed = engine.makeSED(sd, ed);
       findLinkedStructures(res, sed);
     }
@@ -650,7 +651,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
         }
       }
       boolean first = true;
-      for (TypeRefComponent t : ed.getType()) {
+      for (TypeRefComponent t : ed.getTypeList()) {
         StructureDefinition sd = context.fetchTypeDefinition(t.getWorkingCode());
         if (sd != null && !sd.getAbstract()) {
           if (first) {td.tx(" : "); first = false; } else { td.tx("|");  td.wbr(); }
@@ -658,7 +659,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
           if (t.hasTargetProfile()) {
             td.tx("(");
             boolean tfirst = true;
-            for (CanonicalType u : t.getTargetProfile()) {
+            for (CanonicalType u : t.getTargetProfileList()) {
               if (tfirst) {tfirst = false; } else { td.tx("|"); td.wbr(); }
               String rt = tail(u.getValue());
               td.ah(linkforType(rt)).tx(rt);
@@ -812,35 +813,35 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
       if (engine.getVdr2().getResourceNamesAsSet().contains(tail) || engine.getVdr2().fetchTypeDefinition(tail) != null) {
         return true;
       }
-      return engine.getVdr2().fetchResource(Resource.class, ref.replace("/1.0/", "/"), IWorkerContext.VersionResolutionRules.defaultRule()) != null;
+      return engine.getVdr2().fetchResource(Resource.class, ref.replace("/1.0/", "/"), VersionResolutionRules.defaultRule()) != null;
     }
     if (ref.startsWith("http://hl7.org/fhir/3.0/")) {
       String tail = ref.replace("http://hl7.org/fhir/3.0/", "");
       if (engine.getVdr3().getResourceNamesAsSet().contains(tail) || engine.getVdr3().fetchTypeDefinition(tail) != null) {
         return true;
       }
-      return engine.getVdr3().fetchResource(Resource.class, ref.replace("/3.0/", "/"), IWorkerContext.VersionResolutionRules.defaultRule()) != null;
+      return engine.getVdr3().fetchResource(Resource.class, ref.replace("/3.0/", "/"), VersionResolutionRules.defaultRule()) != null;
     }
     if (ref.startsWith("http://hl7.org/fhir/4.0/")) {
       String tail = ref.replace("http://hl7.org/fhir/4.0/", "");
       if (engine.getVdr4().getResourceNamesAsSet().contains(tail) || engine.getVdr4().fetchTypeDefinition(tail) != null) {
         return true;
       }
-      return engine.getVdr4().fetchResource(Resource.class, ref.replace("/4.0/", "/"), IWorkerContext.VersionResolutionRules.defaultRule()) != null;
+      return engine.getVdr4().fetchResource(Resource.class, ref.replace("/4.0/", "/"), VersionResolutionRules.defaultRule()) != null;
     }
     if (ref.startsWith("http://hl7.org/fhir/4.3/")) {
       String tail = ref.replace("http://hl7.org/fhir/4.3/", "");
       if (engine.getVdr4b().getResourceNamesAsSet().contains(tail) || engine.getVdr4b().fetchTypeDefinition(tail) != null) {
         return true;
       }
-      return engine.getVdr4b().fetchResource(Resource.class, ref.replace("/4.3/", "/"), IWorkerContext.VersionResolutionRules.defaultRule()) != null;
+      return engine.getVdr4b().fetchResource(Resource.class, ref.replace("/4.3/", "/"), VersionResolutionRules.defaultRule()) != null;
     }
     if (ref.startsWith("http://hl7.org/fhir/5.0/")) {
       String tail = ref.replace("http://hl7.org/fhir/5.0/", "");
       if (engine.getVdr5().getResourceNamesAsSet().contains(tail) || engine.getVdr5().fetchTypeDefinition(tail) != null) {
         return true;
       }
-      return engine.getVdr5().fetchResource(Resource.class, ref.replace("/5.0/", "/"), IWorkerContext.VersionResolutionRules.defaultRule()) != null;
+      return engine.getVdr5().fetchResource(Resource.class, ref.replace("/5.0/", "/"), VersionResolutionRules.defaultRule()) != null;
     }
     return false;
   }
@@ -854,7 +855,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
       if (sd != null) {
         return sd;
       }
-      return (CanonicalResource) engine.getVdr2().fetchResource(Resource.class, ref.replace("/1.0/", "/"), IWorkerContext.VersionResolutionRules.defaultRule());
+      return (CanonicalResource) engine.getVdr2().fetchResource(Resource.class, ref.replace("/1.0/", "/"), VersionResolutionRules.defaultRule());
     }
     if (ref.startsWith("http://hl7.org/fhir/3.0/")) {
       String tail = ref.replace("http://hl7.org/fhir/3.0/", "");
@@ -862,7 +863,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
       if (sd != null) {
         return sd;
       }
-      return (CanonicalResource) engine.getVdr3().fetchResource(Resource.class, ref.replace("/3.0/", "/"), IWorkerContext.VersionResolutionRules.defaultRule());
+      return (CanonicalResource) engine.getVdr3().fetchResource(Resource.class, ref.replace("/3.0/", "/"), VersionResolutionRules.defaultRule());
     }
     if (ref.startsWith("http://hl7.org/fhir/4.0/")) {
       String tail = ref.replace("http://hl7.org/fhir/4.0/", "");
@@ -870,7 +871,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
       if (sd != null) {
         return sd;
       }
-      return (CanonicalResource) engine.getVdr4().fetchResource(Resource.class, ref.replace("/4.0/", "/"), IWorkerContext.VersionResolutionRules.defaultRule());
+      return (CanonicalResource) engine.getVdr4().fetchResource(Resource.class, ref.replace("/4.0/", "/"), VersionResolutionRules.defaultRule());
     }
     if (ref.startsWith("http://hl7.org/fhir/4.3/")) {
       String tail = ref.replace("http://hl7.org/fhir/4.3/", "");
@@ -878,7 +879,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
       if (sd != null) {
         return sd;
       }
-      return (CanonicalResource) engine.getVdr4b().fetchResource(Resource.class, ref.replace("/4.3/", "/"), IWorkerContext.VersionResolutionRules.defaultRule());
+      return (CanonicalResource) engine.getVdr4b().fetchResource(Resource.class, ref.replace("/4.3/", "/"), VersionResolutionRules.defaultRule());
     }
     if (ref.startsWith("http://hl7.org/fhir/5.0/")) {
       String tail = ref.replace("http://hl7.org/fhir/5.0/", "");
@@ -886,7 +887,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
       if (sd != null) {
         return sd;
       }
-      return (CanonicalResource) engine.getVdr5().fetchResource(Resource.class, ref.replace("/5.0/", "/"), IWorkerContext.VersionResolutionRules.defaultRule());
+      return (CanonicalResource) engine.getVdr5().fetchResource(Resource.class, ref.replace("/5.0/", "/"), VersionResolutionRules.defaultRule());
     }
     return null;
   }

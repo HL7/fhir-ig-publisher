@@ -32,27 +32,28 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.RelatedIG;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
-import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.CanonicalResourceComparison;
-import org.hl7.fhir.r5.comparison.VersionComparisonAnnotation;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.DataRequirement;
-import org.hl7.fhir.r5.model.DataRequirement.DataRequirementCodeFilterComponent;
-import org.hl7.fhir.r5.model.ElementDefinition;
-import org.hl7.fhir.r5.model.PlanDefinition;
-import org.hl7.fhir.r5.model.PlanDefinition.PlanDefinitionActionComponent;
-import org.hl7.fhir.r5.model.Questionnaire;
-import org.hl7.fhir.r5.model.Questionnaire.QuestionnaireItemComponent;
-import org.hl7.fhir.r5.model.StructureDefinition;
-import org.hl7.fhir.r5.model.TriggerDefinition;
-import org.hl7.fhir.r5.model.UriType;
-import org.hl7.fhir.r5.model.ValueSet;
-import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
-import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
-import org.hl7.fhir.r5.utils.EOperationOutcome;
+import org.hl7.fhir.model.Base;
+import org.hl7.fhir.services.comparison.CanonicalResourceComparer.CanonicalResourceComparison;
+import org.hl7.fhir.services.comparison.VersionComparisonAnnotation;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.model.extensions.ExtensionDefinitions;
+import org.hl7.fhir.model.core.CanonicalResource;
+import org.hl7.fhir.model.core.DataRequirement;
+import org.hl7.fhir.model.core.DataRequirement.DataRequirementCodeFilterComponent;
+import org.hl7.fhir.model.core.ElementDefinition;
+import org.hl7.fhir.model.core.PlanDefinition;
+import org.hl7.fhir.model.core.PlanDefinition.PlanDefinitionActionComponent;
+import org.hl7.fhir.model.core.Questionnaire;
+import org.hl7.fhir.model.core.Questionnaire.QuestionnaireItemComponent;
+import org.hl7.fhir.model.core.StructureDefinition;
+import org.hl7.fhir.model.core.TriggerDefinition;
+import org.hl7.fhir.model.core.UriType;
+import org.hl7.fhir.model.core.ValueSet;
+import org.hl7.fhir.model.core.ValueSet.ConceptSetComponent;
+import org.hl7.fhir.services.renderers.utils.RenderingContext;
+import org.hl7.fhir.services.renderers.utils.ResourceWrapper;
+import org.hl7.fhir.model.utilities.ValueSetUtilities;
+import org.hl7.fhir.model.utilities.EOperationOutcome;
 import org.hl7.fhir.utilities.UserDataNames;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
@@ -88,7 +89,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
         }
       }
     }
-    ValueSet vsc = vs.copy();
+    ValueSet vsc = vs.copy(Base.COPY_DATA);
     vsc.setText(null);
     if (vsc.hasCompose()) {
       vsc.setExpansion(null); // we don't want to render an expansion by mistake
@@ -150,7 +151,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
 
   public boolean checkReferencesVS(StringBuilder b, boolean first, Questionnaire q) {
     if (q != null) {
-      if (questionnaireUsesValueSet(q.getItem(), vs.getUrl(), vs.getVersionedUrl())) {
+      if (questionnaireUsesValueSet(q.getItemList(), vs.getUrl(), vs.getVersionedUrl())) {
         if (first) {
           first = false;
           b.append("<ul>\r\n");
@@ -167,8 +168,8 @@ public class ValueSetRenderer extends CanonicalRenderer {
   }
 
   public boolean checkReferencesVS(StringBuilder b, boolean first, ValueSet vc) {
-    for (ConceptSetComponent t : vc.getCompose().getInclude()) {
-      for (UriType ed : t.getValueSet()) {
+    for (ConceptSetComponent t : vc.getCompose().getIncludeList()) {
+      for (UriType ed : t.getValueSetList()) {
         if (Utilities.existsInList(ed.getValueAsString(), vs.getUrl(), vs.getVersionedUrl())) {
           if (first) {
             first = false;
@@ -179,8 +180,8 @@ public class ValueSetRenderer extends CanonicalRenderer {
         }
       }
     }
-    for (ConceptSetComponent t : vc.getCompose().getExclude()) {
-      for (UriType ed : t.getValueSet()) {
+    for (ConceptSetComponent t : vc.getCompose().getExcludeList()) {
+      for (UriType ed : t.getValueSetList()) {
         if (Utilities.existsInList(ed.getValueAsString(), vs.getUrl(), vs.getVersionedUrl())) {
           if (first) {
             first = false;
@@ -196,7 +197,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
 
   public boolean checkReferencesVS(StringBuilder b, boolean first, StructureDefinition sd) {
     if (sd != null) {
-      for (ElementDefinition ed : sd.getDifferential().getElement()) {
+      for (ElementDefinition ed : sd.getDifferential().getElementList()) {
         if (ed.hasBinding() && ed.getBinding().hasValueSet()) {
           if ((ed.getBinding().hasValueSet() && Utilities.existsInList(ed.getBinding().getValueSet(), vs.getUrl(), vs.getVersionedUrl()))) {
             if (first) {
@@ -221,7 +222,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
     for (QuestionnaireItemComponent i : items) {
       if (i.hasAnswerValueSet() && Utilities.existsInList(i.getAnswerValueSet(), url, url2))
         return true;
-      if (questionnaireUsesValueSet(i.getItem(), url, url2))
+      if (questionnaireUsesValueSet(i.getItemList(), url, url2))
         return true;
     }
     return false;
@@ -235,10 +236,10 @@ public class ValueSetRenderer extends CanonicalRenderer {
   }
 
   private boolean referencesValueSet(PlanDefinition pd) {
-    for (PlanDefinitionActionComponent pda : pd.getAction()) {
-      for (TriggerDefinition td : pda.getTrigger()) {
-        for (DataRequirement dr : td.getData())
-          for (DataRequirementCodeFilterComponent ed : dr.getCodeFilter())
+    for (PlanDefinitionActionComponent pda : pd.getActionList()) {
+      for (TriggerDefinition td : pda.getTriggerList()) {
+        for (DataRequirement dr : td.getDataList())
+          for (DataRequirementCodeFilterComponent ed : dr.getCodeFilterList())
             if (Utilities.existsInList(ed.getValueSet(), vs.getUrl(), vs.getVersionedUrl()))
               return true;
       }

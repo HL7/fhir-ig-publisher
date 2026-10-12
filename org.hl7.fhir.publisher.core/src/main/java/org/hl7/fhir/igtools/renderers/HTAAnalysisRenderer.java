@@ -8,12 +8,9 @@ import java.util.Set;
 
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.CodeSystem;
-import org.hl7.fhir.r5.model.ConceptMap;
-import org.hl7.fhir.r5.model.ValueSet;
-import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
+import org.hl7.fhir.model.core.*;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.model.core.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
@@ -323,7 +320,7 @@ public class HTAAnalysisRenderer {
   }
 
   private void processValueSet(Set<String> internal, List<CopyRightAnalysis> res, ValueSet vs) {
-    for (ConceptSetComponent inc : vs.getCompose().getInclude()) {
+    for (ConceptSetComponent inc : vs.getCompose().getIncludeList()) {
       processInclude(internal, res, inc, vs);
     }
 //    for (ConceptSetComponent inc : vs.getCompose().getExclude()) {
@@ -401,7 +398,7 @@ public class HTAAnalysisRenderer {
   }
 
   private String name(String url) {
-    CodeSystem cs = context.fetchCodeSystem(url, IWorkerContext.VersionResolutionRules.defaultRule());
+    CodeSystem cs = context.fetchCodeSystem(url, VersionResolutionRules.defaultRule());
     if (cs != null) {
       return cs.present();
     }

@@ -10,17 +10,20 @@ import java.util.stream.Stream;
 
 import lombok.Getter;
 import org.apache.tools.ant.filters.StringInputStream;
-import org.hl7.fhir.r5.context.ContextUtilities;
-import org.hl7.fhir.r5.elementmodel.Element;
-import org.hl7.fhir.r5.elementmodel.Manager;
-import org.hl7.fhir.r5.formats.IParser;
-import org.hl7.fhir.r5.model.*;
-import org.hl7.fhir.r5.fhirpath.FHIRPathEngine;
-import org.hl7.fhir.r5.renderers.RendererFactory;
-import org.hl7.fhir.r5.renderers.ResourceRenderer;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
-import org.hl7.fhir.r5.utils.EOperationOutcome;
+import org.hl7.fhir.model.Base;
+import org.hl7.fhir.model.utilities.formats.FhirFormat;
+import org.hl7.fhir.model.utilities.formats.OutputStyle;
+import org.hl7.fhir.services.context.ContextUtilities;
+import org.hl7.fhir.services.elementmodel.Element;
+import org.hl7.fhir.services.elementmodel.Manager;
+import org.hl7.fhir.model.utilities.formats.IParser;
+import org.hl7.fhir.model.core.*;
+import org.hl7.fhir.services.fhirpath.FHIRPathEngine;
+import org.hl7.fhir.services.renderers.RendererFactory;
+import org.hl7.fhir.services.renderers.ResourceRenderer;
+import org.hl7.fhir.services.renderers.utils.RenderingContext;
+import org.hl7.fhir.services.renderers.utils.ResourceWrapper;
+import org.hl7.fhir.model.utilities.EOperationOutcome;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonArray;
@@ -147,7 +150,7 @@ public class ClientSideIndexBuilder {
 
   private void addResourceToDataset(Element resource) throws IOException {
     ByteArrayOutputStream bs = new ByteArrayOutputStream();
-    Manager.compose(cu.getWorker(), resource, bs, Manager.FhirFormat.JSON, IParser.OutputStyle.NORMAL, null);
+    Manager.compose(cu.getWorker(), resource, bs, FhirFormat.JSON, OutputStyle.NORMAL, null);
     String json = new String(bs.toByteArray());
     if (dataset.length() > 2) {
       dataset.append(",");
@@ -164,7 +167,7 @@ public class ClientSideIndexBuilder {
 
   private Element parseResource(String json) {
     try {
-      return Manager.parseSingle(fhirPath.getWorker(), new StringInputStream(json), Manager.FhirFormat.JSON);
+      return Manager.parseSingle(fhirPath.getWorker(), new StringInputStream(json), FhirFormat.JSON);
     } catch (Exception e) {
       return null;
     }
@@ -211,7 +214,7 @@ public class ClientSideIndexBuilder {
           urls.add(ref);
         }
     }
-    for (Element child : element.getChildren()) {
+    for (Element child : element.getChildList()) {
       findUrls(child);
     }
   }

@@ -15,15 +15,16 @@ import java.util.Map;
 import java.util.Set;
 
 import org.hl7.fhir.igtools.publisher.loaders.PublisherLoader;
-import org.hl7.fhir.r5.context.IContextResourceLoader;
-import org.hl7.fhir.r5.formats.IParser.OutputStyle;
-import org.hl7.fhir.r5.formats.JsonParser;
-import org.hl7.fhir.r5.formats.XmlParser;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.CodeSystem;
-import org.hl7.fhir.r5.model.Identifier;
-import org.hl7.fhir.r5.model.Identifier.IdentifierUse;
-import org.hl7.fhir.r5.model.Resource;
+import org.hl7.fhir.model.ModelContext;
+import org.hl7.fhir.services.context.IContextResourceLoaderN;
+import org.hl7.fhir.model.utilities.formats.OutputStyle;
+import org.hl7.fhir.model.core.formats.JsonParser;
+import org.hl7.fhir.model.core.formats.XmlParser;
+import org.hl7.fhir.model.core.CanonicalResource;
+import org.hl7.fhir.model.core.CodeSystem;
+import org.hl7.fhir.model.core.Identifier;
+import org.hl7.fhir.model.core.Identifier.IdentifierUse;
+import org.hl7.fhir.model.core.Resource;
 import org.hl7.fhir.r5.model.ResourceType;
 import org.hl7.fhir.utilities.CSVWriter;
 import org.hl7.fhir.utilities.Utilities;
@@ -106,7 +107,7 @@ public class CrossVersionOIDScanner {
     System.out.println("R4B Changes");
     Set<String> usedOids = new HashSet<>();
     for (LoadedCanonicalResource lcr : resourcesR4B) {
-      if (lcr.resource.getResourceType() == ResourceType.ValueSet || lcr.resource.getResourceType() == ResourceType.CodeSystem) {
+      if (Utilities.existsInList(lcr.resource.getResourceType(), "ValueSet", "CodeSystem")) {
         String url = lcr.getResource().getUrl();
         List<String> oids = getOids(lcr);
         String oid = null;
@@ -159,10 +160,10 @@ public class CrossVersionOIDScanner {
         processR5Source(f);
       } else if (f.getName().endsWith(".json")) {
         try {
-          Resource r = new JsonParser().parse(new FileInputStream(f));
+          Resource r = new JsonParser(ModelContext.fullCoreContext()).parse(new FileInputStream(f));
           if (updateOids(r)) {
             OutputStream s = new FileOutputStream(f);
-            new JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(s, r);
+            new JsonParser(ModelContext.fullCoreContext()).setOutputStyle(OutputStyle.PRETTY).compose(s, r);
             s.close();
           }         
         } catch (Exception e) {
@@ -170,10 +171,10 @@ public class CrossVersionOIDScanner {
         }        
       } else if (f.getName().endsWith(".xml")) {
         try {
-          Resource r = new XmlParser().parse(new FileInputStream(f));
+          Resource r = new XmlParser(ModelContext.fullCoreContext()).parse(new FileInputStream(f));
           if (updateOids(r)) {
             OutputStream s = new FileOutputStream(f);
-            new XmlParser().setOutputStyle(OutputStyle.PRETTY).compose(s, r);
+            new XmlParser(ModelContext.fullCoreContext()).setOutputStyle(OutputStyle.PRETTY).compose(s, r);
             s.close();
           }         
         } catch (Exception e) {
@@ -185,12 +186,12 @@ public class CrossVersionOIDScanner {
   }
 
   private boolean updateOids(Resource r) {
-    if (r.getResourceType() == ResourceType.ValueSet || r.getResourceType() == ResourceType.CodeSystem) {
+    if (Utilities.existsInList(r.getResourceType(), "ValueSet", "CodeSystem")) {
       CanonicalResource cr = (CanonicalResource) r;
       String url = cr.getUrl();
       List<String> oids = oidMap.get(url);
       if (oids != null && oids.size() > 0) {
-        cr.getIdentifier().removeIf(i -> i.getValue().startsWith("urn:oid:"));
+        cr.getIdentifierList().removeIf(i -> i.getValue().startsWith("urn:oid:"));
         boolean first = true;
         for (String oid : oids) {
           Identifier id = cr.addIdentifier().setValue("urn:oid:"+oid).setSystem("urn:ietf:rfc:3986");
@@ -198,7 +199,7 @@ public class CrossVersionOIDScanner {
         }
         return true;
       } else {
-        if (cr.getIdentifier().removeIf(i -> i.getValue().startsWith("urn:oid:") && byOid.containsKey(i.getValue().substring(8)))) {
+        if (cr.getIdentifierList().removeIf(i -> i.getValue().startsWith("urn:oid:") && byOid.containsKey(i.getValue().substring(8)))) {
           return true;
         }
       }
@@ -267,12 +268,12 @@ public class CrossVersionOIDScanner {
 
   private List<String> getOids(LoadedCanonicalResource lcr) {
     List<String> oids = new ArrayList<>();
-    for (Identifier id : lcr.getResource().getIdentifier()) {
+    for (Identifier id : lcr.getResource().getIdentifierList()) {
       if (id.hasValue() && id.getValue().startsWith("urn:oid:")) {
         oids.add(id.getValue().substring(8));
       }
     }
-    for (org.hl7.fhir.r5.model.Extension ext : lcr.getResource().getExtension()) {
+    for (org.hl7.fhir.model.core.Extension ext : lcr.getResource().getExtension()) {
       if ("http://hl7.org/fhir/StructureDefinition/valueset-oid".equals(ext.getUrl())) {
         String v = ext.getValue().primitiveValue();
         if (v != null && v.startsWith("urn:oid:")) {
@@ -294,7 +295,7 @@ public class CrossVersionOIDScanner {
     FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager.Builder().build();
     NpmPackage npm = pcm.loadPackage(pid);
 //    SpecMapManager spm = new SpecMapManager(TextFile.streamToBytes(npm.load("other", "spec.internals")), npm.fhirVersion());
-    IContextResourceLoader loader = new PublisherLoader(npm, null, npm.getWebLocation(), null, false).makeLoader();
+    IContextResourceLoaderN loader = new PublisherLoader(npm, null, npm.getWebLocation(), null, false, ModelContext.fullCoreContext()).makeLoader();
     String[] types = new String[] { "StructureDefinition", "CodeSystem", "ValueSet", "SearchParameter", "OperationDefinition", "Questionnaire", "ConceptMap", "StructureMap", "NamingSystem" };
     for (String s : npm.listResources(types)) {
       Resource r = loader.loadResource(npm.load("package", s), true);

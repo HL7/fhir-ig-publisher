@@ -8,20 +8,21 @@ import org.hl7.fhir.exceptions.DefinitionException;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.parsers.*;
-import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
-import org.hl7.fhir.r5.context.ILoggingService;
-import org.hl7.fhir.r5.context.SimpleWorkerContext;
-import org.hl7.fhir.r5.elementmodel.Element;
-import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.formats.IParser;
-import org.hl7.fhir.r5.model.*;
-import org.hl7.fhir.r5.model.Enumeration;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
-import org.hl7.fhir.r5.utils.DataTypeVisitor;
+import org.hl7.fhir.model.Base;
+import org.hl7.fhir.model.IModelContext;
+import org.hl7.fhir.model.core.Enumeration;
+import org.hl7.fhir.services.client.FHIRToolingClient;
+import org.hl7.fhir.model.utilities.formats.OutputStyle;
+import org.hl7.fhir.services.conformance.profile.ProfileUtilities;
+import org.hl7.fhir.standalone.context.SimpleWorkerContext;
+import org.hl7.fhir.services.elementmodel.Element;
+import org.hl7.fhir.model.extensions.ExtensionDefinitions;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.model.core.*;
+import org.hl7.fhir.services.renderers.utils.RenderingContext;
+import org.hl7.fhir.services.renderers.utils.ResourceWrapper;
+import org.hl7.fhir.model.utilities.DataTypeVisitor;
 import org.hl7.fhir.utilities.UserDataNames;
-import org.hl7.fhir.r5.utils.client.FHIRToolingClient;
 import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.filesystem.CSFile;
 import org.hl7.fhir.utilities.i18n.RegionToLocaleMapper;
@@ -29,6 +30,7 @@ import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.model.JsonPrimitive;
 import org.hl7.fhir.utilities.json.model.JsonProperty;
+import org.hl7.fhir.utilities.logging.ILoggingService;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.PackageHacker;
@@ -77,7 +79,7 @@ public class PublisherBase implements ILoggingService {
   }
 
   protected boolean isAdditionalResource(FetchedResource r) {
-    return pf.versionConvertorRegistry.isHandled(r.fhirType(), pf.context.getVersion());
+    return pf.versionConvertorRegistry.isHandled(r.fhirType(), pf.context.getFHIRVersion());
   }
 
   @Nonnull
@@ -391,8 +393,10 @@ public class PublisherBase implements ILoggingService {
       return new TypeParserR2();
     } else if (VersionUtilities.isR4BVer(ver)) {
       return new TypeParserR4B();
-    } else if (VersionUtilities.isR5Plus(ver)) {
+    } else if (VersionUtilities.isR5Ver(ver)) {
       return new TypeParserR5();
+    } else if (VersionUtilities.isR6Plus(ver)) {
+      return new TypeParserRN(pf.context);
     } else
       throw new FHIRException("Unsupported version "+ver);
   }
@@ -400,7 +404,7 @@ public class PublisherBase implements ILoggingService {
   protected Element convertToElement(FetchedResource r, Resource res) throws Exception {
     String parseVersion = pf.version;
     if (r != null) {
-      if (Utilities.existsInList(r.fhirType(), SpecialTypeHandler.specialTypes(pf.context.getVersion()))) {
+      if (Utilities.existsInList(r.fhirType(), SpecialTypeHandler.specialTypes(pf.context.getFHIRVersion()))) {
         parseVersion = SpecialTypeHandler.VERSION;
       } else if (r.getConfig() != null) {
         parseVersion = str(r.getConfig(), "version", pf.version);
@@ -409,50 +413,56 @@ public class PublisherBase implements ILoggingService {
     ByteArrayOutputStream bs = new ByteArrayOutputStream();
     if (VersionUtilities.isR3Ver(parseVersion)) {
       org.hl7.fhir.dstu3.formats.JsonParser jp = new org.hl7.fhir.dstu3.formats.JsonParser();
-      jp.compose(bs, VersionConvertorFactory_30_50.convertResource(res));
+      jp.compose(bs, VersionConvertorFactory_30_N.convertResource(res));
     } else if (VersionUtilities.isR4Ver(parseVersion)) {
       org.hl7.fhir.r4.formats.JsonParser jp = new org.hl7.fhir.r4.formats.JsonParser();
-      jp.compose(bs, VersionConvertorFactory_40_50.convertResource(res));
+      jp.compose(bs, VersionConvertorFactory_40_N.convertResource(res));
     } else if (VersionUtilities.isR4BVer(parseVersion)) {
       org.hl7.fhir.r4b.formats.JsonParser jp = new org.hl7.fhir.r4b.formats.JsonParser();
-      jp.compose(bs, VersionConvertorFactory_43_50.convertResource(res));
+      jp.compose(bs, VersionConvertorFactory_43_N.convertResource(res));
     } else if (VersionUtilities.isR2BVer(parseVersion)) {
       org.hl7.fhir.dstu2016may.formats.JsonParser jp = new org.hl7.fhir.dstu2016may.formats.JsonParser();
-      jp.compose(bs, VersionConvertorFactory_14_50.convertResource(res));
+      jp.compose(bs, VersionConvertorFactory_14_N.convertResource(res));
     } else if (VersionUtilities.isR2Ver(parseVersion)) {
       org.hl7.fhir.dstu2.formats.JsonParser jp = new org.hl7.fhir.dstu2.formats.JsonParser();
-      jp.compose(bs, VersionConvertorFactory_10_50.convertResource(res, new IGR2ConvertorAdvisor5()));
-    } else {
+      jp.compose(bs, VersionConvertorFactory_10_N.convertResource(res, new IGR2ConvertorAdvisor5()));
+    } else if (VersionUtilities.isR5Ver(parseVersion)) {
       org.hl7.fhir.r5.formats.JsonParser jp = new org.hl7.fhir.r5.formats.JsonParser();
+      jp.compose(bs, VersionConvertorFactory_50_N.convertResource(res));
+    } else {
+      org.hl7.fhir.model.core.formats.JsonParser jp = new org.hl7.fhir.model.core.formats.JsonParser(pf.context.getModelContext());
       jp.compose(bs, res);
     }
     byte[] cnt = bs.toByteArray();
     ByteArrayInputStream bi = new ByteArrayInputStream(cnt);
-    Element e = new org.hl7.fhir.r5.elementmodel.JsonParser(pf.context).parseSingle(bi, null);
+    Element e = new org.hl7.fhir.services.elementmodel.JsonParser(pf.context).parseSingle(bi, null);
     return e;
   }
 
   protected Resource convertFromElement(Element res) throws IOException, FHIRException, FHIRFormatError, DefinitionException {
     ByteArrayOutputStream bs = new ByteArrayOutputStream();
-    new org.hl7.fhir.r5.elementmodel.JsonParser(pf.context).compose(res, bs, IParser.OutputStyle.NORMAL, null);
+    new org.hl7.fhir.services.elementmodel.JsonParser(pf.context).compose(res, bs, OutputStyle.NORMAL, null);
     ByteArrayInputStream bi = new ByteArrayInputStream(bs.toByteArray());
     if (VersionUtilities.isR3Ver(pf.version)) {
       org.hl7.fhir.dstu3.formats.JsonParser jp = new org.hl7.fhir.dstu3.formats.JsonParser();
-      return  VersionConvertorFactory_30_50.convertResource(jp.parse(bi));
+      return  VersionConvertorFactory_30_N.convertResource(jp.parse(bi));
     } else if (VersionUtilities.isR4Ver(pf.version)) {
       org.hl7.fhir.r4.formats.JsonParser jp = new org.hl7.fhir.r4.formats.JsonParser();
-      return  VersionConvertorFactory_40_50.convertResource(jp.parse(bi));
+      return  VersionConvertorFactory_40_N.convertResource(jp.parse(bi));
     } else if (VersionUtilities.isR4BVer(pf.version)) {
       org.hl7.fhir.r4b.formats.JsonParser jp = new org.hl7.fhir.r4b.formats.JsonParser();
-      return  VersionConvertorFactory_43_50.convertResource(jp.parse(bi));
+      return  VersionConvertorFactory_43_N.convertResource(jp.parse(bi));
     } else if (VersionUtilities.isR2BVer(pf.version)) {
       org.hl7.fhir.dstu2016may.formats.JsonParser jp = new org.hl7.fhir.dstu2016may.formats.JsonParser();
-      return  VersionConvertorFactory_14_50.convertResource(jp.parse(bi));
+      return  VersionConvertorFactory_14_N.convertResource(jp.parse(bi));
     } else if (VersionUtilities.isR2Ver(pf.version)) {
       org.hl7.fhir.dstu2.formats.JsonParser jp = new org.hl7.fhir.dstu2.formats.JsonParser();
-      return VersionConvertorFactory_10_50.convertResource(jp.parse(bi));
-    } else { // if (version.equals(Constants.VERSION)) {
+      return VersionConvertorFactory_10_N.convertResource(jp.parse(bi));
+    } else if (VersionUtilities.isR5Ver(pf.version)) {
       org.hl7.fhir.r5.formats.JsonParser jp = new org.hl7.fhir.r5.formats.JsonParser();
+      return VersionConvertorFactory_50_N.convertResource(jp.parse(bi));
+    } else { // if (version.equals(Constants.VERSION)) {
+      org.hl7.fhir.model.core.formats.JsonParser jp = new org.hl7.fhir.model.core.formats.JsonParser(pf.context.getModelContext());
       return jp.parse(bi);
     }
   }
@@ -492,7 +502,7 @@ public class PublisherBase implements ILoggingService {
     if (pf.sourceIg.getDefinition().getPage().hasName()) {
       set.add(pf.sourceIg.getDefinition().getPage().getName());
     }
-    listPageTargets(set, pf.sourceIg.getDefinition().getPage().getPage());
+    listPageTargets(set, pf.sourceIg.getDefinition().getPage().getPageList());
     return set;
   }
 
@@ -501,7 +511,7 @@ public class PublisherBase implements ILoggingService {
       if (p.hasName()) {
         set.add(p.getName());
       }
-      listPageTargets(set, p.getPage());
+      listPageTargets(set, p.getPageList());
     }
   }
 
@@ -639,13 +649,13 @@ public class PublisherBase implements ILoggingService {
   protected void loadIgPages(ImplementationGuide.ImplementationGuideDefinitionPageComponent page, HashMap<String, ImplementationGuide.ImplementationGuideDefinitionPageComponent> map) throws FHIRException {
     if (page.hasName() && page.hasName())
       map.put(page.getName(), page);
-    for (ImplementationGuide.ImplementationGuideDefinitionPageComponent childPage: page.getPage()) {
+    for (ImplementationGuide.ImplementationGuideDefinitionPageComponent childPage: page.getPageList()) {
       loadIgPages(childPage, map);
     }
   }
 
   protected ImplementationGuide.ImplementationGuideDefinitionResourceComponent findIGReference(String type, String id) {
-    for (ImplementationGuide.ImplementationGuideDefinitionResourceComponent r : pf.publishedIg.getDefinition().getResource()) {
+    for (ImplementationGuide.ImplementationGuideDefinitionResourceComponent r : pf.publishedIg.getDefinition().getResourceList()) {
       if (r.hasReference() && r.getReference().getReference().equals(type+"/"+id)) {
         return r;
       }
@@ -727,10 +737,10 @@ public class PublisherBase implements ILoggingService {
         }
         utils.setIds(sd, true);
 
-        String p = sd.getDifferential().hasElement() ? sd.getDifferential().getElement().get(0).getPath() : null;
+        String p = sd.getDifferential().hasElement() ? sd.getDifferential().getElementList().get(0).getPath() : null;
         if (p == null || p.contains(".")) {
           changed = true;
-          sd.getDifferential().getElement().add(0, new ElementDefinition().setPath(p == null ? sd.getType() : p.substring(0, p.indexOf("."))));
+          sd.getDifferential().getElementList().add(0, new ElementDefinition().setPath(p == null ? sd.getType() : p.substring(0, p.indexOf("."))));
         }
         utils.setDefWebRoot(this.pf.igpkp.getCanonical());
         try {
@@ -792,11 +802,11 @@ public class PublisherBase implements ILoggingService {
   private boolean checkValueSetVersions(FetchedFile f, ValueSet vs) {
     boolean changed = false;
     int i = 0;
-    for (ValueSet.ConceptSetComponent inc : vs.getCompose().getInclude()) {
+    for (ValueSet.ConceptSetComponent inc : vs.getCompose().getIncludeList()) {
       changed = checkValueSetVersions(f, inc, "ValueSet.compose.include["+i+"]") || changed;
       i++;
     }
-    for (ValueSet.ConceptSetComponent inc : vs.getCompose().getExclude()) {
+    for (ValueSet.ConceptSetComponent inc : vs.getCompose().getExcludeList()) {
       changed = checkValueSetVersions(f, inc, "ValueSet.compose.exclude["+i+"]") || changed;
     }
     return changed;
@@ -855,11 +865,11 @@ public class PublisherBase implements ILoggingService {
   private boolean checkValueSetVersionsLatest(FetchedFile f, ValueSet vs) {
     boolean changed = false;
     int i = 0;
-    for (ValueSet.ConceptSetComponent inc : vs.getCompose().getInclude()) {
+    for (ValueSet.ConceptSetComponent inc : vs.getCompose().getIncludeList()) {
       changed = checkValueSetVersions(f, inc, "ValueSet.compose.include["+i+"]") || changed;
       i++;
     }
-    for (ValueSet.ConceptSetComponent inc : vs.getCompose().getExclude()) {
+    for (ValueSet.ConceptSetComponent inc : vs.getCompose().getExcludeList()) {
       changed = checkValueSetVersionsLatest(f, inc, "ValueSet.compose.exclude["+i+"]") || changed;
     }
     return changed;
@@ -928,7 +938,7 @@ public class PublisherBase implements ILoggingService {
   }
 
   protected boolean isExampleResource(CanonicalResource mr) {
-    for (ImplementationGuide.ImplementationGuideDefinitionResourceComponent ir : pf.publishedIg.getDefinition().getResource()) {
+    for (ImplementationGuide.ImplementationGuideDefinitionResourceComponent ir : pf.publishedIg.getDefinition().getResourceList()) {
       if (isSameResource(ir, mr)) {
         return ir.getIsExample() || ir.hasProfile();
       }
@@ -1120,7 +1130,7 @@ public class PublisherBase implements ILoggingService {
       // nothing, if there's a problem, we'll take it up elsewhere
     }
     if (pv != null) {
-      for (Reference entity : pv.getTarget()) {
+      for (Reference entity : pv.getTargetList()) {
         if (entity.hasReference()) {
           String[] ref = entity.getReference().split("\\/");
           int i = chooseType(ref);
@@ -1142,13 +1152,13 @@ public class PublisherBase implements ILoggingService {
     res.setPath(path);
     res.setAction(pv.getActivity().getCodingFirstRep());
     res.setDate(pv.hasOccurredPeriod() ? pv.getOccurredPeriod().getEndElement() : pv.hasOccurredDateTimeType() ? pv.getOccurredDateTimeType() : pv.getRecordedElement());
-    if (pv.getAuthorizationFirstRep().getConcept().hasText()) {
-      res.setComment(pv.getAuthorizationFirstRep().getConcept().getText());
+    if (pv.getAuthorizationFirstRep().hasText()) {
+      res.setComment(pv.getAuthorizationFirstRep().getText());
     } else if (pv.getActivity().hasText()) {
       res.setComment(pv.getActivity().getText());
     }
-    for (Provenance.ProvenanceAgentComponent agent : pv.getAgent()) {
-      for (Coding c : agent.getType().getCoding()) {
+    for (Provenance.ProvenanceAgentComponent agent : pv.getAgentList()) {
+      for (Coding c : agent.getType().getCodingList()) {
         res.getActors().put(c, agent.getWho());
       }
     }
@@ -1181,7 +1191,7 @@ public class PublisherBase implements ILoggingService {
           d = c.getChildValue("definition");
         }
         CanonicalResource canonical = null;
-        if (VersionUtilities.getCanonicalResourceNames(pf.context.getVersion()).contains(c.fhirType())) {
+        if (VersionUtilities.getCanonicalResourceNames(pf.context.getFHIRVersion()).contains(c.fhirType())) {
           try {
             canonical = (CanonicalResource)convertFromElement(c);
           } catch (Exception ex) {
@@ -1195,7 +1205,7 @@ public class PublisherBase implements ILoggingService {
   }
 
   protected StringType findReleaseLabel() {
-    for (ImplementationGuide.ImplementationGuideDefinitionParameterComponent p : pf.publishedIg.getDefinition().getParameter()) {
+    for (ImplementationGuide.ImplementationGuideDefinitionParameterComponent p : pf.publishedIg.getDefinition().getParameterList()) {
       if ("releaselabel".equals(p.getCode().getCode())) {
         return p.getValueElement();
       }
@@ -1262,7 +1272,7 @@ public class PublisherBase implements ILoggingService {
     if (res.hasWebPath() && (res instanceof DomainResource)) {
       ExtensionUtilities.setUrlExtension((DomainResource) res, ExtensionDefinitions.EXT_WEB_SOURCE_NEW, res.getWebPath());
     }
-    return serializeForVersion(res, v, pf.version, pf.packageId());
+    return serializeForVersion(pf.context.getModelContext(), res, v, pf.version, pf.packageId());
   }
 
   /**
@@ -1279,12 +1289,12 @@ public class PublisherBase implements ILoggingService {
    * {@code sourceVersion} is retained on the signature for the sole production caller
    * ({@code convVersion} passes {@code pf.version}) and is no longer consulted here.
    */
-  static byte[] serializeForVersion(Resource res, String v, String sourceVersion, String basePackageId) throws FHIRException, IOException {
+  static byte[] serializeForVersion(IModelContext context, Resource res, String v, String sourceVersion, String basePackageId) throws FHIRException, IOException {
     String version = v.startsWith("r") ? VersionUtilities.versionFromCode(v) : v;
     if (res instanceof ImplementationGuide) {
       ImplementationGuide ig = (ImplementationGuide) res;
-      ig.getFhirVersion().clear();
-      ig.getFhirVersion().add(new Enumeration<>(new Enumerations.FHIRVersionEnumFactory(), PublisherIGLoader.canonicalVersion(v)));
+      ig.getFhirVersionList().clear();
+      ig.getFhirVersionList().add(new Enumeration<>(new Enumerations.FHIRVersionEnumFactory(), PublisherIGLoader.canonicalVersion(v)));
       ig.setPackageId(basePackageId+"."+PublisherIGLoader.suffixName(v));
     }
     if (res instanceof StructureDefinition) {
@@ -1292,17 +1302,19 @@ public class PublisherBase implements ILoggingService {
       sd.setFhirVersion(Enumerations.FHIRVersion.fromCode(PublisherIGLoader.canonicalVersion(v)));
     }
     if (VersionUtilities.isR2Ver(version)) {
-      return new org.hl7.fhir.dstu2.formats.JsonParser().composeBytes(VersionConvertorFactory_10_50.convertResource(res));
+      return new org.hl7.fhir.dstu2.formats.JsonParser().composeBytes(VersionConvertorFactory_10_N.convertResource(res));
     } else if (VersionUtilities.isR2BVer(version)) {
-      return new org.hl7.fhir.dstu2016may.formats.JsonParser().composeBytes(VersionConvertorFactory_14_50.convertResource(res));
+      return new org.hl7.fhir.dstu2016may.formats.JsonParser().composeBytes(VersionConvertorFactory_14_N.convertResource(res));
     } else if (VersionUtilities.isR3Ver(version)) {
-      return new org.hl7.fhir.dstu3.formats.JsonParser().composeBytes(VersionConvertorFactory_30_50.convertResource(res, new BaseAdvisor_30_50(false)));
+      return new org.hl7.fhir.dstu3.formats.JsonParser().composeBytes(VersionConvertorFactory_30_N.convertResource(res, new BaseAdvisor_30_50(false)));
     } else if (VersionUtilities.isR4Ver(version)) {
-      return new org.hl7.fhir.r4.formats.JsonParser().composeBytes(VersionConvertorFactory_40_50.convertResource(res));
+      return new org.hl7.fhir.r4.formats.JsonParser().composeBytes(VersionConvertorFactory_40_N.convertResource(res));
     } else if (VersionUtilities.isR4BVer(version)) {
-      return new org.hl7.fhir.r4b.formats.JsonParser().composeBytes(VersionConvertorFactory_43_50.convertResource(res));
+      return new org.hl7.fhir.r4b.formats.JsonParser().composeBytes(VersionConvertorFactory_43_N.convertResource(res));
+    } else if (VersionUtilities.isR5Ver(version)) {
+      return new org.hl7.fhir.r5.formats.JsonParser().composeBytes(VersionConvertorFactory_50_N.convertResource(res));
     } else if (VersionUtilities.isR5Plus(version)) {
-      return new org.hl7.fhir.r5.formats.JsonParser().composeBytes(res);
+      return new org.hl7.fhir.model.core.formats.JsonParser(context).composeBytes(res);
     } else {
       throw new Error("Unknown version "+version);
     }
@@ -1548,7 +1560,7 @@ public class PublisherBase implements ILoggingService {
     if (!VersionUtilities.isR5Plus(baseVersion) || !ig.hasDefinition()) {
       return;
     }
-    ig.getDefinition().getResource().removeIf(res -> {
+    ig.getDefinition().getResourceList().removeIf(res -> {
       String ref = res.hasReference() ? res.getReference().getReference() : null;
       Set<String> keys = keyResolver.apply(ref);
       return !isIncludedInVersion(keys, versionToken, baseVersion, r5Inclusions, r4Inclusions, r4bInclusions);
@@ -1570,9 +1582,9 @@ public class PublisherBase implements ILoggingService {
     if (effective == null) {
       return;
     }
-    target.getDependsOn().clear();
-    for (ImplementationGuide.ImplementationGuideDependsOnComponent d : effective.getDependsOn()) {
-      target.getDependsOn().add(d.copy());
+    target.getDependsOnList().clear();
+    for (ImplementationGuide.ImplementationGuideDependsOnComponent d : effective.getDependsOnList()) {
+      target.getDependsOnList().add(d.copy(Base.COPY_DATA));
     }
   }
 

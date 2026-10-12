@@ -25,9 +25,9 @@ import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.HTMLInspector.LoadedFile;
-import org.hl7.fhir.r5.model.ActorDefinition;
-import org.hl7.fhir.r5.model.Coding;
-import org.hl7.fhir.r5.model.Requirements;
+import org.hl7.fhir.model.core.ActorDefinition;
+import org.hl7.fhir.model.core.Coding;
+import org.hl7.fhir.model.core.Requirements;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 

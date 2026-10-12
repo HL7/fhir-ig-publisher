@@ -26,7 +26,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.hl7.fhir.r5.formats.JsonCreator;
+import org.hl7.fhir.model.utilities.formats.JsonCreator;
 import org.hl7.fhir.utilities.Utilities;
 
 public class JsonXhtmlRenderer implements JsonCreator {

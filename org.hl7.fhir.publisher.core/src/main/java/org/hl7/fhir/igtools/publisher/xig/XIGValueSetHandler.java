@@ -10,11 +10,11 @@ import java.util.Set;
 
 import org.hl7.fhir.igtools.publisher.xig.XIGInformation.CanonicalResourceUsage;
 import org.hl7.fhir.igtools.publisher.xig.XIGInformation.UsageType;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.CanonicalType;
-import org.hl7.fhir.r5.model.ValueSet;
-import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
-import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionContainsComponent;
+import org.hl7.fhir.model.core.CanonicalResource;
+import org.hl7.fhir.model.core.CanonicalType;
+import org.hl7.fhir.model.core.ValueSet;
+import org.hl7.fhir.model.core.ValueSet.ConceptSetComponent;
+import org.hl7.fhir.model.core.ValueSet.ValueSetExpansionContainsComponent;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 
@@ -50,7 +50,7 @@ public class XIGValueSetHandler extends XIGHandler {
       return !vs.hasCompose() && vs.hasExpansion();
     } else {
       Set<String> systems = new HashSet<>();
-      for (ConceptSetComponent inc : vs.getCompose().getInclude()) {
+      for (ConceptSetComponent inc : vs.getCompose().getIncludeList()) {
         if (inc.getSystem() != null) {
           systems.add(inc.getSystem());
         }
@@ -92,14 +92,14 @@ public class XIGValueSetHandler extends XIGHandler {
   }
 
   public static void buildUsages(XIGInformation info, ValueSet vs) {
-    for (ConceptSetComponent t : vs.getCompose().getInclude()) {
+    for (ConceptSetComponent t : vs.getCompose().getIncludeList()) {
       info.recordUsage(vs, t.getSystem(), UsageType.VS_SYSTEM);
-      for (CanonicalType c : t.getValueSet()) {
+      for (CanonicalType c : t.getValueSetList()) {
         info.recordUsage(vs, c.getValue(), UsageType.VS_VALUESET);
       }
     }
     if (vs.hasExpansion()) {
-      for (ValueSetExpansionContainsComponent t : vs.getExpansion().getContains()) {
+      for (ValueSetExpansionContainsComponent t : vs.getExpansion().getContainsList()) {
         info.recordUsage(vs, t.getSystem(), UsageType.VS_EXPANSION);
       }
     }

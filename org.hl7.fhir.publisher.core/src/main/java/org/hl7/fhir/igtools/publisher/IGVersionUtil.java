@@ -28,7 +28,7 @@ import java.time.Duration;
 import java.util.Date;
 import java.util.Properties;
 
-import org.hl7.fhir.r5.model.InstantType;
+import org.hl7.fhir.model.core.InstantType;
 import org.hl7.fhir.utilities.Utilities;
 
 /**

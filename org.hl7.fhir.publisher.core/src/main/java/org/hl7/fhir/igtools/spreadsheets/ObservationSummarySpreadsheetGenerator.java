@@ -6,11 +6,11 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.hl7.fhir.igtools.renderers.CrossViewRenderer.ObservationProfile;
 import org.hl7.fhir.igtools.renderers.CrossViewRenderer.UsedType;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.model.Coding;
-import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
-import org.hl7.fhir.r5.renderers.RendererFactory;
-import org.hl7.fhir.r5.renderers.spreadsheets.SpreadsheetGenerator;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.model.core.Coding;
+import org.hl7.fhir.model.core.ElementDefinition.ElementDefinitionBindingComponent;
+import org.hl7.fhir.services.renderers.RendererFactory;
+import org.hl7.fhir.services.renderers.spreadsheets.SpreadsheetGenerator;
 import org.hl7.fhir.utilities.UserDataNames;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 

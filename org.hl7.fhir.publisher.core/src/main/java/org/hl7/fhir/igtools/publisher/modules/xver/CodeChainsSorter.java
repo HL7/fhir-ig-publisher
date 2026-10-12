@@ -3,7 +3,7 @@ package org.hl7.fhir.igtools.publisher.modules.xver;
 import java.util.Comparator;
 import java.util.List;
 
-import org.hl7.fhir.r5.terminologies.ConceptMapUtilities;
+import org.hl7.fhir.model.utilities.ConceptMapUtilities;
 
 public class CodeChainsSorter implements Comparator<List<ElementDefinitionLink>> {
 

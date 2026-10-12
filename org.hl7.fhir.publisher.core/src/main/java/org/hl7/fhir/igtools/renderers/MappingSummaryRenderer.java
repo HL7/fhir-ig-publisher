@@ -8,21 +8,21 @@ import java.util.List;
 import java.util.Set;
 
 import org.hl7.fhir.exceptions.FHIRException;
-import org.hl7.fhir.r5.context.CanonicalResourceManager;
-import org.hl7.fhir.r5.context.ContextUtilities;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
-import org.hl7.fhir.r5.model.StructureDefinition;
-import org.hl7.fhir.r5.model.StructureMap;
-import org.hl7.fhir.r5.model.StructureMap.StructureMapGroupComponent;
-import org.hl7.fhir.r5.model.StructureMap.StructureMapGroupInputComponent;
-import org.hl7.fhir.r5.model.StructureMap.StructureMapInputMode;
-import org.hl7.fhir.r5.model.StructureMap.StructureMapStructureComponent;
-import org.hl7.fhir.r5.renderers.Renderer.RenderingStatus;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
-import org.hl7.fhir.r5.utils.EOperationOutcome;
+import org.hl7.fhir.standalone.context.CanonicalResourceManager;
+import org.hl7.fhir.services.context.ContextUtilities;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.model.core.Enumerations.PublicationStatus;
+import org.hl7.fhir.model.core.StructureDefinition;
+import org.hl7.fhir.model.fml.StructureMap;
+import org.hl7.fhir.model.fml.StructureMap.StructureMapGroupComponent;
+import org.hl7.fhir.model.fml.StructureMap.StructureMapGroupInputComponent;
+import org.hl7.fhir.model.fml.StructureMap.StructureMapInputMode;
+import org.hl7.fhir.model.fml.StructureMap.StructureMapStructureComponent;
+import org.hl7.fhir.services.renderers.Renderer.RenderingStatus;
+import org.hl7.fhir.services.renderers.utils.RenderingContext;
+import org.hl7.fhir.services.renderers.utils.ResourceWrapper;
+import org.hl7.fhir.model.utilities.EOperationOutcome;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
@@ -66,8 +66,8 @@ public class MappingSummaryRenderer {
   }
 
   private void analyse(StructureMap map, Set<String> sources, Set<String> targets) {
-    for (StructureMapGroupComponent group : map.getGroup()) {
-      for (StructureMapGroupInputComponent input : group.getInput()) {
+    for (StructureMapGroupComponent group : map.getGroupList()) {
+      for (StructureMapGroupInputComponent input : group.getInputList()) {
         String url = resolveType(input.getType(), map, input.getMode());
         if (Utilities.isAbsoluteUrl(url)) {
           if (input.getMode() == StructureMapInputMode.SOURCE) {
@@ -84,7 +84,7 @@ public class MappingSummaryRenderer {
     if (Utilities.isAbsoluteUrl(type)) {
       return type;
     }
-    for (StructureMapStructureComponent struc : map.getStructure()) {
+    for (StructureMapStructureComponent struc : map.getStructureList()) {
       if (struc.hasAlias() && struc.getAlias().equals(type)) {
         return struc.getUrl();
       }
@@ -122,7 +122,7 @@ public class MappingSummaryRenderer {
         x.an(mode+"-"+map.getId(), " ");
         x.h4().tx(map.getTitle()+" ("+(map.getStatus() == PublicationStatus.ACTIVE ? "Ready for Use" : map.getStatus().getDisplay())+
             (ExtensionUtilities.getStandardsStatus(map) != null ? "/"+ ExtensionUtilities.getStandardsStatus(map).toDisplay() : "")+")");
-        new org.hl7.fhir.r5.renderers.StructureMapRenderer(rc).buildNarrative(new RenderingStatus(), x, ResourceWrapper.forResource(rc.getContextUtilities(), map));
+        new org.hl7.fhir.services.renderers.StructureMapRenderer(rc).buildNarrative(new RenderingStatus(), x, ResourceWrapper.forResource(rc.getContextUtilities(), map));
       }
     }
     return new XhtmlComposer(false, false).compose(x); 

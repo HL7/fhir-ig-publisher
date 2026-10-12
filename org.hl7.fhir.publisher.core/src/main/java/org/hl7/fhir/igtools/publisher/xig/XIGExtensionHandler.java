@@ -12,11 +12,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
-import org.hl7.fhir.r5.model.StructureDefinition;
-import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionContextComponent;
-import org.hl7.fhir.r5.terminologies.JurisdictionUtilities;
-import org.hl7.fhir.r5.utils.ResourceSorters.CanonicalResourceSortByUrl;
+import org.hl7.fhir.services.conformance.profile.ProfileUtilities;
+import org.hl7.fhir.model.core.StructureDefinition;
+import org.hl7.fhir.model.core.StructureDefinition.StructureDefinitionContextComponent;
+import org.hl7.fhir.model.utilities.JurisdictionUtilities;
+import org.hl7.fhir.services.utilities.ResourceSorters.CanonicalResourceSortByUrl;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
@@ -42,7 +42,7 @@ public class XIGExtensionHandler {
     Set<String> contextGroups = new HashSet<>();
     for (StructureDefinition sd : extensions.values()) {
 //      if (!Utilities.startsWithInList(sd.getUrl(), "", ""))
-      for (StructureDefinitionContextComponent ctxt : sd.getContext()) {
+      for (StructureDefinitionContextComponent ctxt : sd.getContextList()) {
         contexts.add(genExtensionContextName(ctxt));
       }
     }
@@ -117,7 +117,7 @@ public class XIGExtensionHandler {
 
   private StringBuilder header(String title) {
     StringBuilder b = new StringBuilder();
-    b.append("<html>\r\n"+
+    b.append("<html lang=\"en\">\r\n"+
         "<head>\r\n"+
         "<title>"+title+"</title>\r\n"+
         "<link href=\"fhir.css\" rel=\"stylesheet\"/>\r\n"+
@@ -154,7 +154,7 @@ public class XIGExtensionHandler {
 
   private boolean hasContext(StructureDefinition sd, String s) {
 
-    for (StructureDefinitionContextComponent ctxt : sd.getContext()) {
+    for (StructureDefinitionContextComponent ctxt : sd.getContextList()) {
       if (s.equals(genExtensionContextName(ctxt))) {
         return true;
       }

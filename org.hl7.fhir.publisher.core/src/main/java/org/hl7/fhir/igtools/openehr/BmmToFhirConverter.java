@@ -1,8 +1,9 @@
 package org.hl7.fhir.igtools.openehr;
 
-import org.hl7.fhir.r5.formats.IParser;
-import org.hl7.fhir.r5.formats.JsonParser;
-import org.hl7.fhir.r5.model.*;
+import org.hl7.fhir.model.utilities.formats.IParser;
+import org.hl7.fhir.model.core.formats.JsonParser;
+import org.hl7.fhir.model.core.*;
+import org.hl7.fhir.model.utilities.formats.OutputStyle;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.json.model.JsonElement;
 import org.hl7.fhir.utilities.json.model.JsonObject;
@@ -108,7 +109,7 @@ public class BmmToFhirConverter {
       Path outputPath = Paths.get(outputFolder, fileName);
 
       try (FileOutputStream fos = new FileOutputStream(outputPath.toFile())) {
-        new JsonParser().setOutputStyle(IParser.OutputStyle.PRETTY).compose(fos, sd);
+        new JsonParser(sd.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(fos, sd);
       }
     }
   }
@@ -673,7 +674,7 @@ public class BmmToFhirConverter {
             JsonObject typeDef = paramData.getJsonObject("type_def");
             String fhirType = getParameterTypeFromTypeDef(typeDef);
             if (fhirType != null) {
-              param.setType(Enumerations.FHIRTypes.fromCode(fhirType));
+              param.setType(fhirType);
             }
           } else {
             throw new RuntimeException("P_BMM_CONTAINER_FUNCTION_PARAMETER missing type_def for parameter: " + paramName);
@@ -693,10 +694,10 @@ public class BmmToFhirConverter {
       String typeName = paramData.asString("type");
       String fhirType = getFhirParameterType(typeName);
       if (fhirType != null) {
-        param.setType(Enumerations.FHIRTypes.fromCode(fhirType));
+        param.setType(fhirType);
       } else {
         // For complex types, use Parameters resource to allow structured data
-        param.setType(Enumerations.FHIRTypes.PARAMETERS);
+        param.setType("Parameters");
       }
     } else {
       throw new RuntimeException("Function parameter missing type: " + paramName);
@@ -723,10 +724,10 @@ public class BmmToFhirConverter {
       String typeName = resultData.asString("type");
       String fhirType = getFhirParameterType(typeName);
       if (fhirType != null) {
-        param.setType(Enumerations.FHIRTypes.fromCode(fhirType));
+        param.setType(fhirType);
       } else {
         // For complex types, use Parameters to allow structured data
-        param.setType(Enumerations.FHIRTypes.PARAMETERS);
+        param.setType("Parameters");
       }
     } else if (resultData.has("_type")) {
       // Handle complex return types
@@ -736,13 +737,13 @@ public class BmmToFhirConverter {
           param.setMax("*"); // Multiple values
           String fhirType = getParameterTypeFromTypeDef(resultData);
           if (fhirType != null) {
-            param.setType(Enumerations.FHIRTypes.fromCode(fhirType));
+            param.setType(fhirType);
           }
           break;
         case "P_BMM_GENERIC_TYPE":
           String genericFhirType = getParameterTypeFromTypeDef(resultData);
           if (genericFhirType != null) {
-            param.setType(Enumerations.FHIRTypes.fromCode(genericFhirType));
+            param.setType(genericFhirType);
           }
           break;
         default:

@@ -9,12 +9,12 @@ import java.util.Collections;
 import java.util.List;
 
 import org.hl7.fhir.exceptions.FHIRException;
-import org.hl7.fhir.r5.context.ContextUtilities;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.model.ImplementationGuide;
-import org.hl7.fhir.r5.model.ImplementationGuide.GuidePageGeneration;
-import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionPageComponent;
-import org.hl7.fhir.r5.model.UrlType;
+import org.hl7.fhir.services.context.ContextUtilities;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.model.core.ImplementationGuide;
+import org.hl7.fhir.model.core.ImplementationGuide.GuidePageGeneration;
+import org.hl7.fhir.model.core.ImplementationGuide.ImplementationGuideDefinitionPageComponent;
+import org.hl7.fhir.model.core.UrlType;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.JsonException;
@@ -184,7 +184,7 @@ public class PageFactory {
     if (parentPage().equals(page.getName())) {
       return page;
     }
-    for (ImplementationGuideDefinitionPageComponent p : page.getPage()) {
+    for (ImplementationGuideDefinitionPageComponent p : page.getPageList()) {
       ImplementationGuideDefinitionPageComponent t = getParentPage(p);
       if (t != null) {
         return t;

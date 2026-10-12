@@ -26,18 +26,6 @@ This is the code for the HL7 IG publisher: a tool to take a set of inputs
 and create a standard FHIR IG. The HL7 FHIR IG publisher does not provide 
 an authoring environment - that's left to other parties.
 
-## Performance Monitoring
-
-![Performance Tracking](plot-ig-builder-auto.png)
-
-This graph plots the time taken to build a set of key implementation guides across
-the versions of the IG publisher, which are performed as part of the QA release testing. 
-Note that the implementation guides themselves change over time, and the time varies due to network 
-dependencies, so these times are only a rough indication of performance.
-
-Note: For some previous versions, the tests were run over a slow/obstructed starlink connection, so
-have been removed from the graph
-
 ## Building this Project
 
 You can find detailed instructions on setting up this project in your IDE [here](https://hl7.github.io/docs/ig_publisher/getting-started).

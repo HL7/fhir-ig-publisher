@@ -11,14 +11,14 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.Predicate;
 
-import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.model.Enumeration;
-import org.hl7.fhir.r5.model.Enumerations;
-import org.hl7.fhir.r5.model.Extension;
-import org.hl7.fhir.r5.model.ImplementationGuide;
-import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnComponent;
-import org.hl7.fhir.r5.model.MarkdownType;
+import org.hl7.fhir.model.extensions.ExtensionDefinitions;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.model.core.Enumeration;
+import org.hl7.fhir.model.core.Enumerations;
+import org.hl7.fhir.model.core.Extension;
+import org.hl7.fhir.model.core.ImplementationGuide;
+import org.hl7.fhir.model.core.ImplementationGuide.ImplementationGuideDependsOnComponent;
+import org.hl7.fhir.model.core.MarkdownType;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -180,7 +180,7 @@ class PublisherIGLoaderAutoDepsTest {
   private void assertScopedAwayFamilyNotSuppressed(String pkgR4, Predicate<List<ImplementationGuideDependsOnComponent>> family) {
     ImplementationGuide ig = baseIg();
     addAuthorScoped(ig, pkgR4, "6.1.0", "4.0.1"); // R4-only
-    List<ImplementationGuideDependsOnComponent> raw = ig.getDependsOn();
+    List<ImplementationGuideDependsOnComponent> raw = ig.getDependsOnList();
     assertTrue(family.test(raw), pkgR4 + ": raw list sees the family");
     assertFalse(family.test(PublisherIGLoader.autoDepGuardView(raw, "r5", true)), pkgR4 + ": R5 guard view excludes the R4-only entry");
   }
@@ -189,7 +189,7 @@ class PublisherIGLoaderAutoDepsTest {
   void guardView_singleVersion_preservesLegacySuppression() {
     ImplementationGuide ig = baseIg();
     addAuthorScoped(ig, "hl7.terminology.r4", "6.1.0", "4.0.1"); // R4-only
-    List<ImplementationGuideDependsOnComponent> raw = ig.getDependsOn();
+    List<ImplementationGuideDependsOnComponent> raw = ig.getDependsOnList();
     List<ImplementationGuideDependsOnComponent> view = PublisherIGLoader.autoDepGuardView(raw, "r5", false);
     assertSame(raw, view, "single-version returns the raw list reference unchanged");
     assertTrue(PublisherIGLoader.dependsOnUTG(view), "single-version keeps legacy suppression even for a scoped entry");
@@ -203,12 +203,12 @@ class PublisherIGLoaderAutoDepsTest {
     u.setPackageId("hl7.terminology.r5");
     u.setUri(UTG_URI);
     u.setVersion("6.1.0");
-    assertTrue(PublisherIGLoader.dependsOnUTG(PublisherIGLoader.autoDepGuardView(unscoped.getDependsOn(), "r5", true)));
+    assertTrue(PublisherIGLoader.dependsOnUTG(PublisherIGLoader.autoDepGuardView(unscoped.getDependsOnList(), "r5", true)));
 
     // base-version-scoped (5.0.0 occurrence) entry applies to R5 -> stays in the R5 view
     ImplementationGuide scoped = baseIg();
     addAuthorScoped(scoped, "hl7.terminology.r5", "6.1.0", "5.0.0");
-    assertTrue(PublisherIGLoader.dependsOnUTG(PublisherIGLoader.autoDepGuardView(scoped.getDependsOn(), "r5", true)));
+    assertTrue(PublisherIGLoader.dependsOnUTG(PublisherIGLoader.autoDepGuardView(scoped.getDependsOnList(), "r5", true)));
   }
 
   @Test
@@ -220,14 +220,14 @@ class PublisherIGLoaderAutoDepsTest {
 
     ImplementationGuide scopedAway = baseIg();
     addAuthorScoped(scopedAway, "hl7.terminology.r4", "6.1.0", "4.0.1"); // R4-only on an R5 base
-    boolean rawHadUTG = PublisherIGLoader.dependsOnUTG(scopedAway.getDependsOn());
-    List<ImplementationGuideDependsOnComponent> guardDeps = PublisherIGLoader.autoDepGuardView(scopedAway.getDependsOn(), "r5", multiVersion);
+    boolean rawHadUTG = PublisherIGLoader.dependsOnUTG(scopedAway.getDependsOnList());
+    List<ImplementationGuideDependsOnComponent> guardDeps = PublisherIGLoader.autoDepGuardView(scopedAway.getDependsOnList(), "r5", multiVersion);
     assertTrue(multiVersion && rawHadUTG && !PublisherIGLoader.dependsOnUTG(guardDeps), "INFO fires when the family is declared for other versions only");
 
     ImplementationGuide applicable = baseIg();
     addAuthorScoped(applicable, "hl7.terminology.r5", "6.1.0", "5.0.0"); // applicable to R5
-    boolean rawHadUTG2 = PublisherIGLoader.dependsOnUTG(applicable.getDependsOn());
-    List<ImplementationGuideDependsOnComponent> guardDeps2 = PublisherIGLoader.autoDepGuardView(applicable.getDependsOn(), "r5", multiVersion);
+    boolean rawHadUTG2 = PublisherIGLoader.dependsOnUTG(applicable.getDependsOnList());
+    List<ImplementationGuideDependsOnComponent> guardDeps2 = PublisherIGLoader.autoDepGuardView(applicable.getDependsOnList(), "r5", multiVersion);
     assertFalse(multiVersion && rawHadUTG2 && !PublisherIGLoader.dependsOnUTG(guardDeps2), "INFO does not fire when an applicable entry supplies the family");
   }
 
@@ -236,8 +236,8 @@ class PublisherIGLoaderAutoDepsTest {
     // R4-only tooling on an R5 base: the guard view excludes it, so the base still auto-adds R5 tooling.
     ImplementationGuide ig = baseIg();
     addAuthorScoped(ig, "hl7.fhir.uv.tools.r4", "0.4.0", "4.0.1");
-    assertTrue(PublisherIGLoader.dependsOnTooling(ig.getDependsOn()), "raw list sees the tooling family");
-    assertFalse(PublisherIGLoader.dependsOnTooling(PublisherIGLoader.autoDepGuardView(ig.getDependsOn(), "r5", true)),
+    assertTrue(PublisherIGLoader.dependsOnTooling(ig.getDependsOnList()), "raw list sees the tooling family");
+    assertFalse(PublisherIGLoader.dependsOnTooling(PublisherIGLoader.autoDepGuardView(ig.getDependsOnList(), "r5", true)),
             "R5 guard view excludes the R4-only tooling entry");
 
     // The R4 variant carries the author's applicable tooling entry with no duplicate packageId. Auto
@@ -255,7 +255,7 @@ class PublisherIGLoaderAutoDepsTest {
 
   private ImplementationGuide baseIg() {
     ImplementationGuide ig = new ImplementationGuide();
-    ig.getFhirVersion().add(new Enumeration<>(new Enumerations.FHIRVersionEnumFactory(), R5));
+    ig.getFhirVersionList().add(new Enumeration<>(new Enumerations.FHIRVersionEnumFactory(), R5));
     return ig;
   }
 
@@ -286,13 +286,13 @@ class PublisherIGLoaderAutoDepsTest {
     dep.setUri(uri);
     dep.setVersion(version);
     dep.addExtension(ExtensionDefinitions.EXT_IGDEP_COMMENT, new MarkdownType(autoComment));
-    ig.getDependsOn().add(0, dep);
+    ig.getDependsOnList().add(0, dep);
     return dep;
   }
 
   private List<ImplementationGuideDependsOnComponent> family(ImplementationGuide ig, String packageMarker) {
     List<ImplementationGuideDependsOnComponent> r = new ArrayList<>();
-    for (ImplementationGuideDependsOnComponent d : ig.getDependsOn()) {
+    for (ImplementationGuideDependsOnComponent d : ig.getDependsOnList()) {
       if (d.getPackageId() != null && d.getPackageId().contains(packageMarker)) {
         r.add(d);
       }
@@ -306,7 +306,7 @@ class PublisherIGLoaderAutoDepsTest {
 
   private void assertNoDuplicatePackageId(ImplementationGuide ig) {
     Set<String> seen = new HashSet<>();
-    for (ImplementationGuideDependsOnComponent d : ig.getDependsOn()) {
+    for (ImplementationGuideDependsOnComponent d : ig.getDependsOnList()) {
       if (d.getPackageId() != null) {
         assertTrue(seen.add(d.getPackageId()), "duplicate packageId would crash package.json: " + d.getPackageId());
       }

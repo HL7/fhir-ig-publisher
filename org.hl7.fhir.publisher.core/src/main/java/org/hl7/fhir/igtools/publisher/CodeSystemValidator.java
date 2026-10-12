@@ -38,11 +38,11 @@ import java.util.Set;
 
 import javax.annotation.Nonnull;
 
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.model.CodeSystem;
-import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
-import org.hl7.fhir.r5.utils.xver.XVerExtensionManager;
-import org.hl7.fhir.r5.utils.validation.ValidatorSession;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.model.core.CodeSystem;
+import org.hl7.fhir.model.core.CodeSystem.ConceptDefinitionComponent;
+import org.hl7.fhir.services.xver.XVerExtensionManager;
+import org.hl7.fhir.services.validation.ValidatorSession;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 import org.hl7.fhir.validation.BaseValidator;
@@ -70,7 +70,7 @@ public class CodeSystemValidator extends BaseValidator {
 
   private void checkCodesUnique(CodeSystem cs, List<ValidationMessage> errors) {
     Set<String> codes = new HashSet<String>();
-    checkCodes(codes, cs.getConcept(), "CodeSystem.where(id = '"+cs.getId()+"')", errors);
+    checkCodes(codes, cs.getConceptList(), "CodeSystem.where(id = '"+cs.getId()+"')", errors);
   }
 
   private void checkCodes(Set<String> codes, List<ConceptDefinitionComponent> list, String path, List<ValidationMessage> errors) {
@@ -80,7 +80,7 @@ public class CodeSystemValidator extends BaseValidator {
         rule(errors, NO_RULE_DATE, IssueType.BUSINESSRULE, npath, false, "Duplicate Code "+cc.getCode());
       }
       codes.add(cc.getCode());
-      checkCodes(codes, cc.getConcept(), npath, errors);
+      checkCodes(codes, cc.getConceptList(), npath, errors);
     }
   }
 }

@@ -5,11 +5,11 @@ import java.util.Collections;
 import java.util.List;
 
 import org.hl7.fhir.igtools.publisher.xig.XIGInformation.UsageType;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.Enumeration;
-import org.hl7.fhir.r5.model.Enumerations.VersionIndependentResourceTypesAll;
-import org.hl7.fhir.r5.model.SearchParameter;
-import org.hl7.fhir.r5.model.SearchParameter.SearchParameterComponentComponent;
+import org.hl7.fhir.model.core.CanonicalResource;
+import org.hl7.fhir.model.core.Enumeration;
+import org.hl7.fhir.model.core.SearchParameter;
+import org.hl7.fhir.model.core.SearchParameter.SearchParameterComponentComponent;
+import org.hl7.fhir.model.core.UriType;
 import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 
@@ -27,11 +27,11 @@ public class XIGSearchParameterHandler extends XIGHandler {
   public void fillOutJson(SearchParameter sp, JsonObject j) {
     if (sp.hasCode()) {            j.add("code", sp.getCode()); }
     if (sp.hasType()) {            j.add("type", sp.getType().toCode()); }
-    for (Enumeration<VersionIndependentResourceTypesAll> t : sp.getBase()) {
+    for (UriType t : sp.getBaseList()) {
       if (!j.has("resourcesSP")) {
         j.add("resourcesSP", new JsonArray());
       }
-      j.getJsonArray("resourcesSP").add(t.getCode()); 
+      j.getJsonArray("resourcesSP").add(t.primitiveValue());
       info.getSpr().add(t.toString());
     }
   }
@@ -43,8 +43,8 @@ public class XIGSearchParameterHandler extends XIGHandler {
         if (cr instanceof SearchParameter) {
           SearchParameter sp = (SearchParameter) cr;
           boolean ok = false;
-          for (Enumeration<VersionIndependentResourceTypesAll> c : sp.getBase()) {
-            if (r.equals(c.getCode())) {
+          for (UriType c : sp.getBaseList()) {
+            if (r.equals(c.primitiveValue())) {
               ok = true;
             }
           }
@@ -74,7 +74,7 @@ public class XIGSearchParameterHandler extends XIGHandler {
 
   public static void buildUsages(XIGInformation info, SearchParameter sp) {
     info.recordUsage(sp, sp.getDerivedFrom(), UsageType.DERIVATION);
-    for (SearchParameterComponentComponent t : sp.getComponent()) {
+    for (SearchParameterComponentComponent t : sp.getComponentList()) {
       info.recordUsage(sp, t.getDefinition(), UsageType.SP_PROFILE);
     }
     

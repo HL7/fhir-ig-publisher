@@ -19,34 +19,24 @@ import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.HTMLInspector.LoadedFile;
 import org.hl7.fhir.igtools.publisher.HTMLInspector.XhtmlNodeHolder;
-import org.hl7.fhir.r5.context.ILoggingService;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.model.ActorDefinition;
-import org.hl7.fhir.r5.model.BooleanType;
-import org.hl7.fhir.r5.model.CanonicalType;
-import org.hl7.fhir.r5.model.CodeableConcept;
-import org.hl7.fhir.r5.model.Coding;
-import org.hl7.fhir.r5.model.Enumeration;
-import org.hl7.fhir.r5.model.Extension;
-import org.hl7.fhir.r5.model.IdType;
-import org.hl7.fhir.r5.model.ImplementationGuide;
-import org.hl7.fhir.r5.model.Requirements;
-import org.hl7.fhir.r5.model.StringType;
-import org.hl7.fhir.r5.model.ValueSet;
-import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
-import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionParameterComponent;
-import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionContainsComponent;
-import org.hl7.fhir.r5.renderers.ActorDefinitionRenderer;
-import org.hl7.fhir.r5.renderers.Renderer.RenderingStatus;
-import org.hl7.fhir.r5.renderers.RendererFactory;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
-import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
+import org.hl7.fhir.model.core.*;
+import org.hl7.fhir.model.utilities.formats.OutputStyle;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.model.extensions.ExtensionUtilities;
+import org.hl7.fhir.model.core.Enumerations.PublicationStatus;
+import org.hl7.fhir.model.core.ImplementationGuide.ImplementationGuideDefinitionParameterComponent;
+import org.hl7.fhir.model.core.ValueSet.ValueSetExpansionContainsComponent;
+import org.hl7.fhir.services.renderers.ActorDefinitionRenderer;
+import org.hl7.fhir.services.renderers.Renderer.RenderingStatus;
+import org.hl7.fhir.services.renderers.RendererFactory;
+import org.hl7.fhir.services.renderers.utils.RenderingContext;
+import org.hl7.fhir.services.renderers.utils.ResourceWrapper;
+import org.hl7.fhir.services.terminology.ValueSetExpansionOutcome;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.NaturalOrderComparator;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.i18n.I18nConstants;
+import org.hl7.fhir.utilities.logging.ILoggingService;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
@@ -166,13 +156,13 @@ class ConformanceStatementHandler {
   public void setup(ImplementationGuide ig) {
     rootUrl = StringUtils.substringBefore(ig.getUrl(), "ImplementationGuide");
     categories = new HashMap<String, Coding>();
-    for (ImplementationGuideDefinitionParameterComponent param: ig.getDefinition().getParameter()) {
+    for (ImplementationGuideDefinitionParameterComponent param: ig.getDefinition().getParameterList()) {
       if (param.getCode().getSystem().equals("http://hl7.org/fhir/tools/CodeSystem/ig-parameters") && param.getCode().getCode().equals("requirements-category-vs")) {
         String valuesetUrl = param.getValue();
-        ValueSet categoriesVs = context.fetchResource(ValueSet.class, valuesetUrl, IWorkerContext.VersionResolutionRules.defaultRule());
+        ValueSet categoriesVs = context.fetchResource(ValueSet.class, valuesetUrl, VersionResolutionRules.defaultRule());
         ValueSetExpansionOutcome expansion = context.expandVS(categoriesVs, false, true, 100);
-        loadCategories(expansion.getValueset().getExpansion().getContains());
-        for (ValueSetExpansionContainsComponent catCode: expansion.getValueset().getExpansion().getContains()) {
+        loadCategories(expansion.getValueset().getExpansion().getContainsList());
+        for (ValueSetExpansionContainsComponent catCode: expansion.getValueset().getExpansion().getContainsList()) {
           categories.put(catCode.getCode(), new Coding(catCode.getSystem(), catCode.getCode(), catCode.getDisplay()));
         }
         break;
@@ -185,7 +175,7 @@ class ConformanceStatementHandler {
       if (!cat.getAbstract())
         categories.put(cat.getCode(), new Coding(cat.getSystem(), cat.getCode(), cat.getDisplay()));
       if (cat.hasContains()) {
-        loadCategories(cat.getContains());
+        loadCategories(cat.getContainsList());
       }
     }
   }
@@ -224,16 +214,16 @@ class ConformanceStatementHandler {
     if (messages.isEmpty())
       return;
     String reqUrl = this.rootUrl + "Requirements/fromNarrative";
-    Requirements req = context.fetchResource(Requirements.class, reqUrl, IWorkerContext.VersionResolutionRules.defaultRule());
+    Requirements req = context.fetchResource(Requirements.class, reqUrl, VersionResolutionRules.defaultRule());
     Map<String, Requirements.RequirementsStatementComponent> oldReq = new HashMap<>();
     boolean mismatch = false;
     if (req != null) {
       req.setText(null);
-      for (Requirements.RequirementsStatementComponent comp: req.getStatement()) {
+      for (Requirements.RequirementsStatementComponent comp: req.getStatementList()) {
         oldReq.put(comp.getKey(), comp);
       }
-      req.setStatement(new ArrayList<>());
-      if (req.getActor().size()!=this.usedActors.size())
+      req.setStatementList(new ArrayList<>());
+      if (req.getActorList().size()!=this.usedActors.size())
         mismatch = true;
       else {
         for (ActorDefinition actor: usedActors.values()) {
@@ -255,11 +245,11 @@ class ConformanceStatementHandler {
     }
     
     if (mismatch) {
-      req.setActor(new ArrayList<>());
+      req.setActorList(new ArrayList<>());
       for (ActorDefinition actor: usedActors.values()) {
-        CanonicalType actorRef = req.addActorElement();
-        actorRef.setValue(actor.getUrl());
-        actorRef.addExtension(EXT_REQACTORKEY, new IdType(actor.getId()));
+        Requirements.RequirementsActorComponent actorRef = req.addActor();
+        actorRef.setReference(actor.getUrl());
+        actorRef.setKey(actor.getId());
       }
     }
     
@@ -280,10 +270,10 @@ class ConformanceStatementHandler {
       ConformanceClause clause = primaryClauses.get(key);
       
       boolean hasShallNot = newComp.hasExtension(EXT_CSSHALLNOT);
-      int effectiveSize = newComp.getConformance().size() + (hasShallNot ? 1 : 0);
-      if (effectiveSize!=clause.getExpectations().size() || !matchConfExpect(newComp.getConformance(),clause.getExpectations(), hasShallNot)) {
+      int effectiveSize = newComp.getConformanceList().size() + (hasShallNot ? 1 : 0);
+      if (effectiveSize!=clause.getExpectations().size() || !matchConfExpect(newComp.getConformanceList(),clause.getExpectations(), hasShallNot)) {
         mismatch = true;
-        newComp.setConformance(new ArrayList<>());
+        newComp.setConformanceList(new ArrayList<>());
         for (String expectation: clause.getExpectations()) {
           if (expectation.equals("SHALLNOT")) {
             newComp.addExtension(EXT_CSSHALLNOT, new BooleanType(true));
@@ -387,7 +377,7 @@ class ConformanceStatementHandler {
         messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Requirements/fromNarrative", "There are differences between the requirements found in the narrative and what's found the provided Requirements resource.  A new version has been generated in the root.  It should be used to replace the one in the input folder.",
             IssueSeverity.WARNING));
         
-      new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(org.hl7.fhir.r5.formats.IParser.OutputStyle.PRETTY).compose(fs, req);
+      new org.hl7.fhir.model.core.formats.JsonParser(context.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(fs, req);
     }
   }
   
@@ -441,23 +431,24 @@ class ConformanceStatementHandler {
       header.th().id("fcl-rule").style("text-align: center;").tx(rc.formatPhrase(RenderingContext.CSTABLE_HEAD_RULE));
       
       XhtmlNode filters = thead.tr().style("background-color: WhiteSmoke;");
-      filters.td().input("filterid", "text", " ", 4).attribute("title", rc.formatPhrase(RenderingContext.CSTABLE_TITLE_ID));
+      filters.td().input("filterid","filterid", "text", " ", 4).attribute("title", rc.formatPhrase(RenderingContext.CSTABLE_TITLE_ID));
       XhtmlNode expectFilter = filters.td();
       expectFilter.attribute("title", rc.formatPhrase(RenderingContext.CSTABLE_TITLE_EXPECT));
       int count=1;
       for (String expect: foundExpectations) {
         if (count!=1)
           expectFilter.br();
-        expectFilter.input("expect" + count++,  "checkbox",  null, 0).nbsp().tx(translateExpectationEnglish(expect));
+        String name = "expect" + count++;
+        expectFilter.input(name, name,  "checkbox",  null, 0).nbsp().tx(translateExpectationEnglish(expect));
       }
       if (hasConditionalTrue && hasConditionalFalse) {
         XhtmlNode conditionFilter = filters.td();
         conditionFilter.attribute("title", rc.formatPhrase(RenderingContext.CSTABLE_TITLE_COND));
-        conditionFilter.input("conditionFilter", "radio",  null, 0).attribute("id", "conditionYes").attribute("value", "true").nbsp().tx(rc.formatPhrase(RenderingContext.CSTABLE_COND_YES));
+        conditionFilter.input("conditionFilter", "conditionFilter", "radio",  null, 0).attribute("id", "conditionYes").attribute("value", "true").nbsp().tx(rc.formatPhrase(RenderingContext.CSTABLE_COND_YES));
         conditionFilter.br();
-        conditionFilter.input("conditionFilter", "radio",  null, 0).attribute("id", "conditionNo").attribute("value", "false").nbsp().tx(rc.formatPhrase(RenderingContext.CSTABLE_COND_NO));
+        conditionFilter.input("conditionFilter", "conditionFilter", "radio",  null, 0).attribute("id", "conditionNo").attribute("value", "false").nbsp().tx(rc.formatPhrase(RenderingContext.CSTABLE_COND_NO));
         conditionFilter.br();
-        conditionFilter.input("conditionFilter", "radio",  null, 0).nbsp().attribute("id", "conditionAny").attribute("value", "").attribute("checked", "true").tx(rc.formatPhrase(RenderingContext.CSTABLE_COND_ANY));
+        conditionFilter.input("conditionFilter", "conditionFilter", "radio",  null, 0).nbsp().attribute("id", "conditionAny").attribute("value", "").attribute("checked", "true").tx(rc.formatPhrase(RenderingContext.CSTABLE_COND_ANY));
       }
       if (!usedActors.isEmpty()) {
         XhtmlNode actorFilter = filters.td();
@@ -475,7 +466,7 @@ class ConformanceStatementHandler {
           ActorDefinition actor = actorLookup.get(title);
           if (count!=1)
             actorFilter.br();
-          XhtmlNode actorInput = actorFilter.input("actor" + count++,  "checkbox",  null, 1);
+          XhtmlNode actorInput = actorFilter.input("actor" + count++, "Actor", "checkbox",  null, 1);
           actorInput.nbsp();
           rr.renderCanonical(new RenderingStatus(), ResourceWrapper.forResource(rc, actor), actorInput,  ActorDefinition.class, new CanonicalType(actor.getUrl()), lang);
         }
@@ -496,14 +487,14 @@ class ConformanceStatementHandler {
           Coding category = codingLookup.get(display);
           if (count!=1)
             categoryFilter.br();
-          XhtmlNode categoryInput = categoryFilter.input("category" + count++,  "checkbox",  null, 1);
+          XhtmlNode categoryInput = categoryFilter.input("category" + count++, "Category", "checkbox",  null, 1);
           categoryInput.nbsp();
           categoryInput.tx(rr.displayCoding(ResourceWrapper.forType(rc.getContextUtilities(), category)));
         }
       }
       XhtmlNode filterRule = filters.td();
-      filterRule.input("filterrule", "text", " ", 20).attribute("title", rc.formatPhrase(RenderingContext.CSTABLE_TITLE_RULE));
-      filterRule.input("clearFilters", "button", null, 10).style("float:right").attribute("value", rc.formatPhrase(RenderingContext.CSTABLE_CLEAR_FILTERS)).attribute("title", rc.formatPhrase(RenderingContext.CSTABLE_TITLE_CLEAR));
+      filterRule.input("filterrule", "Rule", "text", " ", 20).attribute("title", rc.formatPhrase(RenderingContext.CSTABLE_TITLE_RULE));
+      filterRule.input("clearFilters", "Clear", "button", null, 10).style("float:right").attribute("value", rc.formatPhrase(RenderingContext.CSTABLE_CLEAR_FILTERS)).attribute("title", rc.formatPhrase(RenderingContext.CSTABLE_TITLE_CLEAR));
       
       Set<LoadedFile> sources = new HashSet<>();
       sources.add(info.source);

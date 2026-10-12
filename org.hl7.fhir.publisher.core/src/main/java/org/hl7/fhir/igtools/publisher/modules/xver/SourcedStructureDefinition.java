@@ -1,8 +1,8 @@
 package org.hl7.fhir.igtools.publisher.modules.xver;
 
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.model.Enumerations.ConceptMapRelationship;
-import org.hl7.fhir.r5.model.StructureDefinition;
+import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.model.core.Enumerations.ConceptMapRelationship;
+import org.hl7.fhir.model.core.StructureDefinition;
 
 public class SourcedStructureDefinition {
 
