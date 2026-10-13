@@ -63,6 +63,8 @@ public class PublisherFields {
     Map<String, String> shortCountryCode = null;
     Map<String, String> stateNameForCode = null;
     Map<String, Map<String, ElementDefinition>> sdMapCache = new HashMap<String, Map<String, ElementDefinition>>();
+    // see StructureDefinitionRenderer.setUsageCache(); only set while the html outputs are generated
+    Map<org.hl7.fhir.services.elementmodel.Element, Set<String>> sdUsageCache;
     List<String> ignoreFlags = null;
     Map<String, Boolean> wantGenParams = new HashMap<String, Boolean>();
     Publisher childPublisher = null;
