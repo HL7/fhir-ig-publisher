@@ -123,6 +123,7 @@ public class DependencyRenderer {
   private String npmName;
   private TemplateManager templateManager;
   private Map<String, PackageList> packageListCache = new HashMap<>();
+  private Map<String, PackageList> fetchedPackageLists = new HashMap<>(); // by url; only the ones fetched successfully
   private List<DependencyAnalyser.ArtifactDependency> dependencies;
   private List<GlobalProfile> globals = new ArrayList<>();
   private Set<String> globalPackages = new HashSet<>();
@@ -153,6 +154,16 @@ public class DependencyRenderer {
       String pidv = ext.getValue().primitiveValue();
       globalPackages.add(pidv); // exempt from looking for globals
     }
+  }
+
+  /**
+   * Use the given map, of package lists by the url they were fetched from, to share the package lists
+   * fetched from the web with other renderers, so that each one is fetched once between them rather
+   * than once by each renderer.
+   */
+  public DependencyRenderer setFetchedPackageLists(Map<String, PackageList> fetchedPackageLists) {
+    this.fetchedPackageLists = fetchedPackageLists;
+    return this;
   }
 
   private class PackageVersionInfo {
@@ -682,7 +693,14 @@ public class DependencyRenderer {
     PackageList pl;
     try {
       final String secureCanonical = ManagedWebAccess.makeSecureRef(canonical);
-      pl = PackageList.fromUrl(Utilities.pathURL(secureCanonical, "package-list.json"));
+      String url = Utilities.pathURL(secureCanonical, "package-list.json");
+      pl = fetchedPackageLists.get(url);
+      if (pl == null) {
+        pl = PackageList.fromUrl(url);
+        if (pl != null) {
+          fetchedPackageLists.put(url, pl);
+        }
+      }
           
     } catch (Exception e) {
       pl = null;
