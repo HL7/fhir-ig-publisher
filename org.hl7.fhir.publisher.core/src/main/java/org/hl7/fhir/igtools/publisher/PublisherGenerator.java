@@ -298,13 +298,19 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
 
     logMessage("Generate HTML Outputs");
-    for (FetchedFile f : pf.changeList) {
-      f.start("generate2");
-      try {
-        generateHtmlOutputs(f, false, db, null);
-      } finally {
-        f.finish("generate2");
+    // the resources don't change while the html is generated, so what they use only needs to be worked out once
+    pf.sdUsageCache = new IdentityHashMap<>();
+    try {
+      for (FetchedFile f : pf.changeList) {
+        f.start("generate2");
+        try {
+          generateHtmlOutputs(f, false, db, null);
+        } finally {
+          f.finish("generate2");
+        }
       }
+    } finally {
+      pf.sdUsageCache = null;
     }
 
     logMessage("Generate Spreadsheets");
@@ -1881,6 +1887,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     String structureDefinitionImageFolder = lang == null ? Utilities.path(this.pf.tempDir) : Utilities.path(this.pf.tempDir, lang);
     StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(this.pf.context, this.pf.packageId(), checkAppendSlash(this.pf.specPath), sd, structureDefinitionImageFolder, this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, this.pf.fileList, lrc, this.pf.allInvariants, this.pf.sdMapCache, this.pf.specPath, this.pf.versionToAnnotate, this.pf.relatedIGs, this);
     sdr.setNoXigLink(this.pf.noXigLink);
+    sdr.setUsageCache(this.pf.sdUsageCache);
 
     if (wantGen(r, "summary")) {
       long start = System.currentTimeMillis();
@@ -2978,7 +2985,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       start = System.currentTimeMillis();
       fragment("cross-version-analysis-inline", pf.r4tor4b.generate(pf.npmName, true), pf.otherFilesRun, start, "cross-version-analysis-inline", "Cross", lang);
     }
-    DependencyRenderer depr = new DependencyRenderer(pf.pcm, pf.tempDir, pf.npmName, pf.templateManager, makeDependencies(), pf.context, pf.markdownEngine, rc, pf.specMaps, pf.effectiveBaseIg);
+    DependencyRenderer depr = new DependencyRenderer(pf.pcm, pf.tempDir, pf.npmName, pf.templateManager, makeDependencies(), pf.context, pf.markdownEngine, rc, pf.specMaps, pf.effectiveBaseIg).setFetchedPackageLists(pf.fetchedPackageLists);
     start = System.currentTimeMillis();
     trackedFragment("3", "dependency-table", depr.render(pf.getEffectiveBaseIg(), false, true, true), pf.otherFilesRun, start, "dependency-table", "Cross", lang);
     start = System.currentTimeMillis();

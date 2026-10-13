@@ -37,6 +37,7 @@ import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.logging.ILoggingService;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.hl7.fhir.utilities.npm.PackageList;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.validation.instance.InstanceValidator;
 import org.hl7.fhir.validation.profile.ProfileValidator;
@@ -63,6 +64,8 @@ public class PublisherFields {
     Map<String, String> shortCountryCode = null;
     Map<String, String> stateNameForCode = null;
     Map<String, Map<String, ElementDefinition>> sdMapCache = new HashMap<String, Map<String, ElementDefinition>>();
+    // see StructureDefinitionRenderer.setUsageCache(); only set while the html outputs are generated
+    Map<org.hl7.fhir.services.elementmodel.Element, Set<String>> sdUsageCache;
     List<String> ignoreFlags = null;
     Map<String, Boolean> wantGenParams = new HashMap<String, Boolean>();
     Publisher childPublisher = null;
@@ -253,6 +256,8 @@ public class PublisherFields {
     Set<String> r4bInclusions = new HashSet<>();
     Set<String> r5Inclusions = new HashSet<>();
     List<DependencyAnalyser.ArtifactDependency> dependencyList;
+    // the package-list.json files the DependencyRenderers have fetched, by url, so each is fetched once in the run
+    Map<String, PackageList> fetchedPackageLists = new HashMap<>();
     Map<String, List<String>> trackedFragments = new HashMap<String, List<String>>();
     PackageInformation packageInfo;
     CSVWriter allProfilesCsv;
