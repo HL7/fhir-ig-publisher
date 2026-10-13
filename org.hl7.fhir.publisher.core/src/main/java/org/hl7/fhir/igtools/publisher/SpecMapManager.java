@@ -455,22 +455,22 @@ public class SpecMapManager {
     if (base == null) {
       return false;
     }
-    if (base.endsWith("/")) {
-      base = base.substring(0, base.length()-1);
+    // the base itself, with or without its trailing /
+    if (url.equals(base) || (base.endsWith("/") && base.length() == url.length()+1 && base.startsWith(url))) {
+      return true;
     }
     if (!url.startsWith(base)) {
       return false;
     }
-    String file = url.substring(base.length());
-    if (file.isEmpty()) {
-      return true;
-    }
-    if (!base.isEmpty()) {
-      if (!file.startsWith("/")) {
+    // the file names are joined to the base the way Utilities.pathURL does it
+    int start = base.length();
+    if (!base.isEmpty() && !base.endsWith("/")) {
+      if (!url.startsWith("/", start)) {
         return false;
       }
-      file = file.substring(1);
+      start++;
     }
+    String file = url.substring(start);
     return SPEC_FILES.contains(file) || (canonical && "history.html".equals(file));
   }
 

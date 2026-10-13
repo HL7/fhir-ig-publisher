@@ -14,15 +14,16 @@ import org.junit.jupiter.api.Test;
  */
 class SpecMapManagerSpecLinkTest {
 
-  private static final String[] BASES = { "http://hl7.org/fhir/us/core", "http://hl7.org/fhir/us/core/", "http://example.org", "" };
+  private static final String[] BASES = { "http://hl7.org/fhir/us/core", "http://hl7.org/fhir/us/core/", "http://example.org", "", "/", "http://example.org//" };
   private static final String[] BASE2S = { null, "http://hl7.org/fhir/us/core/STU6.1", "http://hl7.org/fhir/us/core/STU6.1/" };
   private static final String[] FILES = { "", "definitions.json.zip", "definitions.xml.zip", "full-ig.zip", "package.tgz", "history.html",
       "toc.html", "qa.html", "StructureDefinition-us-core-patient.html", "StructureDefinition-us-core-patient.html#profile",
       "index.html", "other.html", "x/package.tgz" };
 
-  // what checkTarget did before isSpecLink. A link's trailing / was removed before these checks
+  // what checkTarget did before isSpecLink. A link's trailing / was removed before these checks. Left out:
+  // (spec.getBase()+"/").equals(rref), dropped on review, which only matched a link that ended in //
   private static boolean oldCheck(SpecMapManager spec, String rref) {
-    if (spec.getBase() != null && (spec.getBase().equals(rref) || (spec.getBase()).equals(rref+"/") || (spec.getBase()+"/").equals(rref)|| spec.hasTarget(rref) ||
+    if (spec.getBase() != null && (spec.getBase().equals(rref) || (spec.getBase()).equals(rref+"/") || spec.hasTarget(rref) ||
             Utilities.existsInList(rref, Utilities.pathURL(spec.getBase(), "definitions.json.zip"),
                     Utilities.pathURL(spec.getBase(), "full-ig.zip"), Utilities.pathURL(spec.getBase(), "definitions.xml.zip"),
                     Utilities.pathURL(spec.getBase(), "package.tgz"), Utilities.pathURL(spec.getBase(), "history.html")))) {
@@ -54,7 +55,11 @@ class SpecMapManagerSpecLinkTest {
         links.add(file.isEmpty() ? base : Utilities.pathURL(base, file));
         // a file name glued to the base without a /
         links.add(base + file);
+        // one / too many
+        links.add(base + "/" + file);
       }
+      // a link that ends in //, which keeps one / after checkTarget removes the last
+      links.add(base + "//");
     }
     links.add("http://hl7.org/fhir/us/core-x/package.tgz");
     links.add("http://hl7.org/fhir/us/corepackage.tgz");
@@ -71,7 +76,7 @@ class SpecMapManagerSpecLinkTest {
     for (String base : BASES) {
       for (String base2 : BASE2S) {
         SpecMapManager spec = spec(base, base2);
-        for (String link : links(BASES[0], BASES[1], BASES[2], BASE2S[1], BASE2S[2])) {
+        for (String link : links(BASES[0], BASES[1], BASES[2], BASES[4], BASES[5], BASE2S[1], BASE2S[2])) {
           Assertions.assertEquals(oldCheck(spec, link), spec.isSpecLink(link), "base " + base + ", base2 " + base2 + ", link " + link);
           count++;
         }
