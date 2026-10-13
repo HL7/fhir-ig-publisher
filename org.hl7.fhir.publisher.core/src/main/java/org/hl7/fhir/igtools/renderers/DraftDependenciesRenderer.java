@@ -2,8 +2,10 @@ package org.hl7.fhir.igtools.renderers;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.hl7.fhir.igtools.publisher.FetchedResource;
@@ -13,6 +15,7 @@ import org.hl7.fhir.model.extensions.ExtensionUtilities;
 import org.hl7.fhir.model.core.CanonicalResource;
 import org.hl7.fhir.model.core.Enumerations.PublicationStatus;
 import org.hl7.fhir.model.core.Resource;
+import org.hl7.fhir.model.core.VersionResolutionRules;
 import org.hl7.fhir.model.utilities.ElementVisitor;
 import org.hl7.fhir.model.utilities.ElementVisitor.ElementVisitorInstruction;
 import org.hl7.fhir.model.utilities.ElementVisitor.IElementVisitor;
@@ -41,6 +44,9 @@ public class DraftDependenciesRenderer implements IElementVisitor {
   private IWorkerContext context;
   private List<DraftReference> draftRefs = new ArrayList<>();
   private String thisPackage;
+  // every primitive in every resource is checked, and the same few urls turn up over and over again, so remember
+  // what each one resolved to (including nothing) rather than asking the context again
+  private Map<String, Resource> resolved = new HashMap<>();
 
   public DraftDependenciesRenderer(IWorkerContext context, String thisPackage) {
     super();
@@ -84,7 +90,7 @@ public class DraftDependenciesRenderer implements IElementVisitor {
       url = url.substring(0, url.indexOf("#"));
     }
     if (Utilities.isAbsoluteUrl(url)) {
-      CanonicalResource tgt = (CanonicalResource) context.fetchResource(Resource.class, url, ElementModelUtilities.getVersionResolutionRules(urlE));
+      CanonicalResource tgt = (CanonicalResource) fetch(url, ElementModelUtilities.getVersionResolutionRules(urlE));
       if (tgt != null && tgt.hasSourcePackage() && !thisPackage.equals(tgt.getSourcePackage().getVID())) {
         if (tgt.getStatus() == PublicationStatus.DRAFT || tgt.getExperimental()) {
           DraftReference dr = new DraftReference(resource, url, tgt);
@@ -105,7 +111,7 @@ public class DraftDependenciesRenderer implements IElementVisitor {
       url = url.substring(0, url.indexOf("#"));
     }
     if (Utilities.isAbsoluteUrl(url)) {
-      CanonicalResource tgt = (CanonicalResource) context.fetchResource(Resource.class, url, ExtensionUtilities.getVersionResolutionRules(urlE));
+      CanonicalResource tgt = (CanonicalResource) fetch(url, ExtensionUtilities.getVersionResolutionRules(urlE));
       if (tgt != null && tgt.hasSourcePackage() && !thisPackage.equals(tgt.getSourcePackage().getVID())) {
         if (tgt.getStatus() == PublicationStatus.DRAFT || tgt.getExperimental()) {
           DraftReference dr = new DraftReference(resource, url, tgt);
@@ -115,6 +121,16 @@ public class DraftDependenciesRenderer implements IElementVisitor {
         }
       }
     }
+  }
+
+  private Resource fetch(String url, VersionResolutionRules rules) {
+    String key = url + "|" + rules;
+    if (resolved.containsKey(key)) {
+      return resolved.get(key);
+    }
+    Resource res = context.fetchResource(Resource.class, url, rules);
+    resolved.put(key, res);
+    return res;
   }
 
   private boolean alreadyExists(DraftReference dr) {
