@@ -244,11 +244,6 @@ public class HTMLInspector {
   @Getter private String rootFolder;
   private String altRootFolder;
   private List<SpecMapManager> specs;
-  // for each spec's base and base2, the urls of its files (definitions.json.zip, package.tgz, history.html, ...)
-  // that a link may point to (see checkTarget). Worked out once per base, rather than for every link
-  // that gets as far as checking the specs
-  private final Map<String, Set<String>> specBaseFiles = new HashMap<>();
-  private final Map<String, Set<String>> specBase2Files = new HashMap<>();
   private List<LinkedSpecification> linkSpecs;
   private Map<String, LoadedFile> cache = new HashMap<String, LoadedFile>();
   private int iteration = 0;
@@ -1666,14 +1661,6 @@ public class HTMLInspector {
     }
   }
 
-  private static Set<String> pathURLs(String base, String... names) {
-    Set<String> urls = new HashSet<>();
-    for (String name : names) {
-      urls.add(Utilities.pathURL(base, name));
-    }
-    return urls;
-  }
-
   private boolean checkTarget(String filename, String ref, String rref, StringBuilder tgtList, BooleanHolder bh, XhtmlNode x, XhtmlNode parent) throws IOException {
     if (rref.startsWith("./")) {
       rref = rref.substring(2);
@@ -1723,12 +1710,7 @@ public class HTMLInspector {
     }
     if (specs != null){
       for (SpecMapManager spec : specs) {
-        if (spec.getBase() != null && (spec.getBase().equals(rref) || (spec.getBase()).equals(rref+"/") || (spec.getBase()+"/").equals(rref)|| spec.hasTarget(rref) ||
-                specBaseFiles.computeIfAbsent(spec.getBase(), b -> pathURLs(b, "definitions.json.zip", "full-ig.zip", "definitions.xml.zip", "package.tgz", "history.html")).contains(rref))) {
-          return true;
-        }
-        if (spec.getBase2() != null && (spec.getBase2().equals(rref) || (spec.getBase2()).equals(rref+"/") ||
-                specBase2Files.computeIfAbsent(spec.getBase2(), b -> pathURLs(b, "definitions.json.zip", "definitions.xml.zip", "package.tgz", "full-ig.zip")).contains(rref))) {
+        if (spec.isSpecLink(rref)) {
           return true;
         }
       }

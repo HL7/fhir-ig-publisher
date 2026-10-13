@@ -437,6 +437,43 @@ public class SpecMapManager {
     return false;  
   }
 
+  // the files every published spec has at its base and at its versioned base (base2)
+  private static final Set<String> SPEC_FILES = Set.of("definitions.json.zip", "definitions.xml.zip", "full-ig.zip", "package.tgz");
+
+  /**
+   * True if a link to url is a link into this spec: one of its targets, its base or base2 itself, or one of the
+   * files every spec has there (SPEC_FILES, plus history.html at the base)
+   */
+  public boolean isSpecLink(String url) {
+    if (base != null && hasTarget(url)) {
+      return true;
+    }
+    return isSpecLink(url, base, true) || isSpecLink(url, base2, false);
+  }
+
+  private static boolean isSpecLink(String url, String base, boolean canonical) {
+    if (base == null) {
+      return false;
+    }
+    if (base.endsWith("/")) {
+      base = base.substring(0, base.length()-1);
+    }
+    if (!url.startsWith(base)) {
+      return false;
+    }
+    String file = url.substring(base.length());
+    if (file.isEmpty()) {
+      return true;
+    }
+    if (!base.isEmpty()) {
+      if (!file.startsWith("/")) {
+        return false;
+      }
+      file = file.substring(1);
+    }
+    return SPEC_FILES.contains(file) || (canonical && "history.html".equals(file));
+  }
+
   public boolean hasImage(String tgt) {
     if (tgt == null) {
       return false;
