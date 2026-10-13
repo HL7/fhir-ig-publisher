@@ -10,6 +10,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -612,7 +613,11 @@ class ConformanceStatementHandler {
     termMayPlural = rc.formatPhrase(RenderingContext.CONF_MAY_PLURAL); 
     
     List<XhtmlNodeHolder> divs = new ArrayList<>();
-    processMarkdownConformanceClauses(x, hasClauses, divs);
+    Set<XhtmlNode> noClauseMarkers = Collections.newSetFromMap(new IdentityHashMap<>());
+    findNodesWithoutClauseMarkers(x, noClauseMarkers);
+    Map<XhtmlNode, Integer> minTextLengths = new IdentityHashMap<>();
+    findMinTextLengths(x, minTextLengths);
+    processMarkdownConformanceClauses(x, hasClauses, divs, noClauseMarkers, minTextLengths);
     List<XhtmlNode> parents = new ArrayList<>();
     List<ValidationMessage> unwarnedMessages = new ArrayList<ValidationMessage>();
     processConformanceClauses(source, parents, x, hasClauses, hasWarning, messages, unwarnedMessages);
@@ -777,16 +782,77 @@ class ConformanceStatementHandler {
     }
   }
   
-  private void processMarkdownConformanceClauses(XhtmlNode x, BooleanHolder hasClauses, List<XhtmlNodeHolder> divs) {
+  /**
+   * processMarkdownConformanceClauses() checks the text of every node it visits, and getting that text means walking
+   * the node's whole subtree, so on a big page the clause scan cost O(nodes x depth) - a significant part of the
+   * whole build for larger IGs. Almost all of a page can't hold a markdown clause, so find those subtrees up front
+   * (one pass) and let the scan skip them.
+   *
+   * Every clause form needs a '§' (or the text '&sect;', so '&' is treated as a marker too) somewhere in the text
+   * that allText() can see - text and comment content, or the alt of an img (the only attribute it reads) - so a
+   * subtree with neither character in any of those can't contain anything for the scan to change.
+   *
+   * @return true if x or anything under it has a marker
+   */
+  boolean findNodesWithoutClauseMarkers(XhtmlNode x, Set<XhtmlNode> noMarkers) {
+    boolean marked = hasClauseMarker(x.getContent()) || ("img".equals(x.getName()) && hasClauseMarker(x.getAttribute("alt")));
+    if (x.hasChildren()) {
+      for (XhtmlNode c : x.getChildNodes()) {
+        // no short cut: every child needs to be classified
+        marked = findNodesWithoutClauseMarkers(c, noMarkers) || marked;
+      }
+    }
+    if (!marked) {
+      noMarkers.add(x);
+    }
+    return marked;
+  }
+
+  private boolean hasClauseMarker(String s) {
+    return s != null && (s.indexOf('§') >= 0 || s.indexOf('&') >= 0);
+  }
+
+  /**
+   * The scan only looks at the whole text of a p, or to see if the text of a node is "!§§", and getting the text of
+   * a node that holds a lot of the page (and has a marker somewhere in it) is expensive. allText() includes all the
+   * text content in a node (and adds to it), so this notes the length of that content for each node with children:
+   * if it's more than 3, the node's text can't be "!§§"
+   *
+   * @return the length of the text content in x
+   */
+  int findMinTextLengths(XhtmlNode x, Map<XhtmlNode, Integer> lengths) {
+    if (!x.hasChildren()) {
+      return x.getContent() == null ? 0 : x.getContent().length();
+    }
+    int length = 0;
+    for (XhtmlNode c : x.getChildNodes()) {
+      if (c.getNodeType() == NodeType.Text) {
+        length += c.getContent() == null ? 0 : c.getContent().length();
+      } else if (c.getNodeType() == NodeType.Element && !"img".equals(c.getName())) {
+        length += findMinTextLengths(c, lengths);
+      }
+    }
+    lengths.put(x, length);
+    return length;
+  }
+
+  void processMarkdownConformanceClauses(XhtmlNode x, BooleanHolder hasClauses, List<XhtmlNodeHolder> divs, Set<XhtmlNode> noClauseMarkers, Map<XhtmlNode, Integer> minTextLengths) {
+    if (noClauseMarkers.contains(x)) {
+      return;
+    }
     boolean tryAgain = false; // for if there's more than one clause in a run of text
-    if ("p".equals(x.getName()) && "§§§".equals(x.allText())) {
+    // the text is only needed for a p, or if it could be "!§§" (see findMinTextLengths()). Nodes added or changed by
+    // the scan aren't in minTextLengths, and the others don't change before they're scanned
+    Integer minTextLength = minTextLengths.get(x);
+    String text = "p".equals(x.getName()) || minTextLength == null || minTextLength <= 3 ? x.allText() : null;
+    if ("p".equals(x.getName()) && "§§§".equals(text)) {
       x.setName("table");
       x.getChildNodes().clear();
       x.setAttribute("class", "fhir-conformance-list grid");
       return;
     }
 
-    if (x.allText() != null && "p".equals(x.getName()) && (x.allText().startsWith("§§") || x.allText().startsWith("&sect;&sect;"))) {
+    if (text != null && "p".equals(x.getName()) && (text.startsWith("§§") || text.startsWith("&sect;&sect;"))) {
       if (divs.isEmpty() || divs.get(0).end != null) {
         // this is the starting node
         divs.add(0, inspector.new XhtmlNodeHolder());
@@ -820,7 +886,7 @@ class ConformanceStatementHandler {
         x.getChildNodes().clear();
         hasClauses.set(true);
       }
-    } else if (x.allText() != null && "!§§".equals(x.allText())) {
+    } else if (text != null && "!§§".equals(text)) {
       // special placeholder for documentation
       x.getChildNodes().clear();
       x.tx("§§");
@@ -900,7 +966,7 @@ class ConformanceStatementHandler {
 
     List<XhtmlNodeHolder> childDivs = new ArrayList<>();
     for (XhtmlNode c : x.getChildNodes()) {
-      processMarkdownConformanceClauses(c, hasClauses, childDivs);
+      processMarkdownConformanceClauses(c, hasClauses, childDivs, noClauseMarkers, minTextLengths);
     }
     
     for (XhtmlNodeHolder childDiv : childDivs) {
