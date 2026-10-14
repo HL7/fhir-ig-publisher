@@ -12,11 +12,11 @@ import org.junit.jupiter.params.provider.MethodSource;
 class AIProcessorResourceFileNamesTest {
 
   private static final List<String> RESOURCE_FILES = List.of(
-    "StructureDefinition-dhp-patient.html", "CodeSystem-Nationality.html", "ValueSet-x.html", "Patient-example");
+    "StructureDefinition-example-patient.html", "CodeSystem-Nationality.html", "ValueSet-x.html", "Patient-example");
 
   static Stream<String> pages() {
-    return Stream.of("StructureDefinition-dhp-patient.html", "structuredefinition-DHP-patient.html",
-      "StructureDefinition-dhp-patient-definitions.html", "StructureDefinition-dhp-patient.profile.json.html",
+    return Stream.of("StructureDefinition-example-patient.html", "structuredefinition-EXAMPLE-patient.html",
+      "StructureDefinition-example-patient-definitions.html", "StructureDefinition-example-patient.profile.json.html",
       "codesystem-nationality.html", "CodeSystem-Nationality-testing.html", "ValueSet-x.html", "ValueSet-xy.html",
       "ValueSet-.html", "Patient-example.html", "Patient-examples.html", "index.html", "toc.html", "");
   }
