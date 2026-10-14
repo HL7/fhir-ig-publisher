@@ -22,11 +22,9 @@ package org.hl7.fhir.igtools.publisher;
 
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -688,13 +686,6 @@ public class HTMLInspector {
     }
   }
 
-  /** Reads a file the way {@link XhtmlParser#parse(File, String)} does. */
-  private static String readFile(File f) throws IOException {
-    try (InputStream input = new FileInputStream(f)) {
-      return new String(input.readAllBytes(), StandardCharsets.UTF_8);
-    }
-  }
-
   private void loadFile(String s, String base, List<ValidationMessage> messages) {
     log.logDebugMessage(ILoggingService.LogCategory.HTML, "Load "+s);
 
@@ -704,7 +695,7 @@ public class HTMLInspector {
     boolean htmlName = f.getName().endsWith(".html") || f.getName().endsWith(".xhtml") || f.getName().endsWith(".svg");
     String content = null;
     try {
-      content = readFile(f);
+      content = FileUtilities.fileToString(f);
       x = new XhtmlParser().setMustBeWellFormed(strict).parse(content, null);
       if (x.getElement("html")==null && x.getElement("svg")==null && !htmlName) {
         // We don't want resources being treated as HTML.  We'll check the HTML of the narrative in the page representation
@@ -720,9 +711,8 @@ public class HTMLInspector {
     boolean lr = false;
     if (x != null) {
 
-      String src;
+      String src = content;
       try {
-        src = content;
         lr = src.contains("lang-redirects.js");
         hl7State = src.contains(RELEASE_HTML_MARKER);
         if (hl7State) {
