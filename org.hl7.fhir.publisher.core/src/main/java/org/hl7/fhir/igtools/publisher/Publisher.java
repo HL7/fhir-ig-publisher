@@ -435,7 +435,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         }
       }
       deleteDuplicateMessages();
-      ValidationPresenter val = new ValidationPresenter(pf.version, workingVersion(), pf.igpkp, pf.childPublisher == null? null : pf.childPublisher.getIgpkp(), pf.rootDir, pf.npmName, pf.childPublisher == null? null : pf.childPublisher.pf.npmName,
+      ValidationPresenter val = new ValidationPresenter(pf.version, workingVersion(), pf.igpkp, pf.rootDir, pf.npmName,
           IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), pf.realmRules, pf.previousVersionComparator, pf.ipaComparator, pf.ipsComparator,
           new DependencyRenderer(pf.pcm, pf.outputDir, pf.npmName, pf.templateManager, pf.dependencyList, pf.context, pf.markdownEngine, pf.rc, pf.specMaps, pf.effectiveBaseIg).render(pf.getEffectiveBaseIg(), true, false, false), new HTAAnalysisRenderer(pf.context, pf.outputDir, pf.markdownEngine).render(pf.packageId(), pf.fileList, pf.publishedIg.present()),
           new PublicationChecker(pf.repoRoot, pf.historyPage, pf.markdownEngine, findReleaseLabelString(), pf.getEffectiveBaseIg(), pf.relatedIGs).check(), renderGlobals(), pf.copyrightYear, pf.context, scanForR5Extensions(), pf.modifierExtensions,
@@ -445,13 +445,9 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       FileUtilities.stringToFile(new IPViewRenderer(uncsList, pf.inspector.getExternalReferences(), pf.inspector.getImageRefs(), pf.inspector.getCopyrights(),
               pf.ipStmt, pf.inspector.getVisibleFragments().get("1"), pf.context).execute(), Utilities.path(pf.outputDir, "qa-ipreview.html"));
       tts.end();
-      if (isChild()) {
-        log("Built. "+ pf.tt.report());
-      } else {
-        log("Built. "+ pf.tt.report());
-        log("Generating QA");
-        log("Validation output in "+val.generate(pf.sourceIg.getName(), pf.errors, pf.fileList, Utilities.path(settings.getDestDir() != null ? settings.getDestDir() : pf.outputDir, "qa.html"), pf.suppressedMessages, pinSummary()));
-      }
+      log("Built. "+ pf.tt.report());
+      log("Generating QA");
+      log("Validation output in "+val.generate(pf.sourceIg.getName(), pf.errors, pf.fileList, Utilities.path(settings.getDestDir() != null ? settings.getDestDir() : pf.outputDir, "qa.html"), pf.suppressedMessages, pinSummary()));
       recordOutcome(null, val);
       buildTracker.setBooleanProperty("status", "complete", true, null);
       buildTracker.save();
@@ -1598,11 +1594,13 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       }
       self.settings.setDebug(CliParams.hasNamedParam(args, "-debug"));
       self.settings.setCacheVersion(CliParams.hasNamedParam(args, "-cacheVersion"));
+      if (CliParams.hasNamedParam(args, "-nested")) {
+        throw new Error("The -nested parameter is no longer supported: the IG Publisher doesn't build nested (child) IGs any more");
+      }
       if (CliParams.hasNamedParam(args, "-publish")) {
         self.settings.setMode(PublisherUtils.IGBuildMode.PUBLICATION);
         self.settings.setTargetOutput(CliParams.getNamedParam(args, "-publish"));
         self.settings.setPublishing(true);
-        self.settings.setTargetOutputNested(CliParams.getNamedParam(args, "-nested"));
       }
       if (CliParams.hasNamedParam(args, "-resetTx")) {
         self.settings.setCacheOption(PublisherUtils.CacheOption.CLEAR_ALL);
@@ -1914,12 +1912,6 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     return Long.toString(maxMemory / (1024*1024));
   }
 
-
-  protected void updateInspector(HTMLInspector parentInspector, String path) {
-    parentInspector.getManual().add(path+"/full-ig.zip");
-    parentInspector.getManual().add("../"+ pf.historyPage);
-    parentInspector.getSpecMaps().addAll(pf.specMaps);
-  }
 
   private String fetchCurrentIGPubVersion() {
     if (pf.currVer == null) {
