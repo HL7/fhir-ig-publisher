@@ -409,8 +409,9 @@ public class DependencyRenderer {
     }
     // create the table
     // add the rows 
-    // render it       
-    XhtmlNode x = gen.generate(model, dstFolder, 0, null);
+    // render it
+    gen.setNoUseCssClasses(true);
+    XhtmlNode x = gen.generate(model, dstFolder, false, null);
     XhtmlNode div = new XhtmlNode(NodeType.Element, "div");
     div.add(x);
     if (QA) {
