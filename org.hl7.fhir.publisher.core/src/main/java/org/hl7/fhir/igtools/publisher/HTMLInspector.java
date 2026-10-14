@@ -1883,14 +1883,17 @@ public class HTMLInspector {
           else if (f.isLangRedirect) {
             String fn = filename.replace(rootFolder, rootFolder+"/"+csHandler.getPrimaryLang());
             return checkTarget(fn, ref, rref, tgtList, bh, x, parent);
+          } else if (f.targets.contains(name)) {
+            return true;
           } else {
+            // only needed for the message about the link that can't be resolved
             tgtList.append(" (valid targets: "+(f.targets.size() > 40 ? Integer.toString(f.targets.size())+" targets"  :  f.targets.toString())+")");
             for (String s : f.targets) {
               if (s.equalsIgnoreCase(name)) {
                 tgtList.append(" - case is wrong ('"+s+"')");
               }
             }
-            return f.targets.contains(name);
+            return false;
           }
         }
       } else {
