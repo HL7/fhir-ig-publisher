@@ -81,6 +81,7 @@ import org.hl7.fhir.validation.ValidatorSettings;
 import org.hl7.fhir.validation.ValidatorUtils;
 import org.hl7.fhir.validation.instance.InstanceValidator;
 import org.hl7.fhir.validation.profile.ProfileValidator;
+import org.apache.commons.lang3.StringUtils;
 import org.w3._1999.xhtml.B;
 import org.w3c.dom.Document;
 import org.xml.sax.SAXException;
@@ -213,6 +214,9 @@ public class PublisherIGLoader extends PublisherBase {
           switch (indent) {
             case 2:
               String t = line.trim();
+              if (t.contains("@npm:"))
+                t = StringUtils.substringAfter(t, "@npm:");
+              
               if (t.contains(":")) {
                 String name = t.substring(0, t.indexOf(":")).trim();
                 String value = t.substring(t.indexOf(":")+1).trim();
