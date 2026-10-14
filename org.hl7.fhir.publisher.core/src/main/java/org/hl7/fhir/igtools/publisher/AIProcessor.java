@@ -390,25 +390,20 @@ public class AIProcessor {
 
   private long loadPages(File dir, List<Page> pages, List<LoadedResource> resources) {
     long res = 0;
+    ResourceFileNames resourceFiles = new ResourceFileNames();
+    for (LoadedResource lr : resources) {
+      if (lr.filename != null) {
+        resourceFiles.add(lr.filename);
+      }
+    }
     for (File f : dir.listFiles()) {
       if ((f.getName().endsWith(".html") || f.getName().endsWith(".json") || f.getName().endsWith(".xml")) && !f.getName().startsWith("qa")) {
         res += f.length();
       }
       if (f.getName().endsWith(".html") && !f.getName().startsWith("qa") && !Utilities.existsInList(f.getName(),
               "toc.html", "searchform.html")) {
-        boolean found = false;
-        boolean found2 = false;
-        for (LoadedResource lr : resources) {
-          if (lr.filename != null) {
-            if (lr.filename.equalsIgnoreCase(f.getName())) {
-              found = true;
-            }
-            String n = FileUtilities.changeFileExt(f.getName().toLowerCase(), "");
-            if (n.startsWith(FileUtilities.changeFileExt(lr.filename.toLowerCase(), ""))) {
-              found2 = true;
-            }
-          }
-        }
+        boolean found = resourceFiles.isResourceFile(f.getName());
+        boolean found2 = resourceFiles.startsWithResourceFile(f.getName());
         if (found) {
           pages.add(new Page(PageKind.RESOURCE, f));
         } else if (!found2) {
@@ -441,6 +436,44 @@ public class AIProcessor {
     return null; // can't get here, really
   }
 
+
+  /**
+   * The names of the files the resources were loaded from. The lower case names without extensions
+   * are worked out once, rather than for every page.
+   */
+  static class ResourceFileNames {
+    private final List<String> names = new ArrayList<>();
+    private final List<String> stems = new ArrayList<>();
+
+    void add(String filename) {
+      names.add(filename);
+      stems.add(FileUtilities.changeFileExt(filename.toLowerCase(), ""));
+    }
+
+    /** @return true if a resource was loaded from a file with this name, ignoring case */
+    boolean isResourceFile(String name) {
+      for (String n : names) {
+        if (n.equalsIgnoreCase(name)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    /**
+     * @return true if the name, in lower case and without its extension, starts with the lower case
+     *   name of a resource's file without its extension
+     */
+    boolean startsWithResourceFile(String name) {
+      String n = FileUtilities.changeFileExt(name.toLowerCase(), "");
+      for (String stem : stems) {
+        if (n.startsWith(stem)) {
+          return true;
+        }
+      }
+      return false;
+    }
+  }
 
   private enum PageKind {PAGE, RESOURCE}
 
