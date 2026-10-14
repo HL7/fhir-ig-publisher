@@ -8,6 +8,7 @@ import java.io.File;
 import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
@@ -115,18 +116,22 @@ class DBBuilderListTest {
   }
 
   @Test
-  void rowsAreCommittedByFinishList() throws SQLException {
+  void rowsAreOnlyCommittedByFinishList() throws SQLException {
     String path = new File(dir.toFile(), "committed.db").getAbsolutePath();
     DBBuilder db = new DBBuilder(path, null, null, null, new ArrayList<>());
-    db.startList();
-    addLists(db);
-    db.finishList();
-    List<String> rows = dump(db.getConnection());
-    db.closeUp();
-
-    try (Connection con = java.sql.DriverManager.getConnection("jdbc:sqlite:" + path)) {
-      assertEquals(rows, dump(con));
+    List<String> before;
+    try (Connection other = DriverManager.getConnection("jdbc:sqlite:" + path)) {
+      before = dump(other);
+      db.startList();
+      addLists(db);
+      // still in the one transaction, so another connection doesn't see the rows yet
+      assertEquals(before, dump(other));
+      db.finishList();
+      List<String> rows = dump(db.getConnection());
+      assertTrue(rows.size() > before.size() + 200, "expected the list rows to be added");
+      assertEquals(rows, dump(other));
     }
+    db.closeUp();
   }
 
   @Test
