@@ -1120,9 +1120,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       genWrapper(null, r, template, this.pf.igpkp.getProperty(r, "format"), f.getOutputNames(), vars, "ttl", "", false, lang, lrc);
     }
     org.hl7.fhir.services.elementmodel.XmlParser xp = new org.hl7.fhir.services.elementmodel.XmlParser(this.pf.context);
-    ByteArrayOutputStream bs = new ByteArrayOutputStream();
-    xp.compose(langElement, bs, OutputStyle.NORMAL, null);
-    int size = bs.size();
+    // the xml, json and ttl views only use Prism for small resources; finding that out doesn't need the whole xml
+    Element sizeElement = langElement;
+    boolean prism = OutputSizeCheck.isSmallerThan(stream -> xp.compose(sizeElement, stream, OutputStyle.NORMAL, null), PRISM_SIZE_LIMIT);
 
     Element e = langElement;
     if (SpecialTypeHandler.handlesType(r.fhirType(), this.pf.context.getFHIRVersion()) && !pf.customResourceNames.contains(r.fhirType())) {
@@ -1135,7 +1135,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     if (wantGen(r, "xml-html")) {
       long start = System.currentTimeMillis();
       XmlXHtmlRenderer x = new XmlXHtmlRenderer();
-      x.setPrism(size < PRISM_SIZE_LIMIT);
+      x.setPrism(prism);
       xp.setLinkResolver(this.pf.igpkp);
       xp.setShowDecorations(false);
       if (suppressId(f, r)) {
@@ -1147,7 +1147,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     if (wantGen(r, "json-html")) {
       long start = System.currentTimeMillis();
       JsonXhtmlRenderer j = new JsonXhtmlRenderer();
-      j.setPrism(size < PRISM_SIZE_LIMIT);
+      j.setPrism(prism);
       org.hl7.fhir.services.elementmodel.JsonParser jp = new org.hl7.fhir.services.elementmodel.JsonParser(this.pf.context);
       jp.setLinkResolver(this.pf.igpkp);
       jp.setAllowComments(true);
@@ -1168,7 +1168,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       }
       ttl.setStyle(OutputStyle.PRETTY);
       ttl.compose(e, rdf, "");
-      fragment(r.fhirType()+"-"+r.getId()+"-ttl-html", rdf.asHtml(size < PRISM_SIZE_LIMIT), f.getOutputNames(), r, vars, "ttl", start, "ttl-html", "Resource", lang);
+      fragment(r.fhirType()+"-"+r.getId()+"-ttl-html", rdf.asHtml(prism), f.getOutputNames(), r, vars, "ttl", start, "ttl-html", "Resource", lang);
     }
 
     generateHtml(f, r, res, langElement, vars, lrc, lang);
