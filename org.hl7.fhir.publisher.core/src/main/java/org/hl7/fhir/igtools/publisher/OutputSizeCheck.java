@@ -56,12 +56,21 @@ class OutputSizeCheck {
     try {
       output.writeTo(stream);
     } catch (IOException | RuntimeException e) {
-      if (stream.full) {
-        // the answer is known, whatever the writer made of being stopped
+      if (stream.full && isLimitReached(e)) {
+        // the answer is known, whether the writer passed the stop on as it was or wrapped it
         return false;
       }
       throw e;
     }
     return stream.count < limit;
+  }
+
+  private static boolean isLimitReached(Throwable e) {
+    for (Throwable t = e; t != null; t = t.getCause() == t ? null : t.getCause()) {
+      if (t instanceof LimitReached) {
+        return true;
+      }
+    }
+    return false;
   }
 }

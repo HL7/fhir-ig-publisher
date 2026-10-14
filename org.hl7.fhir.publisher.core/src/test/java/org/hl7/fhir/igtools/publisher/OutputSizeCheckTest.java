@@ -114,4 +114,18 @@ class OutputSizeCheckTest {
     };
     assertSame(failure, assertThrows(IOException.class, () -> OutputSizeCheck.isSmallerThan(output, LIMIT)));
   }
+
+  @Test
+  void otherFailuresAfterTheLimitArePassedOn() {
+    IllegalStateException failure = new IllegalStateException("broken");
+    OutputSizeCheck.Output output = stream -> {
+      try {
+        stream.write(new byte[LIMIT]);
+      } catch (IOException e) {
+        // a writer that drops the stop and fails for its own reason
+      }
+      throw failure;
+    };
+    assertSame(failure, assertThrows(IllegalStateException.class, () -> OutputSizeCheck.isSmallerThan(output, LIMIT)));
+  }
 }
