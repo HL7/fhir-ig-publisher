@@ -396,35 +396,6 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     System.gc();
     printMemUsage();
 
-    if (pf.nestedIgConfig != null) {
-      if (pf.nestedIgOutput == null || pf.igArtifactsPage == null) {
-        throw new Exception("If nestedIgConfig is specified, then nestedIgOutput and igArtifactsPage must also be specified.");
-      }
-      pf.inspector.setAltRootFolder(pf.nestedIgOutput);
-      log("");
-      log("**************************");
-      log("Processing nested IG: " + pf.nestedIgConfig);
-      pf.childPublisher = new Publisher();
-      pf.childPublisher.setConfigFile(Utilities.path(FileUtilities.getDirectoryForFile(this.getConfigFile()), pf.nestedIgConfig));
-      pf.childPublisher.settings.setJekyllCommand(this.settings.getJekyllCommand());
-      pf.childPublisher.settings.setTxServer(this.settings.getTxServer());
-      pf.childPublisher.settings.setDebug(this.settings.isDebug());
-      pf.childPublisher.settings.setCacheOption(this.settings.getCacheOption());
-      pf.childPublisher.setIsChild(true);
-      pf.childPublisher.settings.setMode(this.getMode());
-      pf.childPublisher.settings.setTargetOutput(this.getTargetOutputNested());
-
-      try {
-        pf.childPublisher.execute();
-        log("Done processing nested IG: " + pf.nestedIgConfig);
-        log("**************************");
-        pf.childPublisher.updateInspector(pf.inspector, pf.nestedIgOutput);
-      } catch (Exception e) {
-        log("Publishing Child IG Failed: " + pf.nestedIgConfig);
-        throw e;
-      }
-      createToc(pf.childPublisher.getPublishedIg().getDefinition().getPage(), pf.igArtifactsPage, pf.nestedIgOutput);
-    }
     fixSearchForm();
     if (!settings.isGenerationOff()) {
       templateBeforeJekyll();
@@ -502,101 +473,94 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       }
     }
 
-    if (pf.childPublisher !=null) {
-      // Combine list of files so that the validation report will include everything
-      pf.fileList.addAll(pf.childPublisher.getFileList());
+    log("Checking Output HTML");
+    String statusMessage;
+    Map<String, String> statusMessages = new HashMap<>();
+    if (settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD) {
+      statusMessage = pf.rc.formatPhrase(RenderingI18nContext.STATUS_MSG_AUTOBUILD, Utilities.escapeXml(pf.sourceIg.present()), Utilities.escapeXml(pf.sourceIg.getPublisher()), Utilities.escapeXml(workingVersion()), gh(), pf.igpkp.getCanonical());
+      for (String lang : allLangs()) {
+        statusMessages.put(lang, pf.rcLangs.get(lang).formatPhrase(RenderingI18nContext.STATUS_MSG_AUTOBUILD, Utilities.escapeXml(pf.sourceIg.present()), Utilities.escapeXml(pf.sourceIg.getPublisher()), Utilities.escapeXml(workingVersion()), gh(), pf.igpkp.getCanonical()));
+      }
+    } else if (settings.getMode() == PublisherUtils.IGBuildMode.PUBLICATION) {
+      statusMessage = pf.rc.formatPhrase(RenderingI18nContext.STATUS_MSG_PUBLICATION_HOLDER);
+      for (String lang : allLangs()) {
+        statusMessages.put(lang, pf.rcLangs.get(lang).formatPhrase(RenderingI18nContext.STATUS_MSG_PUBLICATION_HOLDER));
+      }
+    } else {
+      statusMessage = pf.rc.formatPhrase(RenderingI18nContext.STATUS_MSG_LOCAL_BUILD, Utilities.escapeXml(pf.sourceIg.present()), Utilities.escapeXml(workingVersion()), pf.igpkp.getCanonical());
+      for (String lang : allLangs()) {
+        statusMessages.put(lang, pf.rcLangs.get(lang).formatPhrase(RenderingI18nContext.STATUS_MSG_LOCAL_BUILD, Utilities.escapeXml(pf.sourceIg.present()), Utilities.escapeXml(workingVersion()), pf.igpkp.getCanonical()));
+      }
     }
 
-    if (!isChild()) {
-      log("Checking Output HTML");
-      String statusMessage;
-      Map<String, String> statusMessages = new HashMap<>();
-      if (settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD) {
-        statusMessage = pf.rc.formatPhrase(RenderingI18nContext.STATUS_MSG_AUTOBUILD, Utilities.escapeXml(pf.sourceIg.present()), Utilities.escapeXml(pf.sourceIg.getPublisher()), Utilities.escapeXml(workingVersion()), gh(), pf.igpkp.getCanonical());
-        for (String lang : allLangs()) {
-          statusMessages.put(lang, pf.rcLangs.get(lang).formatPhrase(RenderingI18nContext.STATUS_MSG_AUTOBUILD, Utilities.escapeXml(pf.sourceIg.present()), Utilities.escapeXml(pf.sourceIg.getPublisher()), Utilities.escapeXml(workingVersion()), gh(), pf.igpkp.getCanonical()));
-        }
-      } else if (settings.getMode() == PublisherUtils.IGBuildMode.PUBLICATION) {
-        statusMessage = pf.rc.formatPhrase(RenderingI18nContext.STATUS_MSG_PUBLICATION_HOLDER);
-        for (String lang : allLangs()) {
-          statusMessages.put(lang, pf.rcLangs.get(lang).formatPhrase(RenderingI18nContext.STATUS_MSG_PUBLICATION_HOLDER));
-        }
+    pf.realmRules.addOtherFiles(pf.inspector.getExceptions(), pf.outputDir);
+    pf.previousVersionComparator.addOtherFiles(pf.inspector.getExceptions(), pf.outputDir, pf.getExemptHtmlPatterns());
+    if (pf.ipaComparator != null) {
+      pf.ipaComparator.addOtherFiles(pf.inspector.getExceptions(), pf.outputDir);
+    }
+    if (pf.ipsComparator != null) {
+      pf.ipsComparator.addOtherFiles(pf.inspector.getExceptions(), pf.outputDir);
+    }
+
+    if (!settings.isGenerationOff()) {
+      AIProcessor ai = new AIProcessor(pf.inspector.getRootFolder());
+      if (isNewML()) {
+        ai.processNewTemplates(allLangs());
       } else {
-        statusMessage = pf.rc.formatPhrase(RenderingI18nContext.STATUS_MSG_LOCAL_BUILD, Utilities.escapeXml(pf.sourceIg.present()), Utilities.escapeXml(workingVersion()), pf.igpkp.getCanonical());
-        for (String lang : allLangs()) {
-          statusMessages.put(lang, pf.rcLangs.get(lang).formatPhrase(RenderingI18nContext.STATUS_MSG_LOCAL_BUILD, Utilities.escapeXml(pf.sourceIg.present()), Utilities.escapeXml(workingVersion()), pf.igpkp.getCanonical()));
-        }
+        ai.processOldTemplates();
       }
-
-      pf.realmRules.addOtherFiles(pf.inspector.getExceptions(), pf.outputDir);
-      pf.previousVersionComparator.addOtherFiles(pf.inspector.getExceptions(), pf.outputDir, pf.getExemptHtmlPatterns());
-      if (pf.ipaComparator != null) {
-        pf.ipaComparator.addOtherFiles(pf.inspector.getExceptions(), pf.outputDir);
-      }
-      if (pf.ipsComparator != null) {
-        pf.ipsComparator.addOtherFiles(pf.inspector.getExceptions(), pf.outputDir);
-      }
-
-      if (!settings.isGenerationOff()) {
-        AIProcessor ai = new AIProcessor(pf.inspector.getRootFolder());
-        if (isNewML()) {
-          ai.processNewTemplates(allLangs());
-        } else {
-          ai.processOldTemplates();
-        }
-      }
-
-      pf.inspector.setReqFolder(pf.repoRoot);
-      pf.inspector.setDefaultLang(pf.defaultTranslationLang);
-      pf.inspector.setTranslationLangs(pf.translationLangs);
-
-
-      if (pf.previousVersionComparator != null) {
-        for (PreviousVersionComparator.VersionInstance vi : pf.previousVersionComparator.getVersionList()) {
-          pf.inspector.getComparisonFiles().add("comparison-v"+vi.getVersion()+"/index.html");
-        }
-      }
-      if (pf.ipaComparator != null && pf.ipaComparator.hasLast()) {
-        pf.inspector.getComparisonFiles().add(pf.ipaComparator.getBaseFile());
-      }
-      if (pf.ipsComparator != null && pf.ipsComparator.hasLast()) {
-        pf.inspector.getComparisonFiles().add(pf.ipsComparator.getBaseFile());
-      }
-      List<ValidationMessage> linkmsgs = settings.isGenerationOff() ? new ArrayList<ValidationMessage>() : pf.inspector.check(statusMessage, statusMessages);
-      int bl = 0;
-      int lf = 0;
-      for (ValidationMessage m : ValidationPresenter.filterMessages(null, linkmsgs, true, pf.suppressedMessages)) {
-        if (ValidationPresenter.isBrokenLink(m)) {
-          bl++;
-        } else if (m.getLevel() == ValidationMessage.IssueSeverity.ERROR && m.getType() != ValidationMessage.IssueType.NOTFOUND) {
-          lf++;
-        } else if (m.getLevel() == ValidationMessage.IssueSeverity.FATAL) {
-          throw new Exception(m.getMessage());
-        }
-      }
-      log("  ... "+Integer.toString(pf.inspector.total())+" html "+checkPlural("file", pf.inspector.total())+", "+Integer.toString(lf)+" "+checkPlural("page", lf)+" invalid xhtml ("+Integer.toString((lf*100)/(pf.inspector.total() == 0 ? 1 : pf.inspector.total()))+"%)");
-      log("  ... "+Integer.toString(pf.inspector.links())+" "+checkPlural("link", pf.inspector.links())+", "+Integer.toString(bl)+" broken "+checkPlural("link", bl)+" ("+Integer.toString((bl*100)/(pf.inspector.links() == 0 ? 1 : pf.inspector.links()))+"%)");
-      pf.errors.addAll(linkmsgs);
-      if (pf.brokenLinksError && bl > 0) {
-        throw new Error("Halting build because broken links have been found, and these are disallowed in the IG control file");
-      }
-      if (settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD && !pf.inspector.getPublishBoxOK()) {
-        throw new FHIRException("The auto-build infrastructure does not publish IGs unless the publish-box is present ("+ pf.inspector.getPublishboxParsingSummary()+"). For further information, see note at http://wiki.hl7.org/index.php?title=FHIR_Implementation_Guide_Publishing_Requirements#HL7_HTML_Standards_considerations");
-      }
-      generateFragmentUsage();
-      log("Build final .zip");
-      if (settings.getMode() == PublisherUtils.IGBuildMode.PUBLICATION) {
-        IGReleaseVersionUpdater igvu = new IGReleaseVersionUpdater(pf.outputDir, null, null, new ArrayList<>(), new ArrayList<>(), null, pf.outputDir);
-        String fragment = pf.sourceIg.present()+" - Downloaded Version "+ pf.businessVersion +" See the <a href=\""+ pf.igpkp.getCanonical()+"/history.html\">Directory of published versions</a></p>";
-        igvu.updateStatement(fragment, 0, null);
-      }
-      ZipGenerator zip = new ZipGenerator(Utilities.path(pf.tempDir, "full-ig.zip"));
-      zip.addFolder(pf.outputDir, "site/", false);
-      zip.addFileSource("index.html", REDIRECT_SOURCE, false);
-      zip.close();
-      FileUtilities.copyFile(Utilities.path(pf.tempDir, "full-ig.zip"), Utilities.path(pf.outputDir, "full-ig.zip"));
-      log("Final .zip built");
     }
+
+    pf.inspector.setReqFolder(pf.repoRoot);
+    pf.inspector.setDefaultLang(pf.defaultTranslationLang);
+    pf.inspector.setTranslationLangs(pf.translationLangs);
+
+
+    if (pf.previousVersionComparator != null) {
+      for (PreviousVersionComparator.VersionInstance vi : pf.previousVersionComparator.getVersionList()) {
+        pf.inspector.getComparisonFiles().add("comparison-v"+vi.getVersion()+"/index.html");
+      }
+    }
+    if (pf.ipaComparator != null && pf.ipaComparator.hasLast()) {
+      pf.inspector.getComparisonFiles().add(pf.ipaComparator.getBaseFile());
+    }
+    if (pf.ipsComparator != null && pf.ipsComparator.hasLast()) {
+      pf.inspector.getComparisonFiles().add(pf.ipsComparator.getBaseFile());
+    }
+    List<ValidationMessage> linkmsgs = settings.isGenerationOff() ? new ArrayList<ValidationMessage>() : pf.inspector.check(statusMessage, statusMessages);
+    int bl = 0;
+    int lf = 0;
+    for (ValidationMessage m : ValidationPresenter.filterMessages(null, linkmsgs, true, pf.suppressedMessages)) {
+      if (ValidationPresenter.isBrokenLink(m)) {
+        bl++;
+      } else if (m.getLevel() == ValidationMessage.IssueSeverity.ERROR && m.getType() != ValidationMessage.IssueType.NOTFOUND) {
+        lf++;
+      } else if (m.getLevel() == ValidationMessage.IssueSeverity.FATAL) {
+        throw new Exception(m.getMessage());
+      }
+    }
+    log("  ... "+Integer.toString(pf.inspector.total())+" html "+checkPlural("file", pf.inspector.total())+", "+Integer.toString(lf)+" "+checkPlural("page", lf)+" invalid xhtml ("+Integer.toString((lf*100)/(pf.inspector.total() == 0 ? 1 : pf.inspector.total()))+"%)");
+    log("  ... "+Integer.toString(pf.inspector.links())+" "+checkPlural("link", pf.inspector.links())+", "+Integer.toString(bl)+" broken "+checkPlural("link", bl)+" ("+Integer.toString((bl*100)/(pf.inspector.links() == 0 ? 1 : pf.inspector.links()))+"%)");
+    pf.errors.addAll(linkmsgs);
+    if (pf.brokenLinksError && bl > 0) {
+      throw new Error("Halting build because broken links have been found, and these are disallowed in the IG control file");
+    }
+    if (settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD && !pf.inspector.getPublishBoxOK()) {
+      throw new FHIRException("The auto-build infrastructure does not publish IGs unless the publish-box is present ("+ pf.inspector.getPublishboxParsingSummary()+"). For further information, see note at http://wiki.hl7.org/index.php?title=FHIR_Implementation_Guide_Publishing_Requirements#HL7_HTML_Standards_considerations");
+    }
+    generateFragmentUsage();
+    log("Build final .zip");
+    if (settings.getMode() == PublisherUtils.IGBuildMode.PUBLICATION) {
+      IGReleaseVersionUpdater igvu = new IGReleaseVersionUpdater(pf.outputDir, null, null, new ArrayList<>(), new ArrayList<>(), null, pf.outputDir);
+      String fragment = pf.sourceIg.present()+" - Downloaded Version "+ pf.businessVersion +" See the <a href=\""+ pf.igpkp.getCanonical()+"/history.html\">Directory of published versions</a></p>";
+      igvu.updateStatement(fragment, 0, null);
+    }
+    ZipGenerator zip = new ZipGenerator(Utilities.path(pf.tempDir, "full-ig.zip"));
+    zip.addFolder(pf.outputDir, "site/", false);
+    zip.addFileSource("index.html", REDIRECT_SOURCE, false);
+    zip.close();
+    FileUtilities.copyFile(Utilities.path(pf.tempDir, "full-ig.zip"), Utilities.path(pf.outputDir, "full-ig.zip"));
+    log("Final .zip built");
     if (!pf.txUnloadEarly) {
       // default path: terminology stayed loaded through HTML inspection (so conformance
       // statement rendering works); unload it now that the inspector is complete.
@@ -669,7 +633,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
   }
 
   private boolean needFile(String s) {
-    if (s.endsWith(".css") && !isChild())
+    if (s.endsWith(".css"))
       return true;
     if (s.startsWith("tbl"))
       return true;
