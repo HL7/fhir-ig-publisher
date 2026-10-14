@@ -283,12 +283,22 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
     generateViewDefinitions(db);
     if (!pf.changeList.isEmpty()) {
-      if (isNewML()) {
-        for (String l : allLangs()) {
-          generateSummaryOutputsBefore(db, l, pf.rcLangs.get(l));
+      // the code system and value set lists add a few rows to the database for each entry
+      if (db != null) {
+        db.startList();
+      }
+      try {
+        if (isNewML()) {
+          for (String l : allLangs()) {
+            generateSummaryOutputsBefore(db, l, pf.rcLangs.get(l));
+          }
+        } else {
+          generateSummaryOutputsBefore(db, null, pf.rc);
         }
-      } else {
-        generateSummaryOutputsBefore(db, null, pf.rc);
+      } finally {
+        if (db != null) {
+          db.finishList();
+        }
       }
     }
     templateBeforeGenerate();
