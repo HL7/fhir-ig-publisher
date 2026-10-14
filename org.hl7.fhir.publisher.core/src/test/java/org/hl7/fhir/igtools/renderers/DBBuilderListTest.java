@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
+import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -126,5 +127,17 @@ class DBBuilderListTest {
     try (Connection con = java.sql.DriverManager.getConnection("jdbc:sqlite:" + path)) {
       assertEquals(rows, dump(con));
     }
+  }
+
+  @Test
+  void finishListWithoutStartListDoesNothing() throws Exception {
+    DBBuilder db = db("unstarted.db");
+    db.finishList();
+    assertTrue(db.getConnection().getAutoCommit());
+    // there's no transaction to commit, so nothing should be reported
+    Field errors = DBBuilder.class.getDeclaredField("errors");
+    errors.setAccessible(true);
+    assertEquals(Set.of(), errors.get(db));
+    db.closeUp();
   }
 }
