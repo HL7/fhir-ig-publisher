@@ -22,9 +22,11 @@ package org.hl7.fhir.igtools.publisher;
 
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -413,14 +415,16 @@ public class HTMLInspector {
           first = false;
         }
       }
-      checkFragmentIds(FileUtilities.fileToString(lf.filename));
+      // read the page once for the fragment checks and the parse
+      String src = FileUtilities.fileToString(lf.filename);
+      checkFragmentIds(src);
 
       if (lf.isHasXhtml()) {
         if (fragmentUses != null) {
-          checkFragmentMarkers(FileUtilities.fileToString(lf.getFilename()));
+          checkFragmentMarkers(src);
         }
         XhtmlParser parser = new XhtmlParser().setMustBeWellFormed(strict);
-        XhtmlNode x = parser.parse(new File(lf.filename), null);
+        XhtmlNode x = parser.parse(src, null);
         // The parse is lenient so that a page with broken markup still gets link checked, heading
         // checked and so on. But the markup IS broken - IG output is XHTML - so report whatever the
         // parser had to fix up to get here, with the line and column it happened at.
@@ -684,6 +688,13 @@ public class HTMLInspector {
     }
   }
 
+  /** Reads a file the way {@link XhtmlParser#parse(File, String)} does. */
+  private static String readFile(File f) throws IOException {
+    try (InputStream input = new FileInputStream(f)) {
+      return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+    }
+  }
+
   private void loadFile(String s, String base, List<ValidationMessage> messages) {
     log.logDebugMessage(ILoggingService.LogCategory.HTML, "Load "+s);
 
@@ -691,8 +702,10 @@ public class HTMLInspector {
     Boolean hl7State = null;
     XhtmlNode x = null;
     boolean htmlName = f.getName().endsWith(".html") || f.getName().endsWith(".xhtml") || f.getName().endsWith(".svg");
+    String content = null;
     try {
-      x = new XhtmlParser().setMustBeWellFormed(strict).parse(f, null);
+      content = readFile(f);
+      x = new XhtmlParser().setMustBeWellFormed(strict).parse(content, null);
       if (x.getElement("html")==null && x.getElement("svg")==null && !htmlName) {
         // We don't want resources being treated as HTML.  We'll check the HTML of the narrative in the page representation
         x = null;
@@ -709,7 +722,7 @@ public class HTMLInspector {
 
       String src;
       try {
-        src = FileUtilities.fileToString(f);
+        src = content;
         lr = src.contains("lang-redirects.js");
         hl7State = src.contains(RELEASE_HTML_MARKER);
         if (hl7State) {
@@ -728,8 +741,9 @@ public class HTMLInspector {
             src = src.substring(0, index) + pl + src.substring(index);
           }
           FileUtilities.stringToFile(src, f);
+          x = new XhtmlParser().setMustBeWellFormed(strict).parse(src, null);
         }
-        x = new XhtmlParser().setMustBeWellFormed(strict).parse(f, null);
+        // otherwise the file is still what was parsed above
       } catch (Exception e1) {
         hl7State = false;
       }
