@@ -7,6 +7,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -122,9 +123,14 @@ public class DependencyRenderer {
   private String npmName;
   private TemplateManager templateManager;
   private Map<String, PackageList> packageListCache = new HashMap<>();
+  private Map<String, PackageList> fetchedPackageLists = new HashMap<>(); // by url; only the ones fetched successfully
   private List<DependencyAnalyser.ArtifactDependency> dependencies;
   private List<GlobalProfile> globals = new ArrayList<>();
   private Set<String> globalPackages = new HashSet<>();
+  // the packages whose guides checkGlobals has already looked at, by identity: resolve() hands back the
+  // same object for a fixed version, and a fresh one each time for current, dev and so on
+  private Set<NpmPackage> globalsChecked = Collections.newSetFromMap(new IdentityHashMap<>());
+  private Map<String, NpmPackage> resolvedPackages = new HashMap<>();
   private IWorkerContext context;
   private MarkDownProcessor mdEngine;
   private RenderingContext rc;
@@ -148,6 +154,16 @@ public class DependencyRenderer {
       String pidv = ext.getValue().primitiveValue();
       globalPackages.add(pidv); // exempt from looking for globals
     }
+  }
+
+  /**
+   * Use the given map, of package lists by the url they were fetched from, to share the package lists
+   * fetched from the web with other renderers, so that each one is fetched once between them rather
+   * than once by each renderer.
+   */
+  public DependencyRenderer setFetchedPackageLists(Map<String, PackageList> fetchedPackageLists) {
+    this.fetchedPackageLists = fetchedPackageLists;
+    return this;
   }
 
   private class PackageVersionInfo {
@@ -590,13 +606,20 @@ public class DependencyRenderer {
     return false;
   }
 
-  private void checkGlobals(NpmPackage npm) throws IOException {
+  // package-private for testing
+  void checkGlobals(NpmPackage npm) throws IOException {
+    // once a package's guides have been checked, checking them again adds nothing: each guide's
+    // versioned url is already in globalPackages. So don't load and parse them again
+    if (globalsChecked.contains(npm)) {
+      return;
+    }
     for (String n : npm.listResources("ImplementationGuide")) {
       ImplementationGuide ig = loadImplementationGuide(npm.loadResource(n), npm.fhirVersion());
       if (ig != null && !ig.getUrl().equals("http://hl7.org/fhir/us/daf")) {
         checkGlobals(ig, npm);
       }
     }
+    globalsChecked.add(npm);
   }
 
   private ImplementationGuide loadImplementationGuide(InputStream content, String v) throws FHIRFormatError, FHIRException, IOException {
@@ -671,7 +694,14 @@ public class DependencyRenderer {
     PackageList pl;
     try {
       final String secureCanonical = ManagedWebAccess.makeSecureRef(canonical);
-      pl = PackageList.fromUrl(Utilities.pathURL(secureCanonical, "package-list.json"));
+      String url = Utilities.pathURL(secureCanonical, "package-list.json");
+      pl = fetchedPackageLists.get(url);
+      if (pl == null) {
+        pl = PackageList.fromUrl(url);
+        if (pl != null) {
+          fetchedPackageLists.put(url, pl);
+        }
+      }
           
     } catch (Exception e) {
       pl = null;
@@ -691,13 +721,26 @@ public class DependencyRenderer {
     return resolve(pid, d.getVersion());
   }
 
-  private NpmPackage resolve(String id, String version) throws FHIRException, IOException {
+  // package-private for testing
+  NpmPackage resolve(String id, String version) throws FHIRException, IOException {
     if (VersionUtilities.isCorePackage(id)) {
       version = VersionUtilities.getCurrentVersion(version);
-      return pcm.loadPackage(id, version);      
-    } else {
+    }
+    // the same packages turn up many times in the dependency tree, and loading one reads it from disk.
+    // Only fixed versions are kept: for current, dev or no version, loadPackage checks what the
+    // latest is each time
+    if (!VersionUtilities.isSemVer(version, false)) {
       return pcm.loadPackage(id, version);
     }
+    String key = id + "#" + version;
+    NpmPackage npm = resolvedPackages.get(key);
+    if (npm == null) {
+      npm = pcm.loadPackage(id, version);
+      if (npm != null) {
+        resolvedPackages.put(key, npm);
+      }
+    }
+    return npm;
   }
 
   private Row addBaseRow(HierarchicalTableGenerator gen, TableModel model, ImplementationGuide ig, boolean QA, boolean hasDesc) {
