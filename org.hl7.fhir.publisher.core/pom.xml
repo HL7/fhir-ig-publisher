@@ -30,6 +30,13 @@
             <groupId>info.cqframework</groupId>
             <artifactId>cql</artifactId>
             <version>${info_cqframework_version}</version>
+            <exclusions>
+                <!-- Build-time ANTLR tool leaked into compile scope; only antlr4-runtime is used -->
+                <exclusion>
+                    <groupId>org.antlr</groupId>
+                    <artifactId>antlr4</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>info.cqframework</groupId>

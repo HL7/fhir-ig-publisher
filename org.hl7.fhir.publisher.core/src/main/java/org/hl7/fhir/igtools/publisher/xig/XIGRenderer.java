@@ -70,6 +70,7 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
     this.rc.setDestDir(target);
     this.rc.setPkp(this);
     this.rc.setNoSlowLookup(true);
+    this.rc.setCacheResourceAnalysis(true);
     this.date = date;
   }
 

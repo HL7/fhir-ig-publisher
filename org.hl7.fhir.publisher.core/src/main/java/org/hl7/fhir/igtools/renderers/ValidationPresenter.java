@@ -330,14 +330,12 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   private Date ruleDateCutoff = null;
   private String statedVersion;
   private IGKnowledgeProvider provider;
-  private IGKnowledgeProvider altProvider;
   int err = 0;
   int warn = 0;
   int info = 0;
   int brokenLinks = 0;
   private String root;
   private String packageId;
-  private String altPackageId;
   private String igVersion;
   private String toolsVersion;
   private String currentToolsVersion;
@@ -377,7 +375,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   private List<RelatedIG> relatedIGs;
 
   
-  public ValidationPresenter(String statedVersion, String igVersion, IGKnowledgeProvider provider, IGKnowledgeProvider altProvider, String root, String packageId, String altPackageId, 
+  public ValidationPresenter(String statedVersion, String igVersion, IGKnowledgeProvider provider, String root, String packageId,
       String toolsVersion, String currentToolsVersion, RealmBusinessRules realm, PreviousVersionComparator previousVersionComparator, IpaComparator ipaComparator, IpsComparator ipsComparator,
       String dependencies, String csAnalysis, String pubReqCheck, String globalCheck, String copyrightYear, IWorkerContext context,
       Set<String> r5Extensions, List<StructureDefinition> modifierExtensions, String draftDependencies,
@@ -387,10 +385,8 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     this.statedVersion = statedVersion;
     this.igVersion = igVersion;
     this.provider = provider;
-    this.altProvider = altProvider;
     this.root = root;
     this.packageId = packageId;
-    this.altPackageId = altPackageId;
     this.realm = realm;
     this.toolsVersion = toolsVersion;
     this.currentToolsVersion = currentToolsVersion;
@@ -1668,10 +1664,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     t.add("filename", f.getName());
     t.add("path", makeLocal(f.getPath()));
     String link = f.getResources().isEmpty() ? null : provider.getLinkFor(f.getResources().get(0), true);
-    if (link==null) {
-      link = f.getResources().isEmpty() ? null : altProvider.getLinkFor(f.getResources().get(0), true);
-    }
-    if (link != null) { 
+    if (link != null) {
       link = link.replace("{{[id]}}", f.getResources().get(0).getId());
       link = link.replace("{{[type]}}", f.getResources().get(0).fhirType());
     }
@@ -1877,10 +1870,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     t.add("filename", f.getName());
     t.add("fpath", makeLocal(f.getPath()));
     String link = provider.getLinkFor(f.getResources().get(0), true);
-    if (link==null) {
-      link = altProvider.getLinkFor(f.getResources().get(0), true);
-    }
-    if (link != null) { 
+    if (link != null) {
       link = link.replace("{{[id]}}", f.getResources().get(0).getId());
       link = link.replace("{{[type]}}", f.getResources().get(0).fhirType());
     }

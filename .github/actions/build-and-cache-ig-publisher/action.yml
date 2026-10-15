@@ -36,6 +36,12 @@ runs:
         repository: HL7/fhir-ig-publisher
         ref: ${{ inputs.ref }}
         path: ${{ github.workspace }}/ig-publisher-cli-build
+    - name: Rename reserved 'local' repository id (releases before #1393)
+      # Maven now rejects 'local' as a repository id - it's reserved for the local repository. Releases up to
+      # 3.0.0 declare it in pom.xml (removed in #1393); harmless no-op for refs that don't have it
+      run: sed -i 's#<id>local</id>#<id>local-lib</id>#' pom.xml
+      shell: bash
+      working-directory: ${{ github.workspace }}/ig-publisher-cli-build
     - name: Build IG Publisher
       run: mvn clean install -Dmaven.test.skip=true
       shell: bash
