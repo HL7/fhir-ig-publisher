@@ -2,6 +2,8 @@ package org.hl7.fhir.igtools.publisher;
 
 import lombok.Getter;
 import lombok.Setter;
+import org.hl7.fhir.convertors.igs.r5.testing.TestingR4Convertor;
+import org.hl7.fhir.convertors.igs.r5.testing.TestingR5Convertor;
 import org.hl7.fhir.convertors.registry.VersionConvertorRegistry;
 import org.hl7.fhir.igtools.publisher.comparators.IpaComparator;
 import org.hl7.fhir.igtools.publisher.comparators.IpsComparator;
@@ -22,6 +24,7 @@ import org.hl7.fhir.model.core.*;
 import org.hl7.fhir.model.core.Enumeration;
 import org.hl7.fhir.services.renderers.DataRenderer;
 import org.hl7.fhir.services.renderers.RendererFactory;
+import org.hl7.fhir.services.renderers.igs.testing.TestingRenderers;
 import org.hl7.fhir.services.renderers.spreadsheets.StructureDefinitionSpreadsheetGenerator;
 import org.hl7.fhir.services.renderers.utils.RenderingContext;
 import org.hl7.fhir.services.renderers.utils.Resolver;
@@ -53,7 +56,6 @@ public class PublisherFields {
 
     Locale forcedLanguage;
     String igPack = "";
-    boolean isChild;
     boolean appendTrailingSlashInDataFile;
     boolean newIg = false;
     boolean inferResourceConformance = false;
@@ -68,7 +70,6 @@ public class PublisherFields {
     Map<org.hl7.fhir.services.elementmodel.Element, Set<String>> sdUsageCache;
     List<String> ignoreFlags = null;
     Map<String, Boolean> wantGenParams = new HashMap<String, Boolean>();
-    Publisher childPublisher = null;
     boolean genExampleNarratives = true;
     List<FetchedResource> noNarrativeResources = new ArrayList<FetchedResource>();
     final List<String> customResourceFiles = new ArrayList<String>();
@@ -207,9 +208,6 @@ public class PublisherFields {
     String htmlTemplate;
     String mdTemplate;
     boolean brokenLinksError;
-    String nestedIgConfig;
-    String igArtifactsPage;
-    String nestedIgOutput;
     boolean genExamples;
     boolean doTransforms;
     boolean allInvariants = true;
@@ -352,8 +350,28 @@ public class PublisherFields {
     List<String> suppressedMappings = new ArrayList<>();
 
     PublisherSigner signer;
-    RendererFactory rendererFactory = new RendererFactory();
-    VersionConvertorRegistry versionConvertorRegistry = new VersionConvertorRegistry() ;
+    RendererFactory rendererFactory = makeRendererFactory();
+    VersionConvertorRegistry versionConvertorRegistry = makeVersionConvertorRegistry();
+
+    /**
+     * The Testing IG resources (TestPlan etc) are always registered on the shared full core model
+     * context (see ModelContext.fullCoreContext()), so they are always in scope, and the convertors
+     * that take them back to R4/R5 are always needed - not just when incubator-ig is set
+     */
+    private static RendererFactory makeRendererFactory() {
+      RendererFactory rf = new RendererFactory();
+      TestingRenderers.register(rf); // the Testing IG is always in scope - see makeVersionConvertorRegistry()
+      return rf;
+    }
+
+    private static VersionConvertorRegistry makeVersionConvertorRegistry() {
+      VersionConvertorRegistry reg = new VersionConvertorRegistry();
+        reg.register(new org.hl7.fhir.convertors.igs.r5.testing.TestingR4Convertor());
+        reg.register(new org.hl7.fhir.convertors.igs.r5.testing.TestingR5Convertor());
+        reg.register(new org.hl7.fhir.convertors.igs.rN.testing.TestingR4Convertor());
+        reg.register(new org.hl7.fhir.convertors.igs.rN.testing.TestingR5Convertor());
+      return reg;
+    }
 
     public boolean excludeTtl;
 
