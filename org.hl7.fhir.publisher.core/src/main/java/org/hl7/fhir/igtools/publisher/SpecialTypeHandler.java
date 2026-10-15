@@ -14,8 +14,15 @@ public class SpecialTypeHandler {
   
   public static final String VERSION = "5.0.0";
 
+  /**
+   * The resource types that are authored in R5 format in an IG that is based on an earlier version (and 
+   * converted). In an R6+ IG there are none: ActorDefinition, Requirements and SubscriptionTopic are native, 
+   * and TestPlan is the Testing IG's TestPlan (registered on the model context), not R5's
+   */
   public static List<String> specialTypes(String version) {
-    if (VersionUtilities.isR4BVer(version)) {
+    if (VersionUtilities.isR6Plus(version)) {
+      return Collections.emptyList();
+    } else if (VersionUtilities.isR4BVer(version)) {
       return SPECIAL_TYPES_4B;
     } else {
       return SPECIAL_TYPES_OTHER;
