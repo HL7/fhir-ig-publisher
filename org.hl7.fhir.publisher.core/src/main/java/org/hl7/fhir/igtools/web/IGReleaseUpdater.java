@@ -342,7 +342,9 @@ public class IGReleaseUpdater {
     }
     igvu.checkXmlJsonClones(vf);
     System.out.println("  .. "+igvu.getClonedTotal()+" clones checked, "+igvu.getClonedCount()+" updated");
-    if (!isCore) {
+    // the binaries of a version with a binaries-location are not in its folder, and must not be rebuilt there
+    boolean binariesHere = isCurrent || ReleaseBinaries.location(version) == null;
+    if (!isCore && binariesHere) {
       IGPackageChecker pc = new IGPackageChecker(vf, canonical, version.asString("path"), ig.asString("package-id"));
       String fv = version.asString("fhirversion", "fhirversion");
       pc.check(version.asString("version"), ig.asString("package-id"), fv, 
@@ -365,7 +367,9 @@ public class IGReleaseUpdater {
       rb.buildOldAspRedirections();
     }
     System.out.println("  .. "+rb.getCountTotal()+" redirections ("+rb.getCountUpdated()+" created/updated)");
-    new DownloadBuilder(vf, canonical, isCurrent ?  canonical : version.asString("path"), ignoreList).execute();
+    if (binariesHere) {
+      new DownloadBuilder(vf, canonical, isCurrent ?  canonical : version.asString("path"), ignoreList).execute();
+    }
     if (!isCurrent && serverType == ServerType.ASP2) {
       new VersionRedirectorGenerator(canonicalPath).execute(version.asString("version"), version.asString("path"));
     }
@@ -378,9 +382,11 @@ public class IGReleaseUpdater {
       }
     }
     // check links:
-    checkFileExists(vf, "package.tgz");
     checkFileExists(vf, "qa.html");
-    checkFileExists(vf, isCore ? "fhir-spec.zip" : "full-ig.zip");
+    if (binariesHere) {
+      checkFileExists(vf, "package.tgz");
+      checkFileExists(vf, isCore ? "fhir-spec.zip" : "full-ig.zip");
+    }
     
     if (sft != null) {
       String html = FileUtilities.fileToString(sft);
