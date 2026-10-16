@@ -29,6 +29,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import org.hl7.fhir.igtools.publisher.NewLocationRedirects;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
@@ -210,8 +211,12 @@ public class IGReleaseRedirectionBuilder {
     if (map == null) {
       System.out.println("!!! no map, "+folder);
     } else {
+      // the web.config sends every request for Type/* to the redirector for Type, so the redirectors also have to
+      // send the artifacts that are now published elsewhere to their new location
+      Map<String, String> moved = loadNewLocations();
       // we need to generate a web config, and the redirectors
       Set<String> rtl = listResourceTypes(map);
+      rtl.addAll(listResourceTypes(moved));
       if (rtl.isEmpty()) {
         if (!folder.contains("smart-app-launch") && !folder.contains("davinci-deqm")) {
           System.out.println("!!! empty map, "+folder);
@@ -219,7 +224,7 @@ public class IGReleaseRedirectionBuilder {
       } else {
         generateWebConfig(rtl, isCoreRoot);
         for (String rt : rtl) {
-          generateRedirect(rt, map);
+          generateRedirect(rt, map, moved);
         }
         if (isCoreRoot) {
           for (String s : map.keySet()) {
@@ -240,18 +245,27 @@ public class IGReleaseRedirectionBuilder {
     }
   }
 
-  private void generateRedirect(String rt, Map<String, String> map) throws IOException {
-    if (!rt.contains(":")) {      
+  private void generateRedirect(String rt, Map<String, String> map, Map<String, String> moved) throws IOException {
+    if (!rt.contains(":")) {
       StringBuilder b = new StringBuilder();
       countTotal++;
 
       String root = Utilities.pathURL(canonical, rt);
-      b.append("<%@ language=\"javascript\"%>\r\n" + 
-          "\r\n" + 
-          "<%\r\n" + 
+      b.append("<%@ language=\"javascript\"%>\r\n" +
+          "\r\n" +
+          "<%\r\n" +
           "  var s = String(Request.ServerVariables(\"HTTP_ACCEPT\"));\r\n" +
-          "  var id = Request.QueryString(\"id\");\r\n"+
-          "  if (s.indexOf(\"application/json+fhir\") > -1) \r\n" + 
+          "  var id = Request.QueryString(\"id\");\r\n");
+      // artifacts now published elsewhere go to their new location, whatever the format asked for
+      for (String s : moved.keySet()) {
+        if (s.startsWith(rt+"/")) {
+          b.append("  if (id == \""+s.substring(rt.length()+1)+"\")\r\n" +
+              "    Response.Redirect(\""+moved.get(s)+"\");\r\n" +
+              "  else");
+        }
+      }
+      b.append(
+          "  if (s.indexOf(\"application/json+fhir\") > -1) \r\n" +
           "    Response.Redirect(\""+root+"-\"+id+\".json2\");\r\n" + 
           "  else if (s.indexOf(\"application/fhir+json\") > -1) \r\n" + 
           "    Response.Redirect(\""+root+"-\"+id+\".json1\");\r\n" + 
@@ -437,32 +451,49 @@ public class IGReleaseRedirectionBuilder {
   }
 
   private Map<String, String> createMap(boolean isCore) throws IOException {
+    JsonObject json = loadSpecInternals();
+    if (json == null) {
+      return null;
+    }
+    Map<String, String> res = parseSpecDetails(json);
+    if (isCore) {
+      scanAdditionalFiles(res);
+    }
+    return res;
+  }
+
+  private JsonObject loadSpecInternals() throws IOException {
     if (new File(Utilities.path(folder, "spec.internals")).exists()) {
-      JsonObject json = null;
       try {
-        json = JsonParser.parseObjectFromFile(Utilities.path(folder, "spec.internals"));
+        return JsonParser.parseObjectFromFile(Utilities.path(folder, "spec.internals"));
       } catch (Exception e) {
         return null;
       }
-      Map<String, String> res = parseSpecDetails(json);
-      if (isCore) {
-        scanAdditionalFiles(res);      
-      }
-      return res;
     }
     File f = new File(Utilities.path(folder, "package.tgz"));
     if (!f.exists())
       return null;
     pkg = NpmPackage.fromPackage(new FileInputStream(f));
-    JsonObject json = null;
     try {
-      json = JsonParser.parseObject(pkg.load("other", "spec.internals"));
+      return JsonParser.parseObject(pkg.load("other", "spec.internals"));
     } catch (Exception e) {
       return null;
     }
-    Map<String, String> res = parseSpecDetails(json);
-    if (isCore) {
-      scanAdditionalFiles(res);      
+  }
+
+  /**
+   * @return the artifacts that were in this IG and are now published in another one (Type/id : new location), from
+   *   the new-location extensions of the IG. The IG build writes static redirect pages for these
+   */
+  private Map<String, String> loadNewLocations() throws IOException {
+    Map<String, String> res = new HashMap<>();
+    JsonObject json = loadSpecInternals();
+    if (json != null && json.has(NewLocationRedirects.SPEC_INTERNALS_KEY)) {
+      for (JsonProperty p : json.getJsonObject(NewLocationRedirects.SPEC_INTERNALS_KEY).getProperties()) {
+        if (p.getName().contains("/")) {
+          res.put(p.getName(), p.getValue().asString());
+        }
+      }
     }
     return res;
   }

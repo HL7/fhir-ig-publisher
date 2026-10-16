@@ -58,6 +58,23 @@ class IGReleaseRedirectionBuilderTest {
   }
 
   @Test
+  void aspRedirectorsSendMovedArtifactsToTheirNewLocation() throws IOException {
+    // ValueSet/moved is now published in another IG (new-location), and no other ValueSet is left in this one
+    FileUtilities.stringToFile("{\"paths\": {\"" + CANONICAL + "/StructureDefinition/foo\": \"StructureDefinition-foo.html\"}, " +
+        "\"new-locations\": {\"ValueSet/moved\": \"https://example.org/fhir/terminology/ValueSet-moved.html\", \"old-page\": \"https://example.org/fhir/terminology/old-page.html\"}}",
+        new File(stagingFolder, "spec.internals"));
+    IGReleaseRedirectionBuilder rb = new IGReleaseRedirectionBuilder(stagingFolder, publishedFolder, CANONICAL, VPATH, webRoot);
+    rb.buildNewAspRedirections(false, false);
+    String webConfig = FileUtilities.fileToString(new File(stagingFolder, "web.config"));
+    assertTrue(webConfig.contains("<rule name=\"ig.test.ValueSet\">"), webConfig);
+    String asp = FileUtilities.fileToString(new File(stagingFolder, "crvalueset.asp"));
+    int moved = asp.indexOf("if (id == \"moved\")\r\n    Response.Redirect(\"https://example.org/fhir/terminology/ValueSet-moved.html\");");
+    assertTrue(moved > -1, asp);
+    // before the redirects by format, so that a browser and a FHIR client both go to the new location
+    assertTrue(moved < asp.indexOf("application/json+fhir"), asp);
+  }
+
+  @Test
   void folderInsideWebsiteRootIsAccepted() {
     assertDoesNotThrow(() -> new IGReleaseRedirectionBuilder(publishedFolder, CANONICAL, VPATH, webRoot));
   }

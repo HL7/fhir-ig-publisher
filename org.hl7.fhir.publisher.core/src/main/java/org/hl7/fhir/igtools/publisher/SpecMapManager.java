@@ -370,6 +370,13 @@ public class SpecMapManager {
     this.base2 = PackageHacker.fixPackageUrl(base2);
   }
 
+  /**
+   * Record that content which was in this IG (Type/id of an artifact, or a page name) is now found at target
+   */
+  public void newLocation(String local, String target) {
+    spec.forceObject(NewLocationRedirects.SPEC_INTERNALS_KEY).set(local, target);
+  }
+
   public void target(String tgt) {
     if (!targetSet.contains(tgt)) {
       targetSet.add(tgt);
