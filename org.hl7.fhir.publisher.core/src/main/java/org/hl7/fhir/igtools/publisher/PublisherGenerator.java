@@ -405,6 +405,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       if (!settings.isGenerationOff()) {
         templateOnCheck();
       }
+      generateNewLocationRedirects();
 
       if (!pf.changeList.isEmpty()) {
         File df = makeSpecFile();
@@ -4093,6 +4094,21 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
   }
 
+  /**
+   * Redirect pages for content that this IG says is now published in another IG (the new-location extension)
+   */
+  private void generateNewLocationRedirects() throws IOException {
+    pf.newLocations = new NewLocationRedirects(pf.errors);
+    pf.newLocations.load(pf.sourceIg, pf.version);
+    Set<String> resources = new HashSet<>();
+    for (FetchedFile f : pf.fileList) {
+      for (FetchedResource r : f.getResources()) {
+        resources.add(r.fhirType()+"/"+r.getId());
+      }
+    }
+    pf.newLocations.generate(pf.outputDir, pf.igpkp.getDefaultConfig(), resources, allLangs());
+  }
+
   private File makeSpecFile() throws Exception {
     SpecMapManager map = new SpecMapManager(pf.npmName, pf.npmName +"#"+ pf.version, pf.version, Constants.VERSION, Integer.toString(ToolsVersion.TOOLS_VERSION), pf.getExecTime(), pf.igpkp.getCanonical());
     for (FetchedFile f : pf.fileList) {
@@ -4120,6 +4136,11 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     for (String s : new File(pf.outputDir).list()) {
       if (s.endsWith(".html")) {
         map.target(s);
+      }
+    }
+    if (pf.newLocations != null) {
+      for (Map.Entry<String, String> e : pf.newLocations.getRedirects().entrySet()) {
+        map.newLocation(e.getKey(), e.getValue());
       }
     }
     File df = File.createTempFile("fhir", "tmp");
