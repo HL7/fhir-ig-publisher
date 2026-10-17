@@ -1181,7 +1181,7 @@ public class PublisherBase implements ILoggingService {
           d = c.getChildValue("definition");
         }
         CanonicalResource canonical = null;
-        if (VersionUtilities.getCanonicalResourceNames(pf.context.getFHIRVersion()).contains(c.fhirType())) {
+        if (pf.cu.isCanonicalResource(c.fhirType())) {
           try {
             canonical = (CanonicalResource)convertFromElement(c);
           } catch (Exception ex) {
