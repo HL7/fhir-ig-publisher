@@ -432,7 +432,7 @@ public class RapidoTracker {
       skip.add(canonical(Utilities.path(pf.rootDir, "fsh-generated", "fsh-index.txt")));
       skip.add(canonical(Utilities.path(pf.rootDir, "fsh-generated", "data", "fsh-index.json")));
     }
-    listTree(new File(pf.rootDir), new File(pf.rootDir), skip, otherFiles);
+    otherFiles.putAll(scanOtherFiles());
     global.put("other-files", hashOtherFiles(otherFiles));
   }
 
@@ -452,13 +452,35 @@ public class RapidoTracker {
     }
   }
 
-  private void listTree(File root, File dir, Set<String> skip, Map<String, String> files) throws IOException {
-    if (skip.contains(canonical(dir.getAbsolutePath()))) {
+  /** the other files in the IG folder (see computeGlobal), relative path to content hash */
+  private Map<String, String> scanOtherFiles() {
+    return scanTree(new File(pf.rootDir), otherSkip);
+  }
+
+  /** every file under root (skipping the canonical paths in skip), relative path to content hash; safe on link loops */
+  static Map<String, String> scanTree(File root, Set<String> skip) {
+    Map<String, String> res = new TreeMap<>();
+    listTree(root, root, skip, res, new HashSet<>());
+    return res;
+  }
+
+  private static void listTree(File root, File dir, Set<String> skip, Map<String, String> files, Set<String> visited) {
+    String c = canonical(dir.getAbsolutePath());
+    if (skip.contains(c)) {
       return;
     }
     String rel = root.toPath().relativize(dir.toPath()).toString();
     if (dir.isFile()) {
-      files.put(rel, new Hasher().add(Files.readAllBytes(dir.toPath())).finish());
+      try {
+        files.put(rel, new Hasher().add(Files.readAllBytes(dir.toPath())).finish());
+      } catch (IOException e) {
+        files.put(rel, "unreadable: "+UUID.randomUUID()); // can't tell what it holds, so assume it changed
+      }
+      return;
+    }
+    if (!visited.add(c)) {
+      // a link to a folder that's already been listed (possibly one that contains it)
+      files.put(rel + "/", "(same as "+c+")");
       return;
     }
     String[] list = dir.list();
@@ -468,8 +490,9 @@ public class RapidoTracker {
     if (list.length == 0) {
       files.put(rel + "/", "(empty folder)");
     }
+    java.util.Arrays.sort(list); // so that which path to a linked folder gets listed doesn't vary
     for (String s : list) {
-      listTree(root, new File(dir, s), skip, files);
+      listTree(root, new File(dir, s), skip, files, visited);
     }
   }
 
@@ -575,8 +598,7 @@ public class RapidoTracker {
     // next build has to be compared with what the other files hold now, not with what they held when this one started.
     // (A file edited by hand while the build is running is taken as unchanged by the next build, as it would be by any
     // build tool that compares with the end of the last build)
-    Map<String, String> otherNow = new TreeMap<>();
-    listTree(new File(pf.rootDir), new File(pf.rootDir), otherSkip, otherNow);
+    Map<String, String> otherNow = scanOtherFiles();
     global.put("other-files", hashOtherFiles(otherNow));
     JsonObject g = new JsonObject();
     for (Map.Entry<String, String> e : global.entrySet()) {

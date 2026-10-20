@@ -5,11 +5,15 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
 
 import org.hl7.fhir.igtools.publisher.RapidoDependencyAnalyser.FileNode;
@@ -21,6 +25,7 @@ import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Each test builds a small IG, analyses it, makes one edit, analyses it again, and checks which files Rapido would
@@ -292,5 +297,24 @@ class RapidoDependencyAnalyserTest {
     assertEquals(1, back.getSliceInfo().size());
     assertEquals(vm.getDisplay(), back.getDisplay());
     assertTrue(vm.matches(back));
+  }
+
+  /** the scan of the other files in the IG folder must stop on a link back up the tree (it used to recurse until the
+   * path got too long) and still see edits and skip what it's told to */
+  @Test
+  void otherFilesScanSurvivesLinkLoops(@TempDir Path dir) throws IOException {
+    Files.writeString(dir.resolve("ig.ini"), "[IG]");
+    Files.createDirectories(dir.resolve("input"));
+    Files.writeString(dir.resolve("input/x.txt"), "one");
+    Files.createDirectories(dir.resolve("output"));
+    Files.writeString(dir.resolve("output/o.txt"), "built");
+    Files.createSymbolicLink(dir.resolve("self"), dir);
+    Files.createSymbolicLink(dir.resolve("input/up"), dir.resolve("input"));
+    Set<String> skip = Set.of(dir.resolve("output").toFile().getCanonicalPath());
+    Map<String, String> a = RapidoTracker.scanTree(dir.toFile(), skip);
+    assertEquals(Set.of("ig.ini", "input/x.txt", "input/up/", "self/"), a.keySet());
+    assertEquals(a, RapidoTracker.scanTree(dir.toFile(), skip));
+    Files.writeString(dir.resolve("input/x.txt"), "two");
+    assertNotEquals(a.get("input/x.txt"), RapidoTracker.scanTree(dir.toFile(), skip).get("input/x.txt"));
   }
 }
