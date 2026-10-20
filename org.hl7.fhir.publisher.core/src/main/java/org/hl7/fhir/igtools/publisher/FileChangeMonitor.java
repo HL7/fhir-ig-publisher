@@ -421,8 +421,9 @@ public class FileChangeMonitor implements AutoCloseable {
       changeQueue.clear();
     }
 
-    // the watch service stays open, so that monitoring can be started again (watch mode stops and restarts it
-    // around every rebuild); changes made while stopped are reported once it is restarted
+    // the watch service stays open, so that monitoring can be started again (it used to be closed here, so that a
+    // restarted monitor never reported anything); changes made while stopped are reported once it is restarted.
+    // close() releases it
     @Override
     public void stopMonitoring() {
       monitoring = false;
