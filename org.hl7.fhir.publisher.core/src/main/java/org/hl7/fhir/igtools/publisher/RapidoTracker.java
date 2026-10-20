@@ -80,6 +80,8 @@ public class RapidoTracker {
   private final Map<String, String> global = new TreeMap<>();
   /** path (relative to the IG folder) to content hash, for the files behind global "other-files" */
   private final Map<String, String> otherFiles = new TreeMap<>();
+  /** what isn't part of other-files (outputs, caches, the IG's own files, ...) */
+  private final Set<String> otherSkip = new HashSet<>();
   private String fileSetHash;
   private String uuid;
   private boolean complete;
@@ -397,7 +399,7 @@ public class RapidoTracker {
     global.put("publisher", jar.finish());
     global.put("ig", new Hasher().add(igf.getPath()).add(igf.getSource()).finish());
 
-    Set<String> skip = new HashSet<>();
+    Set<String> skip = otherSkip;
     for (String s : new String[] {Utilities.path(pf.rootDir, "output"), Utilities.path(pf.rootDir, "temp"), pf.tempDir, pf.tempLangDir,
       Utilities.path(pf.rootDir, "template"), Utilities.path(pf.rootDir, "input-cache"), pf.vsCache, pf.qaDir, Utilities.path(pf.rootDir, ".git"),
       Utilities.path(pf.rootDir, "input", "fsh"), Utilities.path(pf.rootDir, "fsh")}) {
@@ -430,12 +432,16 @@ public class RapidoTracker {
       skip.add(canonical(Utilities.path(pf.rootDir, "fsh-generated", "fsh-index.txt")));
       skip.add(canonical(Utilities.path(pf.rootDir, "fsh-generated", "data", "fsh-index.json")));
     }
-    listTree(new File(pf.rootDir), new File(pf.rootDir), skip);
+    listTree(new File(pf.rootDir), new File(pf.rootDir), skip, otherFiles);
+    global.put("other-files", hashOtherFiles(otherFiles));
+  }
+
+  private static String hashOtherFiles(Map<String, String> files) {
     Hasher other = new Hasher();
-    for (Map.Entry<String, String> e : otherFiles.entrySet()) {
+    for (Map.Entry<String, String> e : files.entrySet()) {
       other.add(e.getKey()).add(e.getValue());
     }
-    global.put("other-files", other.finish());
+    return other.finish();
   }
 
   private static String canonical(String s) {
@@ -446,13 +452,13 @@ public class RapidoTracker {
     }
   }
 
-  private void listTree(File root, File dir, Set<String> skip) throws IOException {
+  private void listTree(File root, File dir, Set<String> skip, Map<String, String> files) throws IOException {
     if (skip.contains(canonical(dir.getAbsolutePath()))) {
       return;
     }
     String rel = root.toPath().relativize(dir.toPath()).toString();
     if (dir.isFile()) {
-      otherFiles.put(rel, new Hasher().add(Files.readAllBytes(dir.toPath())).finish());
+      files.put(rel, new Hasher().add(Files.readAllBytes(dir.toPath())).finish());
       return;
     }
     String[] list = dir.list();
@@ -460,10 +466,10 @@ public class RapidoTracker {
       return;
     }
     if (list.length == 0) {
-      otherFiles.put(rel + "/", "(empty folder)");
+      files.put(rel + "/", "(empty folder)");
     }
     for (String s : list) {
-      listTree(root, new File(dir, s), skip);
+      listTree(root, new File(dir, s), skip, files);
     }
   }
 
@@ -565,13 +571,20 @@ public class RapidoTracker {
     state.add("version", STATE_VERSION);
     state.add("uuid", uuid);
     state.add("fileSet", fileSetHash);
+    // the template can write into the IG folder as well (the HL7 template copies the IG's Jira spec file there), so the
+    // next build has to be compared with what the other files hold now, not with what they held when this one started.
+    // (A file edited by hand while the build is running is taken as unchanged by the next build, as it would be by any
+    // build tool that compares with the end of the last build)
+    Map<String, String> otherNow = new TreeMap<>();
+    listTree(new File(pf.rootDir), new File(pf.rootDir), otherSkip, otherNow);
+    global.put("other-files", hashOtherFiles(otherNow));
     JsonObject g = new JsonObject();
     for (Map.Entry<String, String> e : global.entrySet()) {
       g.add(e.getKey(), e.getValue());
     }
     state.add("global", g);
     JsonObject of = new JsonObject();
-    for (Map.Entry<String, String> e : otherFiles.entrySet()) {
+    for (Map.Entry<String, String> e : otherNow.entrySet()) {
       of.set(e.getKey(), e.getValue());
     }
     state.add("otherFiles", of);
