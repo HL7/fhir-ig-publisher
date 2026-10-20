@@ -250,6 +250,20 @@ class RapidoDependencyAnalyserTest {
     assertEquals(List.of("p2"), o.validate);
   }
 
+  /** a reference resolves even when an earlier one has already found the same resource (by url, then as Type/id) */
+  @Test
+  void repeatedReferencesStillResolve() {
+    Ig ig = new Ig();
+    ig.add("ext", "StructureDefinition", "ext").url(B+"/StructureDefinition/ext").str("StructureDefinition/ext");
+    ig.add("p1", "Patient", "p1").str(B+"/StructureDefinition/ext").str("StructureDefinition/ext").str(B+"/StructureDefinition/ext|1.0");
+    ig.add("p2", "Patient", "p2");
+    Map<String, FileResult> res = ig.analyse();
+    assertFalse(res.get("ext").isUsesInventory());
+    assertFalse(res.get("p1").isUsesInventory());
+    Outcome o = edit(ig, i -> i.get("p2").title("renamed"));
+    assertEquals(List.of("p2"), o.validate);
+  }
+
   @Test
   void cyclesAreHarmless() {
     Ig ig = new Ig();

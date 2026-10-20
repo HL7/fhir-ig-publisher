@@ -383,7 +383,44 @@ public class RapidoDependencyAnalyser {
   }
 
   private boolean resolveReference(String s, Set<ResourceNode> targets) {
-    int before = targets.size();
+    // what this string finds, apart from what the strings before it found (it can find the same resource again)
+    Set<ResourceNode> found = new HashSet<>();
+    resolveInto(s, found);
+    targets.addAll(found);
+    if (!found.isEmpty()) {
+      return true;
+    }
+    // nothing found. Is it meant to point into the IG?
+    String path = refPath(s);
+    boolean local = (canonical != null && path.startsWith(canonical+"/")) || RELATIVE_REF.matcher(path).matches();
+    if (!local) {
+      return true;
+    }
+    String[] parts = path.split("/");
+    String last = parts.length == 0 ? path : parts[parts.length-1];
+    if (ID_LIKE.matcher(last).matches()) {
+      // be generous: anything with the same id might be what's meant
+      addAll(targets, byId.get(last));
+    }
+    return false;
+  }
+
+  /** the reference without its #fragment, |version and /_history/ */
+  private static String refPath(String s) {
+    String path = s;
+    if (path.contains("#")) {
+      path = path.substring(0, path.indexOf("#"));
+    }
+    if (path.contains("|")) {
+      path = path.substring(0, path.indexOf("|"));
+    }
+    if (path.contains("/_history/")) {
+      path = path.substring(0, path.indexOf("/_history/"));
+    }
+    return path;
+  }
+
+  private void resolveInto(String s, Set<ResourceNode> targets) {
     String base = s;
     if (base.contains("#")) {
       base = base.substring(0, base.indexOf("#"));
@@ -410,20 +447,6 @@ public class RapidoDependencyAnalyser {
         targets.add(r);
       }
     }
-    if (targets.size() > before) {
-      return true;
-    }
-    // nothing found. Is it meant to point into the IG?
-    boolean local = (canonical != null && path.startsWith(canonical+"/")) || RELATIVE_REF.matcher(path).matches();
-    if (!local) {
-      return true;
-    }
-    String last = parts.length == 0 ? path : parts[parts.length-1];
-    if (ID_LIKE.matcher(last).matches()) {
-      // be generous: anything with the same id might be what's meant
-      addAll(targets, byId.get(last));
-    }
-    return false;
   }
 
   private static void addAll(Set<ResourceNode> targets, List<ResourceNode> list) {
