@@ -51,6 +51,10 @@ public class FileChangeMonitor implements AutoCloseable {
       this.recursive = recursive;
     }
 
+    public Path getPath() {
+      return path;
+    }
+
     public static MonitoredPath recursive(Path path) {
       return new MonitoredPath(path, true);
     }
@@ -211,6 +215,17 @@ public class FileChangeMonitor implements AutoCloseable {
       }
     }
 
+    /** Watches a directory that was just created, and reports the files already in it */
+    private void watchNewDirectory(Path dir) {
+      List<FileChangeEvent> created = new ArrayList<>();
+      try {
+        registerRecursive(dir, created);
+      } catch (IOException e) {
+        System.err.println("Unable to watch new directory " + dir + ": " + e.getMessage());
+      }
+      changeQueue.addAll(created);
+    }
+
     /**
      * Watches directory and all the directories below it. If created is not null, the files found in them are
      * reported as created: they appeared in a directory that was not being watched yet.
@@ -286,13 +301,7 @@ public class FileChangeMonitor implements AutoCloseable {
               Path changedPath = directory.resolve(filename).toAbsolutePath();
 
               if (kind == StandardWatchEventKinds.ENTRY_CREATE && recursiveRoots.contains(changedPath) && Files.isDirectory(changedPath)) {
-                List<FileChangeEvent> created = new ArrayList<>();
-                try {
-                  registerRecursive(changedPath, created);
-                } catch (IOException e) {
-                  System.err.println("Unable to watch new directory " + changedPath + ": " + e.getMessage());
-                }
-                changeQueue.addAll(created);
+                watchNewDirectory(changedPath);
                 continue;
               }
               Set<Path> filter = fileFilters.get(directory);
@@ -300,13 +309,7 @@ public class FileChangeMonitor implements AutoCloseable {
                 continue;
               }
               if (kind == StandardWatchEventKinds.ENTRY_CREATE && recursiveDirs.contains(directory) && Files.isDirectory(changedPath)) {
-                List<FileChangeEvent> created = new ArrayList<>();
-                try {
-                  registerRecursive(changedPath, created);
-                } catch (IOException e) {
-                  System.err.println("Unable to watch new directory " + changedPath + ": " + e.getMessage());
-                }
-                changeQueue.addAll(created);
+                watchNewDirectory(changedPath);
               }
 
               FileChangeEvent.ChangeType changeType;

@@ -194,47 +194,57 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     String rootDir = settings.getConfigFile();
     FileChangeMonitor monitor = null;
     WatchSession session = null;
-    if (settings.isWatchMode()) {
-      List<Path> watched = Arrays.asList(
-              Paths.get(Utilities.path(rootDir, "ig.ini")),
-              Paths.get(Utilities.path(rootDir, "sushi-config.yaml")),
-              Paths.get(Utilities.path(rootDir, "publication-request.json")),
-              Paths.get(Utilities.path(rootDir, "sushi-ignoreWarnings.txt")),
-              Paths.get(Utilities.path(rootDir, "input")),
-              Paths.get(Utilities.path(rootDir, "fsh-generated")));
-      monitor = new FileChangeMonitor(Arrays.asList(
-              FileChangeMonitor.MonitoredPath.file(watched.get(0)),
-              FileChangeMonitor.MonitoredPath.file(watched.get(1)),
-              FileChangeMonitor.MonitoredPath.file(watched.get(2)),
-              FileChangeMonitor.MonitoredPath.file(watched.get(3)),
-              FileChangeMonitor.MonitoredPath.recursive(watched.get(4)),
-              FileChangeMonitor.MonitoredPath.recursive(watched.get(5))
-      ));
-      session = new WatchSession(Paths.get(rootDir), watched);
-      PackageListFetcher.rememberFetches();
-      // watch from the start: a change made while a build is running is a reason for another build
-      monitor.startMonitoring();
-    }
-    loader.setWatchSession(session);
     // settings that a build adds to: each build starts again from what the command line said
     List<String> cliNoNarratives = new ArrayList<>(settings.getNoNarratives());
     List<String> cliNoValidate = new ArrayList<>(settings.getNoValidate());
-
     try {
+      if (settings.isWatchMode()) {
+        String igDir = new File(rootDir).isFile() ? FileUtilities.getDirectoryForFile(rootDir) : rootDir;
+        List<FileChangeMonitor.MonitoredPath> watched = Arrays.asList(
+                FileChangeMonitor.MonitoredPath.file(Paths.get(Utilities.path(igDir, "ig.ini"))),
+                FileChangeMonitor.MonitoredPath.file(Paths.get(Utilities.path(igDir, "sushi-config.yaml"))),
+                FileChangeMonitor.MonitoredPath.file(Paths.get(Utilities.path(igDir, "publication-request.json"))),
+                FileChangeMonitor.MonitoredPath.file(Paths.get(Utilities.path(igDir, "sushi-ignoreWarnings.txt"))),
+                FileChangeMonitor.MonitoredPath.recursive(Paths.get(Utilities.path(igDir, "input"))),
+                FileChangeMonitor.MonitoredPath.recursive(Paths.get(Utilities.path(igDir, "fsh"))), // SUSHI's older layout
+                FileChangeMonitor.MonitoredPath.recursive(Paths.get(Utilities.path(igDir, "fsh-generated"))));
+        monitor = new FileChangeMonitor(watched);
+        List<Path> paths = new ArrayList<>();
+        for (FileChangeMonitor.MonitoredPath p : watched) {
+          paths.add(p.getPath());
+        }
+        session = new WatchSession(Paths.get(igDir), paths);
+        PackageListFetcher.rememberFetches();
+      }
+      loader.setWatchSession(session);
+
       boolean first = true;
       do {
-        if (session != null) {
+        if (session == null) {
+          build(rootDir);
+        } else {
           session.startBuild();
           if (!first) {
             resetForRebuild(cliNoNarratives, cliNoValidate);
           }
+          try {
+            build(rootDir);
+          } catch (Exception e) {
+            // keep watching: the next save may fix it
+            log("Publishing Content Failed: " + e.getMessage());
+            log("");
+            log("Stack Dump (for debugging):");
+            e.printStackTrace();
+          }
         }
         first = false;
-        build(rootDir);
       } while (session != null && waitForChanges(monitor, session));
     } finally {
       if (monitor != null) {
         monitor.close();
+      }
+      if (session != null) {
+        PackageListFetcher.forgetFetches();
       }
     }
   }
@@ -295,23 +305,35 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
    * saved without being changed, and files the build itself wrote, don't count
    */
   private boolean waitForChanges(FileChangeMonitor monitor, WatchSession session) throws InterruptedException, IOException {
-    System.out.println("Watching for changes (Cascais:Rapido mode)");
-    while (true) {
-      if (monitor.hasChanges()) {
-        // wait until the files have been quiet for a moment: an editor or a git checkout often writes several
-        do {
-          monitor.clearChanges();
-          Thread.sleep(250);
-        } while (monitor.hasChanges());
-        SourceSnapshot.Changes changes = session.changesSinceBuildStart();
-        if (!changes.isEmpty()) {
-          System.out.println("=== File Changes Detected ===");
-          System.out.print(changes);
-          return true;
-        }
-      } else {
-        Thread.sleep(100);
+    // monitoring is started before looking for changes made while the build ran, so that nothing is missed in between
+    monitor.startMonitoring();
+    try {
+      SourceSnapshot.Changes changes = session.changesSinceBuildStart();
+      if (changes.isEmpty()) {
+        System.out.println("Watching for changes (Cascais:Rapido mode)");
       }
+      while (changes.isEmpty()) {
+        if (monitor.hasChanges()) {
+          // wait until the files have been quiet for a moment (an editor or a git checkout often writes several),
+          // but not for ever, in case something keeps writing
+          long giveUp = System.currentTimeMillis() + 5000;
+          do {
+            monitor.clearChanges();
+            Thread.sleep(250);
+          } while (monitor.hasChanges() && System.currentTimeMillis() < giveUp);
+          changes = session.changesSinceBuildStart();
+        } else {
+          Thread.sleep(100);
+        }
+      }
+      System.out.println("=== File Changes Detected ===");
+      System.out.print(changes);
+      return true;
+    } finally {
+      // not watched while building: the files the build writes would be reported for nothing (and on macOS, the
+      // folders would be scanned again and again while the build runs). What changes while the build runs is
+      // found by changesSinceBuildStart() once it has finished
+      monitor.stopMonitoring();
     }
   }
 
