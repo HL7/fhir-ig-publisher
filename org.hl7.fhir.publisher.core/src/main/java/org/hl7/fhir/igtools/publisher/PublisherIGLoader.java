@@ -207,7 +207,11 @@ public class PublisherIGLoader extends PublisherBase {
       new FSHRunner(this).runFsh(new File(FileUtilities.getDirectoryForFile(fsh.getAbsolutePath())), settings.getMode());
     } catch (Exception | Error e) {
       if (watchSession != null) {
-        watchSession.sushiFailed();
+        try {
+          watchSession.sushiFailed();
+        } catch (IOException e2) {
+          e.addSuppressed(e2);
+        }
       }
       throw e;
     }
@@ -2011,7 +2015,7 @@ public class PublisherIGLoader extends PublisherBase {
     logDebugMessage(LogCategory.INIT, "Fetch Package history from "+Utilities.pathURL(canonical, "package-list.json"));
     try {
       final String secureCanonical = ManagedWebAccess.makeSecureRef(canonical);
-      pl = PackageList.fromUrl(Utilities.pathURL(secureCanonical, "package-list.json"));
+      pl = PackageListFetcher.fromUrl(Utilities.pathURL(secureCanonical, "package-list.json"));
     } catch (Exception e) {
       return null;
     }

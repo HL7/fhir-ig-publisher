@@ -174,6 +174,15 @@ class WatchSessionTest {
   }
 
   @Test
+  void whatAFailedSushiWroteIsNotAChange() throws IOException {
+    WatchSession s = session();
+    s.startBuild();
+    write("fsh-generated/resources/A.json", "{\"written by a SUSHI that reported errors\":true}");
+    s.sushiFailed();
+    assertTrue(s.changesSinceBuildStart().isEmpty());
+  }
+
+  @Test
   void anEditWhileSushiRunsIsNotMissed() throws IOException {
     WatchSession s = session();
     s.startBuild();

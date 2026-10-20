@@ -205,6 +205,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
                 FileChangeMonitor.MonitoredPath.file(Paths.get(Utilities.path(igDir, "sushi-config.yaml"))),
                 FileChangeMonitor.MonitoredPath.file(Paths.get(Utilities.path(igDir, "publication-request.json"))),
                 FileChangeMonitor.MonitoredPath.file(Paths.get(Utilities.path(igDir, "sushi-ignoreWarnings.txt"))),
+                FileChangeMonitor.MonitoredPath.file(Paths.get(Utilities.path(igDir, "fsh.ini"))), // which SUSHI to run
                 FileChangeMonitor.MonitoredPath.recursive(Paths.get(Utilities.path(igDir, "input"))),
                 FileChangeMonitor.MonitoredPath.recursive(Paths.get(Utilities.path(igDir, "fsh"))), // SUSHI's older layout
                 FileChangeMonitor.MonitoredPath.recursive(Paths.get(Utilities.path(igDir, "fsh-generated"))));

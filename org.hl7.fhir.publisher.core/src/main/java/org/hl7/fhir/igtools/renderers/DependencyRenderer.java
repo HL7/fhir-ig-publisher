@@ -1,5 +1,6 @@
 package org.hl7.fhir.igtools.renderers;
 
+import org.hl7.fhir.igtools.publisher.PackageListFetcher;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -697,7 +698,7 @@ public class DependencyRenderer {
       String url = Utilities.pathURL(secureCanonical, "package-list.json");
       pl = fetchedPackageLists.get(url);
       if (pl == null) {
-        pl = PackageList.fromUrl(url);
+        pl = PackageListFetcher.fromUrl(url);
         if (pl != null) {
           fetchedPackageLists.put(url, pl);
         }

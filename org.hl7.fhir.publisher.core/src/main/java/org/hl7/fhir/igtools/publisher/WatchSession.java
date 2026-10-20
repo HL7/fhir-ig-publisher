@@ -99,14 +99,24 @@ public class WatchSession {
     if (buildStart == null) {
       return;
     }
-    SourceSnapshot generated = SourceSnapshot.take(Collections.singletonList(fshGenerated), buildStart);
-    buildStart = buildStart.withTree(fshGenerated, generated);
+    takeSushiOutput();
     // the inputs are taken from before SUSHI ran: if one changed while it was running, it's seen as changed next time
     sushiInputs = buildStart;
   }
 
-  /** SUSHI was run, but didn't finish properly: it must run next time */
-  public void sushiFailed() {
+  /**
+   * SUSHI was run, but didn't finish properly: it must run next time. What it wrote (it writes its output even when
+   * it reports errors) is not a change that needs another build either: the same sources would fail the same way
+   */
+  public void sushiFailed() throws IOException {
     sushiInputs = null;
+    if (buildStart != null) {
+      takeSushiOutput();
+    }
+  }
+
+  private void takeSushiOutput() throws IOException {
+    SourceSnapshot generated = SourceSnapshot.take(Collections.singletonList(fshGenerated), buildStart);
+    buildStart = buildStart.withTree(fshGenerated, generated);
   }
 }

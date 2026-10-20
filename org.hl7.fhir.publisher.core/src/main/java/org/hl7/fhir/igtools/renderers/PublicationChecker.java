@@ -1,5 +1,6 @@
 package org.hl7.fhir.igtools.renderers;
 
+import org.hl7.fhir.igtools.publisher.PackageListFetcher;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -543,7 +544,7 @@ public class PublicationChecker {
   
   private PackageList readPackageList(String dst) throws IOException {
     final String secureDst = ManagedWebAccess.makeSecureRef(dst);
-    return PackageList.fromUrl(Utilities.pathURL(secureDst, "package-list.json"));
+    return PackageListFetcher.fromUrl(Utilities.pathURL(secureDst, "package-list.json"));
   }
 
   private String determineDestination(NpmPackage npm) {

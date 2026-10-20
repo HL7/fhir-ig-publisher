@@ -123,15 +123,17 @@ public class SourceSnapshot {
           }
 
           @Override
-          public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
-            if (exc instanceof NoSuchFileException) {
-              return FileVisitResult.CONTINUE; // deleted while we were reading the directory
-            }
-            throw exc;
+          public FileVisitResult visitFileFailed(Path file, IOException exc) {
+            unreadable(file, exc);
+            return FileVisitResult.CONTINUE;
           }
         });
       } else if (Files.isRegularFile(r)) {
-        addEntry(entries, r, Files.readAttributes(r, BasicFileAttributes.class), previous, start);
+        try {
+          addEntry(entries, r, Files.readAttributes(r, BasicFileAttributes.class), previous, start);
+        } catch (IOException e) {
+          unreadable(r, e);
+        }
       }
     }
     return new SourceSnapshot(entries);
@@ -146,9 +148,18 @@ public class SourceSnapshot {
     } else {
       try {
         entries.put(file, new Entry(size, modified, modified.toMillis() > start - RACY_MILLIS, hash(file)));
-      } catch (NoSuchFileException e) {
-        // deleted since the directory was read: it's not there
+      } catch (IOException e) {
+        unreadable(file, e);
       }
+    }
+  }
+
+  /**
+   * A file that can't be read is left out, as if it wasn't there: it's seen as changed once it can be read again
+   */
+  private static void unreadable(Path file, IOException e) {
+    if (!(e instanceof NoSuchFileException)) { // else deleted since the directory was read: it's just not there
+      System.err.println("Unable to read " + file + ": " + e.getMessage());
     }
   }
 
