@@ -38,14 +38,14 @@ public class WatchSession {
    * @param watched the files and folders watched for changes (all under rootDir)
    */
   public WatchSession(Path rootDir, List<Path> watched) {
-    Path root = rootDir.toAbsolutePath();
+    Path root = rootDir.toAbsolutePath().normalize();
     this.fshGenerated = root.resolve("fsh-generated");
     for (String s : PAGE_FOLDERS) {
       pageFolders.add(root.resolve("input").resolve(s));
     }
     this.watched = new ArrayList<>();
     for (Path p : watched) {
-      this.watched.add(p.toAbsolutePath());
+      this.watched.add(p.toAbsolutePath().normalize());
     }
   }
 
