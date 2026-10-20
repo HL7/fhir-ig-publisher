@@ -310,7 +310,7 @@ public class PublisherIGLoader extends PublisherBase {
       throw new Exception("Error Parsing File "+ pf.igName +": "+e.getMessage(), e);
     }
     pf.templateManager.loadTemplateOverrides(ini, pf.rootDir);
-    pf.template = pf.templateManager.loadTemplate(templateName, pf.rootDir, pf.packageId(), settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD, pf.logOptions.contains("template"), settings.isRapidoMode());
+    pf.template = pf.templateManager.loadTemplate(templateName, pf.rootDir, pf.packageId(), settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD, pf.logOptions.contains("template"), false); // Rapido has to produce every fragment that a full build does
     if (pf.template.hasExtraTemplates()) {
       processExtraTemplates(pf.template.getExtraTemplates());
     }

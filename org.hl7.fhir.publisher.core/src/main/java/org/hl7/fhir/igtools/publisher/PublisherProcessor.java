@@ -543,6 +543,9 @@ public class PublisherProcessor extends PublisherBase  {
         f.finish("validate");
       }
     }
+    if (pf.rapido != null) {
+      pf.rapido.finishValidation();
+    }
     logDebugMessage(LogCategory.PROGRESS, " .. check Profile Examples");
     logDebugMessage(LogCategory.PROGRESS, "gen narratives");
     for (FetchedFile f : pf.fileList) {
@@ -1719,6 +1722,16 @@ public class PublisherProcessor extends PublisherBase  {
       file.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.INVALID, file.getName(), "Unknown Parameters: "+ pf.unknownParams.toString(), ValidationMessage.IssueSeverity.WARNING));
     }
 
+    List<ValidationMessage> reused = pf.rapido == null ? null : pf.rapido.reuseValidation(file, r);
+    if (reused != null) {
+      // nothing that the resource depends on has changed since the last build
+      processValidationOutcomes(file, r, reused);
+      r.setValidated(true);
+      if (r.getConfig() == null) {
+        pf.igpkp.findConfiguration(file, r);
+      }
+      return;
+    }
     TimeTracker.Session tts = pf.tt.start("validation");
     List<ValidationMessage> errs = new ArrayList<ValidationMessage>();
     r.getElement().setUserData(UserDataNames.pub_context_file, file);
@@ -1757,6 +1770,9 @@ public class PublisherProcessor extends PublisherBase  {
         addProfile(profiles, s, r.fhirType());
       }
       validate(file, r, errs, profiles);
+    }
+    if (pf.rapido != null) {
+      pf.rapido.recordValidation(file, r, errs);
     }
     processValidationOutcomes(file, r, errs);
     r.setValidated(true);
