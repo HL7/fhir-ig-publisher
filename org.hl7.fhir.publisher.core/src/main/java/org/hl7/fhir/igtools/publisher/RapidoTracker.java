@@ -63,7 +63,7 @@ public class RapidoTracker {
   public static final String PHASE_HTML = "html";
   public static final String PHASE_SHEETS = "sheets";
 
-  private static final int STATE_VERSION = 3;
+  private static final int STATE_VERSION = 4;
 
   private final PublisherFields pf;
   private final String stateFile;
@@ -850,18 +850,49 @@ public class RapidoTracker {
   /**
    * Whether the outputs of the phase can be reused for the file. The html includes the file's messages (its
    * -validation fragment), and they're not all from validation, so they're compared at the point the html would be
-   * generated
+   * generated. And the files the phase wrote have to hold what it wrote: other steps can write to the same paths (the
+   * native xml of a Library and its first xml attachment are both Library-[id].xml), and in a complete build the
+   * phase would have written them again
    */
   public boolean canReplay(FetchedFile f, String phase) {
     if (!renderClean.contains(f)) {
       return false;
     }
-    if (PHASE_HTML.equals(phase) && !messagesHash(f).equals(oldFiles.getJsonObject(keys.get(f)).getJsonObject(PHASE_HTML).asString("messages"))) {
+    JsonObject j = oldFiles.getJsonObject(keys.get(f)).getJsonObject(phase);
+    String problem = null;
+    if (PHASE_HTML.equals(phase) && !messagesHash(f).equals(j.asString("messages"))) {
+      problem = "its messages changed";
+    }
+    JsonObject written = j.getJsonObject("written");
+    if (problem == null && written == null) {
+      problem = "no record of its outputs";
+    }
+    if (problem == null) {
+      for (String path : written.getNames()) {
+        if (!fileHash(path).equals(written.asString(path))) {
+          problem = "an output was overwritten: "+new File(path).getName();
+          break;
+        }
+      }
+    }
+    if (problem != null) {
       renderClean.remove(f);
-      why.put(f, "its messages changed");
+      why.put(f, problem);
       return false;
     }
     return true;
+  }
+
+  private static String fileHash(String path) {
+    File f = new File(path);
+    if (!f.isFile()) {
+      return "missing";
+    }
+    try {
+      return new Hasher().add(Files.readAllBytes(f.toPath())).finish();
+    } catch (IOException e) {
+      return "unreadable: "+UUID.randomUUID();
+    }
   }
 
   private static String messagesHash(FetchedFile f) {
@@ -907,6 +938,7 @@ public class RapidoTracker {
     private final String phase;
     private final JsonObject journal = new JsonObject();
     private final Set<String> outputsBefore;
+    private final Map<String, String> outputHashesBefore = new HashMap<>();
     private final Set<String> otherBefore;
     private final int errorsBefore;
     private final int fileErrorsBefore;
@@ -917,6 +949,9 @@ public class RapidoTracker {
       this.file = file;
       this.phase = phase;
       outputsBefore = new HashSet<>(file.getOutputNames());
+      for (String s : outputsBefore) {
+        outputHashesBefore.put(s, fileHash(s));
+      }
       otherBefore = new HashSet<>(pf.otherFilesRun);
       errorsBefore = pf.errors.size();
       fileErrorsBefore = file.getErrors().size();
@@ -955,6 +990,17 @@ public class RapidoTracker {
       if (!rec.otherBefore.contains(s)) {
         other.add(s);
       }
+    }
+    // what the phase wrote, including what it wrote over from an earlier phase, to check before it's replayed
+    JsonObject written = j.forceObject("written");
+    for (String s : new TreeSet<>(f.getOutputNames())) {
+      String h = fileHash(s);
+      if (!h.equals(rec.outputHashesBefore.get(s))) {
+        written.set(s, h);
+      }
+    }
+    for (String s : other.asStrings()) {
+      written.set(s, fileHash(s));
     }
     if (pf.errors.size() < rec.errorsBefore || f.getErrors().size() < rec.fileErrorsBefore || pf.expansions.size() < rec.expansionsBefore) {
       return;
