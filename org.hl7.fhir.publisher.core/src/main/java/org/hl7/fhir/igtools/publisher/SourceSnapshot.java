@@ -2,13 +2,13 @@ package org.hl7.fhir.igtools.publisher;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
@@ -29,14 +29,23 @@ import java.util.TreeSet;
  */
 public class SourceSnapshot {
 
+  /**
+   * A file modified this close to (or after) the moment a snapshot started reading it may be changed again without
+   * its modified time changing (file systems store the time with a limited precision, as coarse as 2 seconds), so the
+   * next snapshot reads it again whatever its modified time says
+   */
+  private static final long RACY_MILLIS = 2000;
+
   private static class Entry {
     private final long size;
-    private final long modified;
+    private final FileTime modified;
+    private final boolean racy;
     private final byte[] hash;
 
-    private Entry(long size, long modified, byte[] hash) {
+    private Entry(long size, FileTime modified, boolean racy, byte[] hash) {
       this.size = size;
       this.modified = modified;
+      this.racy = racy;
       this.hash = hash;
     }
   }
@@ -96,10 +105,11 @@ public class SourceSnapshot {
   /**
    * Reads the current state of roots: each root is a file, which may not exist, or a directory, which is read with
    * everything below it. Files whose size and modified time are the same as in previous (which can be null) are not
-   * read again.
+   * read again, unless they were modified just before previous was taken.
    */
   public static SourceSnapshot take(Collection<Path> roots, SourceSnapshot previous) throws IOException {
     Map<Path, Entry> entries = new HashMap<>();
+    long start = System.currentTimeMillis();
     for (Path root : roots) {
       Path r = root.toAbsolutePath();
       if (Files.isDirectory(r)) {
@@ -107,7 +117,7 @@ public class SourceSnapshot {
           @Override
           public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
             if (attrs.isRegularFile()) {
-              addEntry(entries, file, attrs, previous);
+              addEntry(entries, file, attrs, previous, start);
             }
             return FileVisitResult.CONTINUE;
           }
@@ -121,21 +131,21 @@ public class SourceSnapshot {
           }
         });
       } else if (Files.isRegularFile(r)) {
-        addEntry(entries, r, Files.readAttributes(r, BasicFileAttributes.class), previous);
+        addEntry(entries, r, Files.readAttributes(r, BasicFileAttributes.class), previous, start);
       }
     }
     return new SourceSnapshot(entries);
   }
 
-  private static void addEntry(Map<Path, Entry> entries, Path file, BasicFileAttributes attrs, SourceSnapshot previous) throws IOException {
+  private static void addEntry(Map<Path, Entry> entries, Path file, BasicFileAttributes attrs, SourceSnapshot previous, long start) throws IOException {
     long size = attrs.size();
-    long modified = attrs.lastModifiedTime().toMillis();
+    FileTime modified = attrs.lastModifiedTime();
     Entry old = previous == null ? null : previous.entries.get(file);
-    if (old != null && old.size == size && old.modified == modified) {
+    if (old != null && !old.racy && old.size == size && old.modified.equals(modified)) {
       entries.put(file, old);
     } else {
       try {
-        entries.put(file, new Entry(size, modified, hash(file)));
+        entries.put(file, new Entry(size, modified, modified.toMillis() > start - RACY_MILLIS, hash(file)));
       } catch (NoSuchFileException e) {
         // deleted since the directory was read: it's not there
       }
@@ -195,26 +205,5 @@ public class SourceSnapshot {
       }
     }
     return res;
-  }
-
-  /** A hash of the names and content of all the files in this snapshot */
-  public byte[] digest() throws IOException {
-    MessageDigest md;
-    try {
-      md = MessageDigest.getInstance("SHA-256");
-    } catch (NoSuchAlgorithmException e) {
-      throw new IOException(e);
-    }
-    for (Path p : new TreeSet<>(entries.keySet())) {
-      md.update(p.toString().getBytes(StandardCharsets.UTF_8));
-      md.update((byte) 0);
-      md.update(entries.get(p).hash);
-    }
-    return md.digest();
-  }
-
-  /** The files (absolute paths) in this snapshot */
-  public Set<Path> getFiles() {
-    return Collections.unmodifiableSet(entries.keySet());
   }
 }

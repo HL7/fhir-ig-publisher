@@ -1,6 +1,5 @@
 package org.hl7.fhir.igtools.publisher;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -70,11 +69,13 @@ class WatchSessionTest {
 
   @Test
   void aChangeThatKeepsSizeAndTimeIsOnlySeenWithoutReuse() throws IOException {
-    // documents the trade-off: a file is only read again when its size or modified time changed
+    // documents the trade-off: a file that wasn't modified recently is only read again when its size or modified
+    // time changed
     session();
     Path f = dir.resolve("input/fsh/a.fsh");
+    FileTime t = FileTime.fromMillis(System.currentTimeMillis() - 60000);
+    Files.setLastModifiedTime(f, t);
     SourceSnapshot before = SourceSnapshot.take(roots(), null);
-    FileTime t = Files.getLastModifiedTime(f);
     write("input/fsh/a.fsh", "Profile: B");
     Files.setLastModifiedTime(f, t);
     assertTrue(SourceSnapshot.take(roots(), before).changesSince(before).isEmpty());
@@ -82,7 +83,20 @@ class WatchSessionTest {
   }
 
   @Test
-  void withTreeAndDigest() throws IOException {
+  void aRecentlyModifiedFileIsReadAgain() throws IOException {
+    // the file system may not see the time between two saves: a file modified just before a snapshot is read again
+    session();
+    Path f = dir.resolve("input/fsh/a.fsh");
+    FileTime t = FileTime.fromMillis(System.currentTimeMillis() - 500);
+    Files.setLastModifiedTime(f, t);
+    SourceSnapshot before = SourceSnapshot.take(roots(), null);
+    write("input/fsh/a.fsh", "Profile: B");
+    Files.setLastModifiedTime(f, t);
+    assertEquals(Collections.singleton(f.toAbsolutePath()), SourceSnapshot.take(roots(), before).changesSince(before).getModified());
+  }
+
+  @Test
+  void withTree() throws IOException {
     session();
     SourceSnapshot before = SourceSnapshot.take(roots(), null);
     write("fsh-generated/resources/A.json", "{\"a\":1}");
@@ -91,8 +105,7 @@ class WatchSessionTest {
     SourceSnapshot merged = before.withTree(dir.resolve("fsh-generated"), now);
     SourceSnapshot.Changes c = now.changesSince(merged);
     assertEquals(Collections.singleton(dir.resolve("input/fsh/a.fsh").toAbsolutePath()), c.getModified());
-    assertArrayEquals(before.digest(), SourceSnapshot.take(roots(), null).withTree(dir.resolve("fsh-generated"), before).withTree(dir.resolve("input"), before).digest());
-    assertFalse(Arrays.equals(before.digest(), now.digest()));
+    assertTrue(SourceSnapshot.take(roots(), null).withTree(dir.resolve("fsh-generated"), before).withTree(dir.resolve("input"), before).changesSince(before).isEmpty());
   }
 
   @Test
@@ -168,16 +181,5 @@ class WatchSessionTest {
     s.sushiRan();
     s.startBuild();
     assertFalse(s.canSkipSushi());
-  }
-
-  @Test
-  void hasPackageAnswersLikeTheContext() {
-    List<String> loaded = Arrays.asList("hl7.fhir.r4.core#4.0.1", "hl7.fhir.uv.extensions.r4#5.2.0");
-    assertTrue(WatchSession.hasPackage(loaded, "hl7.fhir.r4.core#4.0.1"));
-    assertFalse(WatchSession.hasPackage(loaded, "hl7.fhir.r4.core#4.0.0"));
-    assertTrue(WatchSession.hasPackage(loaded, "hl7.fhir.uv.extensions.r4#5.2.0"));
-    assertTrue(WatchSession.hasPackage(loaded, "hl7.fhir.uv.extensions.r4#5.2.x"));
-    assertFalse(WatchSession.hasPackage(loaded, "hl7.fhir.uv.extensions.r4#4.0.x"));
-    assertFalse(WatchSession.hasPackage(loaded, "hl7.fhir.us.core#6.1.0"));
   }
 }

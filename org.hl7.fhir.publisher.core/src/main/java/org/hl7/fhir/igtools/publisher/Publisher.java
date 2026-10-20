@@ -230,14 +230,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
           }
         }
         first = false;
-        try {
-          build(rootDir);
-        } catch (WatchSession.WarmContextUnusableException e) {
-          log("Rebuilding without the worker context of the previous build: "+e.getMessage());
-          session.abandonContext();
-          resetForRebuild(cliNoNarratives, cliNoValidate);
-          build(rootDir);
-        }
+        build(rootDir);
       } while (session != null && waitForChanges(monitor, session));
     } finally {
       if (monitor != null) {
@@ -978,6 +971,21 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     buildTracker.setBooleanProperty("status", "complete", false, null);
     buildTracker.setBooleanProperty("status", "started", true, null);
 
+    if (settings.isWatchMode()) {
+      // in watch mode, every build is complete, so that its output is the same as a fresh build's (a rebuild is
+      // faster because of what it doesn't need to do again, see WatchSession, not because it builds less). So the
+      // build doesn't need to know what changed, and the tracker forgets the hashes: the next build without watch
+      // mode is complete too, since what it would compare them with may have changed several times since
+      log("Rapido Mode: Complete Build (watch mode)");
+      buildTracker.removeSection("source");
+      buildTracker.removeSection("tracked");
+      buildTracker.setStringProperty("status", "uuid", HierarchicalTableGenerator.uuid, null);
+      buildTracker.save();
+      pf.changeList.addAll(pf.fileList);
+      loader.clearTempFolder();
+      return;
+    }
+
     // first, we load all the direct dependency lists
     for (FetchedFile f : pf.fileList) {
       if (igf != f) {
@@ -1018,14 +1026,6 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       buildTracker.setStringProperty("status", "uuid", HierarchicalTableGenerator.uuid, null);
     } else if (pf.changeList.size() == pf.fileList.size()) {
       log("Rapido Mode: Complete Build (all files)");
-      loader.clearTempFolder();
-      buildTracker.setStringProperty("status", "uuid", HierarchicalTableGenerator.uuid, null);
-    } else if (settings.isWatchMode()) {
-      // in watch mode, every build is complete, so that its output is the same as a fresh build's: a rebuild is
-      // faster because it reuses what the previous build loaded (see WatchSession), not because it does less
-      log("Rapido Mode: Complete Build (watch mode, "+pf.changeList.size()+" of "+pf.fileList.size()+" files affected)");
-      pf.changeList.clear();
-      pf.changeList.addAll(pf.fileList);
       loader.clearTempFolder();
       buildTracker.setStringProperty("status", "uuid", HierarchicalTableGenerator.uuid, null);
     } else {
