@@ -1,0 +1,183 @@
+package org.hl7.fhir.igtools.publisher;
+
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+/**
+ * What watch mode decides from the source files: whether anything changed since a build started, and whether SUSHI
+ * has to run again
+ */
+class WatchSessionTest {
+
+  @TempDir
+  Path dir;
+
+  private void write(String path, String content) throws IOException {
+    Path p = dir.resolve(path);
+    Files.createDirectories(p.getParent());
+    Files.write(p, content.getBytes(StandardCharsets.UTF_8));
+  }
+
+  private List<Path> roots() {
+    return Arrays.asList(dir.resolve("ig.ini"), dir.resolve("sushi-config.yaml"), dir.resolve("input"), dir.resolve("fsh-generated"));
+  }
+
+  private WatchSession session() throws IOException {
+    write("ig.ini", "[IG]");
+    write("sushi-config.yaml", "id: x");
+    write("input/fsh/a.fsh", "Profile: A");
+    write("input/pagecontent/index.md", "# Home");
+    write("input/images/a.png", "png");
+    write("fsh-generated/resources/A.json", "{}");
+    return new WatchSession(dir, roots());
+  }
+
+  @Test
+  void snapshotsFindAddedModifiedAndRemovedFiles() throws IOException {
+    session();
+    SourceSnapshot before = SourceSnapshot.take(roots(), null);
+    write("input/pagecontent/index.md", "# Home, edited");
+    write("input/pagecontent/new.md", "new");
+    Files.delete(dir.resolve("input/images/a.png"));
+    SourceSnapshot.Changes c = SourceSnapshot.take(roots(), before).changesSince(before);
+    assertEquals(Collections.singleton(dir.resolve("input/pagecontent/index.md").toAbsolutePath()), c.getModified());
+    assertEquals(Collections.singleton(dir.resolve("input/pagecontent/new.md").toAbsolutePath()), c.getAdded());
+    assertEquals(Collections.singleton(dir.resolve("input/images/a.png").toAbsolutePath()), c.getRemoved());
+  }
+
+  @Test
+  void savingTheSameContentIsNotAChange() throws IOException {
+    session();
+    SourceSnapshot before = SourceSnapshot.take(roots(), null);
+    write("input/fsh/a.fsh", "Profile: A");
+    Files.setLastModifiedTime(dir.resolve("input/fsh/a.fsh"), FileTime.fromMillis(System.currentTimeMillis() + 5000));
+    assertTrue(SourceSnapshot.take(roots(), before).changesSince(before).isEmpty());
+  }
+
+  @Test
+  void aChangeThatKeepsSizeAndTimeIsOnlySeenWithoutReuse() throws IOException {
+    // documents the trade-off: a file is only read again when its size or modified time changed
+    session();
+    Path f = dir.resolve("input/fsh/a.fsh");
+    SourceSnapshot before = SourceSnapshot.take(roots(), null);
+    FileTime t = Files.getLastModifiedTime(f);
+    write("input/fsh/a.fsh", "Profile: B");
+    Files.setLastModifiedTime(f, t);
+    assertTrue(SourceSnapshot.take(roots(), before).changesSince(before).isEmpty());
+    assertEquals(1, SourceSnapshot.take(roots(), null).changesSince(before).getModified().size());
+  }
+
+  @Test
+  void withTreeAndDigest() throws IOException {
+    session();
+    SourceSnapshot before = SourceSnapshot.take(roots(), null);
+    write("fsh-generated/resources/A.json", "{\"a\":1}");
+    write("input/fsh/a.fsh", "Profile: C");
+    SourceSnapshot now = SourceSnapshot.take(roots(), before);
+    SourceSnapshot merged = before.withTree(dir.resolve("fsh-generated"), now);
+    SourceSnapshot.Changes c = now.changesSince(merged);
+    assertEquals(Collections.singleton(dir.resolve("input/fsh/a.fsh").toAbsolutePath()), c.getModified());
+    assertArrayEquals(before.digest(), SourceSnapshot.take(roots(), null).withTree(dir.resolve("fsh-generated"), before).withTree(dir.resolve("input"), before).digest());
+    assertFalse(Arrays.equals(before.digest(), now.digest()));
+  }
+
+  @Test
+  void changesSinceBuildStartIgnoreWhatSushiWrote() throws IOException {
+    WatchSession s = session();
+    s.startBuild();
+    write("fsh-generated/resources/A.json", "{\"generated\":true}"); // SUSHI runs
+    s.sushiRan();
+    assertTrue(s.changesSinceBuildStart().isEmpty());
+    write("input/pagecontent/index.md", "# edited");
+    assertEquals(1, s.changesSinceBuildStart().getModified().size());
+  }
+
+  @Test
+  void sushiRunsUntilItHasRunOnce() throws IOException {
+    WatchSession s = session();
+    s.startBuild();
+    assertFalse(s.canSkipSushi());
+    s.sushiRan();
+    s.startBuild();
+    assertTrue(s.canSkipSushi(), "nothing changed");
+  }
+
+  @Test
+  void sushiIsSkippedForPageEditsOnly() throws IOException {
+    WatchSession s = session();
+    s.startBuild();
+    s.sushiRan();
+
+    write("input/pagecontent/index.md", "# Home, edited");
+    write("input/images/a.png", "png2");
+    s.startBuild();
+    assertTrue(s.canSkipSushi());
+
+    write("input/fsh/a.fsh", "Profile: A2");
+    s.startBuild();
+    assertFalse(s.canSkipSushi(), "an FSH file changed");
+    s.sushiRan();
+    s.startBuild();
+    assertTrue(s.canSkipSushi());
+
+    write("input/pagecontent/added.md", "added");
+    s.startBuild();
+    assertFalse(s.canSkipSushi(), "SUSHI lists the pages");
+    s.sushiRan();
+
+    write("sushi-config.yaml", "id: y");
+    s.startBuild();
+    assertFalse(s.canSkipSushi());
+    s.sushiRan();
+
+    write("fsh-generated/resources/A.json", "{\"edited\":true}");
+    s.startBuild();
+    assertFalse(s.canSkipSushi(), "SUSHI's output was changed");
+  }
+
+  @Test
+  void aFailedSushiRunsAgain() throws IOException {
+    WatchSession s = session();
+    s.startBuild();
+    s.sushiRan();
+    s.startBuild();
+    s.sushiFailed();
+    s.startBuild();
+    assertFalse(s.canSkipSushi());
+  }
+
+  @Test
+  void anEditWhileSushiRunsIsNotMissed() throws IOException {
+    WatchSession s = session();
+    s.startBuild();
+    write("input/fsh/a.fsh", "Profile: edited while SUSHI was running");
+    s.sushiRan();
+    s.startBuild();
+    assertFalse(s.canSkipSushi());
+  }
+
+  @Test
+  void hasPackageAnswersLikeTheContext() {
+    List<String> loaded = Arrays.asList("hl7.fhir.r4.core#4.0.1", "hl7.fhir.uv.extensions.r4#5.2.0");
+    assertTrue(WatchSession.hasPackage(loaded, "hl7.fhir.r4.core#4.0.1"));
+    assertFalse(WatchSession.hasPackage(loaded, "hl7.fhir.r4.core#4.0.0"));
+    assertTrue(WatchSession.hasPackage(loaded, "hl7.fhir.uv.extensions.r4#5.2.0"));
+    assertTrue(WatchSession.hasPackage(loaded, "hl7.fhir.uv.extensions.r4#5.2.x"));
+    assertFalse(WatchSession.hasPackage(loaded, "hl7.fhir.uv.extensions.r4#4.0.x"));
+    assertFalse(WatchSession.hasPackage(loaded, "hl7.fhir.us.core#6.1.0"));
+  }
+}

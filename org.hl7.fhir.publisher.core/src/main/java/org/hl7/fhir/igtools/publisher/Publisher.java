@@ -193,65 +193,129 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 
     String rootDir = settings.getConfigFile();
     FileChangeMonitor monitor = null;
+    WatchSession session = null;
     if (settings.isWatchMode()) {
+      List<Path> watched = Arrays.asList(
+              Paths.get(Utilities.path(rootDir, "ig.ini")),
+              Paths.get(Utilities.path(rootDir, "sushi-config.yaml")),
+              Paths.get(Utilities.path(rootDir, "publication-request.json")),
+              Paths.get(Utilities.path(rootDir, "sushi-ignoreWarnings.txt")),
+              Paths.get(Utilities.path(rootDir, "input")),
+              Paths.get(Utilities.path(rootDir, "fsh-generated")));
       monitor = new FileChangeMonitor(Arrays.asList(
-              FileChangeMonitor.MonitoredPath.file(Paths.get(Utilities.path(rootDir, "ig.ini"))),
-              FileChangeMonitor.MonitoredPath.file(Paths.get(Utilities.path(rootDir, "sushi-config.yaml"))),
-              FileChangeMonitor.MonitoredPath.file(Paths.get(Utilities.path(rootDir, "publication-request.json"))),
-              FileChangeMonitor.MonitoredPath.file(Paths.get(Utilities.path(rootDir, "sushi-ignoreWarnings.txt"))),
-              FileChangeMonitor.MonitoredPath.recursive(Paths.get(Utilities.path(rootDir, "input"))),
-              FileChangeMonitor.MonitoredPath.recursive(Paths.get(Utilities.path(rootDir, "fsh-generated")))
+              FileChangeMonitor.MonitoredPath.file(watched.get(0)),
+              FileChangeMonitor.MonitoredPath.file(watched.get(1)),
+              FileChangeMonitor.MonitoredPath.file(watched.get(2)),
+              FileChangeMonitor.MonitoredPath.file(watched.get(3)),
+              FileChangeMonitor.MonitoredPath.recursive(watched.get(4)),
+              FileChangeMonitor.MonitoredPath.recursive(watched.get(5))
       ));
+      session = new WatchSession(Paths.get(rootDir), watched);
+      PackageListFetcher.rememberFetches();
+      // watch from the start: a change made while a build is running is a reason for another build
+      monitor.startMonitoring();
     }
+    loader.setWatchSession(session);
+    // settings that a build adds to: each build starts again from what the command line said
+    List<String> cliNoNarratives = new ArrayList<>(settings.getNoNarratives());
+    List<String> cliNoValidate = new ArrayList<>(settings.getNoValidate());
 
-    do {
-      pf = new PublisherFields();
-      loader.setPf(pf);
-      processor.setPf(pf);
-      generator.setPf(pf);
-      pf.resolver = this;
-      setLogger(this);
-
-      pf.tt = new TimeTracker();
-      loader.initialize();
-      if (pf.validator != null) {
-        pf.validator.setTracker(this);
-      }
-
-      if (pf.isBuildingTemplate) {
-        packageTemplate();
-      } else {
-        log("Load IG");
-        try {
-          createIg();
-        } catch (Exception e) {
-          recordOutcome(e, null);
-          throw e;
+    try {
+      boolean first = true;
+      do {
+        if (session != null) {
+          session.startBuild();
+          if (!first) {
+            resetForRebuild(cliNoNarratives, cliNoValidate);
+          }
         }
-      }
-      if (pf.templateLoaded && new File(rootDir).exists()) {
-        FileUtilities.clearDirectory(Utilities.path(rootDir, "template"));
-      }
-      if (pf.folderToDelete != null) {
+        first = false;
         try {
-          FileUtilities.clearDirectory(pf.folderToDelete);
-          new File(pf.folderToDelete).delete();
-        } catch (Throwable e) {
-          // nothing
+          build(rootDir);
+        } catch (WatchSession.WarmContextUnusableException e) {
+          log("Rebuilding without the worker context of the previous build: "+e.getMessage());
+          session.abandonContext();
+          resetForRebuild(cliNoNarratives, cliNoValidate);
+          build(rootDir);
         }
+      } while (session != null && waitForChanges(monitor, session));
+    } finally {
+      if (monitor != null) {
+        monitor.close();
       }
-    } while (monitor != null && thereIsAFileChange(monitor));
+    }
   }
 
-  private boolean thereIsAFileChange(FileChangeMonitor monitor) throws InterruptedException {
-    monitor.startMonitoring();
+  /**
+   * Puts back the state that a build changes outside PublisherFields to what a fresh start has, so that a rebuild
+   * in watch mode doesn't see what the previous build did
+   */
+  private void resetForRebuild(List<String> cliNoNarratives, List<String> cliNoValidate) {
+    settings.getNoNarratives().clear();
+    settings.getNoNarratives().addAll(cliNoNarratives);
+    settings.getNoValidate().clear();
+    settings.getNoValidate().addAll(cliNoValidate);
+    HierarchicalTableGenerator.ACTIVE_TABLES = false;
+    HierarchicalTableGenerator.uuid = UUIDUtilities.makeUuidLC();
+  }
+
+  private void build(String rootDir) throws Exception {
+    pf = new PublisherFields();
+    loader.setPf(pf);
+    processor.setPf(pf);
+    generator.setPf(pf);
+    pf.resolver = this;
+    setLogger(this);
+
+    pf.tt = new TimeTracker();
+    loader.initialize();
+    if (pf.validator != null) {
+      pf.validator.setTracker(this);
+    }
+
+    if (pf.isBuildingTemplate) {
+      packageTemplate();
+    } else {
+      log("Load IG");
+      try {
+        createIg();
+      } catch (Exception e) {
+        recordOutcome(e, null);
+        throw e;
+      }
+    }
+    if (pf.templateLoaded && new File(rootDir).exists()) {
+      FileUtilities.clearDirectory(Utilities.path(rootDir, "template"));
+    }
+    if (pf.folderToDelete != null) {
+      try {
+        FileUtilities.clearDirectory(pf.folderToDelete);
+        new File(pf.folderToDelete).delete();
+      } catch (Throwable e) {
+        // nothing
+      }
+    }
+  }
+
+  /**
+   * Waits until the content of a watched file is different from what the last build started with. Files that were
+   * saved without being changed, and files the build itself wrote, don't count
+   */
+  private boolean waitForChanges(FileChangeMonitor monitor, WatchSession session) throws InterruptedException, IOException {
     System.out.println("Watching for changes (Cascais:Rapido mode)");
     while (true) {
       if (monitor.hasChanges()) {
-        monitor.printChanges();
-        monitor.clearChanges();
-        monitor.stopMonitoring();
-        return true;
+        // wait until the files have been quiet for a moment: an editor or a git checkout often writes several
+        do {
+          monitor.clearChanges();
+          Thread.sleep(250);
+        } while (monitor.hasChanges());
+        SourceSnapshot.Changes changes = session.changesSinceBuildStart();
+        if (!changes.isEmpty()) {
+          System.out.println("=== File Changes Detected ===");
+          System.out.print(changes);
+          return true;
+        }
       } else {
         Thread.sleep(100);
       }
@@ -954,6 +1018,14 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       buildTracker.setStringProperty("status", "uuid", HierarchicalTableGenerator.uuid, null);
     } else if (pf.changeList.size() == pf.fileList.size()) {
       log("Rapido Mode: Complete Build (all files)");
+      loader.clearTempFolder();
+      buildTracker.setStringProperty("status", "uuid", HierarchicalTableGenerator.uuid, null);
+    } else if (settings.isWatchMode()) {
+      // in watch mode, every build is complete, so that its output is the same as a fresh build's: a rebuild is
+      // faster because it reuses what the previous build loaded (see WatchSession), not because it does less
+      log("Rapido Mode: Complete Build (watch mode, "+pf.changeList.size()+" of "+pf.fileList.size()+" files affected)");
+      pf.changeList.clear();
+      pf.changeList.addAll(pf.fileList);
       loader.clearTempFolder();
       buildTracker.setStringProperty("status", "uuid", HierarchicalTableGenerator.uuid, null);
     } else {

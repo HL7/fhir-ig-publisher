@@ -90,9 +90,11 @@ import java.io.*;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.MessageDigest;
 import java.util.*;
 import java.util.function.Predicate;
 
@@ -124,6 +126,13 @@ public class PublisherIGLoader extends PublisherBase {
   static final String AUTO_DEP_COMMENT_UTG = "Automatically added as a dependency - all IGs depend on HL7 Terminology";
 
   private List<StructureDefinition> additionalResources = new ArrayList<>();
+  // in watch mode, what is kept from one build to the next (else null)
+  private WatchSession watchSession;
+  // when this build started with a copy of the worker context of an earlier build: the packages (id#version) that
+  // the context would have loaded by now if it had loaded everything itself (else null)
+  private List<String> warmLoadedPackages;
+  private String contextKey;
+  private List<String> coreLoadedPackages;
 
   public PublisherIGLoader(PublisherSettings settings) {
     super(settings);
@@ -131,6 +140,7 @@ public class PublisherIGLoader extends PublisherBase {
 
 
   public void initialize() throws Exception {
+    additionalResources.clear(); // in watch mode, this loader runs once per build
     pf.pcm = getFilesystemPackageCacheManager();
     log("Build FHIR IG from "+ settings.getConfigFile());
     if (settings.getMode() == PublisherUtils.IGBuildMode.PUBLICATION)
@@ -170,14 +180,12 @@ public class PublisherIGLoader extends PublisherBase {
       }
       File fsh = new File(Utilities.path(focusDir(), "fsh"));
       if (fsh.exists() && fsh.isDirectory() && !settings.isNoSushi()) {
-        prescanSushiConfig(focusDir());
-        new FSHRunner(this).runFsh(new File(FileUtilities.getDirectoryForFile(fsh.getAbsolutePath())), settings.getMode());
+        runSushi(fsh);
         pf.isSushi = true;
       } else {
         File fsh2 = new File(Utilities.path(focusDir(), "input", "fsh"));
         if (fsh2.exists() && fsh2.isDirectory() && !settings.isNoSushi()) {
-          prescanSushiConfig(focusDir());
-          new FSHRunner(this).runFsh(new File(FileUtilities.getDirectoryForFile(fsh.getAbsolutePath())), settings.getMode());
+          runSushi(fsh);
           pf.isSushi = true;
         }
       }
@@ -194,6 +202,29 @@ public class PublisherIGLoader extends PublisherBase {
       throw new Error("Old style JSON configuration is no longer supported. If you see this, then ig.ini wasn't found in '"+ pf.rootDir +"'");
     }
     pf.expectedJurisdiction = checkForJurisdiction();
+  }
+
+  private void runSushi(File fsh) throws Exception {
+    if (watchSession != null && watchSession.canSkipSushi()) {
+      log("Sushi: not run again - only page content has changed since it last ran");
+      return;
+    }
+    try {
+      prescanSushiConfig(focusDir());
+      new FSHRunner(this).runFsh(new File(FileUtilities.getDirectoryForFile(fsh.getAbsolutePath())), settings.getMode());
+    } catch (Exception | Error e) {
+      if (watchSession != null) {
+        watchSession.sushiFailed();
+      }
+      throw e;
+    }
+    if (watchSession != null) {
+      watchSession.sushiRan();
+    }
+  }
+
+  public void setWatchSession(WatchSession watchSession) {
+    this.watchSession = watchSession;
   }
 
   private void prescanSushiConfig(String dir) throws IOException {
@@ -1217,7 +1248,7 @@ public class PublisherIGLoader extends PublisherBase {
       loadIncubatorPackage(s);
     }
 
-    if (!VersionUtilities.isR5Plus(pf.context.getFHIRVersion())) {
+    if (!VersionUtilities.isR5Plus(pf.context.getFHIRVersion()) && warmLoadedPackages == null) { // a copy already has them
       System.out.println("Load R5 Specials");
       R5ExtensionsLoader r5e = new R5ExtensionsLoader(pf.pcm, pf.context);
       r5e.load();
@@ -1235,6 +1266,7 @@ public class PublisherIGLoader extends PublisherBase {
     //    specMaps.add(smm);
     //    System.out.println(" - " + r5e.getCount() + " resources (" + tt.milestone() + ")");
     generateLoadedSnapshots();
+    checkWarmContext();
 
     // set up validator;
     pf.validatorSession = new ValidatorSession();
@@ -1573,6 +1605,17 @@ public class PublisherIGLoader extends PublisherBase {
     pf.npmList.add(pi);
 
     SpecMapManager spm = loadSpecDetails(FileUtilities.streamToBytes(pi.load("other", "spec.internals")), "basespec", pi, pf.specPath);
+    warmLoadedPackages = null;
+    contextKey = watchSession == null ? null : contextKey(pi);
+    SimpleWorkerContext warm = watchSession == null ? null : watchSession.copyContext(contextKey);
+    if (warm != null) {
+      log("Using a copy of the worker context of the previous build (nothing it was loaded from has changed)");
+      warm.initTxCache(pf.vsCache); // the cache as it is on disk, as a context loaded now would have it
+      warm.setForPublication(true);
+      warm.setSuppressedMappings(pf.suppressedMappings);
+      warmLoadedPackages = watchSession.getContextCorePackages();
+      return warm;
+    }
     SimpleWorkerContext sp;
     IContextResourceLoaderN loader = new PublisherLoader(pi, spm, pf.specPath, pf.igpkp, false, ModelContext.fullCoreContext()).makeLoader();
     sp = new SimpleWorkerContext.SimpleWorkerContextBuilder(ModelContext.fullCoreContext()).withAllowLoadingDuplicates(true).withTerminologyCachePath(pf.vsCache).fromPackage(pi, loader, false); // allowDuplicates because of problem in R4 package
@@ -1586,7 +1629,91 @@ public class PublisherIGLoader extends PublisherBase {
         utils.setIds(sd, true);
       }
     }
+    coreLoadedPackages = new ArrayList<>(sp.getLoadedPackages());
     return sp;
+  }
+
+  /**
+   * Identifies what the worker context is loaded from, up to the point where watch mode keeps it (see
+   * WatchSession): if any of it changes, a rebuild loads a new context. The packages the dependencies resolve to
+   * are checked separately, once they are known (see checkWarmContext)
+   */
+  private String contextKey(NpmPackage core) {
+    if (!pf.customResourceNames.isEmpty() || !additionalResources.isEmpty()) {
+      return null; // these change the context in ways that are not repeated on a copy
+    }
+    try {
+      MessageDigest md = MessageDigest.getInstance("SHA-256");
+      StringBuilder b = new StringBuilder();
+      b.append(pf.version).append("|").append(pf.igPack).append("|").append(pf.specPath).append("|").append(pf.vsCache).append("|");
+      b.append(settings.getTxServer()).append("|").append(settings.getMode()).append("|").append(pf.suppressedMappings).append("|");
+      b.append(packageIdentity(core)).append("|");
+      md.update(b.toString().getBytes(StandardCharsets.UTF_8));
+      // the IG, apart from its list of resources and pages (adding a resource or a page doesn't change the context)
+      ImplementationGuide ig = pf.sourceIg.copy(Base.COPY_DATA);
+      ig.getDefinition().getResourceList().clear();
+      ig.getDefinition().setPage(null);
+      ig.setText(null);
+      md.update(new JsonParser(ModelContext.fullCoreContext()).composeString(ig).getBytes(StandardCharsets.UTF_8));
+      for (String f : new String[] {settings.getConfigFile(), Utilities.path(pf.rootDir, "publication-request.json")}) {
+        File file = new File(f);
+        md.update((f+(file.isFile() ? ":"+file.length() : ":-")).getBytes(StandardCharsets.UTF_8));
+        if (file.isFile()) {
+          md.update(Files.readAllBytes(file.toPath()));
+        }
+      }
+      // the template, as loaded for this build
+      File tdir = new File(Utilities.path(pf.rootDir, "template"));
+      if (tdir.isDirectory()) {
+        SourceSnapshot t = SourceSnapshot.take(Collections.singletonList(tdir.toPath()), null);
+        md.update(t.digest());
+      }
+      return java.util.Base64.getEncoder().encodeToString(md.digest());
+    } catch (Exception e) {
+      log("Unable to identify the worker context, so it won't be kept: "+e.getMessage());
+      return null;
+    }
+  }
+
+  private static String packageIdentity(NpmPackage npm) {
+    String path = npm.getPath();
+    File pj = path == null ? null : new File(new File(path, "package"), "package.json");
+    return npm.name()+"#"+npm.version()+"@"+path+(pj != null && pj.exists() ? ":"+pj.lastModified()+":"+pj.length() : "");
+  }
+
+  /** Records that pi has been loaded into the context (only needed when the context is a copy, see hasPackage) */
+  private void noteLoaded(NpmPackage pi) {
+    if (warmLoadedPackages != null && !warmLoadedPackages.contains(pi.id()+"#"+pi.version())) {
+      warmLoadedPackages.add(pi.id()+"#"+pi.version());
+    }
+  }
+
+  /**
+   * Whether the context has loaded the package dep. When the context is a copy of an earlier build's, it has
+   * already loaded every package that build loaded, so the answer is the one a context loaded by this build would
+   * give at this point
+   */
+  private boolean contextHasPackage(String dep) {
+    return warmLoadedPackages == null ? pf.context.hasPackage(dep) : WatchSession.hasPackage(warmLoadedPackages, dep);
+  }
+
+  /**
+   * Once the dependencies are loaded: if the context is a copy, check that it was loaded from the same packages;
+   * else keep a copy of it for the next build
+   */
+  private void checkWarmContext() throws Exception {
+    if (watchSession == null) {
+      return;
+    }
+    List<String> packages = new ArrayList<>();
+    for (NpmPackage npm : pf.npmList) {
+      packages.add(packageIdentity(npm));
+    }
+    if (warmLoadedPackages != null) {
+      watchSession.checkPackages(packages);
+    } else {
+      watchSession.keepContext(contextKey, pf.context, coreLoadedPackages, packages);
+    }
   }
 
   private Parameters makeExpProfile() {
@@ -1613,14 +1740,17 @@ public class PublisherIGLoader extends PublisherBase {
     loader.setPatchUrls(true);
     loader.setLoadProfiles(false);
     pf.context.loadFromPackage(npm, loader);
+    noteLoaded(npm);
   }
 
 
   private void loadPubPack() throws FHIRException, IOException {
     NpmPackage npm = pf.pcm.loadPackage(CommonPackages.ID_PUBPACK, CommonPackages.VER_PUBPACK);
     pf.context.loadFromPackage(npm, null);
+    noteLoaded(npm);
     npm = pf.pcm.loadPackage(CommonPackages.ID_XVER, CommonPackages.VER_XVER);
     pf.context.loadFromPackage(npm, null);
+    noteLoaded(npm);
   }
 
   private String getUTGPackageName() throws FHIRException, IOException {
@@ -1827,6 +1957,7 @@ public class PublisherIGLoader extends PublisherBase {
     // the package is loaded as a "master" package: its definitions override the definitions
     // in the base specification for version-less fetches (that's the point of an incubator IG)
     pf.context.loadFromPackage(npm, loader, true);
+    noteLoaded(npm);
   }
 
   private void loadIg(String name, String packageId, String igver, String uri, int index, boolean loadDeps, boolean internal) throws Exception {
@@ -1914,7 +2045,7 @@ public class PublisherIGLoader extends PublisherBase {
   public IContextResourceLoaderN loadFromPackage(String name, String canonical, NpmPackage pi, String webref, SpecMapManager igm, boolean loadDeps, boolean internal) throws IOException {
     if (loadDeps) { // we do not load dependencies for packages the tooling loads on it's own initiative
       for (String dep : pi.dependencies()) {
-        if (!pf.context.hasPackage(dep)) {
+        if (!contextHasPackage(dep)) {
           String fdep = fixPackageReference(dep);
           String coreVersion = VersionUtilities.getVersionForPackage(fdep);
           if (coreVersion != null) {
@@ -1959,6 +2090,7 @@ public class PublisherIGLoader extends PublisherBase {
     }
     IContextResourceLoaderN loader = new PublisherLoader(pi, igm, webref, pf.igpkp, internal, pf.context.getModelContext()).makeLoader();
     pf.context.loadFromPackage(pi, loader);
+    noteLoaded(pi);
     return loader;
   }
 

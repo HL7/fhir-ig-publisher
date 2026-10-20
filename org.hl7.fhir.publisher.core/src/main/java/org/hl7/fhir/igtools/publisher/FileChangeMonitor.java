@@ -14,7 +14,7 @@ import java.util.stream.Collectors;
  * - macOS: Polling-based (fast, reliable)
  * - Other OS: WatchService-based (efficient)
  */
-public class FileChangeMonitor {
+public class FileChangeMonitor implements AutoCloseable {
   private final FileChangeMonitorImpl impl;
 
   public static class FileChangeEvent {
@@ -125,6 +125,12 @@ public class FileChangeMonitor {
     impl.stopMonitoring();
   }
 
+  /** Stops monitoring for good and releases the operating system resources */
+  @Override
+  public void close() {
+    impl.close();
+  }
+
   // Private interface for implementations
   private interface FileChangeMonitorImpl {
     void startMonitoring();
@@ -137,13 +143,20 @@ public class FileChangeMonitor {
     FileChangeEvent waitForChange() throws InterruptedException;
     void clearChanges();
     void stopMonitoring();
+    void close();
   }
 
   // WatchService implementation (Linux, Windows)
   private static class WatchServiceFileChangeMonitorImpl implements FileChangeMonitorImpl {
     private final WatchService watchService;
     private final Map<WatchKey, Path> watchKeys;
-    private final Set<Path> monitoredFiles;
+    // directories that are only watched for some of their files (MonitoredPath.file): directory -> those files.
+    // Events in every other watched directory are always reported
+    private final Map<Path, Set<Path>> fileFilters;
+    // directories watched as part of a recursive MonitoredPath: subdirectories created in them are watched too
+    private final Set<Path> recursiveDirs;
+    // the recursive MonitoredPaths themselves: they are watched from the moment they are (re)created
+    private final Set<Path> recursiveRoots;
     private ExecutorService executor;
     private final BlockingQueue<FileChangeEvent> changeQueue;
     private volatile boolean monitoring;
@@ -151,32 +164,80 @@ public class FileChangeMonitor {
     public WatchServiceFileChangeMonitorImpl(List<MonitoredPath> pathsToMonitor) throws IOException {
       this.watchService = FileSystems.getDefault().newWatchService();
       this.watchKeys = new ConcurrentHashMap<>();
-      this.monitoredFiles = ConcurrentHashMap.newKeySet();
+      this.fileFilters = new ConcurrentHashMap<>();
+      this.recursiveDirs = ConcurrentHashMap.newKeySet();
+      this.recursiveRoots = ConcurrentHashMap.newKeySet();
       this.executor = Executors.newSingleThreadExecutor();
       this.changeQueue = new LinkedBlockingQueue<>();
       this.monitoring = false;
 
       for (MonitoredPath monitoredPath : pathsToMonitor) {
-        Path path = monitoredPath.path;
+        Path path = monitoredPath.path.toAbsolutePath();
+        if (monitoredPath.recursive) {
+          recursiveRoots.add(path);
+          watchParent(path, null); // so that the directory is noticed when it is created, or deleted and created again
+        }
 
         if (Files.isDirectory(path)) {
           if (monitoredPath.recursive) {
-            registerRecursive(path);
+            registerRecursive(path, null);
           } else {
             registerDirectory(path);
+            fileFilters.remove(path);
           }
-        } else if (Files.exists(path)) {
-          monitoredFiles.add(path.toAbsolutePath());
-          registerDirectory(path.getParent());
+        } else if (!monitoredPath.recursive) {
+          // a file is watched through its directory, even if it doesn't exist yet, so creating it is noticed
+          watchParent(path, path);
         }
       }
     }
 
-    private void registerRecursive(Path directory) throws IOException {
+    /**
+     * Watches the directory that contains path for changes to path only (unless that directory is already watched
+     * for everything in it). If reported is null, the directory is watched without reporting anything in it
+     */
+    private void watchParent(Path path, Path reported) throws IOException {
+      Path dir = path.getParent();
+      if (dir == null || !Files.isDirectory(dir)) {
+        return;
+      }
+      if (!watchKeys.containsValue(dir)) {
+        registerDirectory(dir);
+        fileFilters.put(dir, ConcurrentHashMap.newKeySet());
+      }
+      Set<Path> filter = fileFilters.get(dir);
+      if (filter != null && reported != null) {
+        filter.add(reported);
+      }
+    }
+
+    /**
+     * Watches directory and all the directories below it. If created is not null, the files found in them are
+     * reported as created: they appeared in a directory that was not being watched yet.
+     */
+    private void registerRecursive(Path directory, List<FileChangeEvent> created) throws IOException {
       Files.walkFileTree(directory, new SimpleFileVisitor<Path>() {
         @Override
         public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+          // registering a directory again is harmless (the existing key is returned), and needed when the directory
+          // was deleted and created again
           registerDirectory(dir);
+          recursiveDirs.add(dir);
+          fileFilters.remove(dir);
+          return FileVisitResult.CONTINUE;
+        }
+
+        @Override
+        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+          if (created != null) {
+            created.add(new FileChangeEvent(file, FileChangeEvent.ChangeType.CREATED));
+          }
+          return FileVisitResult.CONTINUE;
+        }
+
+        @Override
+        public FileVisitResult visitFileFailed(Path file, IOException exc) {
+          // deleted while we were walking: the delete is reported by the parent directory
           return FileVisitResult.CONTINUE;
         }
       });
@@ -213,15 +274,39 @@ public class FileChangeMonitor {
 
             for (WatchEvent<?> event : key.pollEvents()) {
               WatchEvent.Kind<?> kind = event.kind();
-              if (kind == StandardWatchEventKinds.OVERFLOW) continue;
+              if (kind == StandardWatchEventKinds.OVERFLOW) {
+                // events were lost: report the directory itself, so the caller knows something changed in it
+                changeQueue.offer(new FileChangeEvent(directory, FileChangeEvent.ChangeType.MODIFIED));
+                continue;
+              }
 
               @SuppressWarnings("unchecked")
               WatchEvent<Path> ev = (WatchEvent<Path>) event;
               Path filename = ev.context();
               Path changedPath = directory.resolve(filename).toAbsolutePath();
 
-              if (!monitoredFiles.isEmpty() && !monitoredFiles.contains(changedPath)) {
+              if (kind == StandardWatchEventKinds.ENTRY_CREATE && recursiveRoots.contains(changedPath) && Files.isDirectory(changedPath)) {
+                List<FileChangeEvent> created = new ArrayList<>();
+                try {
+                  registerRecursive(changedPath, created);
+                } catch (IOException e) {
+                  System.err.println("Unable to watch new directory " + changedPath + ": " + e.getMessage());
+                }
+                changeQueue.addAll(created);
                 continue;
+              }
+              Set<Path> filter = fileFilters.get(directory);
+              if (filter != null && !filter.contains(changedPath)) {
+                continue;
+              }
+              if (kind == StandardWatchEventKinds.ENTRY_CREATE && recursiveDirs.contains(directory) && Files.isDirectory(changedPath)) {
+                List<FileChangeEvent> created = new ArrayList<>();
+                try {
+                  registerRecursive(changedPath, created);
+                } catch (IOException e) {
+                  System.err.println("Unable to watch new directory " + changedPath + ": " + e.getMessage());
+                }
+                changeQueue.addAll(created);
               }
 
               FileChangeEvent.ChangeType changeType;
@@ -241,6 +326,9 @@ public class FileChangeMonitor {
             boolean valid = key.reset();
             if (!valid) {
               watchKeys.remove(key);
+              if (!watchKeys.containsValue(directory)) {
+                recursiveDirs.remove(directory); // gone (unless it was already created again)
+              }
             }
           }
         } catch (InterruptedException e) {
@@ -333,6 +421,8 @@ public class FileChangeMonitor {
       changeQueue.clear();
     }
 
+    // the watch service stays open, so that monitoring can be started again (watch mode stops and restarts it
+    // around every rebuild); changes made while stopped are reported once it is restarted
     @Override
     public void stopMonitoring() {
       monitoring = false;
@@ -342,13 +432,20 @@ public class FileChangeMonitor {
           if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
             executor.shutdownNow();
           }
-          watchService.close();
         } catch (InterruptedException e) {
           executor.shutdownNow();
           Thread.currentThread().interrupt();
-        } catch (IOException e) {
-          System.err.println("Error closing watch service: " + e.getMessage());
         }
+      }
+    }
+
+    @Override
+    public void close() {
+      stopMonitoring();
+      try {
+        watchService.close();
+      } catch (IOException e) {
+        System.err.println("Error closing watch service: " + e.getMessage());
       }
     }
   }
@@ -607,6 +704,11 @@ public class FileChangeMonitor {
           Thread.currentThread().interrupt();
         }
       }
+    }
+
+    @Override
+    public void close() {
+      stopMonitoring();
     }
   }
 
