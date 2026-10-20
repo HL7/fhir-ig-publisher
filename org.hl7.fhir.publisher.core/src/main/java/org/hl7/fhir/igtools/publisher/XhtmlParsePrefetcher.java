@@ -7,7 +7,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
@@ -22,7 +21,7 @@ import org.hl7.fhir.utilities.xhtml.XhtmlParser;
  * Parsing is a pure function of the bytes parsed and the parser settings, so a tree parsed early is
  * the tree a parse on the walking thread would give - provided the file still has the same bytes.
  * {@link #parse} therefore always reads the file itself and only hands out a prefetched tree whose
- * source bytes are equal to what it read; otherwise (file changed, prefetch failed or threw, or not
+ * source bytes are equal to what it read, parsed with the same setting; otherwise (file changed, prefetch failed or threw, or not
  * started yet) it parses on the calling thread, exactly as before. Each prefetched tree is handed
  * out at most once, so callers own the trees they get, as they do with a fresh parse.
  * <p>
@@ -35,17 +34,19 @@ public class XhtmlParsePrefetcher implements AutoCloseable {
   /** One parse of one byte sequence. */
   public static class Parsed {
     private final byte[] source;
+    private final boolean mustBeWellFormed;
     private final XhtmlNode node;
     private final List<String> recoveryNotes;
 
-    Parsed(byte[] source, XhtmlNode node, List<String> recoveryNotes) {
+    Parsed(byte[] source, boolean mustBeWellFormed, XhtmlNode node, List<String> recoveryNotes) {
       this.source = source;
+      this.mustBeWellFormed = mustBeWellFormed;
       this.node = node;
       this.recoveryNotes = recoveryNotes;
     }
   }
 
-  /** What a worker does for one file: the parses the walking thread is expected to ask for, in order. */
+  /** What a worker does for one file: the parses the walking thread is expected to ask for. */
   public interface Job {
     List<Parsed> run(String path) throws Exception;
   }
@@ -69,11 +70,11 @@ public class XhtmlParsePrefetcher implements AutoCloseable {
       parsed.add(p);
     }
 
-    /** @return a parse of exactly these bytes, removed so it isn't handed out again, or null */
-    Parsed claim(byte[] bytes) {
+    /** @return a parse of exactly these bytes with this setting, removed so it isn't handed out again, or null */
+    Parsed claim(byte[] bytes, boolean mustBeWellFormed) {
       for (Iterator<Parsed> it = parsed.iterator(); it.hasNext(); ) {
         Parsed p = it.next();
-        if (Arrays.equals(p.source, bytes)) {
+        if (p.mustBeWellFormed == mustBeWellFormed && Arrays.equals(p.source, bytes)) {
           it.remove();
           return p;
         }
@@ -110,8 +111,8 @@ public class XhtmlParsePrefetcher implements AutoCloseable {
   private boolean closed;
 
   /**
-   * @return a prefetcher, or null when there is no spare processor to run it on (callers then just
-   *         parse, see {@link #parse})
+   * @return a prefetcher, or null when there is no spare processor to run it on or fewer than two
+   *         files (callers then just parse, see {@link #parse})
    */
   public static XhtmlParsePrefetcher start(List<String> paths, Job job) {
     int threads = Math.min(3, Runtime.getRuntime().availableProcessors() - 1);
@@ -253,18 +254,19 @@ public class XhtmlParsePrefetcher implements AutoCloseable {
   public static Parsed parseBytes(byte[] bytes, boolean mustBeWellFormed) throws IOException, FHIRFormatError {
     XhtmlParser parser = new XhtmlParser().setMustBeWellFormed(mustBeWellFormed);
     XhtmlNode x = parser.parse(new ByteArrayInputStream(bytes), null);
-    return new Parsed(bytes, x, new ArrayList<>(parser.getRecoveryNotes()));
+    return new Parsed(bytes, mustBeWellFormed, x, new ArrayList<>(parser.getRecoveryNotes()));
   }
 
   /**
    * The same as {@code new XhtmlParser().setMustBeWellFormed(mustBeWellFormed).parse(f, null)},
-   * taking the tree from {@code available} if it holds a parse of the file's current bytes.
+   * taking the tree from {@code available} if it holds a parse of the file's current bytes with the
+   * same setting.
    *
    * @param available may be null
    */
   public static Parsed parseFile(File f, boolean mustBeWellFormed, Parsings available) throws IOException, FHIRFormatError {
     byte[] bytes = read(f);
-    Parsed p = available == null ? null : available.claim(bytes);
+    Parsed p = available == null ? null : available.claim(bytes, mustBeWellFormed);
     return p != null ? p : parseBytes(bytes, mustBeWellFormed);
   }
 
@@ -279,17 +281,6 @@ public class XhtmlParsePrefetcher implements AutoCloseable {
       recoveryNotes.addAll(p.recoveryNotes);
     }
     return p.node;
-  }
-
-  /** @return the parses in a job's result list */
-  public static List<Parsed> list(Parsed... parsed) {
-    List<Parsed> res = new ArrayList<>();
-    for (Parsed p : parsed) {
-      if (p != null) {
-        res.add(p);
-      }
-    }
-    return Collections.unmodifiableList(res);
   }
 
   /** @return the parse's tree, for a job that needs to look at it to decide what comes next */

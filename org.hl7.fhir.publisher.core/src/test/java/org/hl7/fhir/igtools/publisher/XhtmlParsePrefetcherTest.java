@@ -44,7 +44,7 @@ class XhtmlParsePrefetcherTest {
   }
 
   private static XhtmlParsePrefetcher.Job parseJob(boolean strict) {
-    return path -> XhtmlParsePrefetcher.list(XhtmlParsePrefetcher.parseBytes(XhtmlParsePrefetcher.read(new File(path)), strict));
+    return path -> List.of(XhtmlParsePrefetcher.parseBytes(XhtmlParsePrefetcher.read(new File(path)), strict));
   }
 
   /** A job that counts down {@code started} once it is under way, after which take() waits for it rather than skipping it. */
@@ -102,7 +102,7 @@ class XhtmlParsePrefetcherTest {
     byte[] bytes = XhtmlParsePrefetcher.read(a);
     XhtmlParsePrefetcher.Parsed first = XhtmlParsePrefetcher.parseBytes(bytes, false);
     XhtmlParsePrefetcher.Parsed second = XhtmlParsePrefetcher.parseBytes(bytes, false);
-    XhtmlParsePrefetcher.Parsings got = new XhtmlParsePrefetcher.Parsings(XhtmlParsePrefetcher.list(first, second));
+    XhtmlParsePrefetcher.Parsings got = new XhtmlParsePrefetcher.Parsings(List.of(first, second));
     XhtmlNode x1 = XhtmlParsePrefetcher.parse(a, false, got, null);
     XhtmlNode x2 = XhtmlParsePrefetcher.parse(a, false, got, null);
     XhtmlNode x3 = XhtmlParsePrefetcher.parse(a, false, got, null);
@@ -126,6 +126,15 @@ class XhtmlParsePrefetcherTest {
     XhtmlNode x = XhtmlParsePrefetcher.parse(a, false, parsings, null);
     assertNotSame(XhtmlParsePrefetcher.node(first), x);
     assertTrue(compose(x).contains("rewritten"));
+  }
+
+  @Test
+  void aParseWithAnotherSettingIsNotUsed() throws Exception {
+    File a = write("a.html", PAGE);
+    XhtmlParsePrefetcher.Parsings parsings = new XhtmlParsePrefetcher.Parsings();
+    parsings.add(XhtmlParsePrefetcher.parseFile(a, false, null));
+    // the page isn't well formed, so a parse that must find it well formed fails rather than taking the lenient tree
+    assertThrows(Exception.class, () -> XhtmlParsePrefetcher.parse(a, true, parsings, null));
   }
 
   @Test
