@@ -527,16 +527,16 @@ public class RapidoTracker {
     }
   }
 
-  /**
-   * The packages the build has loaded (into the context) so far, each with a hash of its package.json in the package
-   * cache, which changes whenever the package is downloaded again. Packages are compared one by one, so that packages
-   * this IG doesn't use can come and go in the cache without making the next build a complete one.
-   */
   /** the day of the build, in the time zone the build date is stamped in */
   static String buildDay(Calendar execTime) {
     return new DateTimeType(execTime).asStringValue().substring(0, 10);
   }
 
+  /**
+   * The packages the build has loaded (into the context) so far, each with a hash of its package.json in the package
+   * cache, which changes whenever the package is downloaded again. Packages are compared one by one, so that packages
+   * this IG doesn't use can come and go in the cache without making the next build a complete one.
+   */
   private Map<String, String> loadedPackages() {
     Map<String, String> res = new TreeMap<>();
     if (pf.context == null) {
