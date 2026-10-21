@@ -2,6 +2,7 @@ package org.hl7.fhir.igtools.publisher;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
@@ -32,10 +33,8 @@ class NewLocationRedirectsTest {
 
   // the relevant part of the defaults in the base template's config.json
   private static final String DEFAULTS = "{"+
-      "\"Any\": {\"template-base\": \"x.html\", \"base\": \"{{[type]}}-{{[id]}}.html\", \"format\": \"{{[type]}}-{{[id]}}.{{[fmt]}}.html\", \"list-types\": \"CodeSystem|ValueSet\", \"change-history\": \"{{[type]}}-{{[id]}}.change.history.html\"},"+
-      "\"StructureDefinition\": {\"base\": \"{{[type]}}-{{[id]}}.html\", \"defns\": \"{{[type]}}-{{[id]}}-definitions.html\", \"format\": \"{{[type]}}-{{[id]}}.profile.{{[fmt]}}.html\"},"+
-      "\"StructureDefinition:extension\": {\"base\": \"{{[type]}}-{{[id]}}.html\", \"mappings\": \"{{[type]}}-{{[id]}}-mappings.html\"},"+
-      "\"ValueSet\": {\"base\": \"{{[type]}}-{{[id]}}.html\", \"format\": \"{{[type]}}-{{[id]}}.{{[fmt]}}.html\", \"testing\": \"{{[type]}}-{{[id]}}-testing.html\"}"+
+      "\"Any\": {\"template-base\": \"x.html\", \"base\": \"{{[type]}}-{{[id]}}.html\", \"format\": \"{{[type]}}-{{[id]}}.{{[fmt]}}.html\"},"+
+      "\"ValueSet\": {\"base\": \"{{[type]}}-{{[id]}}.html\", \"testing\": \"{{[type]}}-{{[id]}}-testing.html\"}"+
       "}";
 
   @TempDir
@@ -95,53 +94,45 @@ class NewLocationRedirectsTest {
   }
 
   @Test
-  void redirectsTheTemplatePagesOfAMovedArtifact() throws IOException {
+  void redirectsTheMainPageOfAMovedArtifact() throws IOException {
     NewLocationRedirects nl = load("2.0.0", newLocation("ValueSet/be-civilstate", null, NEW_SPEC, null, "2.0.0"));
-    nl.generate(output, defaults, Set.of(), List.of());
-    for (String page : List.of("ValueSet-be-civilstate.html", "ValueSet-be-civilstate.xml.html", "ValueSet-be-civilstate.json.html",
-        "ValueSet-be-civilstate.ttl.html", "ValueSet-be-civilstate-testing.html", "ValueSet-be-civilstate.change.history.html")) {
-      assertTrue(read(page).contains("url="+NEW_SPEC+"/"+page+"\""), page);
-      // the HTML checker doesn't allow <link> elements that point outside the IG
-      assertFalse(read(page).contains("<link"), page);
-    }
-    assertTrue(read("ValueSet", "be-civilstate", "index.html").contains("url="+NEW_SPEC+"/ValueSet-be-civilstate.html\""));
-    assertEquals(NEW_SPEC+"/ValueSet-be-civilstate.html", nl.getRedirects().get("ValueSet/be-civilstate"));
+    nl.generate(output, defaults, Set.of());
+    String page = read("ValueSet-be-civilstate.html");
+    assertTrue(page.contains("url="+NEW_SPEC+"/ValueSet-be-civilstate.html\""), page);
+    // the HTML checker doesn't allow <link> elements that point outside the IG
+    assertFalse(page.contains("<link"), page);
+    // only the main page: the canonical URL is redirected when the IG is published, by format
+    assertFalse(exists("ValueSet-be-civilstate.json.html"));
+    assertFalse(exists("ValueSet-be-civilstate-testing.html"));
+    assertFalse(exists("ValueSet"));
+    NewLocationRedirects.Target t = nl.getRedirects().get("ValueSet/be-civilstate");
+    assertEquals(NEW_SPEC+"/ValueSet-be-civilstate.html", t.getPage());
+    assertEquals(NEW_SPEC+"/ValueSet-be-civilstate", t.getSource());
     assertEquals(0, count(IssueSeverity.ERROR), errors.toString());
   }
 
   @Test
-  void usesTheTypeOwnPageNamesAndThoseOfItsVariants() throws IOException {
-    NewLocationRedirects nl = load("2.0.0", newLocation("StructureDefinition/be-ext", null, NEW_SPEC, null, "2.0.0"));
-    nl.generate(output, defaults, Set.of(), List.of());
-    assertTrue(exists("StructureDefinition-be-ext.profile.json.html"));
-    assertFalse(exists("StructureDefinition-be-ext.json.html"));
-    assertTrue(exists("StructureDefinition-be-ext-definitions.html"));
-    assertTrue(exists("StructureDefinition-be-ext-mappings.html"));
-  }
-
-  @Test
-  void renamesAndRedirectsEachLanguage() throws IOException {
-    Files.createDirectories(Path.of(output, "fr"));
+  void usesTheNewIdWhenRenamed() throws IOException {
     NewLocationRedirects nl = load("2.0.0", newLocation("ValueSet/be-civilstate", null, NEW_SPEC, "be-civil-state", "2.0.0"));
-    nl.generate(output, defaults, Set.of(), List.of("fr", "nl"));
+    nl.generate(output, defaults, Set.of());
     assertTrue(read("ValueSet-be-civilstate.html").contains("url="+NEW_SPEC+"/ValueSet-be-civil-state.html\""));
-    assertTrue(read("fr", "ValueSet-be-civilstate.html").contains("url="+NEW_SPEC+"/fr/ValueSet-be-civil-state.html\""));
-    assertFalse(exists("nl"));
+    assertEquals(NEW_SPEC+"/ValueSet-be-civil-state", nl.getRedirects().get("ValueSet/be-civilstate").getSource());
   }
 
   @Test
   void redirectsAMovedPage() throws IOException {
     NewLocationRedirects nl = load("2.0.0", newLocation(null, "terminology-guidance", NEW_SPEC, "guidance", "2.0.0"));
-    nl.generate(output, defaults, Set.of(), List.of());
+    nl.generate(output, defaults, Set.of());
     assertTrue(read("terminology-guidance.html").contains("url="+NEW_SPEC+"/guidance.html\""));
-    assertEquals(NEW_SPEC+"/guidance.html", nl.getRedirects().get("terminology-guidance"));
+    assertEquals(NEW_SPEC+"/guidance.html", nl.getRedirects().get("terminology-guidance").getPage());
+    assertNull(nl.getRedirects().get("terminology-guidance").getSource());
   }
 
   @Test
   void appliesFromItsVersionOn() throws IOException {
-    load("1.1.0", newLocation("ValueSet/a", null, NEW_SPEC, null, "2.0.0")).generate(output, defaults, Set.of(), List.of());
-    load("2.0.0-ballot", newLocation("ValueSet/b", null, NEW_SPEC, null, "2.0.0")).generate(output, defaults, Set.of(), List.of());
-    load("2.1.0", newLocation("ValueSet/c", null, NEW_SPEC, null, "2.0.0")).generate(output, defaults, Set.of(), List.of());
+    load("1.1.0", newLocation("ValueSet/a", null, NEW_SPEC, null, "2.0.0")).generate(output, defaults, Set.of());
+    load("2.0.0-ballot", newLocation("ValueSet/b", null, NEW_SPEC, null, "2.0.0")).generate(output, defaults, Set.of());
+    load("2.1.0", newLocation("ValueSet/c", null, NEW_SPEC, null, "2.0.0")).generate(output, defaults, Set.of());
     assertFalse(exists("ValueSet-a.html"));
     assertFalse(exists("ValueSet-b.html"));
     assertTrue(exists("ValueSet-c.html"));
@@ -154,7 +145,7 @@ class NewLocationRedirectsTest {
     NewLocationRedirects nl = load("2.0.0",
         newLocation("ValueSet/still-here", null, NEW_SPEC, null, "2.0.0"),
         newLocation("ValueSet/kept", null, NEW_SPEC, null, "2.0.0"));
-    nl.generate(output, defaults, Set.of("ValueSet/still-here"), List.of());
+    nl.generate(output, defaults, Set.of("ValueSet/still-here"));
     assertFalse(exists("ValueSet-still-here.html"));
     assertEquals("<html>the real page</html>", read("ValueSet-kept.html"));
     assertEquals(2, count(IssueSeverity.ERROR), errors.toString());

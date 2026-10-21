@@ -4106,7 +4106,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         resources.add(r.fhirType()+"/"+r.getId());
       }
     }
-    pf.newLocations.generate(pf.outputDir, pf.igpkp.getDefaultConfig(), resources, allLangs());
+    pf.newLocations.generate(pf.outputDir, pf.igpkp.getDefaultConfig(), resources);
   }
 
   private File makeSpecFile() throws Exception {
@@ -4139,8 +4139,8 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       }
     }
     if (pf.newLocations != null) {
-      for (Map.Entry<String, String> e : pf.newLocations.getRedirects().entrySet()) {
-        map.newLocation(e.getKey(), e.getValue());
+      for (Map.Entry<String, NewLocationRedirects.Target> e : pf.newLocations.getRedirects().entrySet()) {
+        map.newLocation(e.getKey(), e.getValue().getPage(), e.getValue().getSource());
       }
     }
     File df = File.createTempFile("fhir", "tmp");
