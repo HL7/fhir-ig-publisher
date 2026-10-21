@@ -279,6 +279,10 @@ class RapidoDependencyAnalyserTest {
     assertTrue(ig.analyse().get("prof").isUsesInventory());
     assertEquals(List.of("prof", "ex", "other", "inst"), edit(ig, i -> i.get("other").title("renamed")).validate);
 
+    // no types known at all is taken as any
+    ig.types = List.of();
+    assertTrue(ig.analyse().get("prof").isUsesInventory());
+
     ig.types = List.of("Patient", "Practitioner", "Basic", "StructureDefinition");
     Map<String, FileResult> res = ig.analyse();
     assertFalse(res.get("prof").isUsesInventory());

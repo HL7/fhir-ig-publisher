@@ -219,14 +219,15 @@ public class RapidoDependencyAnalyser {
   }
 
   /**
-   * @param resourceTypes the resource types the build knows (null: take any capitalised name as one). Strings such as
+   * @param resourceTypes the resource types the build knows (null or empty: take any capitalised name as one). Strings such as
    * the v2 mapping XPN/4 look like a relative reference, but can't be one, and would otherwise make everything that
    * depends on a base snapshot depend on the inventory. The types of the IG's own resources and the ids and names of
    * its StructureDefinitions (logical models, custom resources) are added.
    */
   public RapidoDependencyAnalyser(String canonical, Collection<String> resourceTypes) {
     this.canonical = canonical;
-    this.resourceTypes = resourceTypes == null ? null : new HashSet<>(resourceTypes);
+    // an empty list would make every dangling Type/id look external, and so rebuild less: take it as unknown
+    this.resourceTypes = resourceTypes == null || resourceTypes.isEmpty() ? null : new HashSet<>(resourceTypes);
   }
 
   public Map<String, FileResult> analyse(Collection<FileNode> files) {
