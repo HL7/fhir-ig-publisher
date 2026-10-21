@@ -126,7 +126,7 @@ public class RapidoTracker {
     for (FetchedFile f : pf.fileList) {
       nodes.put(f, fileNode(f));
     }
-    results = new RapidoDependencyAnalyser(pf.igpkp.getCanonical()).analyse(nodes.values());
+    results = new RapidoDependencyAnalyser(pf.igpkp.getCanonical(), pf.context == null ? null : pf.context.getResourceNames()).analyse(nodes.values());
 
     JsonObject old = loadState();
     reason = failure;

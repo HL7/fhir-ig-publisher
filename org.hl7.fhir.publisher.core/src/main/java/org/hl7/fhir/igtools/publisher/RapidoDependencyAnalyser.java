@@ -204,6 +204,8 @@ public class RapidoDependencyAnalyser {
   private static final int MAX_REF_LENGTH = 1024;
 
   private final String canonical;
+  /** the type names a relative reference (Type/id) can start with, or null for any capitalised name */
+  private final Set<String> resourceTypes;
   private final Map<String, ResourceNode> byKey = new HashMap<>();
   private final Map<String, List<ResourceNode>> byUrl = new HashMap<>();
   private final Map<String, List<ResourceNode>> byId = new HashMap<>();
@@ -213,13 +215,33 @@ public class RapidoDependencyAnalyser {
   private final Set<ResourceNode> unresolved = new HashSet<>();
 
   public RapidoDependencyAnalyser(String canonical) {
+    this(canonical, null);
+  }
+
+  /**
+   * @param resourceTypes the resource types the build knows (null: take any capitalised name as one). Strings such as
+   * the v2 mapping XPN/4 look like a relative reference, but can't be one, and would otherwise make everything that
+   * depends on a base snapshot depend on the inventory. The types of the IG's own resources and the ids and names of
+   * its StructureDefinitions (logical models, custom resources) are added.
+   */
+  public RapidoDependencyAnalyser(String canonical, Collection<String> resourceTypes) {
     this.canonical = canonical;
+    this.resourceTypes = resourceTypes == null ? null : new HashSet<>(resourceTypes);
   }
 
   public Map<String, FileResult> analyse(Collection<FileNode> files) {
     for (FileNode f : files) {
       for (ResourceNode r : f.resources) {
         index(f, r);
+        if (resourceTypes != null) {
+          resourceTypes.add(r.type);
+          if ("StructureDefinition".equals(r.type)) {
+            resourceTypes.add(r.id);
+            if (r.name != null) {
+              resourceTypes.add(r.name);
+            }
+          }
+        }
       }
     }
     for (FileNode f : files) {
@@ -392,7 +414,7 @@ public class RapidoDependencyAnalyser {
     }
     // nothing found. Is it meant to point into the IG?
     String path = refPath(s);
-    boolean local = (canonical != null && path.startsWith(canonical+"/")) || RELATIVE_REF.matcher(path).matches();
+    boolean local = (canonical != null && path.startsWith(canonical+"/")) || isRelativeReference(path);
     if (!local) {
       return true;
     }
@@ -403,6 +425,10 @@ public class RapidoDependencyAnalyser {
       addAll(targets, byId.get(last));
     }
     return false;
+  }
+
+  private boolean isRelativeReference(String path) {
+    return RELATIVE_REF.matcher(path).matches() && (resourceTypes == null || resourceTypes.contains(path.substring(0, path.indexOf('/'))));
   }
 
   /** the reference without its #fragment, |version and /_history/ */

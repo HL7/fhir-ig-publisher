@@ -38,6 +38,8 @@ class RapidoDependencyAnalyserTest {
   /** a mutable description of an IG: file key -> the resources in it, as (type, id, url, content strings) */
   private static class Ig {
     final Map<String, List<Res>> files = new LinkedHashMap<>();
+    /** the resource types the build knows, or null for any */
+    List<String> types;
 
     Res add(String file, String type, String id) {
       Res r = new Res(type, id);
@@ -69,7 +71,7 @@ class RapidoDependencyAnalyserTest {
         }
         nodes.add(fn);
       }
-      return new RapidoDependencyAnalyser(B).analyse(nodes);
+      return new RapidoDependencyAnalyser(B, types).analyse(nodes);
     }
   }
 
@@ -262,6 +264,31 @@ class RapidoDependencyAnalyserTest {
     assertFalse(res.get("p1").isUsesInventory());
     Outcome o = edit(ig, i -> i.get("p2").title("renamed"));
     assertEquals(List.of("p2"), o.validate);
+  }
+
+  @Test
+  void mappingsAreNotRelativeReferences() {
+    // base snapshots carry v2 mappings such as XPN/4, which look like Type/id
+    Ig ig = new Ig();
+    ig.add("prof", "StructureDefinition", "prof").url(B+"/StructureDefinition/prof").str("XPN/4");
+    ig.add("ex", "Patient", "ex").str(B+"/StructureDefinition/prof");
+    ig.add("other", "Patient", "other");
+    ig.add("model", "StructureDefinition", "MyModel").url(B+"/StructureDefinition/MyModel");
+    ig.add("inst", "Basic", "inst").str("MyModel/missing").str("Practitioner/missing");
+    // without the list of types, any capitalised name could be a type: the profile and its examples depend on everything
+    assertTrue(ig.analyse().get("prof").isUsesInventory());
+    assertEquals(List.of("prof", "ex", "other", "inst"), edit(ig, i -> i.get("other").title("renamed")).validate);
+
+    ig.types = List.of("Patient", "Practitioner", "Basic", "StructureDefinition");
+    Map<String, FileResult> res = ig.analyse();
+    assertFalse(res.get("prof").isUsesInventory());
+    assertFalse(res.get("ex").isUsesInventory());
+    // a real resource type, or a logical model of the IG, is still meant to be local
+    assertTrue(res.get("inst").isUsesInventory());
+    ig.get("inst").strings.remove("Practitioner/missing");
+    assertTrue(ig.analyse().get("inst").isUsesInventory());
+    Outcome o = edit(ig, i -> i.get("other").title("renamed again"));
+    assertEquals(List.of("other", "inst"), o.validate);
   }
 
   @Test
