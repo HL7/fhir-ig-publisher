@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
@@ -54,7 +55,7 @@ import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
  *   changed</li>
  * </ul>
  * Anything outside the files of the IG that could affect the build (the publisher itself, the command line, the IG
- * resource, the template, other files in the IG folder) goes into a global hash, and each package the build loaded is
+ * resource, the template, other files in the IG folder, the day) goes into a global hash, and each package the build loaded is
  * recorded with a hash of its package.json. If any of that changes, or the set of files changes, or the last build
  * didn't finish, the build is a complete one.
  */
@@ -398,6 +399,9 @@ public class RapidoTracker {
     }
     global.put("publisher", jar.finish());
     global.put("ig", new Hasher().add(igf.getPath()).add(igf.getSource()).finish());
+    // the loader stamps the build date on canonicals that have none, and pages show it ("Draft as of ..."); FHIRPath
+    // today() and now() see it too. A page replayed on a later day would show the day it was first rendered
+    global.put("date", buildDay(pf.getExecTime()));
 
     Set<String> skip = otherSkip;
     for (String s : new String[] {Utilities.path(pf.rootDir, "output"), Utilities.path(pf.rootDir, "temp"), pf.tempDir, pf.tempLangDir,
@@ -528,6 +532,11 @@ public class RapidoTracker {
    * cache, which changes whenever the package is downloaded again. Packages are compared one by one, so that packages
    * this IG doesn't use can come and go in the cache without making the next build a complete one.
    */
+  /** the day of the build, in the time zone the build date is stamped in */
+  static String buildDay(Calendar execTime) {
+    return new DateTimeType(execTime).asStringValue().substring(0, 10);
+  }
+
   private Map<String, String> loadedPackages() {
     Map<String, String> res = new TreeMap<>();
     if (pf.context == null) {

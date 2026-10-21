@@ -296,6 +296,21 @@ class RapidoDependencyAnalyserTest {
   }
 
   @Test
+  void buildDayIsTheDayOfTheStampedDate() {
+    // a Rapido build on a later day than the last one is a complete one: replayed pages would show the old day
+    java.util.Calendar late = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("Europe/Tallinn"));
+    late.set(2026, java.util.Calendar.OCTOBER, 20, 23, 59, 30);
+    java.util.Calendar early = (java.util.Calendar) late.clone();
+    early.set(2026, java.util.Calendar.OCTOBER, 20, 0, 0, 5);
+    java.util.Calendar next = (java.util.Calendar) late.clone();
+    next.add(java.util.Calendar.MINUTE, 1);
+    assertEquals("2026-10-20", RapidoTracker.buildDay(late));
+    assertEquals(RapidoTracker.buildDay(early), RapidoTracker.buildDay(late));
+    assertEquals("2026-10-21", RapidoTracker.buildDay(next));
+    assertEquals(new org.hl7.fhir.model.core.DateTimeType(late).asStringValue().substring(0, 10), RapidoTracker.buildDay(late));
+  }
+
+  @Test
   void cyclesAreHarmless() {
     Ig ig = new Ig();
     ig.add("a", "ValueSet", "a").url(B+"/ValueSet/a").str(B+"/ValueSet/b");
