@@ -80,6 +80,26 @@ class DBBuilderPragmaTest {
   }
 
   @Test
+  void packageDbIsBuiltWithTheseSettings(@TempDir Path dir) throws SQLException {
+    Path db = dir.resolve("package.db");
+    DBBuilder builder = new DBBuilder(db.toString(), null, null, null, null);
+    builder.metadata("name", "value");
+    try (Statement st = builder.getConnection().createStatement()) {
+      try (ResultSet rs = st.executeQuery("PRAGMA journal_mode")) {
+        rs.next();
+        assertEquals("memory", rs.getString(1));
+      }
+      try (ResultSet rs = st.executeQuery("select name, value from Metadata")) {
+        rs.next();
+        assertEquals("name", rs.getString(1));
+        assertEquals("value", rs.getString(2));
+      }
+    }
+    builder.closeUp();
+    assertEquals(false, Files.exists(dir.resolve("package.db-journal")));
+  }
+
+  @Test
   void settingsApplied(@TempDir Path dir) throws SQLException {
     try (Connection con = DriverManager.getConnection("jdbc:sqlite:" + dir.resolve("p.db"))) {
       DBBuilder.configureForBuildArtifact(con);

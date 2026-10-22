@@ -3,9 +3,12 @@ package org.hl7.fhir.igtools.publisher;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 import java.io.ByteArrayInputStream;
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -62,6 +65,40 @@ class EscapedJsonWriterTest {
     check(new byte[] { (byte) 0xe2, (byte) 0x82 });
     check(new byte[] { 'a', (byte) 0xed, (byte) 0xa0, (byte) 0x80, '<' });
     check(new byte[] { (byte) 0xf0, (byte) 0x9f, (byte) 0x98 });
+  }
+
+  /** XmlEscaper.process(), with the charset of its InputStreamReader made explicit */
+  private static byte[] referenceWithCharset(byte[] source, Charset cs) throws IOException {
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    BufferedReader reader = new BufferedReader(new InputStreamReader(new ByteArrayInputStream(source), cs));
+    int i;
+    while ((i = reader.read()) != -1) {
+      char c = (char) i;
+      if (c == '<') out.write("&lt;".getBytes(StandardCharsets.UTF_8));
+      else if (c == '>') out.write("&gt;".getBytes(StandardCharsets.UTF_8));
+      else if (c == '&') out.write("&amp;".getBytes(StandardCharsets.UTF_8));
+      else if (c == '"') out.write("&quot;".getBytes(StandardCharsets.UTF_8));
+      else out.write((byte) i);
+    }
+    return out.toByteArray();
+  }
+
+  @Test
+  void sameAsXmlEscaperUnderOtherDefaultCharsets() throws IOException {
+    // the platform default charset is not always UTF-8 (Java before 18 on Windows); inputs span the reader's buffers
+    Random rnd = new Random(7);
+    for (String cn : new String[] { "UTF-8", "windows-1252", "ISO-8859-1", "US-ASCII", "Shift_JIS", "GB18030" }) {
+      Charset cs = Charset.forName(cn);
+      for (int i = 0; i < 40; i++) {
+        byte[] b = new byte[rnd.nextInt(20000)];
+        rnd.nextBytes(b);
+        if (i % 2 == 0) {
+          byte[] t = "x\u00e9<&>\"".repeat(b.length / 5 + 1).getBytes(cs);
+          System.arraycopy(t, 0, b, 0, Math.min(t.length, b.length));
+        }
+        assertArrayEquals(referenceWithCharset(b, cs), EscapedJsonWriter.escape(b, cs), cn);
+      }
+    }
   }
 
   @Test

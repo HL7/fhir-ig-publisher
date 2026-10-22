@@ -12,9 +12,9 @@ import org.hl7.fhir.utilities.xml.XmlEscaper;
  * produces from the plain {@code .json} file, but built in memory from the bytes the publisher has just written,
  * and written with a single call.
  * <p>
- * {@link XmlEscaper} writes one byte at a time to an unbuffered {@code FileOutputStream}, so every byte of a
- * resource is a separate system call. For an IG with large profiles that was most of the "Generate Native
- * Outputs" phase.
+ * {@link XmlEscaper} writes to an unbuffered {@code FileOutputStream} one character at a time, so each
+ * character of a resource is a separate system call. On an IG with large profiles that was about a third of the
+ * "Generate Native Outputs" phase.
  * <p>
  * The output has to stay byte-identical to XmlEscaper's, quirks included: XmlEscaper decodes the input with the
  * platform default charset (an {@code InputStreamReader} without a charset), replaces {@code < > & "} with their
@@ -28,7 +28,16 @@ public final class EscapedJsonWriter {
 
   /** Returns the bytes XmlEscaper would write for this input. */
   public static byte[] escape(byte[] source) {
-    String s = new String(source, Charset.defaultCharset());
+    return escape(source, Charset.defaultCharset());
+  }
+
+  /**
+   * Returns the bytes XmlEscaper would write if its reader decoded the input with this charset. Decoding the whole
+   * array at once gives the same chars as XmlEscaper's {@code InputStreamReader}, malformed input included (both
+   * replace it with U+FFFD).
+   */
+  static byte[] escape(byte[] source, Charset charset) {
+    String s = new String(source, charset);
     int n = s.length();
     int size = n;
     for (int i = 0; i < n; i++) {
