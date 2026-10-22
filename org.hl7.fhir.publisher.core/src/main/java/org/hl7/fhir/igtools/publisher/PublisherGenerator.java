@@ -935,7 +935,8 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     for (FetchedFile f : pf.changeList) {
       if (f.getProcessMode() != FetchedFile.PROCESS_NONE && f.getProcessMode() != FetchedFile.PROCESS_XSLT) {
         for (FetchedResource r : f.getResources()) {
-          // the side-effect free part of wantGen(r, "xlsx"); the loop still asks wantGen itself
+          // wantGen(r, "xlsx") without the template check, which is always true for xlsx but counts the calls;
+          // the loop still asks wantGen itself
           if (r.getResource() instanceof StructureDefinition && ((StructureDefinition) r.getResource()).hasSnapshot()
               && !Boolean.FALSE.equals(pf.wantGenParams.get("xlsx")) && pf.igpkp.wantGen(r, "xlsx")) {
             candidates.add(r);
