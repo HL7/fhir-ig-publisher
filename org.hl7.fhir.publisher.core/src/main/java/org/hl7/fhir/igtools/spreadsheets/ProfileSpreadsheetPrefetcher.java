@@ -11,6 +11,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.hl7.fhir.model.core.StructureDefinition;
+
 /**
  * Builds the per-profile xlsx workbooks of the Spreadsheets phase on worker threads, a few profiles ahead of
  * the publisher's own (single-threaded, in-order) loop, which then just writes the bytes.
@@ -136,7 +138,7 @@ public class ProfileSpreadsheetPrefetcher<K> implements AutoCloseable {
   }
 
   /** a {@link Job} for one profile workbook */
-  public static Job job(ProfileSpreadsheetGenerator generator, org.hl7.fhir.model.core.StructureDefinition sd) {
+  public static Job job(ProfileSpreadsheetGenerator generator, StructureDefinition sd) {
     return () -> {
       generator.renderStructureDefinition(sd, false);
       ByteArrayOutputStream bytes = new ByteArrayOutputStream();
