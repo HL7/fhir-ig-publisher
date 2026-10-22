@@ -799,7 +799,7 @@ public class DBBuilder {
    * package.db is a build artifact: connect() deletes it and it is rebuilt from scratch on every run. Most rows
    * are inserted in auto-commit mode (one transaction each, over a thousand per IG), and with SQLite's defaults
    * (a rollback journal file, synchronous=FULL) every transaction creates and deletes the journal and waits for
-   * several fsyncs. That made package.db I/O the bulk of the "Generate Native Outputs" phase.
+   * several fsyncs. That made package.db I/O about half of the "Generate Native Outputs" phase.
    * <p>
    * This keeps the rollback journal in memory and stops waiting for fsync. It is safe for a file that is rebuilt
    * on every run:
