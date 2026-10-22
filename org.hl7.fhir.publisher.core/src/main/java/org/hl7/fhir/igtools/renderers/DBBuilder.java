@@ -781,6 +781,7 @@ public class DBBuilder {
   private Connection connect(String filename) throws SQLException, ClassNotFoundException {
     new File(filename).delete();
     Connection con = DriverManager.getConnection("jdbc:sqlite:"+filename); 
+    configureForBuildArtifact(con);
     makeMetadataTable(con);
     makeResourcesTable(con);
     makePropertiesTable(con);
@@ -792,6 +793,32 @@ public class DBBuilder {
     makeCSListTables(con);
     makeVSListTables(con);
     return con;    
+  }
+
+  /**
+   * package.db is a build artifact: connect() deletes it and it is rebuilt from scratch on every run. Most rows
+   * are inserted in auto-commit mode (one transaction each, over a thousand per IG), and with SQLite's defaults
+   * (a rollback journal file, synchronous=FULL) every transaction creates and deletes the journal and waits for
+   * several fsyncs. That made package.db I/O the bulk of the "Generate Native Outputs" phase.
+   * <p>
+   * This keeps the rollback journal in memory and stops waiting for fsync. It is safe for a file that is rebuilt
+   * on every run:
+   * <ul>
+   * <li>the content is the same, and so is the file format: these settings don't change the database header or
+   * the pages written, and the number of transactions is unchanged;</li>
+   * <li>ROLLBACK still works (finishResources, ensureCodeSystemInDB and flushDeferredOperations use it), because
+   * the journal is kept in memory rather than switched off;</li>
+   * <li>this connection and any other reader see every committed write, through the OS page cache, as before;</li>
+   * <li>a crash of the publisher while a transaction is open can leave a damaged file, and so can a crash of the
+   * OS before it has written its cache to disk. Either way the build has failed, and the next build deletes the
+   * file and starts again. The publisher's other output files are not fsynced either.</li>
+   * </ul>
+   */
+  static void configureForBuildArtifact(Connection con) throws SQLException {
+    try (Statement stmt = con.createStatement()) {
+      stmt.execute("PRAGMA journal_mode=MEMORY");
+      stmt.execute("PRAGMA synchronous=OFF");
+    }
   }
 
   private void makeValueSetTable(Connection con) throws SQLException {
