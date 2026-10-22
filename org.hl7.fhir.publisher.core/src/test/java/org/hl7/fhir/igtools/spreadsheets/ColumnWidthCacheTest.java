@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Random;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.Font;
@@ -39,7 +40,8 @@ class ColumnWidthCacheTest {
     big.setUnderline(Font.U_SINGLE);
     CellStyle bigStyle = wb.createCellStyle();
     bigStyle.setFont(big);
-    CellStyle[] styles = {plain, bold, indented, rotated, bigStyle};
+    CellStyle[] styles = {plain, bold, indented, rotated, bigStyle, style(wb, f -> f.setFontHeightInPoints((short) 16)),
+        style(wb, f -> f.setItalic(true)), style(wb, f -> f.setUnderline(Font.U_SINGLE)), style(wb, f -> f.setFontName("Monospaced"))};
     Sheet s = wb.createSheet("S");
     for (int r = 0; r < 60; r++) {
       if (r % 13 == 7) {
@@ -63,6 +65,15 @@ class ColumnWidthCacheTest {
       s.addMergedRegion(new CellRangeAddress(2, 2, 0, 1));
     }
     return wb;
+  }
+
+  /** a style whose font differs from the default in one way */
+  private static CellStyle style(XSSFWorkbook wb, Consumer<Font> change) {
+    Font f = wb.createFont();
+    change.accept(f);
+    CellStyle style = wb.createCellStyle();
+    style.setFont(f);
+    return style;
   }
 
   private static void assertSameWidths(boolean merged, BiConsumer<Sheet, Integer> sizer) throws Exception {
@@ -111,6 +122,28 @@ class ColumnWidthCacheTest {
         a.getSheetAt(0).autoSizeColumn(c);
         cache.autoSizeColumn(b.getSheetAt(0), c);
         assertEquals(a.getSheetAt(0).getColumnWidth(c), b.getSheetAt(0).getColumnWidth(c));
+      }
+    }
+  }
+
+  @Test
+  void sameWidthsAcrossWorkbooksWithOtherDefaultFonts() throws Exception {
+    // the same text in the same font, in workbooks whose default font (and so character width) differs
+    ColumnWidthCache cache = new ColumnWidthCache();
+    for (short defaultPoints : new short[] {11, 20, 8}) {
+      try (XSSFWorkbook a = new XSSFWorkbook(); XSSFWorkbook b = new XSSFWorkbook()) {
+        for (XSSFWorkbook wb : new XSSFWorkbook[] {a, b}) {
+          wb.getFontAt(0).setFontHeightInPoints(defaultPoints);
+          CellStyle style = style(wb, f -> f.setFontHeightInPoints((short) 11));
+          Sheet s = wb.createSheet("S");
+          for (int r = 0; r < TEXTS.length; r++) {
+            s.createRow(r).createCell(0).setCellValue(TEXTS[r]);
+            s.getRow(r).getCell(0).setCellStyle(style);
+          }
+        }
+        a.getSheetAt(0).autoSizeColumn(0);
+        cache.autoSizeColumn(b.getSheetAt(0), 0);
+        assertEquals(a.getSheetAt(0).getColumnWidth(0), b.getSheetAt(0).getColumnWidth(0), "default font " + defaultPoints + "pt");
       }
     }
   }

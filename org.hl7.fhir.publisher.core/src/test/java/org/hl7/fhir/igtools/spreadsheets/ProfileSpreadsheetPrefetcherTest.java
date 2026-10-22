@@ -79,7 +79,7 @@ class ProfileSpreadsheetPrefetcherTest {
       assertNull(p.take("k3"));
       assertNull(p.take("k4"));
       assertArrayEquals("k5".getBytes(), p.take("k5"));
-      assertEquals(2, p.getFallbacks());
+      assertEquals(3, p.getFallbacks(), "k1, k3 and k4; k2 had nothing to do");
     }
   }
 

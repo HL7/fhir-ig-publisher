@@ -74,7 +74,8 @@ public class ProfileSpreadsheetPrefetcher<K> implements AutoCloseable {
       try {
         job = factory.prepare(key);
       } catch (Exception e) {
-        continue; // the caller's own path will meet the same problem and report it
+        fallbacks++; // the caller's own path will meet the same problem and report it
+        continue;
       }
       if (job != null) {
         tasks.put(key, executor.submit((Callable<byte[]>) job::render));
@@ -107,7 +108,7 @@ public class ProfileSpreadsheetPrefetcher<K> implements AutoCloseable {
     }
   }
 
-  /** the number of tasks that failed, and so were left to the caller */
+  /** the number of profiles that failed to prepare or render, and so were left to the caller */
   public int getFallbacks() {
     return fallbacks;
   }
