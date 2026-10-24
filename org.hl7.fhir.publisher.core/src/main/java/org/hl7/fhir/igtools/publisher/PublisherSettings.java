@@ -2,6 +2,7 @@ package org.hl7.fhir.igtools.publisher;
 
 import lombok.Getter;
 import lombok.Setter;
+import org.hl7.fhir.utilities.settings.FhirSettings;
 import org.hl7.fhir.utilities.Utilities;
 
 import java.util.ArrayList;
@@ -27,6 +28,8 @@ public class PublisherSettings {
     @Getter @Setter private String sourceDir;
     @Getter @Setter private String destDir;
     @Getter @Setter private String txServer;
+    // the terminology ecosystem coordination server (tx-reg), or null for none - see Publisher.setTxServerValue
+    @Getter @Setter private String ecosystem = FhirSettings.getTxEcosystem();
     @Getter @Setter private String packageCacheFolder = null;
     @Getter @Setter private String configFile;
     @Getter @Setter private String packagesFolder;

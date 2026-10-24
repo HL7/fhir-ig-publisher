@@ -2963,7 +2963,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     NpmPackage npm = pcm.loadPackage("hl7.fhir.r2.core");
     R2ToRNLoader ldr = new R2ToRNLoader(vdr5.getModelContext(), loadTypes(), new XVerAnalysisLoader("http://hl7.org/fhir/DSTU2"));
     SimpleWorkerContext ctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder(vdr5.getModelContext()).withTerminologyCachePath(Utilities.path(path, "input-cache", "xv-tx", "r2")).fromPackage(npm, ldr, true);
-    ctxt.connectToTSServer(ldr.txFactory(), "https://tx.fhir.org", "Java Client", null, false);
+    ctxt.connectToTSServer(ldr.txFactory(), "https://tx.fhir.org", "Java Client", null, null);
     ctxt.setExpansionParameters(new Parameters());
     return ctxt;
   }
@@ -2973,7 +2973,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     NpmPackage npm = pcm.loadPackage("hl7.fhir.r3.core");
     R3ToRNLoader ldr = new R3ToRNLoader(vdr5.getModelContext(), loadTypes(), new XVerAnalysisLoader("http://hl7.org/fhir/STU3"));
     SimpleWorkerContext ctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder(vdr5.getModelContext()).withTerminologyCachePath(Utilities.path(path, "input-cache", "xv-tx", "r3")).fromPackage(npm, ldr, true);
-    ctxt.connectToTSServer(ldr.txFactory(), "https://tx.fhir.org", "Java Client", null, false);
+    ctxt.connectToTSServer(ldr.txFactory(), "https://tx.fhir.org", "Java Client", null, null);
     ctxt.setExpansionParameters(new Parameters());
     return ctxt;
   }
@@ -2983,7 +2983,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     NpmPackage npm = pcm.loadPackage("hl7.fhir.r4.core");
     R4ToRNLoader ldr = new R4ToRNLoader(vdr5.getModelContext(), loadTypes(), new XVerAnalysisLoader("http://hl7.org/fhir/R4"), "4.0.0");
     SimpleWorkerContext ctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder(vdr5.getModelContext()).withTerminologyCachePath(Utilities.path(path, "input-cache", "xv-tx", "r4")).fromPackage(npm, ldr, true);
-    ctxt.connectToTSServer(ldr.txFactory(), "https://tx.fhir.org", "Java Client", null, false);
+    ctxt.connectToTSServer(ldr.txFactory(), "https://tx.fhir.org", "Java Client", null, null);
     ctxt.setExpansionParameters(new Parameters());
     return ctxt;
   }
@@ -2993,7 +2993,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     NpmPackage npm = pcm.loadPackage("hl7.fhir.r4b.core");
     R4BToRNLoader ldr = new R4BToRNLoader(vdr5.getModelContext(), loadTypes(), new XVerAnalysisLoader("http://hl7.org/fhir/R4B"), "4.3.0");
     SimpleWorkerContext ctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder(vdr5.getModelContext()).withTerminologyCachePath(Utilities.path(path, "input-cache", "xv-tx", "r4b")).fromPackage(npm, ldr, true);
-    ctxt.connectToTSServer(ldr.txFactory(), "https://tx.fhir.org", "Java Client", null, false);
+    ctxt.connectToTSServer(ldr.txFactory(), "https://tx.fhir.org", "Java Client", null, null);
     ctxt.setExpansionParameters(new Parameters());
     return ctxt;
   }
@@ -3003,7 +3003,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     NpmPackage npm = pcm.loadPackage("hl7.fhir.r5.core");
     R5ToRNLoader ldr = new R5ToRNLoader(vdr5.getModelContext(), loadTypes(), new XVerAnalysisLoader("http://hl7.org/fhir/R5"));
     SimpleWorkerContext ctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder(vdr5.getModelContext()).withTerminologyCachePath(Utilities.path(path, "input-cache", "xv-tx", "r5")).fromPackage(npm, ldr, true);
-    ctxt.connectToTSServer(ldr.txFactory(), "https://tx.fhir.org", "Java Client", null, false);
+    ctxt.connectToTSServer(ldr.txFactory(), "https://tx.fhir.org", "Java Client", null, null);
     ctxt.setExpansionParameters(new Parameters());
     return ctxt;
   }

@@ -1054,11 +1054,11 @@ public class PublisherIGLoader extends PublisherBase {
         pf.context.setCanRunWithoutTerminology(true);
         pf.txLog = null;
       } else {
-        log("Connect to Terminology Server at "+ settings.getTxServer());
-        pf.context.connectToTSServer(new TerminologyClientFactory(pf.version), settings.getTxServer(), "fhir/publisher", pf.txLog, true);
+        log("Connect to Terminology Server at "+ settings.getTxServer()+(settings.getEcosystem() == null ? " (no ecosystem)" : " (ecosystem: "+settings.getEcosystem()+")"));
+        pf.context.connectToTSServer(new TerminologyClientFactory(pf.version), settings.getTxServer(), "fhir/publisher", pf.txLog, settings.getEcosystem());
       }
     } else {
-      pf.context.connectToTSServer(new TerminologyClientFactory(pf.version), pf.webTxServer.getAddress(), "fhir/publisher", pf.txLog, true);
+      pf.context.connectToTSServer(new TerminologyClientFactory(pf.version), pf.webTxServer.getAddress(), "fhir/publisher", pf.txLog, settings.getEcosystem());
     }
     if (expParams != null) {
       /* This call to uncheckedPath is allowed here because the path is used to
