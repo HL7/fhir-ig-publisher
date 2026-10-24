@@ -45,6 +45,12 @@ public class PublisherTests {
             assertEquals("dummy file content", actualContent);
         }
 
+    @Test
+    public void testDetermineActualIGWithoutIg() {
+        Exception e = Assertions.assertThrows(Exception.class, () -> Publisher.determineActualIG(null, PublisherUtils.IGBuildMode.MANUAL));
+        assertEquals("No Implementation Guide Specified (-ig parameter)", e.getMessage());
+    }
+
     static final String PATH_DELIMITER = "/";
 
     public static InputStream getResourceAsInputStream(Class<?> clazz, String... resourcePath) {
