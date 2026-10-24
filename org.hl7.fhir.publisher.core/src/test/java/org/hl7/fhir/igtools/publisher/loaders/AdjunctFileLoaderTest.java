@@ -2,6 +2,7 @@ package org.hl7.fhir.igtools.publisher.loaders;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -18,6 +19,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class AdjunctFileLoaderTest {
+
+  @Test
+  void matchesLibraryMediaTypesWithParameters() {
+    assertTrue(AdjunctFileLoader.matchesMediaType("text/cql; charset=utf-8", "text/cql"));
+    assertTrue(AdjunctFileLoader.matchesMediaType("APPLICATION/XML ; charset=utf-8", "application/xml"));
+    assertFalse(AdjunctFileLoader.matchesMediaType("text/plain; charset=utf-8", "text/cql"));
+  }
 
   @Test
   void replaceAttachments2LoadsAttachmentWithExplicitContentType(@TempDir Path tempDir) throws IOException {

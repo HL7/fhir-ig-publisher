@@ -92,7 +92,7 @@ public class AdjunctFileLoader {
           att.getAttachment().setData(a.getData());
           att.getAttachment().setContentType(contentType);
           // Library - post processing needed
-          if (r.getResource() instanceof Library && ("text/cql".equals(contentType) || "application/xml".equals(contentType))) {
+          if (r.getResource() instanceof Library && (matchesMediaType(contentType, "text/cql") || matchesMediaType(contentType, "application/xml"))) {
             // we just injected CQL or a CQL ModelInfo into a library
             try {
               performLibraryCQLProcessing(f, (Library) r.getResource(), a);
@@ -106,6 +106,15 @@ public class AdjunctFileLoader {
       }
     }
     return res;    
+  }
+
+  static boolean matchesMediaType(String contentType, String expected) {
+    if (contentType == null) {
+      return false;
+    }
+    int parameterSeparator = contentType.indexOf(';');
+    String mediaType = parameterSeparator < 0 ? contentType : contentType.substring(0, parameterSeparator);
+    return expected.equalsIgnoreCase(mediaType.trim());
   }
   
   /**
