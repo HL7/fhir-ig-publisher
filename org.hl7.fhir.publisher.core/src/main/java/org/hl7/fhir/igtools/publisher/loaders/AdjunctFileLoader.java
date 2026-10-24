@@ -86,6 +86,10 @@ public class AdjunctFileLoader {
         try {
           f.addAdditionalPath(fn);
           a = loadFile(fn);
+          if (a == null) {
+            f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, att.getPath(), notFoundMessage(fn), IssueSeverity.ERROR));
+            continue;
+          }
           res = true;
           att.getAttachment().setId(null);
           att.getAttachment().setData(a.getData());
@@ -170,7 +174,7 @@ public class AdjunctFileLoader {
       try {
         Attachment a = loadFile(fn);
         if (a == null) {
-          f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, e.line(), e.col(), "Binary", "Unable to find Adjunct Binary "+fn, IssueSeverity.ERROR));
+          f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, e.line(), e.col(), "Binary", notFoundMessage(fn), IssueSeverity.ERROR));
         } else {
           res = true;
           if (a.hasContentType()) {
@@ -189,7 +193,7 @@ public class AdjunctFileLoader {
 
   public void addAttachment(FetchedFile f, ElementWithPath att, String fn, Attachment a) {
     if (a == null) {
-      f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, att.getElement().line(), att.getElement().col(), att.getPath(), "Unable to find Adjunct Binary "+fn, IssueSeverity.ERROR));
+      f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, att.getElement().line(), att.getElement().col(), att.getPath(), notFoundMessage(fn), IssueSeverity.ERROR));
     } else {
       att.getElement().getChildren().clear();
       if (a.hasContentType()) {
@@ -199,6 +203,20 @@ public class AdjunctFileLoader {
       }
       att.getElement().setProperty("data", new Base64BinaryType(a.getData()));
     }
+  }
+
+  private String notFoundMessage(String fn) {
+    if (binaryPaths.isEmpty()) {
+      return "Unable to find Adjunct Binary "+fn+": no path-binary parameters are defined in the IG";
+    }
+    StringBuilder b = new StringBuilder();
+    for (String dir : binaryPaths) {
+      if (b.length() > 0) {
+        b.append(", ");
+      }
+      b.append(dir);
+    }
+    return "Unable to find Adjunct Binary "+fn+" in any path-binary folder ("+b.toString()+")";
   }
 
   private Attachment loadFile(String fn) throws FileNotFoundException, IOException {
