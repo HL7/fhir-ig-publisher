@@ -585,16 +585,29 @@ class ConformanceStatementHandler {
   }
   
   public void readConformanceClauses(LoadedFile source, XhtmlNode x, BooleanHolder hasClauses, BooleanHolder hasWarning, List<ValidationMessage> messages) {
-    // there's two kinds of conformance clauses:
+    // there are two forms of conformance clause:
     // from XML
-    //  <span class="fhir-conformance" id="id">clause</span> - in paragraph clause id is optional but recommended
-    //  <div class=="fhir-conformance" id="id" summary="summary">multi-paragraphs</div> - summary is mandatory
+    //  <span class="fhir-conformance" id="id">clause</span> - inline; id is optional, summary defaults to the text
+    //  <div class="fhir-conformance" id="id" summary="summary">block content</div> - id is optional, summary is mandatory
     // and from markdown
-    //  §id:clause$. in-paragraph clause. Id must be a token if present. it's optional but recommended
-    //  §§id:summary. both id and summary are mandatory
+    //  §id:clause§ or §clause§ - inline; clause may include inline formatting
+    //  §§id:summary^title - opening paragraph; id and summary are mandatory, title is the first block paragraph
+    //  §§ - closing paragraph after the block content
     //
-    // the first pass is finding and fixing the markdown clauses, and then we process them at the end
-    // spans
+    // id should be a FHIR id and may have metadata suffixes in either XML or markdown:
+    //  id? - conditional
+    //  id^actor1,actor2 - actors
+    //  id^^category1,category2 - categories without actors
+    //  id?^actor1,actor2^category1,category2 - combined; e.g. §id?^actor1^category1:clause§
+    // actors reference ActorDefinition ids from the IG or its dependencies; categories use requirements-category-vs
+    //
+    // conformance statement table (one per language):
+    //  <table class="fhir-conformance-list"/> in XML, or a markdown paragraph containing only §§§
+    //
+    // the first pass converts markdown markers to XML elements, then we process the clauses and table placeholders
+
+    // This is documented in the FHIR Implementation Guide on conformance statements
+    // https://build.fhir.org/ig/FHIR/ig-guidance/conformance-statements.html
 
     String langName = langForSource(source);
     rc = new RenderingContext(context, rendererFactory, new MarkDownProcessor(MarkDownProcessor.Dialect.COMMON_MARK),
@@ -925,7 +938,7 @@ class ConformanceStatementHandler {
             String cnt = c.getContent();
             int si = cnt.indexOf("§")+1;
             int ei = cnt.substring(si).indexOf("§") + si;
-            span.addText((si > 0 && ei >= si) ? cnt.substring(si, ei) : cnt);
+            addConformanceClauseText(span, (si > 0 && ei >= si) ? cnt.substring(si, ei) : cnt);
             x.getChildNodes().add(start + 1, span);
             String ss = cnt.substring(0, si-1);
             String es = cnt.substring(ei + 1);
@@ -933,7 +946,7 @@ class ConformanceStatementHandler {
             if (!Utilities.noString(es)) {
               XhtmlNode t = new XhtmlNode(NodeType.Text);
               t.setContent(es);
-              x.getChildNodes().add(start + 2, span);
+              x.getChildNodes().add(start + 2, t);
             }
           } else {
             XhtmlNode sc = x.getChildNodes().get(start);
@@ -943,14 +956,7 @@ class ConformanceStatementHandler {
             int si = sc.getContent().indexOf("§");
             int ei = ec.getContent().indexOf("§");
             String cnt = sc.getContent().substring(si + 1);
-            if (cnt.contains(":")) {
-              String token = cnt.substring(0, cnt.indexOf(":"));
-              if (token.matches("^[a-zA-Z0-9._\\-\\^\\,\\?]+$")) {
-                span.setAttribute("id", token);
-                cnt = cnt.substring(cnt.indexOf(":")+1);
-              }
-            }
-            span.addText(cnt);
+            addConformanceClauseText(span, cnt);
             for (int i = start + 1; i < end; i++) {
               span.add(x.getChildNodes().get(start + 1));
               x.getChildNodes().remove(start + 1);
@@ -980,6 +986,17 @@ class ConformanceStatementHandler {
         x.getChildNodes().subList(start + 1, end).clear();
       }
     }
+  }
+
+  private void addConformanceClauseText(XhtmlNode span, String text) {
+    if (text.contains(":")) {
+      String token = text.substring(0, text.indexOf(":"));
+      if (token.matches("^[a-zA-Z0-9._\\-\\^\\,\\?]+$")) {
+        span.setAttribute("id", token);
+        text = text.substring(text.indexOf(":")+1);
+      }
+    }
+    span.addText(text);
   }
 
   public void renderConfHomes() throws IOException {
