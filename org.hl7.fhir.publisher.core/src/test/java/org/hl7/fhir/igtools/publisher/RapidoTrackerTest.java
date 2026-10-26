@@ -2,13 +2,19 @@ package org.hl7.fhir.igtools.publisher;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+
+import java.util.List;
 
 import org.hl7.fhir.model.ModelContext;
 import org.hl7.fhir.model.core.Narrative.NarrativeStatus;
+import org.hl7.fhir.model.core.StructureDefinition;
 import org.hl7.fhir.model.core.ValueSet;
 import org.hl7.fhir.model.core.formats.JsonParser;
 import org.hl7.fhir.model.core.formats.XmlParser;
 import org.hl7.fhir.model.utilities.formats.OutputStyle;
+import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.junit.jupiter.api.Test;
@@ -59,5 +65,29 @@ class RapidoTrackerTest {
     ValueSet vs = expansion();
     ValueSet read = (ValueSet) new JsonParser(ModelContext.fullCoreContext()).parse(json(vs));
     assertNotEquals(xml(vs), xml(read));
+  }
+
+  @Test
+  void profileUsagesAreFoundByUrl() {
+    FetchedFile f = new FetchedFile("sd.json");
+    FetchedResource r = f.addResource("sd");
+    StructureDefinition sd = new StructureDefinition();
+    sd.setUrl("http://example.org/StructureDefinition/address");
+    r.setResource(sd);
+    FetchedFile g = new FetchedFile("vs.json");
+    g.addResource("vs").setResource(new ValueSet().setUrl("http://example.org/StructureDefinition/address"));
+
+    JsonArray a = new JsonArray();
+    a.add("http://example.org/StructureDefinition/address");
+    List<FetchedResource> found = RapidoTracker.profileSources(List.of(g, f), a);
+    assertEquals(1, found.size());
+    assertSame(r, found.get(0));
+
+    assertEquals(0, RapidoTracker.profileSources(List.of(g, f), new JsonArray()).size());
+    // a profile that is no longer in the IG, or a record from a build that didn't keep them: validate again
+    JsonArray gone = new JsonArray();
+    gone.add("http://example.org/StructureDefinition/gone");
+    assertNull(RapidoTracker.profileSources(List.of(g, f), gone));
+    assertNull(RapidoTracker.profileSources(List.of(g, f), null));
   }
 }

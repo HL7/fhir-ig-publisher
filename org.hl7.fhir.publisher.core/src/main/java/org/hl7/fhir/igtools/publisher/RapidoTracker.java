@@ -27,9 +27,11 @@ import org.hl7.fhir.igtools.publisher.RapidoDependencyAnalyser.FileNode;
 import org.hl7.fhir.igtools.publisher.RapidoDependencyAnalyser.FileResult;
 import org.hl7.fhir.igtools.publisher.RapidoDependencyAnalyser.Hasher;
 import org.hl7.fhir.igtools.publisher.RapidoDependencyAnalyser.ResourceNode;
+import org.hl7.fhir.model.core.CanonicalResource;
 import org.hl7.fhir.model.core.DateTimeType;
 import org.hl7.fhir.model.core.DomainResource;
 import org.hl7.fhir.model.core.Resource;
+import org.hl7.fhir.model.core.StructureDefinition;
 import org.hl7.fhir.model.core.ValueSet;
 import org.hl7.fhir.model.core.formats.JsonParser;
 import org.hl7.fhir.model.utilities.formats.OutputStyle;
@@ -94,6 +96,8 @@ public class RapidoTracker {
   private Recording recording;
   /** the validator's statusWarnings before the resource being validated now, or null if they can't be read */
   private Set<String> statusBefore;
+  /** how many of the IG's profiles the resource being validated was known to conform to before it was validated */
+  private int profilesBefore;
   /** the date the loader puts on canonical resources that have none; it differs every build */
   private final String buildDate;
 
@@ -676,6 +680,7 @@ public class RapidoTracker {
     if (res == null) {
       Set<String> sw = statusWarnings();
       statusBefore = sw == null ? null : new HashSet<>(sw);
+      profilesBefore = r.getFoundProfiles().size();
     }
     return res;
   }
@@ -704,6 +709,16 @@ public class RapidoTracker {
     if (sw == null || !statusHash(sw).equals(rv.asString("statusBefore"))) {
       return null;
     }
+    // validating an example tells the publisher which of the IG's profiles it conforms to (recordProfileUsage), which
+    // the profiles' "no examples" checks and example lists depend on
+    List<FetchedResource> sources = profileSources(pf.fileList, rv.getJsonArray("profileUsages"));
+    if (sources == null) {
+      return null;
+    }
+    for (FetchedResource source : sources) {
+      source.addFoundExample(r);
+      r.getFoundProfiles().add(((CanonicalResource) source.getResource()).getUrl());
+    }
     sw.addAll(rv.forceArray("statusAdded").asStrings());
     newFile(f).forceObject("validation").set(ri, rv);
     return res;
@@ -724,6 +739,13 @@ public class RapidoTracker {
         added.add(s);
       }
     }
+    JsonArray usages = rv.forceArray("profileUsages");
+    for (String url : r.getFoundProfiles().subList(Math.min(profilesBefore, r.getFoundProfiles().size()), r.getFoundProfiles().size())) {
+      usages.add(url);
+    }
+    if (profileSources(pf.fileList, usages) == null) {
+      return;
+    }
     JsonArray msgs = rv.forceArray("messages");
     for (ValidationMessage vm : errs) {
       JsonObject m = writeMessage(vm);
@@ -733,6 +755,33 @@ public class RapidoTracker {
       msgs.add(m);
     }
     newFile(f).forceObject("validation").set(Integer.toString(f.getResources().indexOf(r)), rv);
+  }
+
+  /**
+   * The IG's profiles that a resource was found to conform to when it was validated, as the publisher's
+   * recordProfileUsage finds them. null if one of them isn't in the IG (or the record is from a build that didn't
+   * keep them), so the resource has to be validated again
+   */
+  static List<FetchedResource> profileSources(List<FetchedFile> files, JsonArray usages) {
+    if (usages == null) {
+      return null;
+    }
+    List<FetchedResource> res = new ArrayList<>();
+    for (String url : usages.asStrings()) {
+      FetchedResource source = null;
+      for (FetchedFile f : files) {
+        for (FetchedResource r : f.getResources()) {
+          if (r.getResource() instanceof StructureDefinition && url.equals(((StructureDefinition) r.getResource()).getUrl())) {
+            source = r;
+          }
+        }
+      }
+      if (source == null) {
+        return null;
+      }
+      res.add(source);
+    }
+    return res;
   }
 
   /** a file with no resources to validate still needs a record, so the next build knows it can be reused */
