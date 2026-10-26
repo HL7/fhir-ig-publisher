@@ -3305,9 +3305,9 @@ public class PublisherIGLoader extends PublisherBase {
       } else if (contentType.contains("xml")) {
         res = new org.hl7.fhir.r5.formats.XmlParser(true).parse(source);
       } else if (contentType.contains("fml")) {
-        // don't need a context to parse, which is good since we don't have one
-        StructureMapUtilities mu = new StructureMapUtilities(null, null, null);
-        res = mu.parse(new String(source), "");
+        StructureMapTools mu = new StructureMapTools(pf.context, null, null);
+        mu.setExceptionsForChecks(false);
+        return mu.parse(new String(source), "");
       } else {
         throw new Exception("Unable to determine file type for "+name);
       }

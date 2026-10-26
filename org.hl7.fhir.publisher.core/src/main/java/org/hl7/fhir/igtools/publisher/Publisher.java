@@ -1561,9 +1561,6 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         }
       } else {
         self.setConfigFile(determineActualIG(CliParams.getNamedParam(args, "-ig"), self.settings.getMode()));
-        if (Utilities.noString(self.getConfigFile())) {
-          throw new Exception("No Implementation Guide Specified (-ig parameter)");
-        }
         self.setConfigFile(getAbsoluteConfigFilePath(self.getConfigFile()));
       }
       if (CliParams.hasNamedParam(args, "-jekyll")) {
@@ -1806,6 +1803,9 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 
 
   public static String determineActualIG(String ig, PublisherUtils.IGBuildMode mode) throws Exception {
+    if (Utilities.noString(ig)) {
+      throw new Exception("No Implementation Guide Specified (-ig parameter)");
+    }
     if (ig.startsWith("http://") || ig.startsWith("https://")) {
       ig = convertUrlToLocalIg(ig);
     }
