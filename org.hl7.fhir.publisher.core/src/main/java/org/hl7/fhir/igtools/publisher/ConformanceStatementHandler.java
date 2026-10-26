@@ -899,7 +899,7 @@ class ConformanceStatementHandler {
         x.getChildNodes().clear();
         hasClauses.set(true);
       }
-    } else if (text != null && "!§§".equals(text)) {
+    } else if (text != null && x.getNodeType() == NodeType.Element && "!§§".equals(text)) {
       // special placeholder for documentation
       x.getChildNodes().clear();
       x.tx("§§");

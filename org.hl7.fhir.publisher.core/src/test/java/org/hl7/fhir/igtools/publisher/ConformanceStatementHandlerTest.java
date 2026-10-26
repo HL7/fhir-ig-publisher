@@ -149,6 +149,26 @@ class ConformanceStatementHandlerTest {
     assertEquals(text, paragraph.allText());
   }
 
+  @Test
+  void replacesDocumentationPlaceholder() throws Exception {
+    XhtmlNode paragraph = paragraph("!\u00a7\u00a7");
+
+    assertTrue(process(paragraph));
+
+    assertEquals("\u00a7\u00a7", paragraph.allText());
+  }
+
+  @Test
+  void leavesPlaceholderInCommentUnchanged() throws Exception {
+    XhtmlNode paragraph = paragraph("Text.");
+    XhtmlNode comment = paragraph.addComment("!\u00a7\u00a7");
+
+    assertFalse(process(paragraph));
+
+    assertEquals("!\u00a7\u00a7", comment.getContent());
+    assertEquals("Text.", paragraph.allText());
+  }
+
   @ParameterizedTest
   @CsvSource(value = {
       "req | false | 0 | 0",
