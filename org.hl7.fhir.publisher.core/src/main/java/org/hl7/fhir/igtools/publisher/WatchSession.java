@@ -4,8 +4,16 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
+
+import org.hl7.fhir.igtools.templates.Template;
 
 /**
  * What watch mode (-watch) keeps from one build to the next:
@@ -35,9 +43,28 @@ public class WatchSession {
   private final List<Path> notMonitored = new ArrayList<>();
 
   private SourceSnapshot buildStart;
-  /** the local template folders as they were when a template script started, while it runs */
-  private SourceSnapshot beforeScript;
   private SourceSnapshot sushiInputs;
+  /** while the template writes to its folder, the folder as it was before */
+  private OutputWindow output;
+  /** files in the template folder that changed while the build wrote there, but aren't named as its output */
+  private Set<Path> writtenThisBuild = new HashSet<>();
+  /** ... in the last build, when they alone started this build */
+  private Set<Path> writtenLastBuild = new HashSet<>();
+  /** files in the template folder that the build writes again on every build, with different content */
+  private final Set<Path> alwaysWritten = new HashSet<>();
+  private Consumer<String> log = s -> { };
+
+  private static class OutputWindow {
+    final Path folder;
+    final Predicate<String> managed;
+    final SourceSnapshot before;
+
+    OutputWindow(Path folder, Predicate<String> managed, SourceSnapshot before) {
+      this.folder = folder;
+      this.managed = managed;
+      this.before = before;
+    }
+  }
 
 
   /**
@@ -59,7 +86,17 @@ public class WatchSession {
 
   /** Records the content of the watched files as the build that is starting will see them */
   public void startBuild() throws IOException {
+    SourceSnapshot last = buildStart;
     buildStart = SourceSnapshot.take(watched, buildStart);
+    Set<Path> written = writtenThisBuild;
+    writtenThisBuild = new HashSet<>();
+    writtenLastBuild = new HashSet<>();
+    if (last != null && !written.isEmpty()) {
+      Set<Path> changed = buildStart.changesSince(last).all();
+      if (!changed.isEmpty() && written.containsAll(changed)) {
+        writtenLastBuild.addAll(changed);
+      }
+    }
   }
 
   /**
@@ -91,24 +128,81 @@ public class WatchSession {
   }
 
   /**
-   * A template script is about to run. The scripts write to the template folder (the IG they are given and give back,
-   * their outcomes, versions.txt...), and for a template that is used in place (template = #template) that is a
-   * folder that is watched: what a script writes there is the build's own output, not a change that needs another
-   * build (see templateScriptFinished())
+   * What the template tells about writing to its own folder (see Template.OutputListener): a template that is used in
+   * place (template = #template) is a watched folder, and what the build writes there is its own output, not a change
+   * that needs another build. Only the files the template names as its output (and those found to change on every
+   * build, see outputWritten()) are taken as such; any other change made meanwhile stays a change. The folders a
+   * template is loaded from (#folder, ig.ini overrides) are copied to the template folder first, so nothing is ever
+   * taken from them
    */
-  public void templateScriptStarting() throws IOException {
-    beforeScript = templateFolders.isEmpty() || buildStart == null ? null : SourceSnapshot.take(templateFolders, buildStart);
+  public Template.OutputListener templateOutputs() {
+    return new Template.OutputListener() {
+      @Override
+      public void writing(String folder, Predicate<String> managed) throws IOException {
+        outputWriting(Paths.get(folder), managed);
+      }
+
+      @Override
+      public void written() throws IOException {
+        outputWritten();
+      }
+    };
   }
 
-  /** The template script has finished (or failed): what it changed in the template folders is part of the build */
-  public void templateScriptFinished() throws IOException {
-    if (beforeScript == null || buildStart == null) {
-      beforeScript = null;
+  void outputWriting(Path folder, Predicate<String> managed) throws IOException {
+    Path p = folder.toAbsolutePath().normalize();
+    output = null;
+    if (buildStart != null && isWatched(p)) {
+      output = new OutputWindow(p, managed, SourceSnapshot.take(Collections.singletonList(p), buildStart));
+    }
+  }
+
+  void outputWritten() throws IOException {
+    OutputWindow w = output;
+    output = null;
+    if (w == null || buildStart == null) {
       return;
     }
-    SourceSnapshot after = SourceSnapshot.take(templateFolders, beforeScript);
-    buildStart = buildStart.withFiles(after.changesSince(beforeScript).all(), after);
-    beforeScript = null;
+    SourceSnapshot after = SourceSnapshot.take(Collections.singletonList(w.folder), w.before);
+    Set<Path> absorbed = new TreeSet<>();
+    Set<Path> learnt = new TreeSet<>();
+    for (Path f : after.changesSince(w.before).all()) {
+      if (w.managed.test(w.folder.relativize(f).toString().replace('\\', '/')) || alwaysWritten.contains(f)) {
+        absorbed.add(f);
+      } else if (writtenLastBuild.contains(f)) {
+        // the last build was started by this file changing while the build wrote to the template folder, and it
+        // changes again: something the template writes on every build, with different content each time
+        learnt.add(f);
+      } else {
+        writtenThisBuild.add(f);
+      }
+    }
+    if (!learnt.isEmpty()) {
+      alwaysWritten.addAll(learnt);
+      absorbed.addAll(learnt);
+      log.accept("Watch mode: " + describe(w.folder, learnt) + " changed again while the template wrote to its folder: "
+          + "taken as the template's output from now on, not as changes");
+    }
+    if (!absorbed.isEmpty()) {
+      buildStart = buildStart.withFiles(absorbed, after);
+      log.accept("Watch mode: " + describe(w.folder, absorbed) + " written by the build to the template folder: not a change");
+    }
+  }
+
+  private static String describe(Path folder, Collection<Path> files) {
+    if (files.size() > 3) {
+      return files.size() + " files";
+    }
+    List<String> names = new ArrayList<>();
+    for (Path f : files) {
+      names.add(folder.relativize(f).toString().replace('\\', '/'));
+    }
+    return String.join(", ", names);
+  }
+
+  /** Where watch mode reports what it decides (the publisher's log) */
+  public void setLog(Consumer<String> log) {
+    this.log = log;
   }
 
   /** The folders watched since the file monitor was last made (and forgets them): it has to be made again */

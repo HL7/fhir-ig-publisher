@@ -22,7 +22,6 @@ import org.hl7.fhir.igtools.publisher.realm.USRealmBusinessRules;
 import org.hl7.fhir.igtools.renderers.ValidationPresenter;
 import org.hl7.fhir.igtools.spreadsheets.IgSpreadsheetParser;
 import org.hl7.fhir.igtools.spreadsheets.MappingSpace;
-import org.hl7.fhir.igtools.templates.Template;
 import org.hl7.fhir.igtools.templates.TemplateManager;
 import org.hl7.fhir.model.Base;
 import org.hl7.fhir.model.ModelContext;
@@ -355,18 +354,7 @@ public class PublisherIGLoader extends PublisherBase {
     if (watchSession != null) {
       // a template that is being worked on: a change to it needs a rebuild
       watchSession.watchTemplateFolders(pf.templateManager.getLocalFolders());
-      WatchSession session = watchSession;
-      pf.template.setScriptListener(new Template.ScriptListener() {
-        @Override
-        public void starting() throws IOException {
-          session.templateScriptStarting();
-        }
-
-        @Override
-        public void finished() throws IOException {
-          session.templateScriptFinished();
-        }
-      });
+      pf.template.setOutputListener(watchSession.templateOutputs());
     }
     if (pf.template.hasExtraTemplates()) {
       processExtraTemplates(pf.template.getExtraTemplates());

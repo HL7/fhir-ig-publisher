@@ -9,10 +9,13 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 
+import org.hl7.fhir.igtools.templates.Template;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -229,44 +232,145 @@ class WatchSessionTest {
     assertEquals(1, s.changesSinceBuildStart().getModified().size());
   }
 
-  @Test
-  void whatATemplateScriptWritesToAnInPlaceTemplateIsNotAChange() throws IOException {
+  /** the files a template script names as its output (as Template.scriptOutputs() does) */
+  private static boolean scriptOutput(String path) {
+    return path.matches("onGenerate-(validation\\.json|ig-working\\.json|ig-updated\\.xml)|versions\\.txt");
+  }
+
+  private WatchSession inPlace(List<String> log) throws IOException {
     WatchSession s = session();
+    s.setLog(log::add);
     write("template/config.json", "{}");
     write("template/includes/fragment-header.html", "<header/>");
     write("template/onGenerate-validation.json", "{\"old\":true}");
     s.startBuild();
     s.watchTemplateFolders(Collections.singletonList(dir.resolve("template").toString()));
     assertEquals(Collections.singletonList(dir.resolve("template").toAbsolutePath().normalize()), s.takeNotMonitored());
+    return s;
+  }
 
-    s.templateScriptStarting();
+  private Path abs(String path) {
+    return dir.resolve(path).toAbsolutePath().normalize();
+  }
+
+  @Test
+  void whatATemplateScriptWritesToAnInPlaceTemplateIsNotAChange() throws IOException {
+    List<String> log = new ArrayList<>();
+    WatchSession s = inPlace(log);
+    Template.OutputListener l = s.templateOutputs();
+
+    l.writing(dir.resolve("template").toString(), WatchSessionTest::scriptOutput);
     write("template/onGenerate-validation.json", "{\"new\":true}");
-    write("template/onGenerate-ig-updated.json", "{}");
+    write("template/onGenerate-ig-updated.xml", "<ig/>");
     write("template/versions.txt", "1");
-    s.templateScriptFinished();
+    l.written();
     assertTrue(s.changesSinceBuildStart().isEmpty(), "the script's output is the build's own");
+    assertEquals(Collections.singletonList("Watch mode: onGenerate-ig-updated.xml, onGenerate-validation.json, versions.txt "
+        + "written by the build to the template folder: not a change"), log);
 
     write("template/includes/fragment-header.html", "<header>edited</header>");
-    assertEquals(Collections.singleton(dir.resolve("template/includes/fragment-header.html").toAbsolutePath()),
-        s.changesSinceBuildStart().getModified());
+    assertEquals(Collections.singleton(abs("template/includes/fragment-header.html")), s.changesSinceBuildStart().getModified(),
+        "the user's edit is a change");
 
-    // the next build runs the script again: the same output is still not a change, but the edit is
+    // the next build runs the script again: the new output is still not a change
     s.startBuild();
-    s.templateScriptStarting();
+    l.writing(dir.resolve("template").toString(), WatchSessionTest::scriptOutput);
     write("template/onGenerate-validation.json", "{\"newer\":true}");
-    s.templateScriptFinished();
+    l.written();
     assertTrue(s.changesSinceBuildStart().isEmpty());
   }
 
   @Test
-  void anEditOutsideTheTemplateWhileAScriptRunsIsNotMissed() throws IOException {
-    WatchSession s = session();
-    write("template/config.json", "{}");
-    s.startBuild();
-    s.watchTemplateFolders(Collections.singletonList(dir.resolve("template").toString()));
-    s.templateScriptStarting();
+  void aUserEditInTheTemplateWhileAScriptRunsIsStillAChange() throws IOException {
+    WatchSession s = inPlace(new ArrayList<>());
+    Template.OutputListener l = s.templateOutputs();
+    l.writing(dir.resolve("template").toString(), WatchSessionTest::scriptOutput);
+    write("template/onGenerate-validation.json", "{\"new\":true}");
+    write("template/includes/fragment-header.html", "<header>edited</header>");
     write("input/pagecontent/index.md", "# Edited");
-    s.templateScriptFinished();
-    assertEquals(1, s.changesSinceBuildStart().getModified().size(), "only template folders are the script's output");
+    l.written();
+    SourceSnapshot.Changes c = s.changesSinceBuildStart();
+    assertEquals(new HashSet<>(Arrays.asList(abs("template/includes/fragment-header.html"), abs("input/pagecontent/index.md"))),
+        c.getModified());
+  }
+
+  @Test
+  void nothingIsTakenFromALocalTemplateFolderThatIsCopiedToTheTemplateFolder() throws IOException {
+    List<String> log = new ArrayList<>();
+    WatchSession s = session();
+    s.setLog(log::add);
+    write("my-template/includes/fragment-header.html", "<header/>");
+    write("template/onGenerate-validation.json", "{\"old\":true}");
+    s.startBuild();
+    s.watchTemplateFolders(Collections.singletonList(dir.resolve("my-template").toString()));
+    Template.OutputListener l = s.templateOutputs();
+    // the scripts run on the copy in template/, which isn't watched
+    l.writing(dir.resolve("template").toString(), path -> true);
+    write("template/onGenerate-validation.json", "{\"new\":true}");
+    write("my-template/includes/fragment-header.html", "<header>edited</header>");
+    l.written();
+    assertEquals(Collections.singleton(abs("my-template/includes/fragment-header.html")), s.changesSinceBuildStart().getModified());
+    assertTrue(log.isEmpty());
+  }
+
+  @Test
+  void outputThatChangesOnEveryBuildIsTakenAsOutputAfterOneMoreBuild() throws IOException {
+    List<String> log = new ArrayList<>();
+    WatchSession s = inPlace(log);
+    Template.OutputListener l = s.templateOutputs();
+    // build 1: the script writes a file that isn't named as its output, with a time in it
+    l.writing(dir.resolve("template").toString(), WatchSessionTest::scriptOutput);
+    write("template/stamp.txt", "built at 1");
+    l.written();
+    assertEquals(Collections.singleton(abs("template/stamp.txt")), s.changesSinceBuildStart().getAdded(), "it may be the user's");
+    // build 2, started by that alone: it changes again
+    s.startBuild();
+    l.writing(dir.resolve("template").toString(), WatchSessionTest::scriptOutput);
+    write("template/stamp.txt", "built at 2");
+    l.written();
+    assertTrue(s.changesSinceBuildStart().isEmpty(), "no loop");
+    assertEquals(Arrays.asList("Watch mode: stamp.txt changed again while the template wrote to its folder: taken as the "
+        + "template's output from now on, not as changes",
+        "Watch mode: stamp.txt written by the build to the template folder: not a change"), log);
+    // build 3, for an edit
+    write("template/includes/fragment-header.html", "<header>edited</header>");
+    s.startBuild();
+    l.writing(dir.resolve("template").toString(), WatchSessionTest::scriptOutput);
+    write("template/stamp.txt", "built at 3");
+    l.written();
+    assertTrue(s.changesSinceBuildStart().isEmpty());
+  }
+
+  @Test
+  void aUserEditDuringAScriptIsNotTakenAsOutputByTheLoopGuard() throws IOException {
+    WatchSession s = inPlace(new ArrayList<>());
+    Template.OutputListener l = s.templateOutputs();
+    l.writing(dir.resolve("template").toString(), WatchSessionTest::scriptOutput);
+    write("template/includes/fragment-header.html", "<header>edited</header>");
+    l.written();
+    // the build it starts runs the script, which doesn't write that file
+    s.startBuild();
+    l.writing(dir.resolve("template").toString(), WatchSessionTest::scriptOutput);
+    write("template/onGenerate-validation.json", "{\"new\":true}");
+    l.written();
+    assertTrue(s.changesSinceBuildStart().isEmpty());
+    // so a later edit of it is a change
+    write("template/includes/fragment-header.html", "<header>edited again</header>");
+    assertEquals(Collections.singleton(abs("template/includes/fragment-header.html")), s.changesSinceBuildStart().getModified());
+  }
+
+  @Test
+  void aChangeThatStartedABuildWithOthersIsNotTakenAsOutput() throws IOException {
+    WatchSession s = inPlace(new ArrayList<>());
+    Template.OutputListener l = s.templateOutputs();
+    l.writing(dir.resolve("template").toString(), WatchSessionTest::scriptOutput);
+    write("template/stamp.txt", "built at 1");
+    l.written();
+    write("input/pagecontent/index.md", "# Edited"); // the build isn't started by template output alone
+    s.startBuild();
+    l.writing(dir.resolve("template").toString(), WatchSessionTest::scriptOutput);
+    write("template/stamp.txt", "built at 2");
+    l.written();
+    assertEquals(Collections.singleton(abs("template/stamp.txt")), s.changesSinceBuildStart().getModified());
   }
 }
