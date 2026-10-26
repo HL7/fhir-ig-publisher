@@ -228,4 +228,45 @@ class WatchSessionTest {
     write("input/template/package/package.json", "{\"name\":\"t\"}");
     assertEquals(1, s.changesSinceBuildStart().getModified().size());
   }
+
+  @Test
+  void whatATemplateScriptWritesToAnInPlaceTemplateIsNotAChange() throws IOException {
+    WatchSession s = session();
+    write("template/config.json", "{}");
+    write("template/includes/fragment-header.html", "<header/>");
+    write("template/onGenerate-validation.json", "{\"old\":true}");
+    s.startBuild();
+    s.watchTemplateFolders(Collections.singletonList(dir.resolve("template").toString()));
+    assertEquals(Collections.singletonList(dir.resolve("template").toAbsolutePath().normalize()), s.takeNotMonitored());
+
+    s.templateScriptStarting();
+    write("template/onGenerate-validation.json", "{\"new\":true}");
+    write("template/onGenerate-ig-updated.json", "{}");
+    write("template/versions.txt", "1");
+    s.templateScriptFinished();
+    assertTrue(s.changesSinceBuildStart().isEmpty(), "the script's output is the build's own");
+
+    write("template/includes/fragment-header.html", "<header>edited</header>");
+    assertEquals(Collections.singleton(dir.resolve("template/includes/fragment-header.html").toAbsolutePath()),
+        s.changesSinceBuildStart().getModified());
+
+    // the next build runs the script again: the same output is still not a change, but the edit is
+    s.startBuild();
+    s.templateScriptStarting();
+    write("template/onGenerate-validation.json", "{\"newer\":true}");
+    s.templateScriptFinished();
+    assertTrue(s.changesSinceBuildStart().isEmpty());
+  }
+
+  @Test
+  void anEditOutsideTheTemplateWhileAScriptRunsIsNotMissed() throws IOException {
+    WatchSession s = session();
+    write("template/config.json", "{}");
+    s.startBuild();
+    s.watchTemplateFolders(Collections.singletonList(dir.resolve("template").toString()));
+    s.templateScriptStarting();
+    write("input/pagecontent/index.md", "# Edited");
+    s.templateScriptFinished();
+    assertEquals(1, s.changesSinceBuildStart().getModified().size(), "only template folders are the script's output");
+  }
 }

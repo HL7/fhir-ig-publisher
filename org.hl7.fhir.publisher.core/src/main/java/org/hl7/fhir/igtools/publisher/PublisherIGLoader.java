@@ -22,6 +22,7 @@ import org.hl7.fhir.igtools.publisher.realm.USRealmBusinessRules;
 import org.hl7.fhir.igtools.renderers.ValidationPresenter;
 import org.hl7.fhir.igtools.spreadsheets.IgSpreadsheetParser;
 import org.hl7.fhir.igtools.spreadsheets.MappingSpace;
+import org.hl7.fhir.igtools.templates.Template;
 import org.hl7.fhir.igtools.templates.TemplateManager;
 import org.hl7.fhir.model.Base;
 import org.hl7.fhir.model.ModelContext;
@@ -340,11 +341,32 @@ public class PublisherIGLoader extends PublisherBase {
     pf.templateManager.loadTemplateOverrides(ini, pf.rootDir);
     try {
       pf.template = pf.templateManager.loadTemplate(templateName, pf.rootDir, pf.packageId(), settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD, pf.logOptions.contains("template"), settings.isRapidoMode());
-    } finally {
+    } catch (Throwable e) {
       if (watchSession != null) {
-        // a template that is being worked on: a change to it needs a rebuild (also when it can't be loaded now)
-        watchSession.watchTemplateFolders(pf.templateManager.getLocalFolders());
+        // a template that is being worked on, and can't be loaded now: fixing it needs a rebuild
+        try {
+          watchSession.watchTemplateFolders(pf.templateManager.getLocalFolders());
+        } catch (IOException e2) {
+          e.addSuppressed(e2);
+        }
       }
+      throw e;
+    }
+    if (watchSession != null) {
+      // a template that is being worked on: a change to it needs a rebuild
+      watchSession.watchTemplateFolders(pf.templateManager.getLocalFolders());
+      WatchSession session = watchSession;
+      pf.template.setScriptListener(new Template.ScriptListener() {
+        @Override
+        public void starting() throws IOException {
+          session.templateScriptStarting();
+        }
+
+        @Override
+        public void finished() throws IOException {
+          session.templateScriptFinished();
+        }
+      });
     }
     if (pf.template.hasExtraTemplates()) {
       processExtraTemplates(pf.template.getExtraTemplates());

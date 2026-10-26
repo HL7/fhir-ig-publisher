@@ -35,6 +35,8 @@ public class WatchSession {
   private final List<Path> notMonitored = new ArrayList<>();
 
   private SourceSnapshot buildStart;
+  /** the local template folders as they were when a template script started, while it runs */
+  private SourceSnapshot beforeScript;
   private SourceSnapshot sushiInputs;
 
 
@@ -86,6 +88,27 @@ public class WatchSession {
       }
     }
     return false;
+  }
+
+  /**
+   * A template script is about to run. The scripts write to the template folder (the IG they are given and give back,
+   * their outcomes, versions.txt...), and for a template that is used in place (template = #template) that is a
+   * folder that is watched: what a script writes there is the build's own output, not a change that needs another
+   * build (see templateScriptFinished())
+   */
+  public void templateScriptStarting() throws IOException {
+    beforeScript = templateFolders.isEmpty() || buildStart == null ? null : SourceSnapshot.take(templateFolders, buildStart);
+  }
+
+  /** The template script has finished (or failed): what it changed in the template folders is part of the build */
+  public void templateScriptFinished() throws IOException {
+    if (beforeScript == null || buildStart == null) {
+      beforeScript = null;
+      return;
+    }
+    SourceSnapshot after = SourceSnapshot.take(templateFolders, beforeScript);
+    buildStart = buildStart.withFiles(after.changesSince(beforeScript).all(), after);
+    beforeScript = null;
   }
 
   /** The folders watched since the file monitor was last made (and forgets them): it has to be made again */

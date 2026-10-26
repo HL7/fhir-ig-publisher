@@ -1,6 +1,9 @@
 package org.hl7.fhir.igtools.publisher;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Field;
 
@@ -17,5 +20,12 @@ class ComparisonIdsResetTest {
     f.setInt(null, 20);
     Publisher.resetComparisonIds();
     assertEquals(0, f.getInt(null));
+  }
+
+  @Test
+  void aCounterThatCantBeResetFailsTheRebuild() {
+    IllegalStateException e = assertThrows(IllegalStateException.class, () -> Publisher.resetCounter(ResourceComparer.class, "noSuchCounter"));
+    assertTrue(e.getMessage().contains("ResourceComparer.noSuchCounter"), e.getMessage());
+    assertSame(NoSuchFieldException.class, e.getCause().getClass());
   }
 }

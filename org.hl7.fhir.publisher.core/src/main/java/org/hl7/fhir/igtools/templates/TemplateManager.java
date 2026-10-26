@@ -132,6 +132,9 @@ public class TemplateManager {
     NpmPackage npm;
     if (!inPlace) {
       installTemplate(template, rootFolder, templateDir, scriptTemplates, new ArrayList<String>(), 0);
+    } else {
+      // the IG's own template folder is the template, as it is: a change to it needs a rebuild
+      localFolders.add(new File(templateDir).getAbsolutePath());
     }
     
     if (!autoMode) {
@@ -164,9 +167,10 @@ public class TemplateManager {
       if (!f.exists() || !f.isDirectory()) {
         throw new FHIRException("The ig.ini override for template "+template+" names the folder "+override+" which does not exist");
       }
+      // recorded first, so that a template that can't be read now is still watched: fixing it needs a rebuild
+      localFolders.add(f.getAbsolutePath());
       npm = NpmPackage.fromFolder(f.getAbsolutePath(), PackageType.IG_TEMPLATE, "output", ".git");
       usedOverride = true;
-      localFolders.add(f.getAbsolutePath());
       String id = template.contains("#") ? template.substring(0, template.indexOf("#")) : template;
       if (!id.equals(npm.name())) {
         logger.logMessage(Utilities.padLeft("", ' ', level) + "  Warning: the template in "+override+" is "+npm.name()+", not "+id);
@@ -404,9 +408,8 @@ public class TemplateManager {
       if (template.startsWith("#")) {
         File f = new File(Utilities.path(rootFolder, template.substring(1)));
         if (f.exists() && f.isDirectory()) {
-          NpmPackage npm = NpmPackage.fromFolder(f.getAbsolutePath(), PackageType.IG_TEMPLATE, "output", ".git");
-          localFolders.add(f.getAbsolutePath());
-          return npm;
+          localFolders.add(f.getAbsolutePath()); // first, as for an override
+          return NpmPackage.fromFolder(f.getAbsolutePath(), PackageType.IG_TEMPLATE, "output", ".git");
         }
       }
 

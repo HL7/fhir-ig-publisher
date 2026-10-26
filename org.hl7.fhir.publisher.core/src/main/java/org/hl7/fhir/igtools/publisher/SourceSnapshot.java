@@ -199,6 +199,23 @@ public class SourceSnapshot {
     return new SourceSnapshot(res);
   }
 
+  /**
+   * Returns a copy of this snapshot in which the given files are as they are in other (left out if other doesn't have
+   * them)
+   */
+  public SourceSnapshot withFiles(Collection<Path> files, SourceSnapshot other) {
+    Map<Path, Entry> res = new HashMap<>(entries);
+    for (Path p : files) {
+      Entry e = other.entries.get(p);
+      if (e == null) {
+        res.remove(p);
+      } else {
+        res.put(p, e);
+      }
+    }
+    return new SourceSnapshot(res);
+  }
+
   /** The files that differ in content between before and this snapshot */
   public Changes changesSince(SourceSnapshot before) {
     Changes res = new Changes();

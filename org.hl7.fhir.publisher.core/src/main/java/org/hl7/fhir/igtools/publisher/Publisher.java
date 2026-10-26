@@ -228,10 +228,10 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
           build(rootDir);
         } else {
           session.startBuild();
-          if (!first) {
-            resetForRebuild(cliNoNarratives, cliNoValidate);
-          }
           try {
+            if (!first) {
+              resetForRebuild(cliNoNarratives, cliNoValidate);
+            }
             build(rootDir);
           } catch (Exception e) {
             // keep watching: the next save may fix it
@@ -281,15 +281,21 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   /**
    * The comparisons (previous version, IPA, IPS, imposes) are numbered by a counter that only a fresh start resets
    * (ResourceComparer.counter): without this, a rebuild names their pages sd-21-..., sd-22-..., where a build writes
-   * sd-1-..., sd-2-...
+   * sd-1-..., sd-2-.... If it can't be reset (the core library changed), the rebuild fails rather than write pages
+   * under other names than a build does
    */
   static void resetComparisonIds() {
+    resetCounter(ResourceComparer.class, "counter");
+  }
+
+  static void resetCounter(Class<?> c, String field) {
     try {
-      Field f = ResourceComparer.class.getDeclaredField("counter");
+      Field f = c.getDeclaredField(field);
       f.setAccessible(true);
       f.setInt(null, 0);
     } catch (Exception e) {
-      System.out.println("Unable to reset the comparison numbering for a rebuild: " + e.getMessage());
+      throw new IllegalStateException("Watch mode can't rebuild: unable to reset " + c.getName() + "." + field
+          + ", which numbers the comparison pages (" + e + "); restart the publisher instead", e);
     }
   }
 

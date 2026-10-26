@@ -111,6 +111,7 @@ public class Template {
   @Getter Map<String, TemplateFragmentTypeLoader.PrefixGroup> usedFragmentTypes;
   private boolean rapido;
   private boolean devMode;
+  private ScriptListener scriptListener;
 
   /** unpack the template into /template 
    * 
@@ -373,7 +374,38 @@ public class Template {
     return formatList;
   }
   
+  /** Told when a template script runs (watch mode: what the scripts write to the template folder is the build's) */
+  public interface ScriptListener {
+    void starting() throws IOException;
+
+    void finished() throws IOException;
+  }
+
+  public void setScriptListener(ScriptListener scriptListener) {
+    this.scriptListener = scriptListener;
+  }
+
   private ImplementationGuide runScriptTarget(IWorkerContext context, String target, Map<String, List<ValidationMessage>> messages, ImplementationGuide ig, List<String> fileNames, int modifyIg) throws IOException, FHIRException {
+    if (scriptListener == null) {
+      return runScriptTargetAnt(context, target, messages, ig, fileNames, modifyIg);
+    }
+    scriptListener.starting();
+    ImplementationGuide res;
+    try {
+      res = runScriptTargetAnt(context, target, messages, ig, fileNames, modifyIg);
+    } catch (Throwable e) {
+      try {
+        scriptListener.finished();
+      } catch (IOException e2) {
+        e.addSuppressed(e2); // the script's own failure is the one to report
+      }
+      throw e;
+    }
+    scriptListener.finished();
+    return res;
+  }
+
+  private ImplementationGuide runScriptTargetAnt(IWorkerContext context, String target, Map<String, List<ValidationMessage>> messages, ImplementationGuide ig, List<String> fileNames, int modifyIg) throws IOException, FHIRException {
     if (!canExecute) {
       throw new FHIRException("Unable to execute '"+target+"' in script '"+script+"' as the template '"+templateThatCantExecute+"' is not trusted (reason: "+templateReason+")");
     }
