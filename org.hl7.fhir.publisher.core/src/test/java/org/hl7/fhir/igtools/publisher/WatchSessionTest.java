@@ -259,7 +259,7 @@ class WatchSessionTest {
     WatchSession s = inPlace(log);
     Template.OutputListener l = s.templateOutputs();
 
-    l.writing(dir.resolve("template").toString(), WatchSessionTest::scriptOutput);
+    l.writing(dir.resolve("template").toString(), "onGenerate", WatchSessionTest::scriptOutput);
     write("template/onGenerate-validation.json", "{\"new\":true}");
     write("template/onGenerate-ig-updated.xml", "<ig/>");
     write("template/versions.txt", "1");
@@ -274,7 +274,7 @@ class WatchSessionTest {
 
     // the next build runs the script again: the new output is still not a change
     s.startBuild();
-    l.writing(dir.resolve("template").toString(), WatchSessionTest::scriptOutput);
+    l.writing(dir.resolve("template").toString(), "onGenerate", WatchSessionTest::scriptOutput);
     write("template/onGenerate-validation.json", "{\"newer\":true}");
     l.written();
     assertTrue(s.changesSinceBuildStart().isEmpty());
@@ -284,7 +284,7 @@ class WatchSessionTest {
   void aUserEditInTheTemplateWhileAScriptRunsIsStillAChange() throws IOException {
     WatchSession s = inPlace(new ArrayList<>());
     Template.OutputListener l = s.templateOutputs();
-    l.writing(dir.resolve("template").toString(), WatchSessionTest::scriptOutput);
+    l.writing(dir.resolve("template").toString(), "onGenerate", WatchSessionTest::scriptOutput);
     write("template/onGenerate-validation.json", "{\"new\":true}");
     write("template/includes/fragment-header.html", "<header>edited</header>");
     write("input/pagecontent/index.md", "# Edited");
@@ -305,7 +305,7 @@ class WatchSessionTest {
     s.watchTemplateFolders(Collections.singletonList(dir.resolve("my-template").toString()));
     Template.OutputListener l = s.templateOutputs();
     // the scripts run on the copy in template/, which isn't watched
-    l.writing(dir.resolve("template").toString(), path -> true);
+    l.writing(dir.resolve("template").toString(), "onGenerate", path -> true);
     write("template/onGenerate-validation.json", "{\"new\":true}");
     write("my-template/includes/fragment-header.html", "<header>edited</header>");
     l.written();
@@ -313,64 +313,100 @@ class WatchSessionTest {
     assertTrue(log.isEmpty());
   }
 
+  /** a run of the window: what it writes (path, content, ...) while it runs */
+  private void window(Template.OutputListener l, String name, String... writes) throws IOException {
+    l.writing(dir.resolve("template").toString(), name, WatchSessionTest::scriptOutput);
+    for (int i = 0; i < writes.length; i += 2) {
+      write(writes[i], writes[i + 1]);
+    }
+    l.written();
+  }
+
+  /** a script that writes the time to a file it doesn't name as output: three builds until it is learnt */
+  private void learnStamp(WatchSession s, Template.OutputListener l) throws IOException {
+    window(l, "onGenerate", "template/stamp.txt", "built at 1");
+    assertEquals(Collections.singleton(abs("template/stamp.txt")), s.changesSinceBuildStart().getAdded(), "it may be the user's");
+    s.startBuild(); // started by that alone
+    window(l, "onGenerate", "template/stamp.txt", "built at 2");
+    assertEquals(Collections.singleton(abs("template/stamp.txt")), s.changesSinceBuildStart().getModified(), "still");
+    s.startBuild(); // the second build in a row started by that alone
+    window(l, "onGenerate", "template/stamp.txt", "built at 3");
+    assertTrue(s.changesSinceBuildStart().isEmpty(), "learnt: no loop");
+  }
+
   @Test
-  void outputThatChangesOnEveryBuildIsTakenAsOutputAfterOneMoreBuild() throws IOException {
+  void outputThatChangesOnEveryBuildIsLearntAfterTwoExtraBuilds() throws IOException {
     List<String> log = new ArrayList<>();
     WatchSession s = inPlace(log);
     Template.OutputListener l = s.templateOutputs();
-    // build 1: the script writes a file that isn't named as its output, with a time in it
-    l.writing(dir.resolve("template").toString(), WatchSessionTest::scriptOutput);
-    write("template/stamp.txt", "built at 1");
-    l.written();
-    assertEquals(Collections.singleton(abs("template/stamp.txt")), s.changesSinceBuildStart().getAdded(), "it may be the user's");
-    // build 2, started by that alone: it changes again
-    s.startBuild();
-    l.writing(dir.resolve("template").toString(), WatchSessionTest::scriptOutput);
-    write("template/stamp.txt", "built at 2");
-    l.written();
-    assertTrue(s.changesSinceBuildStart().isEmpty(), "no loop");
-    assertEquals(Arrays.asList("Watch mode: stamp.txt changed again while the template wrote to its folder: taken as the "
-        + "template's output from now on, not as changes",
+    learnStamp(s, l);
+    assertEquals(Arrays.asList("Watch mode: stamp.txt changed by onGenerate in every build: taken as its output from now on, "
+        + "not as changes",
         "Watch mode: stamp.txt written by the build to the template folder: not a change"), log);
-    // build 3, for an edit
+    // a build for an edit: the script writes it again
     write("template/includes/fragment-header.html", "<header>edited</header>");
     s.startBuild();
-    l.writing(dir.resolve("template").toString(), WatchSessionTest::scriptOutput);
-    write("template/stamp.txt", "built at 3");
-    l.written();
+    window(l, "onGenerate", "template/stamp.txt", "built at 4");
     assertTrue(s.changesSinceBuildStart().isEmpty());
   }
 
   @Test
-  void aUserEditDuringAScriptIsNotTakenAsOutputByTheLoopGuard() throws IOException {
+  void aUserWhoSavesATemplateFileWhileScriptsRunInTwoBuildsIsStillSeen() throws IOException {
     WatchSession s = inPlace(new ArrayList<>());
     Template.OutputListener l = s.templateOutputs();
-    l.writing(dir.resolve("template").toString(), WatchSessionTest::scriptOutput);
-    write("template/includes/fragment-header.html", "<header>edited</header>");
-    l.written();
-    // the build it starts runs the script, which doesn't write that file
+    window(l, "onGenerate", "template/includes/fragment-header.html", "<header>1</header>");
+    assertEquals(Collections.singleton(abs("template/includes/fragment-header.html")), s.changesSinceBuildStart().getModified());
+    s.startBuild(); // started by that save alone
+    window(l, "onGenerate", "template/onGenerate-validation.json", "{\"new\":true}", "template/includes/fragment-header.html", "<header>2</header>");
+    assertEquals(Collections.singleton(abs("template/includes/fragment-header.html")), s.changesSinceBuildStart().getModified(),
+        "the second save starts a build too");
     s.startBuild();
-    l.writing(dir.resolve("template").toString(), WatchSessionTest::scriptOutput);
-    write("template/onGenerate-validation.json", "{\"new\":true}");
-    l.written();
+    window(l, "onGenerate", "template/onGenerate-validation.json", "{\"newer\":true}");
     assertTrue(s.changesSinceBuildStart().isEmpty());
-    // so a later edit of it is a change
-    write("template/includes/fragment-header.html", "<header>edited again</header>");
+    // nothing was learnt: a save while the script runs is still a change
+    s.startBuild();
+    window(l, "onGenerate", "template/includes/fragment-header.html", "<header>3</header>");
     assertEquals(Collections.singleton(abs("template/includes/fragment-header.html")), s.changesSinceBuildStart().getModified());
   }
 
   @Test
-  void aChangeThatStartedABuildWithOthersIsNotTakenAsOutput() throws IOException {
+  void aLearntFileIsUnlearntWhenTheWindowLeavesItAsItWas() throws IOException {
+    List<String> log = new ArrayList<>();
+    WatchSession s = inPlace(log);
+    Template.OutputListener l = s.templateOutputs();
+    learnStamp(s, l);
+    write("template/includes/fragment-header.html", "<header>edited</header>");
+    s.startBuild();
+    window(l, "onGenerate", "template/onGenerate-validation.json", "{\"new\":true}"); // stamp.txt left as it was
+    assertTrue(s.changesSinceBuildStart().isEmpty());
+    assertEquals("Watch mode: stamp.txt not changed by onGenerate this time: changes to it count again", log.get(2));
+    s.startBuild();
+    window(l, "onGenerate", "template/stamp.txt", "edited");
+    assertEquals(Collections.singleton(abs("template/stamp.txt")), s.changesSinceBuildStart().getModified());
+  }
+
+  @Test
+  void whatIsLearntIsLearntForItsWindowOnly() throws IOException {
     WatchSession s = inPlace(new ArrayList<>());
     Template.OutputListener l = s.templateOutputs();
-    l.writing(dir.resolve("template").toString(), WatchSessionTest::scriptOutput);
-    write("template/stamp.txt", "built at 1");
-    l.written();
-    write("input/pagecontent/index.md", "# Edited"); // the build isn't started by template output alone
+    learnStamp(s, l);
+    write("template/includes/fragment-header.html", "<header>edited</header>");
     s.startBuild();
-    l.writing(dir.resolve("template").toString(), WatchSessionTest::scriptOutput);
-    write("template/stamp.txt", "built at 2");
-    l.written();
+    window(l, "onLoad", "template/stamp.txt", "loaded");
+    assertEquals(Collections.singleton(abs("template/stamp.txt")), s.changesSinceBuildStart().getModified(),
+        "onLoad didn't write it before");
+  }
+
+  @Test
+  void aBuildStartedByOtherChangesTooBreaksTheRow() throws IOException {
+    WatchSession s = inPlace(new ArrayList<>());
+    Template.OutputListener l = s.templateOutputs();
+    window(l, "onGenerate", "template/stamp.txt", "built at 1");
+    s.startBuild();
+    window(l, "onGenerate", "template/stamp.txt", "built at 2");
+    write("input/pagecontent/index.md", "# Edited"); // the next build isn't started by template output alone
+    s.startBuild();
+    window(l, "onGenerate", "template/stamp.txt", "built at 3");
     assertEquals(Collections.singleton(abs("template/stamp.txt")), s.changesSinceBuildStart().getModified());
   }
 }

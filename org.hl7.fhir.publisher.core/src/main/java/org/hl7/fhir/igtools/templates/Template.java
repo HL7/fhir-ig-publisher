@@ -203,7 +203,7 @@ public class Template {
 
   public void processTemplateTranslations(String defLang, List<String> langCodes) throws IOException {
     // it writes the translation files again
-    writing(translationOutputs(), () -> {
+    writing("translations", translationOutputs(), () -> {
       processTemplateTranslationFiles(defLang, langCodes);
       return null;
     });
@@ -392,10 +392,11 @@ public class Template {
   public interface OutputListener {
     /**
      * @param folder  the folder written to (templateDir)
+     * @param window  what writes: the script target, or "translations"
      * @param managed the paths (relative to folder, with '/') that are written there as the build's output; other
      *                changes made meanwhile may be the user's
      */
-    void writing(String folder, Predicate<String> managed) throws IOException;
+    void writing(String folder, String window, Predicate<String> managed) throws IOException;
 
     /** the writing has finished (or failed) */
     void written() throws IOException;
@@ -434,11 +435,11 @@ public class Template {
     return path -> p.matcher(path).matches();
   }
 
-  private <T> T writing(Predicate<String> managed, Writing<T> work) throws IOException, FHIRException {
+  private <T> T writing(String window, Predicate<String> managed, Writing<T> work) throws IOException, FHIRException {
     if (outputListener == null) {
       return work.run();
     }
-    outputListener.writing(templateDir, managed);
+    outputListener.writing(templateDir, window, managed);
     T res;
     try {
       res = work.run();
@@ -455,7 +456,7 @@ public class Template {
   }
 
   private ImplementationGuide runScriptTarget(IWorkerContext context, String target, Map<String, List<ValidationMessage>> messages, ImplementationGuide ig, List<String> fileNames, int modifyIg) throws IOException, FHIRException {
-    return writing(scriptOutputs(target), () -> runScriptTargetAnt(context, target, messages, ig, fileNames, modifyIg));
+    return writing(target, scriptOutputs(target), () -> runScriptTargetAnt(context, target, messages, ig, fileNames, modifyIg));
   }
 
   private ImplementationGuide runScriptTargetAnt(IWorkerContext context, String target, Map<String, List<ValidationMessage>> messages, ImplementationGuide ig, List<String> fileNames, int modifyIg) throws IOException, FHIRException {

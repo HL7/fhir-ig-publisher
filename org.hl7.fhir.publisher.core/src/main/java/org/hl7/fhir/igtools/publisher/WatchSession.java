@@ -6,8 +6,10 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Consumer;
@@ -46,21 +48,29 @@ public class WatchSession {
   private SourceSnapshot sushiInputs;
   /** while the template writes to its folder, the folder as it was before */
   private OutputWindow output;
-  /** files in the template folder that changed while the build wrote there, but aren't named as its output */
-  private Set<Path> writtenThisBuild = new HashSet<>();
-  /** ... in the last build, when they alone started this build */
-  private Set<Path> writtenLastBuild = new HashSet<>();
-  /** files in the template folder that the build writes again on every build, with different content */
-  private final Set<Path> alwaysWritten = new HashSet<>();
+  /*
+   * The loop guard, by window (a script target, or "translations"; see outputWritten()):
+   */
+  /** files in the template folder that changed in a window of this build, but aren't named as its output */
+  private Map<String, Set<Path>> writtenThisBuild = new HashMap<>();
+  /**
+   * files that changed in a window, and alone started the next build (with others like them), for that many builds
+   * in a row up to this one
+   */
+  private Map<String, Map<Path, Integer>> startedBuilds = new HashMap<>();
+  /** files that a window writes on every build, with different content: taken as its output */
+  private final Map<String, Set<Path>> alwaysWritten = new HashMap<>();
   private Consumer<String> log = s -> { };
 
   private static class OutputWindow {
     final Path folder;
+    final String name;
     final Predicate<String> managed;
     final SourceSnapshot before;
 
-    OutputWindow(Path folder, Predicate<String> managed, SourceSnapshot before) {
+    OutputWindow(Path folder, String name, Predicate<String> managed, SourceSnapshot before) {
       this.folder = folder;
+      this.name = name;
       this.managed = managed;
       this.before = before;
     }
@@ -88,13 +98,35 @@ public class WatchSession {
   public void startBuild() throws IOException {
     SourceSnapshot last = buildStart;
     buildStart = SourceSnapshot.take(watched, buildStart);
-    Set<Path> written = writtenThisBuild;
-    writtenThisBuild = new HashSet<>();
-    writtenLastBuild = new HashSet<>();
-    if (last != null && !written.isEmpty()) {
-      Set<Path> changed = buildStart.changesSince(last).all();
-      if (!changed.isEmpty() && written.containsAll(changed)) {
-        writtenLastBuild.addAll(changed);
+    countWhatStartedThisBuild(last);
+  }
+
+  /**
+   * If this build was started only by files that the last build's windows changed without naming them as output, it
+   * counts for each of them (and its window) one more build in a row that it started; any other start breaks the row
+   */
+  private void countWhatStartedThisBuild(SourceSnapshot last) {
+    Map<String, Set<Path>> written = writtenThisBuild;
+    Map<String, Map<Path, Integer>> before = startedBuilds;
+    writtenThisBuild = new HashMap<>();
+    startedBuilds = new HashMap<>();
+    if (last == null || written.isEmpty()) {
+      return;
+    }
+    Set<Path> changed = buildStart.changesSince(last).all();
+    Set<Path> all = new HashSet<>();
+    for (Set<Path> files : written.values()) {
+      all.addAll(files);
+    }
+    if (changed.isEmpty() || !all.containsAll(changed)) {
+      return;
+    }
+    for (Map.Entry<String, Set<Path>> e : written.entrySet()) {
+      Map<Path, Integer> was = before.getOrDefault(e.getKey(), Collections.emptyMap());
+      for (Path f : e.getValue()) {
+        if (changed.contains(f)) {
+          startedBuilds.computeIfAbsent(e.getKey(), k -> new HashMap<>()).put(f, was.getOrDefault(f, 0) + 1);
+        }
       }
     }
   }
@@ -138,8 +170,8 @@ public class WatchSession {
   public Template.OutputListener templateOutputs() {
     return new Template.OutputListener() {
       @Override
-      public void writing(String folder, Predicate<String> managed) throws IOException {
-        outputWriting(Paths.get(folder), managed);
+      public void writing(String folder, String window, Predicate<String> managed) throws IOException {
+        outputWriting(Paths.get(folder), window, managed);
       }
 
       @Override
@@ -149,14 +181,23 @@ public class WatchSession {
     };
   }
 
-  void outputWriting(Path folder, Predicate<String> managed) throws IOException {
+  void outputWriting(Path folder, String window, Predicate<String> managed) throws IOException {
     Path p = folder.toAbsolutePath().normalize();
     output = null;
     if (buildStart != null && isWatched(p)) {
-      output = new OutputWindow(p, managed, SourceSnapshot.take(Collections.singletonList(p), buildStart));
+      output = new OutputWindow(p, window, managed, SourceSnapshot.take(Collections.singletonList(p), buildStart));
     }
   }
 
+  /**
+   * What changed in the template folder while the window ran: the files it names as its output are the build's;
+   * anything else stays a change (it may be the user's), except for the loop guard. A file that a window writes on
+   * every build with different content (say, with the time in it) would start a build after every build. So a file
+   * that alone started two builds in a row, each time after the same window changed it, and that the window changes
+   * a third time, is taken as that window's output from then on, until a run of the window leaves it as it was. That
+   * costs at most two extra builds; a user who saves a file while a window runs in each of three builds in a row, to
+   * other content each time, would see that third save go unbuilt
+   */
   void outputWritten() throws IOException {
     OutputWindow w = output;
     output = null;
@@ -164,24 +205,36 @@ public class WatchSession {
       return;
     }
     SourceSnapshot after = SourceSnapshot.take(Collections.singletonList(w.folder), w.before);
+    Set<Path> changed = after.changesSince(w.before).all();
+    Set<Path> always = alwaysWritten.computeIfAbsent(w.name, k -> new HashSet<>());
+    Map<Path, Integer> started = startedBuilds.getOrDefault(w.name, Collections.emptyMap());
     Set<Path> absorbed = new TreeSet<>();
     Set<Path> learnt = new TreeSet<>();
-    for (Path f : after.changesSince(w.before).all()) {
-      if (w.managed.test(w.folder.relativize(f).toString().replace('\\', '/')) || alwaysWritten.contains(f)) {
-        absorbed.add(f);
-      } else if (writtenLastBuild.contains(f)) {
-        // the last build was started by this file changing while the build wrote to the template folder, and it
-        // changes again: something the template writes on every build, with different content each time
-        learnt.add(f);
-      } else {
-        writtenThisBuild.add(f);
+    Set<Path> unlearnt = new TreeSet<>();
+    for (Path f : always) {
+      if (!changed.contains(f)) {
+        unlearnt.add(f);
       }
     }
+    always.removeAll(unlearnt);
+    for (Path f : changed) {
+      if (w.managed.test(w.folder.relativize(f).toString().replace('\\', '/')) || always.contains(f)) {
+        absorbed.add(f);
+      } else if (started.getOrDefault(f, 0) >= 2) {
+        learnt.add(f);
+      } else {
+        writtenThisBuild.computeIfAbsent(w.name, k -> new HashSet<>()).add(f);
+      }
+    }
+    if (!unlearnt.isEmpty()) {
+      log.accept("Watch mode: " + describe(w.folder, unlearnt) + " not changed by " + w.name
+          + " this time: changes to it count again");
+    }
     if (!learnt.isEmpty()) {
-      alwaysWritten.addAll(learnt);
+      always.addAll(learnt);
       absorbed.addAll(learnt);
-      log.accept("Watch mode: " + describe(w.folder, learnt) + " changed again while the template wrote to its folder: "
-          + "taken as the template's output from now on, not as changes");
+      log.accept("Watch mode: " + describe(w.folder, learnt) + " changed by " + w.name + " in every build: "
+          + "taken as its output from now on, not as changes");
     }
     if (!absorbed.isEmpty()) {
       buildStart = buildStart.withFiles(absorbed, after);
