@@ -28,6 +28,8 @@ import org.hl7.fhir.igtools.publisher.RapidoDependencyAnalyser.FileResult;
 import org.hl7.fhir.igtools.publisher.RapidoDependencyAnalyser.Hasher;
 import org.hl7.fhir.igtools.publisher.RapidoDependencyAnalyser.ResourceNode;
 import org.hl7.fhir.model.core.DateTimeType;
+import org.hl7.fhir.model.core.DomainResource;
+import org.hl7.fhir.model.core.Resource;
 import org.hl7.fhir.model.core.ValueSet;
 import org.hl7.fhir.model.core.formats.JsonParser;
 import org.hl7.fhir.model.utilities.formats.OutputStyle;
@@ -38,7 +40,9 @@ import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonElement;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
+import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
+import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 
 /**
  * The state that Rapido keeps between builds, and the decisions made from it.
@@ -1056,9 +1060,7 @@ public class RapidoTracker {
     JsonArray exp = j.forceArray("expansions");
     for (ValueSet vs : pf.expansions.subList(rec.expansionsBefore, pf.expansions.size())) {
       try {
-        ByteArrayOutputStream bs = new ByteArrayOutputStream();
-        new JsonParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.NORMAL).compose(bs, vs);
-        exp.add(new String(bs.toByteArray(), StandardCharsets.UTF_8));
+        exp.add(saveExpansion(new JsonParser(pf.context.getModelContext()), vs));
       } catch (Exception e) {
         return;
       }
@@ -1136,7 +1138,7 @@ public class RapidoTracker {
     }
     for (String s : j.forceArray("expansions").asStrings()) {
       try {
-        res.expansions.add((ValueSet) new JsonParser(pf.context.getModelContext()).parse(s));
+        res.expansions.add(readExpansion(new JsonParser(pf.context.getModelContext()), s));
       } catch (Exception e) {
         throw new Error("Unable to read an expansion saved by the last Rapido build: "+e.getMessage(), e);
       }
@@ -1160,6 +1162,89 @@ public class RapidoTracker {
         throw new Error("Unable to read a message saved by the last Rapido build");
       }
       list.add(vm);
+    }
+  }
+
+  /**
+   * Stands in for an empty text node while an expansion is saved. The XHTML parser drops empty text, so without it an
+   * element whose only child was empty text (a renderer's empty table cell) would come back with no children, and be
+   * written as {@code <td/>} where the build that made it wrote {@code <td></td>}.
+   */
+  static final String EMPTY_TEXT = "\uE000rapido:empty\uE000";
+
+  /** the expansion as JSON, keeping its narrative's empty text nodes */
+  static String saveExpansion(JsonParser json, ValueSet vs) throws IOException {
+    List<XhtmlNode> marked = new ArrayList<>();
+    try {
+      markEmptyText(vs, marked);
+      ByteArrayOutputStream bs = new ByteArrayOutputStream();
+      json.setOutputStyle(OutputStyle.NORMAL).compose(bs, vs);
+      return new String(bs.toByteArray(), StandardCharsets.UTF_8);
+    } finally {
+      for (XhtmlNode x : marked) {
+        x.setContent("");
+      }
+    }
+  }
+
+  /** reads an expansion written by {@link #saveExpansion} */
+  static ValueSet readExpansion(JsonParser json, String s) throws IOException {
+    ValueSet vs = (ValueSet) json.parse(s);
+    restoreEmptyText(vs);
+    return vs;
+  }
+
+  private static void markEmptyText(DomainResource dr, List<XhtmlNode> marked) {
+    if (dr.hasText() && dr.getText().hasDiv()) {
+      markEmptyText(dr.getText().getDiv(), marked);
+    }
+    for (Resource c : dr.getContained()) {
+      if (c instanceof DomainResource) {
+        markEmptyText((DomainResource) c, marked);
+      }
+    }
+  }
+
+  private static void markEmptyText(XhtmlNode x, List<XhtmlNode> marked) {
+    if (!x.hasChildren()) {
+      return;
+    }
+    for (XhtmlNode c : x.getChildNodes()) {
+      if (c.getNodeType() == NodeType.Text) {
+        if (c.getContent() != null && c.getContent().isEmpty()) {
+          c.setContent(EMPTY_TEXT);
+          marked.add(c);
+        }
+      } else {
+        markEmptyText(c, marked);
+      }
+    }
+  }
+
+  private static void restoreEmptyText(DomainResource dr) {
+    if (dr.hasText() && dr.getText().hasDiv()) {
+      restoreEmptyText(dr.getText().getDiv());
+    }
+    for (Resource c : dr.getContained()) {
+      if (c instanceof DomainResource) {
+        restoreEmptyText((DomainResource) c);
+      }
+    }
+  }
+
+  private static void restoreEmptyText(XhtmlNode x) {
+    if (!x.hasChildren()) {
+      return;
+    }
+    for (XhtmlNode c : x.getChildNodes()) {
+      if (c.getNodeType() == NodeType.Text) {
+        // an empty text node next to other text is read back merged into it
+        if (c.getContent() != null && c.getContent().contains(EMPTY_TEXT)) {
+          c.setContent(c.getContent().replace(EMPTY_TEXT, ""));
+        }
+      } else {
+        restoreEmptyText(c);
+      }
     }
   }
 }
