@@ -269,7 +269,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
    * Puts back the state that a build changes outside PublisherFields to what a fresh start has, so that a rebuild
    * in watch mode doesn't see what the previous build did
    */
-  private void resetForRebuild(List<String> cliNoNarratives, List<String> cliNoValidate) {
+  void resetForRebuild(List<String> cliNoNarratives, List<String> cliNoValidate) {
     settings.getNoNarratives().clear();
     settings.getNoNarratives().addAll(cliNoNarratives);
     settings.getNoValidate().clear();
