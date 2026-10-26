@@ -2,6 +2,7 @@ package org.hl7.fhir.igtools.publisher;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -28,6 +29,10 @@ public class WatchSession {
   private final Path fshGenerated;
   private final List<Path> pageFolders = new ArrayList<>();
   private final List<Path> watched;
+  /** the local template folders watched, which SUSHI doesn't read */
+  private final List<Path> templateFolders = new ArrayList<>();
+  /** folders watched since the file monitor was made */
+  private final List<Path> notMonitored = new ArrayList<>();
 
   private SourceSnapshot buildStart;
   private SourceSnapshot sushiInputs;
@@ -35,7 +40,8 @@ public class WatchSession {
 
   /**
    * @param rootDir the folder that contains ig.ini
-   * @param watched the files and folders watched for changes (all under rootDir)
+   * @param watched the files and folders watched for changes (all under rootDir; local template folders are added
+   *                as builds load them, see watchTemplateFolders())
    */
   public WatchSession(Path rootDir, List<Path> watched) {
     Path root = rootDir.toAbsolutePath().normalize();
@@ -54,6 +60,41 @@ public class WatchSession {
     buildStart = SourceSnapshot.take(watched, buildStart);
   }
 
+  /**
+   * The build has loaded its template from these local folders (see TemplateManager.getLocalFolders()): they are
+   * watched from now on, as they are now. Folders already watched are left as they are
+   */
+  public void watchTemplateFolders(List<String> folders) throws IOException {
+    for (String f : folders) {
+      Path p = Paths.get(f).toAbsolutePath().normalize();
+      if (isWatched(p)) {
+        continue;
+      }
+      watched.add(p);
+      templateFolders.add(p);
+      notMonitored.add(p);
+      if (buildStart != null) {
+        buildStart = buildStart.withTree(p, SourceSnapshot.take(Collections.singletonList(p), null));
+      }
+    }
+  }
+
+  private boolean isWatched(Path p) {
+    for (Path w : watched) {
+      if (p.startsWith(w)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** The folders watched since the file monitor was last made (and forgets them): it has to be made again */
+  public List<Path> takeNotMonitored() {
+    List<Path> res = new ArrayList<>(notMonitored);
+    notMonitored.clear();
+    return res;
+  }
+
   /** What changed in the watched files since the current (or last) build started */
   public SourceSnapshot.Changes changesSinceBuildStart() throws IOException {
     SourceSnapshot now = SourceSnapshot.take(watched, buildStart);
@@ -64,22 +105,38 @@ public class WatchSession {
 
   /**
    * SUSHI doesn't need to run if it ran before in this session and nothing changed since then except the content of
-   * pages (SUSHI's output, in fsh-generated, must not have changed either)
+   * pages and the local template folders (SUSHI's output, in fsh-generated, must not have changed either)
    */
   public boolean canSkipSushi() {
     if (sushiInputs == null || buildStart == null) {
       return false;
     }
     SourceSnapshot.Changes changes = buildStart.changesSince(sushiInputs);
-    if (!changes.getAdded().isEmpty() || !changes.getRemoved().isEmpty()) {
-      return false;
+    for (Path p : changes.getAdded()) {
+      if (!isTemplate(p)) {
+        return false;
+      }
+    }
+    for (Path p : changes.getRemoved()) {
+      if (!isTemplate(p)) {
+        return false;
+      }
     }
     for (Path p : changes.getModified()) {
-      if (!isPageContent(p)) {
+      if (!isPageContent(p) && !isTemplate(p)) {
         return false;
       }
     }
     return true;
+  }
+
+  private boolean isTemplate(Path p) {
+    for (Path f : templateFolders) {
+      if (p.startsWith(f)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private boolean isPageContent(Path p) {

@@ -191,4 +191,41 @@ class WatchSessionTest {
     s.startBuild();
     assertFalse(s.canSkipSushi());
   }
+
+  @Test
+  void aLocalTemplateIsWatchedOnceTheBuildHasLoadedIt() throws IOException {
+    WatchSession s = session();
+    write("my-template/package/package.json", "{}");
+    write("my-template/includes/fragment-header.html", "<header/>");
+    s.startBuild();
+    s.sushiRan();
+    s.watchTemplateFolders(Collections.singletonList(dir.resolve("my-template").toString()));
+    assertEquals(Collections.singletonList(dir.resolve("my-template").toAbsolutePath().normalize()), s.takeNotMonitored());
+    assertTrue(s.takeNotMonitored().isEmpty(), "the monitor is made again once");
+    assertTrue(s.changesSinceBuildStart().isEmpty(), "the template as the build loaded it is not a change");
+
+    write("my-template/includes/fragment-header.html", "<header>edited</header>");
+    assertEquals(Collections.singleton(dir.resolve("my-template/includes/fragment-header.html").toAbsolutePath()),
+        s.changesSinceBuildStart().getModified());
+    s.startBuild();
+    assertTrue(s.canSkipSushi(), "SUSHI doesn't read the template");
+    // the next build loads it again
+    s.watchTemplateFolders(Collections.singletonList(dir.resolve("my-template").toString()));
+    assertTrue(s.takeNotMonitored().isEmpty(), "already watched");
+    assertTrue(s.changesSinceBuildStart().isEmpty());
+
+    write("my-template/includes/fragment-footer.html", "<footer/>");
+    assertEquals(1, s.changesSinceBuildStart().getAdded().size());
+  }
+
+  @Test
+  void aTemplateFolderThatIsAlreadyWatchedIsLeftAsItIs() throws IOException {
+    WatchSession s = session();
+    write("input/template/package/package.json", "{}");
+    s.startBuild();
+    s.watchTemplateFolders(Collections.singletonList(dir.resolve("input/template").toString()));
+    assertTrue(s.takeNotMonitored().isEmpty());
+    write("input/template/package/package.json", "{\"name\":\"t\"}");
+    assertEquals(1, s.changesSinceBuildStart().getModified().size());
+  }
 }

@@ -196,13 +196,14 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     String rootDir = settings.getConfigFile();
     FileChangeMonitor monitor = null;
     WatchSession session = null;
+    List<FileChangeMonitor.MonitoredPath> watched = null;
     // settings that a build adds to: each build starts again from what the command line said
     List<String> cliNoNarratives = new ArrayList<>(settings.getNoNarratives());
     List<String> cliNoValidate = new ArrayList<>(settings.getNoValidate());
     try {
       if (settings.isWatchMode()) {
         String igDir = new File(rootDir).isFile() ? FileUtilities.getDirectoryForFile(rootDir) : rootDir;
-        List<FileChangeMonitor.MonitoredPath> watched = Arrays.asList(
+        watched = new ArrayList<>(Arrays.asList(
                 FileChangeMonitor.MonitoredPath.file(Paths.get(Utilities.path(igDir, "ig.ini"))),
                 FileChangeMonitor.MonitoredPath.file(Paths.get(Utilities.path(igDir, "sushi-config.yaml"))),
                 FileChangeMonitor.MonitoredPath.file(Paths.get(Utilities.path(igDir, "publication-request.json"))),
@@ -210,7 +211,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
                 FileChangeMonitor.MonitoredPath.file(Paths.get(Utilities.path(igDir, "fsh.ini"))), // which SUSHI to run
                 FileChangeMonitor.MonitoredPath.recursive(Paths.get(Utilities.path(igDir, "input"))),
                 FileChangeMonitor.MonitoredPath.recursive(Paths.get(Utilities.path(igDir, "fsh"))), // SUSHI's older layout
-                FileChangeMonitor.MonitoredPath.recursive(Paths.get(Utilities.path(igDir, "fsh-generated"))));
+                FileChangeMonitor.MonitoredPath.recursive(Paths.get(Utilities.path(igDir, "fsh-generated")))));
         monitor = new FileChangeMonitor(watched);
         List<Path> paths = new ArrayList<>();
         for (FileChangeMonitor.MonitoredPath p : watched) {
@@ -241,6 +242,17 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
           }
         }
         first = false;
+        if (session != null) {
+          List<Path> added = session.takeNotMonitored();
+          if (!added.isEmpty()) {
+            // the build loaded its template from a local folder
+            for (Path p : added) {
+              watched.add(FileChangeMonitor.MonitoredPath.recursive(p));
+            }
+            monitor.close();
+            monitor = new FileChangeMonitor(watched);
+          }
+        }
       } while (session != null && waitForChanges(monitor, session));
     } finally {
       if (monitor != null) {
