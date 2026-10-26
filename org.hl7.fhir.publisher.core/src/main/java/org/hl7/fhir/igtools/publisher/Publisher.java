@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.lang.reflect.Field;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
@@ -61,6 +62,7 @@ import org.hl7.fhir.igtools.renderers.*;
 import org.hl7.fhir.igtools.renderers.ValidationPresenter.IGLanguageInformation;
 import org.hl7.fhir.igtools.ui.IGPublisherUI;
 import org.hl7.fhir.igtools.web.*;
+import org.hl7.fhir.services.comparison.ResourceComparer;
 import org.hl7.fhir.services.context.*;
 import org.hl7.fhir.services.elementmodel.Element;
 import org.hl7.fhir.services.elementmodel.ElementVisitor;
@@ -261,6 +263,22 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     settings.getNoValidate().addAll(cliNoValidate);
     HierarchicalTableGenerator.ACTIVE_TABLES = false;
     HierarchicalTableGenerator.uuid = UUIDUtilities.makeUuidLC();
+    resetComparisonIds();
+  }
+
+  /**
+   * The comparisons (previous version, IPA, IPS, imposes) are numbered by a counter that only a fresh start resets
+   * (ResourceComparer.counter): without this, a rebuild names their pages sd-21-..., sd-22-..., where a build writes
+   * sd-1-..., sd-2-...
+   */
+  static void resetComparisonIds() {
+    try {
+      Field f = ResourceComparer.class.getDeclaredField("counter");
+      f.setAccessible(true);
+      f.setInt(null, 0);
+    } catch (Exception e) {
+      System.out.println("Unable to reset the comparison numbering for a rebuild: " + e.getMessage());
+    }
   }
 
   private void build(String rootDir) throws Exception {
