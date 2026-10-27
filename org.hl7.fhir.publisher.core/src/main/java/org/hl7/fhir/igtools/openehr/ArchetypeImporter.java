@@ -19,7 +19,6 @@ import com.nedap.archie.rminfo.MetaModels;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.services.context.IWorkerContext;
 import org.hl7.fhir.model.extensions.ExtensionDefinitions;
-import org.hl7.fhir.model.Property;
 import org.hl7.fhir.model.core.*;
 import org.hl7.fhir.model.core.Bundle.BundleType;
 import org.hl7.fhir.model.core.CodeSystem.ConceptDefinitionComponent;
@@ -473,19 +472,7 @@ public class ArchetypeImporter {
     Optional<ElementDefinition> child = type.getSnapshot().getElementList().stream().filter(e -> e.getId().equals(rmTypeName+"."+name.replace("_","-"))).findAny();
     if(child.isEmpty()) throw new Error("unknown element " + rmTypeName + "." + name);
     
-    return child.get().getMaxAsInt()==1 && child.get().getMin()>=0;
-
-//    switch (rmTypeName + "." + name) {
-//    case "HISTORY.events": return false;
-//    case "ITEM_TREE.items": return false;
-//    case "CLUSTER.items": return false;
-//    case "ELEMENT.value": return true;
-//    case "DV_QUANTITY.magnitude": return true;
-//    case "DV_QUANTITY.units": return true;
-//    case "DV_QUANTITY.precision": return true;
-//    default:
-//    throw new Error("unknown element " + rmTypeName + "." + name);
-//    }
+    return child.get().getMaxAsInt()==1;
   }
 
   public void buildDefinition(CObject source, ElementDefinition defn) {
