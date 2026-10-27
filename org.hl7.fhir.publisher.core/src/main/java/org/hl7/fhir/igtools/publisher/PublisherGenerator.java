@@ -214,6 +214,22 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
   }
 
   public void generate() throws Exception {
+    try {
+      generateOutputs();
+    } finally {
+      // if the build failed: else the database stays open, and on Windows the next build (in watch mode, in this
+      // process) can't delete it from the temp folder
+      if (openDb != null) {
+        openDb.closeUp();
+        openDb = null;
+      }
+    }
+  }
+
+  // the database generateOutputs() is building, until it's closed
+  private DBBuilder openDb;
+
+  private void generateOutputs() throws Exception {
     if (settings.isSimplifierMode()) {
       return;
     }
@@ -245,6 +261,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     pf.otherFilesRun.add(Utilities.path(pf.outputDir, "package.manifest.json"));
     pf.otherFilesRun.add(Utilities.path(pf.tempDir, "package.db"));
     DBBuilder db = pf.generatingDatabase ? new DBBuilder(Utilities.path(pf.tempDir, "package.db"), pf.context, pf.rc, pf.cu, pf.fileList) : null;
+    openDb = db;
     copyData();
     for (String rg : pf.regenList) {
       regenerate(rg);
@@ -354,6 +371,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
     if (db != null) {
       db.closeUp();
+      openDb = null;
     }
     FileUtilities.bytesToFile(pf.extensionTracker.generate(), Utilities.path(pf.tempDir, "usage-stats.json"));
     try {
