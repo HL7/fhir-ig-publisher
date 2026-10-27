@@ -3,8 +3,12 @@ package org.hl7.fhir.igtools.publisher;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 import org.hl7.fhir.model.ModelContext;
@@ -15,9 +19,11 @@ import org.hl7.fhir.model.core.formats.JsonParser;
 import org.hl7.fhir.model.core.formats.XmlParser;
 import org.hl7.fhir.model.utilities.formats.OutputStyle;
 import org.hl7.fhir.utilities.json.model.JsonArray;
+import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class RapidoTrackerTest {
 
@@ -89,5 +95,56 @@ class RapidoTrackerTest {
     gone.add("http://example.org/StructureDefinition/gone");
     assertNull(RapidoTracker.profileSources(List.of(g, f), gone));
     assertNull(RapidoTracker.profileSources(List.of(g, f), null));
+  }
+
+  private static String plain(JsonObject o) {
+    return org.hl7.fhir.utilities.json.parser.JsonParser.compose(o, false);
+  }
+
+  /**
+   * The state's names are paths and file names: on Windows, with backslashes in them (the paths the files were loaded
+   * from), and a file name can hold a quote, a control character, or non-ASCII. The JSON writer doesn't escape names,
+   * so the state written with them couldn't be read back, and every -rapido build on Windows was a complete one
+   */
+  @Test
+  void theStateIsReadBackWhateverItsNamesHold(@TempDir Path dir) throws Exception {
+    JsonObject state = new JsonObject();
+    state.add("version", 1);
+    JsonObject other = state.forceObject("otherFiles");
+    other.set("input\\images\\a.png", "h1");
+    other.set("input\\up/", "(same as D:\\a\\ig\\input)");
+    other.set("input/q\"uote.txt", "h2");
+    other.set("input/tab\tand\u0001.txt", "h3");
+    other.set("input/images/gr\u00f6\u00dfe-\u00f1.svg", "h4");
+    JsonObject files = state.forceObject("files");
+    JsonObject f = files.forceObject("D:\\a\\_temp\\ig\\input\\pages\\index.md");
+    f.forceObject("resources").set("Patient/p", "h5");
+    f.forceArray("list").add(new JsonObject().add("C:\\x\\y", "z"));
+    File sf = dir.resolve("state.json").toFile();
+
+    RapidoTracker.writeState(state, sf);
+    JsonObject read = RapidoTracker.readState(sf);
+
+    assertEquals(plain(state), plain(read));
+    assertEquals("h1", read.getJsonObject("otherFiles").asString("input\\images\\a.png"));
+    assertEquals("h5", read.getJsonObject("files").getJsonObject("D:\\a\\_temp\\ig\\input\\pages\\index.md").getJsonObject("resources").asString("Patient/p"));
+  }
+
+  /** the state of a build whose names have nothing to escape (any build on Linux or macOS, mostly) is written as before */
+  @Test
+  void aStateWithNothingToEscapeIsWrittenAsBefore(@TempDir Path dir) throws Exception {
+    JsonObject state = new JsonObject();
+    state.add("version", 1);
+    state.forceObject("otherFiles").set("input/images/gr\u00f6\u00dfe-\u00f1.svg", "h\\1\"").set("input/up/", "(same as /x/\"y\")");
+    JsonObject f = state.forceObject("files").forceObject("/home/ig/input/pages/index.md");
+    f.forceObject("resources").set("Patient/p", "h5");
+    f.forceArray("list").add(new JsonObject().add("a", "b")).add("c");
+    File sf = dir.resolve("state.json").toFile();
+    File before = dir.resolve("before.json").toFile();
+
+    RapidoTracker.writeState(state, sf);
+    org.hl7.fhir.utilities.json.parser.JsonParser.compose(state, before, false);
+
+    assertArrayEquals(Files.readAllBytes(before.toPath()), Files.readAllBytes(sf.toPath()));
   }
 }

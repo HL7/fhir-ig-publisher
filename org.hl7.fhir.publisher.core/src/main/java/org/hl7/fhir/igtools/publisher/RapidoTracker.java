@@ -41,6 +41,7 @@ import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonElement;
 import org.hl7.fhir.utilities.json.model.JsonObject;
+import org.hl7.fhir.utilities.json.model.JsonProperty;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
@@ -481,7 +482,8 @@ public class RapidoTracker {
     if (skip.contains(c)) {
       return;
     }
-    String rel = root.toPath().relativize(dir.toPath()).toString();
+    // with '/' between the names on any OS, as the state is the same file on any OS
+    String rel = root.toPath().relativize(dir.toPath()).toString().replace(File.separatorChar, '/');
     if (dir.isFile()) {
       try {
         files.put(rel, new Hasher().add(Files.readAllBytes(dir.toPath())).finish());
@@ -599,10 +601,55 @@ public class RapidoTracker {
       return null;
     }
     try {
-      return org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(f);
+      return readState(f);
     } catch (Exception e) {
       return new JsonObject().add("unreadable", e.getMessage() == null ? e.getClass().getName() : e.getMessage());
     }
+  }
+
+  static JsonObject readState(File f) throws IOException {
+    return org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(f);
+  }
+
+  /**
+   * The JSON writer escapes the values it writes, but not the names, and the state's names are paths and file names
+   * (on Windows, with backslashes in them): written as they are, the next build can't read the state. So the names are
+   * escaped here, as the reader unescapes them. A name with nothing to escape is written as before
+   */
+  static void writeState(JsonObject state, File f) throws IOException {
+    org.hl7.fhir.utilities.json.parser.JsonParser.compose(escapeNames(state), f, false);
+  }
+
+  private static JsonElement escapeNames(JsonElement e) {
+    if (e instanceof JsonObject) {
+      JsonObject res = new JsonObject();
+      for (JsonProperty p : ((JsonObject) e).getProperties()) {
+        res.add(escapeName(p.getName()), escapeNames(p.getValue()));
+      }
+      return res;
+    }
+    if (e instanceof JsonArray) {
+      JsonArray res = new JsonArray();
+      for (JsonElement i : (JsonArray) e) {
+        res.add(escapeNames(i));
+      }
+      return res;
+    }
+    return e;
+  }
+
+  static String escapeName(String s) {
+    StringBuilder b = new StringBuilder();
+    for (char c : s.toCharArray()) {
+      if (c == '"' || c == '\\') {
+        b.append('\\').append(c);
+      } else if (c < 0x20) {
+        b.append(String.format("\\u%04x", (int) c));
+      } else {
+        b.append(c);
+      }
+    }
+    return b.toString();
   }
 
   /** saves the state for the next build. Only called once the build has finished successfully */
@@ -655,7 +702,7 @@ public class RapidoTracker {
     state.add("files", files);
     File sf = new File(stateFile);
     FileUtilities.createDirectory(sf.getParent());
-    org.hl7.fhir.utilities.json.parser.JsonParser.compose(state, sf, false);
+    writeState(state, sf);
   }
 
   private JsonObject newFile(FetchedFile f) {
