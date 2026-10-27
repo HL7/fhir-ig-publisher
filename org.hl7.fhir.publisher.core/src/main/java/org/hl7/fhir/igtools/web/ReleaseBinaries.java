@@ -16,10 +16,11 @@ import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
 /**
  * Support for releases whose binaries are not published with the website.
  *
- * When the publication request has a binaries-location, the release binaries (full-ig.zip and the package files)
- * are moved out of the version folder into a staging folder, from where they are uploaded to the binaries location
- * (typically the assets of a GitHub release). binaries-location is recorded on the version's entry in
- * package-list.json, and whatever links to the binaries of a version uses it instead of the version's path.
+ * When a publication has a binaries-location - from the publication request, or else from the website's layout rule
+ * for the IG - the release binaries (full-ig.zip and the package files) are moved out of the version folder into a
+ * staging folder, from where they are uploaded to the binaries location (typically the assets of a GitHub release).
+ * binaries-location is recorded on the version's entry in package-list.json, and whatever links to the binaries of a
+ * version uses it instead of the version's path.
  */
 public class ReleaseBinaries {
 
@@ -47,9 +48,21 @@ public class ReleaseBinaries {
   }
 
   /**
+   * @param pattern the binaries-location of a layout rule, with the parts of the package id ({1}, {2}, ...) already
+   *   filled in
+   * @return the binaries-location of a release of the package, with {package-id} and {version} filled in
+   */
+  public static String fromPattern(String pattern, String packageId, String version) {
+    return pattern.replace("{package-id}", packageId).replace("{version}", version);
+  }
+
+  /**
    * @return null if binaries-location is acceptable for a publication at path, or else the problem with it
    */
   public static String checkLocation(String location, String path) {
+    if (location.contains("{") || location.contains("}")) {
+      return "The binaries-location '"+location+"' has a placeholder that isn't known (layout rules can use {1}, {2}, ... for the parts of the package id, {package-id} and {version})";
+    }
     if (!location.startsWith("https://")) {
       return "The binaries-location '"+location+"' must be an absolute https URL";
     }

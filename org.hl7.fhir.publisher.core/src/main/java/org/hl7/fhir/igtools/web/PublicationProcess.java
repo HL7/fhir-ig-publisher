@@ -278,6 +278,14 @@ public class PublicationProcess {
             destination, workingRoot, res, src, id, pubSetup, fSource, fRoot, fRegistry, fHistory, 
             jsonXmlClones, igBuildZipDir, prSrc, mode);
       } else {
+        // the release binaries go where the publication request says, or else where the layout rule says. The
+        // location is recorded on the version in the package-list, so changing the rule doesn't move past releases
+        if (prSrc.has(ReleaseBinaries.PROPERTY)) {
+          System.out.println("Release binaries will be held at "+prSrc.asString(ReleaseBinaries.PROPERTY)+" (from the publication request)");
+        } else if (rules.has(ReleaseBinaries.PROPERTY)) {
+          prSrc.set(ReleaseBinaries.PROPERTY, ReleaseBinaries.fromPattern(calcByRule(rules.str(ReleaseBinaries.PROPERTY), p), id, prSrc.asString("version")));
+          System.out.println("Release binaries will be held at "+prSrc.asString(ReleaseBinaries.PROPERTY)+" (from the layout rule)");
+        }
         // check the output
         File fOutput = checkDirectory(Utilities.path(source, "output"), res, "Publication Source");
         File fQA = checkFile(Utilities.path(source, "output", "qa.json"), res, "Publication QA info");

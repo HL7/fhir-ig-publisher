@@ -53,6 +53,16 @@ class ReleaseBinariesTest {
   }
 
   @Test
+  void fillsTheLayoutRulePattern() {
+    // the parts of the package id ({1}, {2}, ...) are filled in by the layout rule processing first
+    assertEquals("https://github.com/hl7-be/fhir-binaries/releases/download/hl7.fhir.be.core-1.2.0",
+        ReleaseBinaries.fromPattern("https://github.com/hl7-be/fhir-binaries/releases/download/{package-id}-{version}", "hl7.fhir.be.core", "1.2.0"));
+    assertEquals("https://github.com/hl7-be/core/releases/download/v1.2.0",
+        ReleaseBinaries.fromPattern("https://github.com/hl7-be/core/releases/download/v{version}", "hl7.fhir.be.core", "1.2.0"));
+    assertNotNull(ReleaseBinaries.checkLocation("https://github.com/hl7-be/{5}/releases/download/v1.2.0", PATH));
+  }
+
+  @Test
   void stagesOnlyTheReleaseBinaries() throws IOException {
     List<String> names = ReleaseBinaries.stage(versionFolder, stagingFolder, false);
     assertEquals(3, names.size(), names.toString());
