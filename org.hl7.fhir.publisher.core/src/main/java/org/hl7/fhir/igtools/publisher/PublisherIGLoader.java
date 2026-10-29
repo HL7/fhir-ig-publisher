@@ -4120,7 +4120,7 @@ public class PublisherIGLoader extends PublisherBase {
   }
 
 
-  private void loadPrePages() throws Exception {
+  void loadPrePages() throws Exception {
     if (pf.prePagesDirs.isEmpty())
       return;
 
@@ -4153,12 +4153,11 @@ public class PublisherIGLoader extends PublisherBase {
       }
       addFile(dir, false);
     }
+    // the fetched paths are canonical, and basePath may not be (a symlink, or an 8.3 short name on Windows)
+    String canonicalBasePath = new File(basePath).getCanonicalPath();
     for (String link : dir.getFiles()) {
       FetchedFile f = this.pf.fetcher.fetch(link);
-      if (basePath.startsWith("/var") && f.getPath().startsWith("/private/var")) {
-        f.setPath(f.getPath().substring(8));
-      }
-      f.setRelativePath(f.getPath().substring(basePath.length()+1));
+      f.setRelativePath(f.getPath().substring(canonicalBasePath.length()+1));
       if (f.isFolder())
         loadPrePages(f, basePath);
       else
