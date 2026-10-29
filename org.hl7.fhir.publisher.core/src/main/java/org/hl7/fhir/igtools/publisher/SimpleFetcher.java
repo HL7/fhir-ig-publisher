@@ -26,6 +26,12 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -122,6 +128,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
       ff.setFolder(true);   
       for (File fl : f.listFiles()) {
         if (!isIgnoredFile(fl.getName())) {
+          checkFileNameDecoded(fl);
           ff.getFiles().add(fl.getCanonicalPath());
         }
       }
@@ -139,6 +146,56 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
       ss.close();
     }
     return ff;
+  }
+
+  /**
+   * A folder listing gives U+FFFD for the bytes of a name that it can't decode with the file name encoding Java takes
+   * from the locale (e.g. a non-ASCII name under the POSIX locale, or a Latin-1 name under a UTF-8 one), and java.io
+   * can't open a file by a name like that
+   */
+  private static void checkFileNameDecoded(File f) {
+    if (isUndecodable(f)) {
+      throw new FHIRException(undecodableFileNameMessage(f.getPath(), System.getProperty("sun.jnu.encoding")));
+    }
+  }
+
+  private static boolean isUndecodable(File f) {
+    return f.getName().indexOf('\uFFFD') >= 0 && !f.exists();
+  }
+
+  /**
+   * java.io can't tell what an undecodable name is (isDirectory() is false), but the Paths a java.nio listing gives
+   * keep the name's bytes, so it can
+   */
+  private static boolean isUndecodableFolder(File f) {
+    if (isUndecodable(f)) {
+      try (DirectoryStream<Path> list = Files.newDirectoryStream(f.getParentFile().toPath())) {
+        for (Path p : list) {
+          if (p.getFileName().toString().equals(f.getName()) && Files.isDirectory(p)) {
+            return true;
+          }
+        }
+      } catch (IOException | InvalidPathException e) {
+        // then it's treated as a file
+      }
+    }
+    return false;
+  }
+
+  static String undecodableFileNameMessage(String path, String encoding) {
+    if (isUtf8(encoding)) {
+      return "Unable to read "+path+": its name isn't valid UTF-8 (e.g. it was made on a system that uses another encoding for file names), so Java can't open it. Rename it so its name is valid UTF-8, or plain ASCII";
+    } else {
+      return "Unable to read "+path+": its name can't be decoded with the file name encoding '"+encoding+"' that Java takes from the locale. Rename it so its name is plain ASCII, or run the IG Publisher with a UTF-8 locale (e.g. LC_ALL=C.UTF-8)";
+    }
+  }
+
+  private static boolean isUtf8(String encoding) {
+    try {
+      return encoding != null && Charset.forName(encoding).equals(StandardCharsets.UTF_8);
+    } catch (IllegalArgumentException e) {
+      return false;
+    }
   }
 
   public static boolean isIgnoredFile(String name) {
@@ -346,11 +403,14 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
       File file = new File(s);
       if (file.exists()) {
         for (File f : file.listFiles()) {
-          if (!f.isDirectory() && !exemptions.contains(f.getAbsolutePath()) && !isExemptFileType(f.getName())) {
+          if (!f.isDirectory() && !isUndecodableFolder(f) && !exemptions.contains(f.getAbsolutePath()) && !isExemptFileType(f.getName())) {
 //            System.out.println("scanning: "+f.getAbsolutePath());
             String fn = f.getCanonicalPath();
             String ext = Utilities.getFileExtension(fn);
             if (!Utilities.existsInList(ext, "md", "txt") && !fn.endsWith(".gitignore") && !fn.contains("-spreadsheet") && !isIgnoredFile(f.getName())) {
+              if (mightLoadAsResource(ext, context)) {
+                checkFileNameDecoded(f);
+              }
               boolean ok = false;
               if (!Utilities.existsInList(ext, fixedFileTypes()))
                 try {
@@ -457,6 +517,14 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
     return name.endsWith(".svg");
   }
 
+  // scan() never opens .html (or .adl without openEHR), and images and documents can't parse as a resource, so a name that can't be decoded doesn't matter
+  private boolean mightLoadAsResource(String ext, IWorkerContext context) {
+    if (Utilities.existsInList(ext, "html", "jpg", "png", "gif", "mp3", "mp4", "pfd", "doc", "docx", "ppt", "pptx", "svg")) {
+      return false;
+    }
+    return !"adl".equals(ext) || context.hasPackage("openehr.base", null);
+  }
+
   private List<String> fixedFileTypes() {
     return Utilities.strings(
         // known file types we have parsers for
@@ -553,6 +621,9 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
         for (File f : list) {
           if (f.isDirectory()) {
             scanFolders(f, dirs);
+          } else if (isUndecodableFolder(f)) {
+            // its contents would be left out
+            checkFileNameDecoded(f);
           }
         }
       }
