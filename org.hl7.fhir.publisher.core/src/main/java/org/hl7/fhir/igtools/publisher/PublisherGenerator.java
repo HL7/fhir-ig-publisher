@@ -3389,21 +3389,20 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
   }
 
-  private void templateBeforeGenerate() throws IOException, FHIRException {
+  void templateBeforeGenerate() throws IOException, FHIRException {
     if (pf.template != null) {
       logMessage("Run Template");
       TimeTracker.Session tts = pf.tt.start("template");
       List<String> newFileList = new ArrayList<String>();
       checkOutcomes(pf.template.beforeGenerateEvent(pf.context, pf.publishedIg, pf.tempDir, pf.otherFilesRun, newFileList, allLangs()));
+      // the fetched paths are canonical, and tempDir may not be (a symlink, or an 8.3 short name on Windows)
+      String canonicalTempDir = new File(this.pf.tempDir).getCanonicalPath();
       for (String newFile: newFileList) {
         if (!newFile.isEmpty()) {
           try {
             FetchedFile f = this.pf.fetcher.fetch(Utilities.path(this.pf.repoRoot, newFile));
             String dir = FileUtilities.getDirectoryForFile(f.getPath());
-            if (this.pf.tempDir.startsWith("/var") && dir.startsWith("/private/var")) {
-              dir = dir.substring(8);
-            }
-            String relative = this.pf.tempDir.length() > dir.length() ? "" : dir.substring(this.pf.tempDir.length());
+            String relative = canonicalTempDir.length() > dir.length() ? "" : dir.substring(canonicalTempDir.length());
             if (relative.length() > 0)
               relative = relative.substring(1);
             f.setRelativePath(f.getPath().substring( FileUtilities.getDirectoryForFile(f.getPath()).length()+1));
