@@ -67,10 +67,10 @@ import org.hl7.fhir.model.fml.StructureMap.StructureMapGroupRuleComponent;
 import org.hl7.fhir.model.fml.StructureMap.StructureMapGroupRuleDependentComponent;
 import org.hl7.fhir.model.fml.StructureMap.StructureMapGroupRuleSourceComponent;
 import org.hl7.fhir.model.fml.StructureMap.StructureMapGroupRuleTargetComponent;
-import org.hl7.fhir.model.fml.StructureMap.StructureMapGroupTypeMode;
-import org.hl7.fhir.model.fml.StructureMap.StructureMapInputMode;
+import org.hl7.fhir.model.fml.StructureMap.StructureMapGroupTypeModeVS;
+import org.hl7.fhir.model.fml.StructureMap.StructureMapInputModeVS;
 import org.hl7.fhir.model.fml.StructureMap.StructureMapStructureComponent;
-import org.hl7.fhir.model.fml.StructureMap.StructureMapTransform;
+import org.hl7.fhir.model.fml.StructureMap.StructureMapTransformVS;
 import org.hl7.fhir.model.core.UriType;
 import org.hl7.fhir.model.core.ValueSet;
 import org.hl7.fhir.model.core.ValueSet.ConceptReferenceComponent;
@@ -1217,7 +1217,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
           // qaMsg("unvisited group "+grp.getName()+" in "+map.getUrl(), false);
           for (StructureMapGroupRuleComponent r : grp.getRuleList()) {
             for (StructureMapGroupRuleTargetComponent tgt : r.getTargetList()) {
-              if (tgt.getTransform() == StructureMapTransform.TRANSLATE) {
+              if (tgt.getTransform() == StructureMapTransformVS.TRANSLATE) {
                 String url = tgt.getParameterList().get(1).getValue().primitiveValue();
                 ConceptMap cm = conceptMapsByUrl.get(url);
                 if (cm == null) {
@@ -1256,7 +1256,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   }
 
   private boolean isStart(StructureMapGroupComponent grp) {
-    return grp.getTypeMode() == StructureMapGroupTypeMode.TYPEANDTYPES && grp.getInputList().size() == 2;
+    return grp.getTypeMode() == StructureMapGroupTypeModeVS.TYPEANDTYPES && grp.getInputList().size() == 2;
   }
 
   private void processGroup(StructureMap map, List<StructureMapGroupComponent> grpList, String srcVer, String dstVer, Map<String, SourcedStructureDefinition> srcList, Map<String, ElementWithType> vars,  StructureMapGroupComponent grp) throws FileNotFoundException, IOException {
@@ -1314,7 +1314,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
                   StructureMapGroupInputComponent input = dgrp.getInputList().get(i);
                   if (dep.getParameterList().get(i).getValue() instanceof IdType) {
                     String varName = input.getMode().toCode()+":"+dep.getParameterList().get(i).getValue().primitiveValue();
-                    String varName2 = input.getMode() == StructureMapInputMode.SOURCE ? "target:"+dep.getParameterList().get(i).getValue().primitiveValue() : null;
+                    String varName2 = input.getMode() == StructureMapInputModeVS.SOURCE ? "target:"+dep.getParameterList().get(i).getValue().primitiveValue() : null;
                     if (tvars.containsKey(varName)) {
                       gvars.put(input.getMode().toCode()+":"+input.getName(), tvars.get(varName));
                     } else if (varName2 != null && tvars.containsKey(varName2)) {
@@ -1348,10 +1348,10 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   private Map<String, ElementWithType> processRuleTarget(StructureMap map, String srcVer, String dstVer, StructureMapGroupComponent grp, StructureMapGroupRuleComponent r, ElementWithType source, Map<String, ElementWithType> tvars, StructureMapGroupRuleTargetComponent t, Map<String, SourcedStructureDefinition> srcList, BooleanHolder bh) throws FileNotFoundException, IOException {
     ElementWithType tgt = tvars.get("target:"+t.getContext());
     if (tgt == null) {
-      if (t.getContext() == null && t.getTransform() == StructureMapTransform.EVALUATE) {
+      if (t.getContext() == null && t.getTransform() == StructureMapTransformVS.EVALUATE) {
         // complicated queries... we're not going to check any further, but it's not an error
         bh.fail();
-      } else if (t.getContext() == null && t.getTransform() == StructureMapTransform.CREATE) {
+      } else if (t.getContext() == null && t.getTransform() == StructureMapTransformVS.CREATE) {
         IWorkerContext vd = getInputDefinitions(srcList, "target");
         StructureDefinition sd = vd.fetchTypeDefinition(t.getParameterList().get(0).getValue().primitiveValue());
         if (sd == null) {
@@ -1372,14 +1372,14 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
         qaMsg("Cannot find tgt element '"+t.getContext()+"."+t.getElementList()+"' on "+tgt.toString()+" in rule "+r.getName()+" in group "+grp.getName()+" in map "+map.getUrl(), false);
 //       todo  bh.fail();
       } else {
-        if (t.getTransform() == StructureMapTransform.CREATE) {
+        if (t.getTransform() == StructureMapTransformVS.CREATE) {
           if (t.hasParameter()) {
             String type = t.getParameterList().get(0).getValue().primitiveValue();
             target.setType(type);
           } else {
             bh.fail();
           }
-        } else if (t.getTransform() == StructureMapTransform.TRANSLATE) {
+        } else if (t.getTransform() == StructureMapTransformVS.TRANSLATE) {
           String url = t.getParameterList().get(1).getValue().primitiveValue();
           VSPair vsl = isCoded(source.toSED());
           VSPair vsr = isCoded(target.toSED());
