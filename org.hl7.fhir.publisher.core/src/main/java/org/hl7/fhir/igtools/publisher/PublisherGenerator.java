@@ -4230,8 +4230,12 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         exp.addEntry().setResource(vs).setFullUrl(vs.getUrl());
       }
 
-      new JsonParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(pf.outputDir, "expansions.json")), exp);
-      new XmlParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(pf.outputDir, "expansions.xml")), exp);
+      try (FileOutputStream stream = new FileOutputStream(Utilities.path(pf.outputDir, "expansions.json"))) {
+        new JsonParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(stream, exp);
+      }
+      try (FileOutputStream stream = new FileOutputStream(Utilities.path(pf.outputDir, "expansions.xml"))) {
+        new XmlParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(stream, exp);
+      }
       ZipGenerator zip = new ZipGenerator(Utilities.path(pf.outputDir, "expansions.json.zip"));
       zip.addFileName("expansions.json", Utilities.path(pf.outputDir, "expansions.json"), false);
       zip.close();
