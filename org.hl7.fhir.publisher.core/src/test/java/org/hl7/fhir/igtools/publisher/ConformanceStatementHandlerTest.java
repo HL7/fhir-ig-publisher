@@ -149,6 +149,48 @@ class ConformanceStatementHandlerTest {
     assertEquals(text, paragraph.allText());
   }
 
+  @Test
+  void replacesDocumentationPlaceholder() throws Exception {
+    XhtmlNode paragraph = paragraph("!\u00a7\u00a7");
+
+    assertTrue(process(paragraph));
+
+    assertEquals("\u00a7\u00a7", paragraph.allText());
+  }
+
+  @Test
+  void replacesDocumentationPlaceholderInMixedContent() throws Exception {
+    XhtmlNode paragraph = new XhtmlNode(NodeType.Element, "p");
+    paragraph.addTag("b").tx("Note");
+    paragraph.tx("!\u00a7\u00a7");
+
+    assertTrue(process(paragraph));
+
+    assertEquals("Note\u00a7\u00a7", paragraph.allText());
+    assertTrue(clauses(paragraph).isEmpty());
+  }
+
+  @Test
+  void leavesPlaceholderInCDataUnchanged() throws Exception {
+    XhtmlNode div = new XhtmlNode(NodeType.Element, "div");
+    XhtmlNode cdata = div.addCData("!\u00a7\u00a7");
+
+    process(div);
+
+    assertEquals("!\u00a7\u00a7", cdata.getContent());
+  }
+
+  @Test
+  void leavesPlaceholderInCommentUnchanged() throws Exception {
+    XhtmlNode paragraph = paragraph("Text.");
+    XhtmlNode comment = paragraph.addComment("!\u00a7\u00a7");
+
+    assertFalse(process(paragraph));
+
+    assertEquals("!\u00a7\u00a7", comment.getContent());
+    assertEquals("Text.", paragraph.allText());
+  }
+
   @ParameterizedTest
   @CsvSource(value = {
       "req | false | 0 | 0",

@@ -899,10 +899,14 @@ class ConformanceStatementHandler {
         x.getChildNodes().clear();
         hasClauses.set(true);
       }
-    } else if (text != null && "!§§".equals(text)) {
+    } else if (text != null && (x.getNodeType() == NodeType.Element || x.getNodeType() == NodeType.Text) && "!§§".equals(text)) {
       // special placeholder for documentation
-      x.getChildNodes().clear();
-      x.tx("§§");
+      if (x.getNodeType() == NodeType.Text) {
+        x.setContent("§§");
+      } else {
+        x.getChildNodes().clear();
+        x.tx("§§");
+      }
       hasClauses.set(true);
     } else {
       do {
@@ -911,7 +915,7 @@ class ConformanceStatementHandler {
         tryAgain = false;
         for (int i = 0; i < x.getChildNodes().size(); i++) {
           XhtmlNode c = x.getChildNodes().get(i);
-          if (c.getNodeType() == NodeType.Text && c.getContent().contains("§")) {
+          if (c.getNodeType() == NodeType.Text && c.getContent().contains("§") && !"!§§".equals(c.getContent())) {
             int offset = c.getContent().indexOf("§");
             if (start == -1) {
               start = i;
