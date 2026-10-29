@@ -294,8 +294,12 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       }
       templateBeforeGenerate();
       if (pf.saveExpansionParams) {
-        new JsonParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.NORMAL).compose(new FileOutputStream(Utilities.path(pf.tempDir, "parameters-expansion-parameters.json")), pf.context.getExpansionParameters());
-        new XmlParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.NORMAL).compose(new FileOutputStream(Utilities.path(pf.tempDir, "parameters-expansion-parameters.xml")), pf.context.getExpansionParameters());
+        try (FileOutputStream stream = new FileOutputStream(Utilities.path(pf.tempDir, "parameters-expansion-parameters.json"))) {
+          new JsonParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.NORMAL).compose(stream, pf.context.getExpansionParameters());
+        }
+        try (FileOutputStream stream = new FileOutputStream(Utilities.path(pf.tempDir, "parameters-expansion-parameters.xml"))) {
+          new XmlParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.NORMAL).compose(stream, pf.context.getExpansionParameters());
+        }
       }
 
       logMessage("Generate HTML Outputs");
@@ -329,7 +333,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       if (pf.allProfilesXlsx != null) {
         pf.allProfilesXlsx.configure();
         String path = Utilities.path(pf.tempDir, "all-profiles.xlsx");
-        pf.allProfilesXlsx.finish(new FileOutputStream(path));
+        try (FileOutputStream stream = new FileOutputStream(path)) {
+          pf.allProfilesXlsx.finish(stream);
+        }
         pf.otherFilesRun.add(Utilities.path(pf.tempDir, "all-profiles.xlsx"));
         pf.allProfilesXlsx.dump();
       }
@@ -4224,8 +4230,12 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         exp.addEntry().setResource(vs).setFullUrl(vs.getUrl());
       }
 
-      new JsonParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(pf.outputDir, "expansions.json")), exp);
-      new XmlParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(pf.outputDir, "expansions.xml")), exp);
+      try (FileOutputStream stream = new FileOutputStream(Utilities.path(pf.outputDir, "expansions.json"))) {
+        new JsonParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(stream, exp);
+      }
+      try (FileOutputStream stream = new FileOutputStream(Utilities.path(pf.outputDir, "expansions.xml"))) {
+        new XmlParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(stream, exp);
+      }
       ZipGenerator zip = new ZipGenerator(Utilities.path(pf.outputDir, "expansions.json.zip"));
       zip.addFileName("expansions.json", Utilities.path(pf.outputDir, "expansions.json"), false);
       zip.close();
