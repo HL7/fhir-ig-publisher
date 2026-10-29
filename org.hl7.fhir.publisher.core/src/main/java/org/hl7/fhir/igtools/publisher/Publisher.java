@@ -956,6 +956,13 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       log("Rapido Mode: Complete Build (all files)");
       loader.clearTempFolder();
       buildTracker.setStringProperty("status", "uuid", HierarchicalTableGenerator.uuid, null);
+    } else if (pf.template.isDevMode()) {
+      // the temp folder has already been cleared for a template in development (see PublisherIGLoader), so a
+      // differential build would leave out the pages of the files that haven't changed
+      log("Rapido Mode: Complete Build (template in development mode)");
+      pf.changeList.clear();
+      pf.changeList.addAll(pf.fileList);
+      buildTracker.setStringProperty("status", "uuid", HierarchicalTableGenerator.uuid, null);
     } else {
       log("Rapido Mode: Differential Build ("+pf.changeList.size()+" files)");
       for (String s : Utilities.sorted(changed)) {
