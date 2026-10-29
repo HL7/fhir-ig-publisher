@@ -899,10 +899,14 @@ class ConformanceStatementHandler {
         x.getChildNodes().clear();
         hasClauses.set(true);
       }
-    } else if (text != null && x.getNodeType() == NodeType.Element && "!§§".equals(text)) {
+    } else if (text != null && x.getNodeType() != NodeType.Comment && "!§§".equals(text)) {
       // special placeholder for documentation
-      x.getChildNodes().clear();
-      x.tx("§§");
+      if (x.getNodeType() == NodeType.Text) {
+        x.setContent("§§");
+      } else {
+        x.getChildNodes().clear();
+        x.tx("§§");
+      }
       hasClauses.set(true);
     } else {
       do {

@@ -159,6 +159,16 @@ class ConformanceStatementHandlerTest {
   }
 
   @Test
+  void replacesDocumentationPlaceholderInTextNode() throws Exception {
+    XhtmlNode text = new XhtmlNode(NodeType.Text);
+    text.setContent("!\u00a7\u00a7");
+
+    assertTrue(process(text));
+
+    assertEquals("\u00a7\u00a7", text.getContent());
+  }
+
+  @Test
   void leavesPlaceholderInCommentUnchanged() throws Exception {
     XhtmlNode paragraph = paragraph("Text.");
     XhtmlNode comment = paragraph.addComment("!\u00a7\u00a7");
