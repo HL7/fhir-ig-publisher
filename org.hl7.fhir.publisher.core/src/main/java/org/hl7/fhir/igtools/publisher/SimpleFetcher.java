@@ -71,6 +71,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
   }
 
   private static final String[] EXTENSIONS = new String[] {".xml", ".json", ".map", ".fml", ".phinvads"};
+  private static final String[] UNPARSED_FILE_TYPES = new String[] {"jpg", "png", "gif", "mp3", "mp4", "pdf", "doc", "docx", "ppt", "pptx", "svg"};
   private IGKnowledgeProvider pkp;
   private IWorkerContext context;
   private List<String> resourceDirs;
@@ -519,19 +520,16 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
 
   // scan() never opens .html (or .adl without openEHR), and images and documents can't parse as a resource, so a name that can't be decoded doesn't matter
   private boolean mightLoadAsResource(String ext, IWorkerContext context) {
-    if (Utilities.existsInList(ext, "html", "jpg", "png", "gif", "mp3", "mp4", "pfd", "doc", "docx", "ppt", "pptx", "svg")) {
+    if ("html".equals(ext) || Utilities.existsInList(ext, UNPARSED_FILE_TYPES)) {
       return false;
     }
     return !"adl".equals(ext) || context.hasPackage("openehr.base", null);
   }
 
   private List<String> fixedFileTypes() {
-    return Utilities.strings(
-        // known file types we have parsers for
-        "json", "ttl", "html", "txt", "fml", "adl",
-        
-        // known files types to not even try parsing
-        "jpg", "png", "gif", "mp3", "mp4", "pfd", "doc", "docx", "ppt", "pptx", "svg");
+    List<String> res = Utilities.strings("json", "ttl", "html", "txt", "fml", "adl");
+    Collections.addAll(res, UNPARSED_FILE_TYPES);
+    return res;
   }
 
   private void addFileForElement(List<FetchedFile> res, File f, org.hl7.fhir.services.elementmodel.Element e, String cnt) throws IOException {

@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.hl7.fhir.services.context.IWorkerContext;
 import org.hl7.fhir.utilities.logging.ILoggingService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledOnOs;
@@ -66,12 +67,12 @@ class SimpleFetcherTest {
   }
 
   @ParameterizedTest
-  @CsvSource({"touch, Notizen-\\374.md", "touch, Ablauf-\\374.svg", "touch, ._\\374bersicht.json", "touch, \\374bersicht.html", "mkdir, \\374bersicht"})
+  @CsvSource({"touch, Notizen-\\374.md", "touch, Ablauf-\\374.svg", "touch, ._\\374bersicht.json", "touch, \\374bersicht.html", "touch, \\374bersicht.pdf", "mkdir, \\374bersicht"})
   @EnabledOnOs(OS.LINUX)
   void scanSkipsUndecodableNamesItDoesNotRead(String command, String name) throws Exception {
     rawName(command, name);
 
-    assertTrue(fetcher().scan(dir.toString(), null, false, new ArrayList<>()).isEmpty());
+    assertTrue(fetcher().scan(dir.toString(), mock(IWorkerContext.class), false, new ArrayList<>()).isEmpty());
   }
 
   @Test

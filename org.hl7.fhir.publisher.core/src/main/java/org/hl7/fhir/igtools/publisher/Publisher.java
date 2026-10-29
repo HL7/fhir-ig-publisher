@@ -1255,7 +1255,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         s = s + " " + removePassword(args, i);
       }
       System.out.println(s);
-      System.out.println("character encoding = " + java.nio.charset.Charset.defaultCharset() + " / " + System.getProperty("file.encoding"));
+      System.out.println("character encoding = " + java.nio.charset.Charset.defaultCharset() + " / " + System.getProperty("file.encoding") + ", file names = " + System.getProperty("sun.jnu.encoding"));
       FilesystemPackageCacheManager pcm = CliParams.hasNamedParam(args, "system")
               ? new FilesystemPackageCacheManager.Builder().withSystemCacheFolder().build()
               : new FilesystemPackageCacheManager.Builder().build();
