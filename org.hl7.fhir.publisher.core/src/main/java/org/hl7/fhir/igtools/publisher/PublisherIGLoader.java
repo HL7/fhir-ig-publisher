@@ -2808,7 +2808,11 @@ public class PublisherIGLoader extends PublisherBase {
     for (String dir : pf.translationSources) {
       File df = new File(Utilities.path(pf.rootDir, dir));
       if (df.exists()) {
-        for (String fn : df.list()) {
+        // sorted, so that translations come in the same order on every machine: File.list() makes no promise
+        // about the order, and the translation extensions are made in the order the units are found
+        String[] names = df.list();
+        Arrays.sort(names);
+        for (String fn : names) {
           if ((fn.startsWith(base+".") || fn.startsWith(base+"-") || fn.startsWith(base+"_")) ||
                   (fn.startsWith(tbase+".") || fn.startsWith(tbase+"-") || fn.startsWith(tbase+"_"))) {
             LanguageFileProducer lp = null;
