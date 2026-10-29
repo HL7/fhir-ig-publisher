@@ -19,6 +19,8 @@ import org.hl7.fhir.model.core.formats.JsonParser;
 import org.hl7.fhir.model.core.formats.XmlParser;
 import org.hl7.fhir.model.utilities.formats.OutputStyle;
 import org.hl7.fhir.utilities.json.model.JsonArray;
+import org.hl7.fhir.utilities.json.model.JsonBoolean;
+import org.hl7.fhir.utilities.json.model.JsonNull;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
@@ -146,5 +148,31 @@ class RapidoTrackerTest {
     org.hl7.fhir.utilities.json.parser.JsonParser.compose(state, before, false);
 
     assertArrayEquals(Files.readAllBytes(before.toPath()), Files.readAllBytes(sf.toPath()));
+  }
+
+  /** the state is written as it goes, but as the JSON writer writes it: whatever it holds, the same bytes */
+  @Test
+  void theStateIsWrittenAsTheJsonWriterWritesIt(@TempDir Path dir) throws Exception {
+    JsonObject state = new JsonObject();
+    state.add("version", 4);
+    state.add("uuid", "u\"1\\\n\u0001\u00e9\u4e2d");
+    state.add("complete", true);
+    state.add("none", new JsonNull());
+    state.add("n", 1234567890123L);
+    state.forceObject("empty");
+    state.forceArray("emptyList");
+    JsonObject files = state.forceObject("files");
+    JsonObject f = files.forceObject("D:\\a\\ig\\input\\q\"uote\t.md");
+    f.forceObject("resources").set("Patient/p", "h5").set("Observation/o", "h6");
+    f.forceArray("list").add(new JsonObject().add("C:\\x", "z")).add("c").add(new JsonArray().add(1).add(new JsonBoolean(false)));
+    files.forceObject("/home/ig/input/gr\u00f6\u00dfe.md").add("oh", "h7");
+    File sf = dir.resolve("state.json").toFile();
+    File before = dir.resolve("before.json").toFile();
+
+    RapidoTracker.writeState(state, sf);
+    org.hl7.fhir.utilities.json.parser.JsonParser.compose(RapidoTracker.escapeNames(state), before, false);
+
+    assertArrayEquals(Files.readAllBytes(before.toPath()), Files.readAllBytes(sf.toPath()));
+    assertEquals(plain(state), plain(RapidoTracker.readState(sf)));
   }
 }

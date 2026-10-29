@@ -1,8 +1,11 @@
 package org.hl7.fhir.igtools.publisher;
 
+import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
@@ -38,9 +41,11 @@ import org.hl7.fhir.model.utilities.formats.OutputStyle;
 import org.hl7.fhir.services.elementmodel.Element;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonElement;
 import org.hl7.fhir.utilities.json.model.JsonObject;
+import org.hl7.fhir.utilities.json.model.JsonPrimitive;
 import org.hl7.fhir.utilities.json.model.JsonProperty;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.xhtml.NodeType;
@@ -617,10 +622,52 @@ public class RapidoTracker {
    * escaped here, as the reader unescapes them. A name with nothing to escape is written as before
    */
   static void writeState(JsonObject state, File f) throws IOException {
-    org.hl7.fhir.utilities.json.parser.JsonParser.compose(escapeNames(state), f, false);
+    // as the JSON writer writes it, but written as it goes: the state of a large IG is hundreds of MB, and made as one
+    // string (and then as bytes) first, it took seconds, at the end of each build
+    try (Writer w = new BufferedWriter(new OutputStreamWriter(ManagedFileAccess.outStream(f), StandardCharsets.UTF_8), 1 << 16)) {
+      write(w, state);
+    } catch (IOException | RuntimeException e) {
+      // not left half written: with no state, the next build is a complete one
+      if (f.exists() && !f.delete()) {
+        e.addSuppressed(new IOException("Unable to delete the incomplete " + f));
+      }
+      throw e;
+    }
   }
 
-  private static JsonElement escapeNames(JsonElement e) {
+  private static void write(Writer w, JsonElement e) throws IOException {
+    if (e instanceof JsonObject) {
+      w.write('{');
+      boolean first = true;
+      for (JsonProperty p : ((JsonObject) e).getProperties()) {
+        if (!first) {
+          w.write(',');
+        }
+        first = false;
+        w.write('"');
+        w.write(escapeName(p.getName()));
+        w.write("\":");
+        write(w, p.getValue());
+      }
+      w.write('}');
+    } else if (e instanceof JsonArray) {
+      w.write('[');
+      boolean first = true;
+      for (JsonElement i : (JsonArray) e) {
+        if (!first) {
+          w.write(',');
+        }
+        first = false;
+        write(w, i);
+      }
+      w.write(']');
+    } else {
+      w.write(((JsonPrimitive) e).toJson());
+    }
+  }
+
+  /** The state with its names escaped (see writeState()) */
+  static JsonElement escapeNames(JsonElement e) {
     if (e instanceof JsonObject) {
       JsonObject res = new JsonObject();
       for (JsonProperty p : ((JsonObject) e).getProperties()) {
@@ -639,6 +686,13 @@ public class RapidoTracker {
   }
 
   static String escapeName(String s) {
+    int i = 0;
+    while (i < s.length() && s.charAt(i) != '"' && s.charAt(i) != '\\' && s.charAt(i) >= 0x20) {
+      i++;
+    }
+    if (i == s.length()) {
+      return s;
+    }
     StringBuilder b = new StringBuilder();
     for (char c : s.toCharArray()) {
       if (c == '"' || c == '\\') {
