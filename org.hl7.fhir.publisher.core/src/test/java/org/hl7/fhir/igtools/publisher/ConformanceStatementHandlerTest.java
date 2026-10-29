@@ -159,13 +159,25 @@ class ConformanceStatementHandlerTest {
   }
 
   @Test
-  void replacesDocumentationPlaceholderInTextNode() throws Exception {
-    XhtmlNode text = new XhtmlNode(NodeType.Text);
-    text.setContent("!\u00a7\u00a7");
+  void replacesDocumentationPlaceholderInMixedContent() throws Exception {
+    XhtmlNode paragraph = new XhtmlNode(NodeType.Element, "p");
+    paragraph.addTag("b").tx("Note");
+    paragraph.tx("!\u00a7\u00a7");
 
-    assertTrue(process(text));
+    assertTrue(process(paragraph));
 
-    assertEquals("\u00a7\u00a7", text.getContent());
+    assertEquals("Note\u00a7\u00a7", paragraph.allText());
+    assertTrue(clauses(paragraph).isEmpty());
+  }
+
+  @Test
+  void leavesPlaceholderInCDataUnchanged() throws Exception {
+    XhtmlNode div = new XhtmlNode(NodeType.Element, "div");
+    XhtmlNode cdata = div.addCData("!\u00a7\u00a7");
+
+    process(div);
+
+    assertEquals("!\u00a7\u00a7", cdata.getContent());
   }
 
   @Test
