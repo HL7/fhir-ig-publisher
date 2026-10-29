@@ -1653,8 +1653,12 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     List<String> issues = new ArrayList<String>();
     if (ConceptMapUtilities.checkReciprocal(left, right, issues, save)) {
       // wipes formatting in files
-      new org.hl7.fhir.model.core.formats.JsonParser(vdr5.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(processingPath, "input", folder, "ConceptMap-"+left.getId()+".json")), left);
-      new org.hl7.fhir.model.core.formats.JsonParser(vdr5.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(processingPath, "input", folder, "ConceptMap-"+right.getId()+".json")), right);
+      try (FileOutputStream out = new FileOutputStream(Utilities.path(processingPath, "input", folder, "ConceptMap-"+left.getId()+".json"))) {
+        new org.hl7.fhir.model.core.formats.JsonParser(vdr5.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(out, left);
+      }
+      try (FileOutputStream out = new FileOutputStream(Utilities.path(processingPath, "input", folder, "ConceptMap-"+right.getId()+".json"))) {
+        new org.hl7.fhir.model.core.formats.JsonParser(vdr5.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(out, right);
+      }
     }
     if (!issues.isEmpty()) {
       qaMsg("Found issues checking reciprocity of "+left.getId()+" and "+right.getId(), true);
@@ -1695,14 +1699,20 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
         ConceptMap cm = null;
         String id = null;
         try {
-          cm = (ConceptMap) new org.hl7.fhir.model.core.formats.JsonParser(vdr5.getModelContext()).parse(new FileInputStream(f));
+          try (FileInputStream in = new FileInputStream(f)) {
+            cm = (ConceptMap) new org.hl7.fhir.model.core.formats.JsonParser(vdr5.getModelContext()).parse(in);
+          }
 
           if (cm.getName().contains("-")) {
             cm.setName(fixName(cm.getName(), cm.getSourceScope().primitiveValue()));
-            new org.hl7.fhir.model.core.formats.JsonParser(vdr5.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(f), cm);
+            try (FileOutputStream out = new FileOutputStream(f)) {
+              new org.hl7.fhir.model.core.formats.JsonParser(vdr5.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(out, cm);
+            }
           }
           if (addRelationships(cm)) {
-            new org.hl7.fhir.model.core.formats.JsonParser(vdr5.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(f), cm);
+            try (FileOutputStream out = new FileOutputStream(f)) {
+              new org.hl7.fhir.model.core.formats.JsonParser(vdr5.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(out, cm);
+            }
           }
           id = f.getName().replace("ConceptMap-", "").replace(".json", "");
           if (!cm.getId().equals(id)) {
@@ -2013,8 +2023,12 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
               qaMsg("Error between "+cmF.getId()+" and "+cmR.getId()+" maps: "+s, true);
             }
             if (altered) {
-              new org.hl7.fhir.model.core.formats.JsonParser(vdr5.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(processingPath, "input", "codes", "ConceptMap-"+cmR.getId()+".json")), cmR);
-              new org.hl7.fhir.model.core.formats.JsonParser(vdr5.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(processingPath, "input", "codes", "ConceptMap-"+cmF.getId()+".json")), cmF);
+              try (FileOutputStream out = new FileOutputStream(Utilities.path(processingPath, "input", "codes", "ConceptMap-"+cmR.getId()+".json"))) {
+                new org.hl7.fhir.model.core.formats.JsonParser(vdr5.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(out, cmR);
+              }
+              try (FileOutputStream out = new FileOutputStream(Utilities.path(processingPath, "input", "codes", "ConceptMap-"+cmF.getId()+".json"))) {
+                new org.hl7.fhir.model.core.formats.JsonParser(vdr5.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(out, cmF);
+              }
             }
           }
           link.setNextCM(cmF);
@@ -2221,7 +2235,9 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
       Collections.sort(g.getElementList(), new ConceptMapUtilities.ConceptMapElementSorter());
     }
     cm.getGroupList().removeIf(g -> g.getElementList().isEmpty());
-    new org.hl7.fhir.model.core.formats.JsonParser(vdr5.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(processingPath, "input", "codes", "ConceptMap-"+cm.getId()+".json")), cm);
+    try (FileOutputStream out = new FileOutputStream(Utilities.path(processingPath, "input", "codes", "ConceptMap-"+cm.getId()+".json"))) {
+      new org.hl7.fhir.model.core.formats.JsonParser(vdr5.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(out, cm);
+    }
     return cm;
   }
 

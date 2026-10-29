@@ -305,6 +305,9 @@ public class PublisherFields {
     RenderingContext.FixedValueFormat fixedFormat = RenderingContext.FixedValueFormat.JSON;
     static PublisherConsoleLogger consoleLogger;
     IPublisherModule module;
+    // in watch mode, input's files before the module pre-processed the IG, and the files that changed while it did
+    Map<java.nio.file.Path, String> inputBeforeModule;
+    Set<java.nio.file.Path> moduleWrites;
     BaseRenderer bdr;
     boolean noXigLink;
 
