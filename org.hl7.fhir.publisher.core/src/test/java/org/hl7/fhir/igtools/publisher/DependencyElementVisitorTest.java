@@ -32,7 +32,7 @@ class DependencyElementVisitorTest {
   }
 
   @Test
-  void aVersionedCanonicalDependsOnTheFileWithThatVersion() {
+  void aVersionedCanonicalDependsOnEveryVersionOfThatUrl() {
     Element canonical = mock(Element.class);
     when(canonical.isPrimitive()).thenReturn(true);
     when(canonical.fhirType()).thenReturn("canonical");
@@ -44,7 +44,7 @@ class DependencyElementVisitorTest {
 
     new DependencyElementVisitor(List.of(focus, library, otherVersion), dependencies, focus).visit(null, canonical);
 
-    assertEquals(List.of(library), dependencies);
+    assertEquals(List.of(library, otherVersion), dependencies);
   }
 
   private static FetchedFile fileWith(String name, String url, String version) {

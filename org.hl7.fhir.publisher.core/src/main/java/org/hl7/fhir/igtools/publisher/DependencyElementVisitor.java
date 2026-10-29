@@ -22,8 +22,7 @@ public class DependencyElementVisitor implements ElementVisitor.IElementVisitor 
     ElementVisitor.ElementVisitorInstruction result = ElementVisitor.ElementVisitorInstruction.NO_VISIT_CHILDREN;
     if (element.isElementForPath("ValueSet.compose.include", "ValueSet.compose.exclude", "Coding.value")) {
       String url = element.getNamedChildValue("system");
-      String version = element.getNamedChildValue("version");
-      checkDependencies(url, version);
+      checkDependencies(url);
     } else if (element.isElementForPath("Quantity")) {
       String url = element.getNamedChildValue("system");
       checkDependencies(url);
@@ -31,9 +30,8 @@ public class DependencyElementVisitor implements ElementVisitor.IElementVisitor 
       if ("canonical".equals(element.fhirType())) {
         String canonical = element.primitiveValue();
         if (canonical != null) { // a canonical can have only extensions
-          String url = canonical.contains("|") ? canonical.substring(0, canonical.indexOf("|")) : canonical;
-          String version = canonical.contains("|") ? canonical.substring(canonical.indexOf("|") + 1) : null;
-          checkDependencies(url, version);
+          // versions are ignored: a missed dependency leaves -rapido output stale, an extra one only costs a rebuild
+          checkDependencies(canonical.contains("|") ? canonical.substring(0, canonical.indexOf("|")) : canonical);
         }
       } else {
         String s = element.primitiveValue();
@@ -43,27 +41,6 @@ public class DependencyElementVisitor implements ElementVisitor.IElementVisitor 
       result = ElementVisitor.ElementVisitorInstruction.VISIT_CHILDREN;
     }
     return result;
-  }
-
-  private void checkDependencies(String url, String version) {
-    if (version == null) {
-      checkDependencies(url);
-    } else if (url != null) {
-      for (FetchedFile f : fileList) {
-        if (f != focus) {
-          boolean dep = false;
-          for (FetchedResource r : f.getResources()) {
-            if (url.equals(r.getElement().getNamedChildValue("url")) &&
-                    version.equals(r.getElement().getNamedChildValue("version"))) {
-              dep = true;
-            }
-          }
-          if (dep && !dependencies.contains(f)) {
-            dependencies.add(f);
-          }
-        }
-      }
-    }
   }
 
   private void checkDependencies(String url) {
