@@ -3375,7 +3375,8 @@ public class PublisherIGLoader extends PublisherBase {
     for (StructureDefinition sd : pf.context.fetchResourcesByType(StructureDefinition.class)) {
       if (sd.getKind() == StructureDefinition.StructureDefinitionKind.RESOURCE && sd.getDerivation() == StructureDefinition.TypeDerivationRule.SPECIALIZATION) {
         String scope = sd.getUrl().substring(0, sd.getUrl().lastIndexOf("/"));
-        if (!"http://hl7.org/fhir/StructureDefinition".equals(scope) && !isCrossVersionScope(scope)) {
+        if (ExtensionUtilities.readBoolExtension(sd, ExtensionDefinitions.EXT_ADDITIONAL_RESOURCE)
+            || (!"http://hl7.org/fhir/StructureDefinition".equals(scope) && !isCrossVersionScope(scope))) {
           pf.customResourceNames.add(sd.getTypeTail());
         }
       }
