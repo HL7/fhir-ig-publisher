@@ -8,12 +8,14 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.RapidoDependencyAnalyser.FileNode;
 import org.hl7.fhir.igtools.publisher.RapidoDependencyAnalyser.FileResult;
 import org.hl7.fhir.model.ModelContext;
@@ -37,14 +39,24 @@ class RapidoTrackerResourcesTest {
 
   private static IWorkerContext context;
   private static String noContext;
+  private static String noPackage;
+
+  /** The package from the cache, downloading it if need be: null (and why in noPackage) when it can't be fetched */
+  private static NpmPackage fetch(String id, String version) throws IOException {
+    try {
+      return new FilesystemPackageCacheManager.Builder().build().loadPackage(id, version);
+    } catch (IOException | FHIRException e) {
+      noPackage = id + "#" + version + " can't be fetched: " + e;
+      return null;
+    }
+  }
 
   @BeforeAll
-  static void loadContext() {
-    try {
-      NpmPackage npm = new FilesystemPackageCacheManager.Builder().build().loadPackage("hl7.fhir.r5.core", "5.0.0");
+  static void loadContext() throws Exception {
+    NpmPackage npm = fetch("hl7.fhir.r5.core", "5.0.0");
+    noContext = noPackage;
+    if (npm != null) {
       context = new SimpleWorkerContext.SimpleWorkerContextBuilder(ModelContext.fullCoreContext()).withAllowLoadingDuplicates(true).fromPackage(npm);
-    } catch (Exception e) {
-      noContext = "hl7.fhir.r5.core can't be loaded: " + e;
     }
   }
 
@@ -131,16 +143,15 @@ class RapidoTrackerResourcesTest {
   }
 
   /**
-   * Every example in the FHIR specification, when the R5 examples package is in the package cache (it isn't downloaded:
-   * run once with -Drapido.corpus.download=true to get it)
+   * Every example in the FHIR specification (an 18 MB package, downloaded once into the package cache: skip it with
+   * -Drapido.corpus.skip=true)
    */
   @Test
   void everySpecExampleCanBeAnalysed() throws Exception {
+    assumeTrue(!Boolean.getBoolean("rapido.corpus.skip"), "rapido.corpus.skip is set");
     RapidoTracker t = tracker();
-    FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager.Builder().build();
-    NpmPackage examples = Boolean.getBoolean("rapido.corpus.download") ? pcm.loadPackage("hl7.fhir.r5.examples", "5.0.0")
-        : pcm.loadPackageFromCacheOnly("hl7.fhir.r5.examples", "5.0.0");
-    assumeTrue(examples != null, "hl7.fhir.r5.examples#5.0.0 is not in the package cache");
+    NpmPackage examples = fetch("hl7.fhir.r5.examples", "5.0.0");
+    assumeTrue(examples != null, noPackage);
 
     List<FileNode> nodes = new ArrayList<>();
     int unparsed = 0;

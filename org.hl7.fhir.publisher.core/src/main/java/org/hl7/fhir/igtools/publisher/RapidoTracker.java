@@ -349,7 +349,7 @@ public class RapidoTracker {
       results = new RapidoDependencyAnalyser(pf.igpkp.getCanonical(), pf.context == null ? null : pf.context.getResourceNames()).analyse(nodes.values());
       return null;
     } catch (RuntimeException | Error e) {
-      if (e instanceof VirtualMachineError && !(e instanceof StackOverflowError)) {
+      if (BuildFailures.isFatal(e)) {
         throw e;
       }
       e.printStackTrace();
