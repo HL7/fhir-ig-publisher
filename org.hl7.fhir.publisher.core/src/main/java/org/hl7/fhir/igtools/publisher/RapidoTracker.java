@@ -138,13 +138,13 @@ public class RapidoTracker {
     }
     fileSetHash = fs.finish();
 
-    for (FetchedFile f : pf.fileList) {
-      nodes.put(f, fileNode(f));
-    }
-    results = new RapidoDependencyAnalyser(pf.igpkp.getCanonical(), pf.context == null ? null : pf.context.getResourceNames()).analyse(nodes.values());
+    String noAnalysis = analyseDependencies();
 
     JsonObject old = loadState();
     reason = failure;
+    if (reason == null) {
+      reason = noAnalysis;
+    }
     if (reason == null) {
       reason = compareState(old);
     }
@@ -337,7 +337,29 @@ public class RapidoTracker {
     return fn;
   }
 
-  private ResourceNode resourceNode(FetchedResource r) {
+  /**
+   * What each file depends on. null, or why it can't be worked out: then the build is a complete one, as a build
+   * without -rapido would be, rather than one that fails
+   */
+  String analyseDependencies() {
+    try {
+      for (FetchedFile f : pf.fileList) {
+        nodes.put(f, fileNode(f));
+      }
+      results = new RapidoDependencyAnalyser(pf.igpkp.getCanonical(), pf.context == null ? null : pf.context.getResourceNames()).analyse(nodes.values());
+      return null;
+    } catch (RuntimeException | Error e) {
+      if (e instanceof VirtualMachineError && !(e instanceof StackOverflowError)) {
+        throw e;
+      }
+      e.printStackTrace();
+      nodes.clear();
+      results = new HashMap<>();
+      return "the dependency analysis failed: " + e;
+    }
+  }
+
+  ResourceNode resourceNode(FetchedResource r) {
     ResourceNode n = new ResourceNode(r.fhirType(), r.getId());
     Element e = r.getElement();
     Hasher h = new Hasher();
