@@ -14,9 +14,11 @@ class WatchBuildFailureTest {
 
   @Test
   void watchingGoesOnAfterWhatTheContentCausedButNotWhenTheJvmIsInTrouble() {
-    assertFalse(Publisher.isFatal(new FHIRException("bad content")));
-    assertFalse(Publisher.isFatal(new Error("Attempt to read a single element when there is more than one present (name)")));
-    assertFalse(Publisher.isFatal(new StackOverflowError()));
-    assertTrue(Publisher.isFatal(new OutOfMemoryError()));
+    assertFalse(BuildFailures.isFatal(new FHIRException("bad content")));
+    assertFalse(BuildFailures.isFatal(new Error("Attempt to read a single element when there is more than one present (name)")));
+    assertFalse(BuildFailures.isFatal(new StackOverflowError()));
+    assertTrue(BuildFailures.isFatal(new OutOfMemoryError()));
+    assertTrue(BuildFailures.isFatal(new NoClassDefFoundError("org/example/Missing")));
+    assertTrue(BuildFailures.isFatal(new ExceptionInInitializerError("static init")));
   }
 }
