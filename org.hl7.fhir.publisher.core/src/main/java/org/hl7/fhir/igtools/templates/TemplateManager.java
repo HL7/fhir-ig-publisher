@@ -63,6 +63,9 @@ public class TemplateManager {
   private Map<String, String> templateOverrides = new LinkedHashMap<>(); // template id (name#version, or just name) -> local folder
   private boolean usedOverride;
 
+  private static final String ACCESSIBLE_MARKER = "[%accessibility-routines%]";
+  private static final String JS_ROUTINE_NAME_REGEX = "[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)*";
+
   public TemplateManager(FilesystemPackageCacheManager pcm, ILoggingService logger) {
     this.pcm = pcm;
     this.logger = logger;
@@ -291,6 +294,48 @@ public class TemplateManager {
       String configPath = Utilities.path(templateDir, "config.json");
       FileUtilities.stringToFile(configString, configPath);
     }
+    if (level==0 && !configs.isEmpty()) {
+      generateMakeAccessible(templateDir, configs.get(0));
+    }
+  }
+
+  /**
+   * Each template in the hierarchy can register javascript routines in its config.json:
+   *
+   *   "accessibility-routines": ["myTemplateMakeAccessible"]
+   *
+   * Arrays are concatenated when the configs are merged (base template first), so the
+   * merged config lists the routines in template order. They're written into the body of
+   * makeAccessible(accessible) in content/assets/js/accessible.js, replacing the marker line,
+   * and each is called as routine(accessible). Each template is responsible for making sure
+   * that any routine it registers is loaded in the page before accessible.js runs
+   */
+  private void generateMakeAccessible(String templateDir, JsonObject config) throws IOException {
+    String path = Utilities.path(templateDir, "content", "assets", "js", "accessible.js");
+    File f = new File(path);
+    if (!f.exists()) {
+      return;
+    }
+    List<String> routines = config.has("accessibility-routines") ? config.getStrings("accessibility-routines") : new ArrayList<>();
+    StringBuilder b = new StringBuilder();
+    for (String r : routines) {
+      if (!r.matches(JS_ROUTINE_NAME_REGEX)) {
+        throw new FHIRException("The template accessibility-routine '"+r+"' is not a valid javascript function name");
+      }
+      b.append("  "+r+"(accessible);\n");
+    }
+    String src = FileUtilities.fileToString(f);
+    String nl = src.contains("\r\n") ? "\r\n" : "\n";
+    int i = src.indexOf(ACCESSIBLE_MARKER);
+    if (i == -1) {
+      logger.logMessage("Template accessible.js has no '"+ACCESSIBLE_MARKER+"' marker, so the accessibility-routines were not added to makeAccessible()");
+      return;
+    }
+    int start = src.lastIndexOf('\n', i) + 1;
+    int end = src.indexOf('\n', i);
+    end = end == -1 ? src.length() : end + 1;
+    src = src.substring(0, start) + b.toString().replace("\n", nl) + src.substring(end);
+    FileUtilities.stringToFile(src, path);
   }
   
   private void applyConfigChanges(JsonObject baseConfig, JsonObject deltaConfig) throws FHIRException {

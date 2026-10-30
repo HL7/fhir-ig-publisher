@@ -282,6 +282,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         db.finishResources();
       }
 
+      generateConstants();
       generateViewDefinitions(db);
       if (!pf.changeList.isEmpty()) {
         if (isNewML()) {
@@ -572,6 +573,18 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
   }
 
+  private void generateConstants() throws IOException {
+    fragment("ul-open", "<ul>", pf.otherFilesRun, System.currentTimeMillis(), "ul-open",  "constant", null);
+    fragment("ul-close", "</ul>", pf.otherFilesRun, System.currentTimeMillis(), "ul-close",  "constant", null);
+    fragment("ol-open", "<ol>", pf.otherFilesRun, System.currentTimeMillis(), "ol-open",  "constant", null);
+    fragment("ol-close", "</ol>", pf.otherFilesRun, System.currentTimeMillis(), "ol-close",  "constant", null);
+    fragment("table-grid-open", "<table class=\"grid\">", pf.otherFilesRun, System.currentTimeMillis(), "table-grid-open",  "constant", null);
+    fragment("table-grid-close", "</table>", pf.otherFilesRun, System.currentTimeMillis(), "table-grid-close",  "constant", null);
+    fragment("table-list-open", "<table class=\"list\">", pf.otherFilesRun, System.currentTimeMillis(), "table-list-open",  "constant", null);
+    fragment("table-list-close", "</table>", pf.otherFilesRun, System.currentTimeMillis(), "table-list-close",  "constant", null);
+
+  }
+
   /**
    * Ensure a finished package declares the correct target FHIR core dependency (patching R5/R6 packages
    * that FHIR core's {@code packageForVersion} leaves without one - the base package, the {@code .r5}
@@ -728,20 +741,20 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
               }
               byte[] src = loadTranslationSource(f, l);
               if (f.getPath().endsWith(".md")) {
-                checkMakeFile(processCustomLiquid(db, stripFrontMatter(src), f, lang), dst, f.getOutputNames());
+                checkMakeFile(processCustomLiquid(db, seatMarkdownPage(f, o, stripFrontMatter(src)), f, lang), dst, f.getOutputNames());
               } else {
                 checkMakeFile(processCustomLiquid(db, src, f, lang), dst, f.getOutputNames());
               }
             }
             dst = Utilities.path(this.pf.tempDir, o.getRelativePath());
             if (f.getPath().endsWith(".md")) {
-              checkMakeFile(processCustomLiquid(db, stripFrontMatter(f.getSource()), f, lang), dst, f.getOutputNames());
+              checkMakeFile(processCustomLiquid(db, seatMarkdownPage(f, o, stripFrontMatter(f.getSource())), f, lang), dst, f.getOutputNames());
             } else {
               checkMakeFile(processCustomLiquid(db, f.getSource(), f, lang), dst, f.getOutputNames());
             }
           } else {
             if (f.getPath().endsWith(".md")) {
-              checkMakeFile(processCustomLiquid(db, stripFrontMatter(f.getSource()), f, lang), dst, f.getOutputNames());
+              checkMakeFile(processCustomLiquid(db, seatMarkdownPage(f, o, stripFrontMatter(f.getSource())), f, lang), dst, f.getOutputNames());
             } else {
               checkMakeFile(processCustomLiquid(db, f.getSource(), f, lang), dst, f.getOutputNames());
             }
@@ -1316,6 +1329,53 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
   }
 
+  /**
+   * Sit the markdown of a template-wrapped page under the page title the template gives it.
+   *
+   * <p>A page with generation=markdown is rendered by the template's md page layout, which emits the
+   * page title as an h2 and then includes the markdown from {@code _includes/<page>.md}. Authors
+   * write that markdown as if it were the whole document (a Keep a Changelog file opens with
+   * '# Changelog' and has a '## [version]' per release), so its headings compete with the title, the
+   * page fails the heading structure checks, and 'page-heading-level' never touches it because it
+   * has more than one root. This is the markdown counterpart of {@link #seatNarrative}, and uses the
+   * same level ({@code pf.narrativeHeadingLevel}) for the same reason.
+   *
+   * <p>Only the {@code _includes} copy of an actual markdown page is seated - other markdown in
+   * {@code _includes} is included at places nobody can know from here. Markdown too deeply nested to
+   * shift is left as it is, and the inspector reports the page.
+   */
+  private byte[] seatMarkdownPage(FetchedFile f, FetchedFile.Output o, byte[] src) throws IOException {
+    if (pf.mdTemplate == null || pf.publishedIg == null || !isTemplatedMarkdownPage(o.getRelativePath(), pf.publishedIg.getDefinition().getPage())) {
+      return src;
+    }
+    String md = new String(src, StandardCharsets.UTF_8);
+    try {
+      String seated = MarkdownHeadingSeater.seat(md, pf.narrativeHeadingLevel);
+      return seated == md ? src : seated.getBytes(StandardCharsets.UTF_8);
+    } catch (FHIRException e) {
+      log("Note: the headings in "+f.getPath()+" could not be fitted under the page heading: "+e.getMessage());
+      return src;
+    }
+  }
+
+  /**
+   * True if relativePath is the {@code _includes} source of a page that {@link #applyPageTemplate}
+   * wraps in the md page template - same tests as there.
+   */
+  private boolean isTemplatedMarkdownPage(String relativePath, ImplementationGuide.ImplementationGuideDefinitionPageComponent page) throws IOException {
+    String p = page.getName();
+    if (p != null && p.endsWith(".html") && page.getGeneration() == ImplementationGuide.GuidePageGeneration.MARKDOWN && !pf.relativeNames.containsKey(p)
+        && relativePath.equals(Utilities.path("_includes", p.substring(0, p.indexOf(".html")) + ".md"))) {
+      return true;
+    }
+    for (ImplementationGuide.ImplementationGuideDefinitionPageComponent childPage : page.getPageList()) {
+      if (isTemplatedMarkdownPage(relativePath, childPage)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private List<ProvenanceDetails> loadProvenanceForBundle(String path, Element bnd, FetchedFile f) throws Exception {
     List<ProvenanceDetails> ret = new ArrayList<>();
     List<Element> entries = bnd.getChildrenByName("entry");
@@ -1534,7 +1594,11 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
     if (wantGen(fr, "content")) {
       long start = System.currentTimeMillis();
-      fragment("CodeSystem-"+prefixForContainer+cs.getId()+"-content", csr.content(this.pf.otherFilesRun), f.getOutputNames(), fr, vars, null, start, "content", "CodeSystem", lang);
+      fragment("CodeSystem-"+prefixForContainer+cs.getId()+"-content", csr.content(this.pf.otherFilesRun, true), f.getOutputNames(), fr, vars, null, start, "content", "CodeSystem", lang);
+    }
+    if (wantGen(fr, "content-noprop")) {
+      long start = System.currentTimeMillis();
+      fragment("CodeSystem-"+prefixForContainer+cs.getId()+"-content-noprop", csr.content(this.pf.otherFilesRun, false), f.getOutputNames(), fr, vars, null, start, "content", "CodeSystem", lang);
     }
     if (wantGen(fr, "xref")) {
       long start = System.currentTimeMillis();
@@ -2531,7 +2595,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
     if (checkMakeFile(FileUtilities.stringToBytes(wrapLiquid(fixedContent)), Utilities.path(pf.tempDir, "_includes", name+(lang == null ? "" : "-" + lang)+".xhtml"), outputTracker)) {
       if (settings.getMode() != PublisherUtils.IGBuildMode.AUTOBUILD && pf.makeQA) {
-        FileUtilities.stringToFile(pageWrap(fixedContent, name), Utilities.path(pf.qaDir, name+".html"));
+        FileUtilities.stringToFile(pageWrap(fixedContent, name), Utilities.path(pf.qaDir, name+(lang == null ? "" : "-" + lang)+".html"));
       }
     }
     // For multi-language IGs, also write a non-suffixed copy for the default language
