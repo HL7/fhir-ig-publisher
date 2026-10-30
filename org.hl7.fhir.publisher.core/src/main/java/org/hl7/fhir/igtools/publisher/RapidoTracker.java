@@ -380,6 +380,9 @@ public class RapidoTracker {
 
   // a canonical resource's url, version, name and title are single primitives; other resources can repeat them (Device.name)
   static String singleValue(Element e, String name) {
+    if (!e.hasChildren()) {
+      return null;
+    }
     List<Element> l = e.getChildrenByName(name);
     return l.size() == 1 && l.get(0).isPrimitive() ? l.get(0).getValue() : null;
   }

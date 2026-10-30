@@ -211,5 +211,6 @@ class RapidoTrackerTest {
     assertNull(RapidoTracker.singleValue(device, "url"));
     Element vs = resource("ValueSet", child("url", "uri", "http://example.org/vs"), child("name", "string", "VS"));
     assertEquals("VS", RapidoTracker.singleValue(vs, "name"));
+    assertNull(RapidoTracker.singleValue(new Element("LogicalModel", mock(Property.class)), "name"));
   }
 }
