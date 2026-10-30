@@ -189,6 +189,14 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     this.settings.setRepoSource(GitUtilities.getURLWithNoUserInfo(repoSource, "-repo CLI parameter"));
   }
 
+  /**
+   * Whether watch mode stops after a build that failed with this. Not for the Errors the core throws when it meets
+   * content it doesn't expect: the next save may fix that too
+   */
+  static boolean isFatal(Throwable e) {
+    return e instanceof VirtualMachineError && !(e instanceof StackOverflowError);
+  }
+
   public void execute() throws Exception {
     XhtmlNode.setCheckParaGeneral(true);
     Configuration.setAllowCustomResourceTypes(true);
@@ -234,7 +242,10 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
               resetForRebuild(cliNoNarratives, cliNoValidate);
             }
             build(rootDir);
-          } catch (Exception e) {
+          } catch (Exception | Error e) {
+            if (isFatal(e)) {
+              throw e;
+            }
             // keep watching: the next save may fix it
             log("Publishing Content Failed: " + e.getMessage());
             log("");
