@@ -5,6 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.nio.file.Files;
@@ -12,12 +15,15 @@ import java.nio.file.Path;
 import java.util.List;
 
 import org.hl7.fhir.model.ModelContext;
+import org.hl7.fhir.model.core.ElementDefinition;
 import org.hl7.fhir.model.core.Narrative.NarrativeStatus;
 import org.hl7.fhir.model.core.StructureDefinition;
 import org.hl7.fhir.model.core.ValueSet;
 import org.hl7.fhir.model.core.formats.JsonParser;
 import org.hl7.fhir.model.core.formats.XmlParser;
 import org.hl7.fhir.model.utilities.formats.OutputStyle;
+import org.hl7.fhir.services.elementmodel.Element;
+import org.hl7.fhir.services.elementmodel.Property;
 import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonBoolean;
 import org.hl7.fhir.utilities.json.model.JsonNull;
@@ -174,5 +180,36 @@ class RapidoTrackerTest {
 
     assertArrayEquals(Files.readAllBytes(before.toPath()), Files.readAllBytes(sf.toPath()));
     assertEquals(plain(state), plain(RapidoTracker.readState(sf)));
+  }
+
+  private static Element child(String name, String type, String value) {
+    Property p = mock(Property.class);
+    when(p.getName()).thenReturn(name);
+    when(p.getDefinition()).thenReturn(new ElementDefinition());
+    when(p.isPrimitive("string")).thenReturn(true);
+    return new Element(name, p, type, value);
+  }
+
+  private static Element resource(String type, Element... children) {
+    Property p = mock(Property.class);
+    when(p.isResource()).thenReturn(true);
+    Element e = new Element(type, p);
+    for (Element c : children) {
+      e.getChildList().add(c);
+    }
+    return e;
+  }
+
+  /** a Device can have more than one name: it has no canonical name, and reading it as one stopped the build */
+  @Test
+  void aResourceWithManyNamesHasNoName() {
+    Element device = resource("Device", child("name", "BackboneElement", null), child("name", "BackboneElement", null));
+    assertThrows(Error.class, () -> device.getNamedChildValue("name"));
+    assertNull(RapidoTracker.singleValue(device, "name"));
+
+    assertNull(RapidoTracker.singleValue(resource("Patient", child("name", "HumanName", null)), "name"));
+    assertNull(RapidoTracker.singleValue(device, "url"));
+    Element vs = resource("ValueSet", child("url", "uri", "http://example.org/vs"), child("name", "string", "VS"));
+    assertEquals("VS", RapidoTracker.singleValue(vs, "name"));
   }
 }

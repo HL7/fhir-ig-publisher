@@ -353,10 +353,10 @@ public class RapidoTracker {
     }
     n.addReference(r.getExampleUri());
     if (e != null) {
-      n.setUrl(e.getNamedChildValue("url"));
-      n.setVersion(e.getNamedChildValue("version"));
-      n.setName(e.getNamedChildValue("name"));
-      n.setTitle(e.getNamedChildValue("title"));
+      n.setUrl(singleValue(e, "url"));
+      n.setVersion(singleValue(e, "version"));
+      n.setName(singleValue(e, "name"));
+      n.setTitle(singleValue(e, "title"));
       if ("StructureDefinition".equals(r.fhirType())) {
         n.setBaseDefinition(e.getNamedChildValue("baseDefinition"));
       }
@@ -376,6 +376,12 @@ public class RapidoTracker {
     }
     n.setContentHash(h.finish());
     return n;
+  }
+
+  // a canonical resource's url, version, name and title are single primitives; other resources can repeat them (Device.name)
+  static String singleValue(Element e, String name) {
+    List<Element> l = e.getChildrenByName(name);
+    return l.size() == 1 && l.get(0).isPrimitive() ? l.get(0).getValue() : null;
   }
 
   private void scan(Element e, Hasher h, ResourceNode n) {
