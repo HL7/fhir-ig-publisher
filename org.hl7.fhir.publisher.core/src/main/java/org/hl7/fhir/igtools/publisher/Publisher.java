@@ -1169,7 +1169,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         s = s + " " + removePassword(args, i);
       }
       System.out.println(s);
-      System.out.println("character encoding = " + java.nio.charset.Charset.defaultCharset() + " / " + System.getProperty("file.encoding"));
+      System.out.println("character encoding = " + java.nio.charset.Charset.defaultCharset() + " / " + System.getProperty("file.encoding") + ", file names = " + System.getProperty("sun.jnu.encoding"));
       FilesystemPackageCacheManager pcm = CliParams.hasNamedParam(args, "system")
               ? new FilesystemPackageCacheManager.Builder().withSystemCacheFolder().build()
               : new FilesystemPackageCacheManager.Builder().build();
@@ -1475,9 +1475,6 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         }
       } else {
         self.setConfigFile(determineActualIG(CliParams.getNamedParam(args, "-ig"), self.settings.getMode()));
-        if (Utilities.noString(self.getConfigFile())) {
-          throw new Exception("No Implementation Guide Specified (-ig parameter)");
-        }
         self.setConfigFile(getAbsoluteConfigFilePath(self.getConfigFile()));
       }
       if (CliParams.hasNamedParam(args, "-jekyll")) {
@@ -1720,6 +1717,9 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 
 
   public static String determineActualIG(String ig, PublisherUtils.IGBuildMode mode) throws Exception {
+    if (Utilities.noString(ig)) {
+      throw new Exception("No Implementation Guide Specified (-ig parameter)");
+    }
     if (ig.startsWith("http://") || ig.startsWith("https://")) {
       ig = convertUrlToLocalIg(ig);
     }

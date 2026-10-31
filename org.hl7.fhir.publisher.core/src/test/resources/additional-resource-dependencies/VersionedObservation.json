@@ -1,0 +1,11 @@
+{
+  "resourceType": "StructureDefinition",
+  "id": "Observation",
+  "url": "http://hl7.org/fhir/5.0/StructureDefinition/Observation",
+  "name": "Observation",
+  "status": "draft",
+  "kind": "resource",
+  "abstract": false,
+  "type": "Observation",
+  "derivation": "specialization"
+}
