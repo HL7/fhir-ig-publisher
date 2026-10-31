@@ -1669,6 +1669,9 @@ public class HTMLInspector {
   private boolean checkResolveLink(String filename, Location loc, String path, String ref, String text, List<ValidationMessage> messages, String uuid, XhtmlNode x, XhtmlNode parent) throws IOException {
     links++;
     String fn = makeLocal(filename);
+    if (ref.contains("?"))
+      ref = ref.substring(0, ref.indexOf("?"));
+    
     String rref;
     try {
       rref = Utilities.URLDecode(ref);
