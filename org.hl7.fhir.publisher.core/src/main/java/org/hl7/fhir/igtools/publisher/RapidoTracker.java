@@ -493,6 +493,15 @@ public class RapidoTracker {
     return other.finish();
   }
 
+  // getCanonicalPath doesn't resolve links on Windows (JDK-8003887), so it can't spot a loop there
+  private static String realPath(File f, String fallback) {
+    try {
+      return f.toPath().toRealPath().toString();
+    } catch (IOException e) {
+      return fallback;
+    }
+  }
+
   private static String canonical(String s) {
     try {
       return new File(s).getCanonicalPath();
@@ -528,9 +537,10 @@ public class RapidoTracker {
       }
       return;
     }
-    if (!visited.add(c)) {
+    String real = realPath(dir, c);
+    if (!visited.add(real)) {
       // a link to a folder that's already been listed (possibly one that contains it)
-      files.put(rel + "/", "(same as "+c+")");
+      files.put(rel + "/", "(same as "+real+")");
       return;
     }
     String[] list = dir.list();
