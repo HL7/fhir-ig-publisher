@@ -5,7 +5,9 @@ import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
@@ -152,7 +154,48 @@ public class HistoryGenerator {
         }
       }
     }
+    sortActorTypes(res);
     return res;
+  }
+
+  // types the code system defines come first, in its order; the rest follow by system then code
+  private void sortActorTypes(List<Coding> types) {
+    Map<String, Map<String, Integer>> positions = new HashMap<>();
+    Comparator<Coding> bySystemThenCode = Comparator.comparing(Coding::getSystem, Comparator.nullsFirst(Comparator.<String>naturalOrder()))
+        .thenComparing(Coding::getCode, Comparator.nullsFirst(Comparator.<String>naturalOrder()));
+    types.sort((a, b) -> {
+      Integer pa = position(positions, a);
+      Integer pb = position(positions, b);
+      if ((pa == null) != (pb == null)) {
+        return pa == null ? 1 : -1;
+      }
+      if (pa == null) {
+        return bySystemThenCode.compare(a, b);
+      }
+      int res = Comparator.nullsFirst(Comparator.<String>naturalOrder()).compare(a.getSystem(), b.getSystem());
+      return res != 0 ? res : Integer.compare(pa, pb);
+    });
+  }
+
+  private Integer position(Map<String, Map<String, Integer>> positions, Coding c) {
+    if (c.getSystem() == null || c.getCode() == null) {
+      return null;
+    }
+    return positions.computeIfAbsent(c.getSystem(), system -> {
+      Map<String, Integer> res = new HashMap<>();
+      CodeSystem cs = context.getWorker().fetchCodeSystem(system, VersionResolutionRules.defaultRule());
+      if (cs != null) {
+        addPositions(res, cs.getConceptList());
+      }
+      return res;
+    }).get(c.getCode());
+  }
+
+  private void addPositions(Map<String, Integer> res, List<ConceptDefinitionComponent> concepts) {
+    for (ConceptDefinitionComponent cd : concepts) {
+      res.putIfAbsent(cd.getCode(), res.size());
+      addPositions(res, cd.getConceptList());
+    }
   }
 
   public static boolean allEntriesAreHistoryProvenance(Element resource) throws UnsupportedEncodingException, FHIRException, IOException {

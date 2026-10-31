@@ -384,6 +384,7 @@ public class TemplateManager {
         "ihe.fhir.template",
         "cqf.fhir.template",
         "ans.fr.template",
+        "ans.cda.fr.template",
         "hl7.v2plus.template",
         "openehr.fhir.template",
         "ch.fhir.ig.template")) {

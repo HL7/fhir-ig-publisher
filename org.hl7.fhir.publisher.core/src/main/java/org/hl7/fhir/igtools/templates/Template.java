@@ -473,6 +473,8 @@ public class Template {
     String fn = Utilities.path(templateDir, target + "-ig-updated.");
     File jsonIg = new File(sfn +"json");
     File xmlIg = new File(sfn + "xml");
+    File jsonUpdated = new File(fn + "json");
+    File xmlUpdated = new File(fn + "xml");
     if (ig != null) {
       antProject.setProperty(target + ".ig.source", sfn);
       antProject.setProperty(target + ".ig.dest", fn);
@@ -480,14 +482,25 @@ public class Template {
         jsonIg.delete();
       if (xmlIg.exists())
         xmlIg.delete();
+      // a file left over from an earlier run would otherwise be read back as this run's output
+      Files.deleteIfExists(jsonUpdated.toPath());
+      Files.deleteIfExists(xmlUpdated.toPath());
       if (USE_R5_IG_FORMAT) {
         org.hl7.fhir.r5.model.ImplementationGuide ig5 = (org.hl7.fhir.r5.model.ImplementationGuide) VersionConvertorFactory_50_N.convertResource(ig, new BaseAdvisor_50_N(true, true));
-        new org.hl7.fhir.r5.formats.XmlParser().compose(new FileOutputStream(sfn+"xml"), ig5);
-        new org.hl7.fhir.r5.formats.JsonParser().compose(new FileOutputStream(sfn+"json"), ig5);
+        try (FileOutputStream f = new FileOutputStream(sfn+"xml")) {
+          new org.hl7.fhir.r5.formats.XmlParser().compose(f, ig5);
+        }
+        try (FileOutputStream f = new FileOutputStream(sfn+"json")) {
+          new org.hl7.fhir.r5.formats.JsonParser().compose(f, ig5);
+        }
       } else {
         org.hl7.fhir.r4.model.ImplementationGuide ig4 = (org.hl7.fhir.r4.model.ImplementationGuide) VersionConvertorFactory_40_N.convertResource(ig, new BaseAdvisor_40_N(true, true));
-        new org.hl7.fhir.r4.formats.XmlParser().compose(new FileOutputStream(sfn+"xml"), ig4);
-        new org.hl7.fhir.r4.formats.JsonParser().compose(new FileOutputStream(sfn+"json"), ig4);
+        try (FileOutputStream f = new FileOutputStream(sfn+"xml")) {
+          new org.hl7.fhir.r4.formats.XmlParser().compose(f, ig4);
+        }
+        try (FileOutputStream f = new FileOutputStream(sfn+"json")) {
+          new org.hl7.fhir.r4.formats.JsonParser().compose(f, ig4);
+        }
       }
     }
     antProject.executeTarget(target);
@@ -520,32 +533,40 @@ public class Template {
       switch (modifyIg) {
         case IG_ANY:
           if (new File(newXml).exists()) {
-            if (USE_R5_IG_FORMAT) {
-              return (ImplementationGuide) VersionConvertorFactory_50_N.convertResource(new org.hl7.fhir.r5.formats.XmlParser().parse(new FileInputStream(newXml)));
-            } else {
-              return (ImplementationGuide) VersionConvertorFactory_40_N.convertResource(new org.hl7.fhir.r4.formats.XmlParser().parse(new FileInputStream(newXml)));                
+            try (FileInputStream f = new FileInputStream(newXml)) {
+              if (USE_R5_IG_FORMAT) {
+                return (ImplementationGuide) VersionConvertorFactory_50_N.convertResource(new org.hl7.fhir.r5.formats.XmlParser().parse(f));
+              } else {
+                return (ImplementationGuide) VersionConvertorFactory_40_N.convertResource(new org.hl7.fhir.r4.formats.XmlParser().parse(f));
+              }
             }
           } else if (new File(newJson).exists()) {
-            if (USE_R5_IG_FORMAT) {
-              return (ImplementationGuide) VersionConvertorFactory_50_N.convertResource(new org.hl7.fhir.r5.formats.JsonParser().parse(new FileInputStream(newXml)));
-            } else {
-              return (ImplementationGuide) VersionConvertorFactory_40_N.convertResource(new org.hl7.fhir.r4.formats.JsonParser().parse(new FileInputStream(newXml)));                
+            try (FileInputStream f = new FileInputStream(newJson)) {
+              if (USE_R5_IG_FORMAT) {
+                return (ImplementationGuide) VersionConvertorFactory_50_N.convertResource(new org.hl7.fhir.r5.formats.JsonParser().parse(f));
+              } else {
+                return (ImplementationGuide) VersionConvertorFactory_40_N.convertResource(new org.hl7.fhir.r4.formats.JsonParser().parse(f));
+              }
             }
           } else
             throw new FHIRException("onLoad script "+targetOnLoad+" failed - no output file produced");        
         case IG_NO_RESOURCE:
           if (new File(newXml).exists()) {
-            if (USE_R5_IG_FORMAT) {
-              loadModifiedIg((ImplementationGuide) VersionConvertorFactory_50_N.convertResource(new org.hl7.fhir.r5.formats.XmlParser().parse(new FileInputStream(newXml))), ig);
-            } else {
-              loadModifiedIg((ImplementationGuide) VersionConvertorFactory_40_N.convertResource(new org.hl7.fhir.r4.formats.XmlParser().parse(new FileInputStream(newXml))), ig);
+            try (FileInputStream f = new FileInputStream(newXml)) {
+              if (USE_R5_IG_FORMAT) {
+                loadModifiedIg((ImplementationGuide) VersionConvertorFactory_50_N.convertResource(new org.hl7.fhir.r5.formats.XmlParser().parse(f)), ig);
+              } else {
+                loadModifiedIg((ImplementationGuide) VersionConvertorFactory_40_N.convertResource(new org.hl7.fhir.r4.formats.XmlParser().parse(f)), ig);
+              }
             }
           }
           else if (new File(newJson).exists()) {
-            if (USE_R5_IG_FORMAT) {
-              loadModifiedIg((ImplementationGuide) VersionConvertorFactory_50_N.convertResource(new org.hl7.fhir.r5.formats.JsonParser().parse(new FileInputStream(newXml))), ig);
-            } else {
-              loadModifiedIg((ImplementationGuide) VersionConvertorFactory_40_N.convertResource(new org.hl7.fhir.r4.formats.JsonParser().parse(new FileInputStream(newXml))), ig);
+            try (FileInputStream f = new FileInputStream(newJson)) {
+              if (USE_R5_IG_FORMAT) {
+                loadModifiedIg((ImplementationGuide) VersionConvertorFactory_50_N.convertResource(new org.hl7.fhir.r5.formats.JsonParser().parse(f)), ig);
+              } else {
+                loadModifiedIg((ImplementationGuide) VersionConvertorFactory_40_N.convertResource(new org.hl7.fhir.r4.formats.JsonParser().parse(f)), ig);
+              }
             }
           }
           return null;

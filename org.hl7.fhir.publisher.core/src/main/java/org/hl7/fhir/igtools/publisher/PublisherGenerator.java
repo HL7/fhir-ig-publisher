@@ -214,22 +214,6 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
   }
 
   public void generate() throws Exception {
-    try {
-      generateOutputs();
-    } finally {
-      // if the build failed: else the database stays open, and on Windows the next build (in watch mode, in this
-      // process) can't delete it from the temp folder
-      if (openDb != null) {
-        openDb.closeUp();
-        openDb = null;
-      }
-    }
-  }
-
-  // the database generateOutputs() is building, until it's closed
-  private DBBuilder openDb;
-
-  private void generateOutputs() throws Exception {
     if (settings.isSimplifierMode()) {
       return;
     }
@@ -261,117 +245,118 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     pf.otherFilesRun.add(Utilities.path(pf.outputDir, "package.manifest.json"));
     pf.otherFilesRun.add(Utilities.path(pf.tempDir, "package.db"));
     DBBuilder db = pf.generatingDatabase ? new DBBuilder(Utilities.path(pf.tempDir, "package.db"), pf.context, pf.rc, pf.cu, pf.fileList) : null;
-    openDb = db;
-    copyData();
-    for (String rg : pf.regenList) {
-      regenerate(rg);
-    }
-    for (FetchedFile f : pf.changeList) {
-      for (FetchedResource r : f.getResources()) {
-        if (r.getResource() != null) {
-          if (!r.getResource().hasWebPath()) {
-            r.getResource().setWebPath(pf.igpkp.getLinkFor(r, true));
-          }
-        }
-        if (r.getElement() != null) {
-          if (!r.getElement().hasWebPath()) {
-            r.getElement().setWebPath(pf.igpkp.getLinkFor(r, true));
-          }
-        }
-      }
-    }
-
-    updateImplementationGuide();
-    generateDataFile(db);
-
-    logMessage("Generate Native Outputs");
-
-    for (FetchedFile f : pf.changeList) {
-      f.start("generate1");
-      try {
-        generateNativeOutputs(f, false, db);
-      } finally {
-        f.finish("generate1");
-      }
-    }
-    if (db != null) {
-      db.finishResources();
-    }
-
-    generateViewDefinitions(db);
-    if (!pf.changeList.isEmpty()) {
-      if (isNewML()) {
-        for (String l : allLangs()) {
-          generateSummaryOutputsBefore(db, l, pf.rcLangs.get(l));
-        }
-      } else {
-        generateSummaryOutputsBefore(db, null, pf.rc);
-      }
-    }
-    templateBeforeGenerate();
-    if (pf.saveExpansionParams) {
-      new JsonParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.NORMAL).compose(new FileOutputStream(Utilities.path(pf.tempDir, "parameters-expansion-parameters.json")), pf.context.getExpansionParameters());
-      new XmlParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.NORMAL).compose(new FileOutputStream(Utilities.path(pf.tempDir, "parameters-expansion-parameters.xml")), pf.context.getExpansionParameters());
-    }
-
-    logMessage("Generate HTML Outputs");
-    // the resources don't change while the html is generated, so what they use only needs to be worked out once
-    pf.sdUsageCache = new IdentityHashMap<>();
     try {
+      copyData();
+      for (String rg : pf.regenList) {
+        regenerate(rg);
+      }
+      for (FetchedFile f : pf.changeList) {
+        for (FetchedResource r : f.getResources()) {
+          if (r.getResource() != null) {
+            if (!r.getResource().hasWebPath()) {
+              r.getResource().setWebPath(pf.igpkp.getLinkFor(r, true));
+            }
+          }
+          if (r.getElement() != null) {
+            if (!r.getElement().hasWebPath()) {
+              r.getElement().setWebPath(pf.igpkp.getLinkFor(r, true));
+            }
+          }
+        }
+      }
+
+      updateImplementationGuide();
+      generateDataFile(db);
+
+      logMessage("Generate Native Outputs");
+
+      for (FetchedFile f : pf.changeList) {
+        f.start("generate1");
+        try {
+          generateNativeOutputs(f, false, db);
+        } finally {
+          f.finish("generate1");
+        }
+      }
+      if (db != null) {
+        db.finishResources();
+      }
+
+      generateViewDefinitions(db);
+      if (!pf.changeList.isEmpty()) {
+        if (isNewML()) {
+          for (String l : allLangs()) {
+            generateSummaryOutputsBefore(db, l, pf.rcLangs.get(l));
+          }
+        } else {
+          generateSummaryOutputsBefore(db, null, pf.rc);
+        }
+      }
+      templateBeforeGenerate();
+      if (pf.saveExpansionParams) {
+        new JsonParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.NORMAL).compose(new FileOutputStream(Utilities.path(pf.tempDir, "parameters-expansion-parameters.json")), pf.context.getExpansionParameters());
+        new XmlParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.NORMAL).compose(new FileOutputStream(Utilities.path(pf.tempDir, "parameters-expansion-parameters.xml")), pf.context.getExpansionParameters());
+      }
+
+      logMessage("Generate HTML Outputs");
+      // the resources don't change while the html is generated, so what they use only needs to be worked out once
+      pf.sdUsageCache = new IdentityHashMap<>();
+      try {
+        for (FetchedFile f : pf.changeList) {
+          f.start("generate2");
+          try {
+            generateHtmlOutputs(f, false, db, null);
+          } finally {
+            f.finish("generate2");
+          }
+        }
+      } finally {
+        pf.sdUsageCache = null;
+      }
+
+      logMessage("Generate Spreadsheets");
       for (FetchedFile f : pf.changeList) {
         f.start("generate2");
         try {
-          generateHtmlOutputs(f, false, db, null);
+          generateSpreadsheets(f, false, db);
         } finally {
           f.finish("generate2");
         }
       }
-    } finally {
-      pf.sdUsageCache = null;
-    }
-
-    logMessage("Generate Spreadsheets");
-    for (FetchedFile f : pf.changeList) {
-      f.start("generate2");
-      try {
-        generateSpreadsheets(f, false, db);
-      } finally {
-        f.finish("generate2");
+      if (pf.allProfilesCsv != null) {
+        pf.allProfilesCsv.dump();
       }
-    }
-    if (pf.allProfilesCsv != null) {
-      pf.allProfilesCsv.dump();
-    }
-    if (pf.allProfilesXlsx != null) {
-      pf.allProfilesXlsx.configure();
-      String path = Utilities.path(pf.tempDir, "all-profiles.xlsx");
-      pf.allProfilesXlsx.finish(new FileOutputStream(path));
-      pf.otherFilesRun.add(Utilities.path(pf.tempDir, "all-profiles.xlsx"));
-      pf.allProfilesXlsx.dump();
-    }
+      if (pf.allProfilesXlsx != null) {
+        pf.allProfilesXlsx.configure();
+        String path = Utilities.path(pf.tempDir, "all-profiles.xlsx");
+        pf.allProfilesXlsx.finish(new FileOutputStream(path));
+        pf.otherFilesRun.add(Utilities.path(pf.tempDir, "all-profiles.xlsx"));
+        pf.allProfilesXlsx.dump();
+      }
 
-    logMessage("Generate Summaries");
+      logMessage("Generate Summaries");
 
 
-    for (String s : pf.profileTestCases) {
-      logMessage("Running Profile Tests Cases in "+s);
-      new ProfileTestCaseExecutor(pf.rootDir, pf.context, pf.validator, pf.fileList).execute(s);
-    }
-    if (!pf.changeList.isEmpty()) {
-      if (isNewML()) {
-        for (String l : allLangs()) {
-          generateSummaryOutputsAfter(l, pf.rcLangs.get(l));
+      for (String s : pf.profileTestCases) {
+        logMessage("Running Profile Tests Cases in "+s);
+        new ProfileTestCaseExecutor(pf.rootDir, pf.context, pf.validator, pf.fileList).execute(s);
+      }
+      if (!pf.changeList.isEmpty()) {
+        if (isNewML()) {
+          for (String l : allLangs()) {
+            generateSummaryOutputsAfter(l, pf.rcLangs.get(l));
+          }
+        } else {
+          generateSummaryOutputsAfter(null, pf.rc);
         }
-      } else {
-        generateSummaryOutputsAfter(null, pf.rc);
       }
-    }
-    pf.template.rapidoSummary();
-    genBasePages();
-
-    if (db != null) {
-      db.closeUp();
-      openDb = null;
+      pf.template.rapidoSummary();
+      genBasePages();
+    } finally {
+      // close it even when generation fails, or the open file can't be deleted on Windows
+      if (db != null) {
+        db.closeUp();
+      }
     }
     FileUtilities.bytesToFile(pf.extensionTracker.generate(), Utilities.path(pf.tempDir, "usage-stats.json"));
     try {
