@@ -208,6 +208,9 @@ public class FetchedFile {
       throw new Error("Source has been dropped");
     return source;
   }
+  public boolean hasSource() {
+    return source != null;
+  }
   public void setSource(byte[] source) {
     this.source = source;
     this.size = source.length;

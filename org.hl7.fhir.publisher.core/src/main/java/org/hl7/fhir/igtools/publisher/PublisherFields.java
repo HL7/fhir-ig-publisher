@@ -210,6 +210,8 @@ public class PublisherFields {
     boolean brokenLinksError;
     boolean genExamples;
     boolean doTransforms;
+    /** what Rapido reuses from the last build (null unless in Rapido mode) */
+    RapidoTracker rapido;
     boolean allInvariants = true;
     List<String> spreadsheets = new ArrayList<String>();
     List<String> bundles = new ArrayList<String>();

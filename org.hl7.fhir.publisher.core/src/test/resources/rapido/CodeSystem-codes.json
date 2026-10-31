@@ -1,0 +1,11 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "codes",
+  "url": "http://example.org/fhir/CodeSystem/codes",
+  "version": "1.0.0",
+  "name": "Codes",
+  "title": "Example Codes",
+  "status": "draft",
+  "content": "complete",
+  "concept": [ { "code": "a" } ]
+}

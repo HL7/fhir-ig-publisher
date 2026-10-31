@@ -300,6 +300,9 @@ public class PublisherBase implements ILoggingService {
     String s = path.toLowerCase();
     if (!pf.allOutputs.add(s))
       throw new Error("Error generating build: the file "+path+" is being generated more than once (may differ by case)");
+    if (pf.rapido != null) {
+      pf.rapido.recordOutput(s);
+    }
     outputTracker.add(path);
 
     File f = new CSFile(path);
@@ -623,9 +626,8 @@ public class PublisherBase implements ILoggingService {
     if (add) {
       pf.fileList.add(file);
     }
-    if (!settings.isRapidoMode() || pf.hasCheckedDependencies) {
-      pf.changeList.add(file);
-    }
+    // Rapido works out what it can reuse from the last build after loading, so every file goes through every step
+    pf.changeList.add(file);
     //  	}
   }
 

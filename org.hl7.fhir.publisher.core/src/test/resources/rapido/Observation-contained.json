@@ -1,0 +1,15 @@
+{
+  "resourceType": "Observation",
+  "id": "contained",
+  "contained": [
+    {
+      "resourceType": "Patient",
+      "id": "p1",
+      "name": [ { "family": "One" }, { "family": "Two" } ]
+    }
+  ],
+  "status": "final",
+  "code": { "coding": [ { "system": "http://example.org/fhir/CodeSystem/codes", "code": "a" } ] },
+  "subject": { "reference": "#p1" },
+  "valueString": "see [[[Codes]]]"
+}

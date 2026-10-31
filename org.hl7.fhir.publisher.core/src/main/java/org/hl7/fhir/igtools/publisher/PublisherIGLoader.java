@@ -310,7 +310,7 @@ public class PublisherIGLoader extends PublisherBase {
       throw new Exception("Error Parsing File "+ pf.igName +": "+e.getMessage(), e);
     }
     pf.templateManager.loadTemplateOverrides(ini, pf.rootDir);
-    pf.template = pf.templateManager.loadTemplate(templateName, pf.rootDir, pf.packageId(), settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD, pf.logOptions.contains("template"), settings.isRapidoMode());
+    pf.template = pf.templateManager.loadTemplate(templateName, pf.rootDir, pf.packageId(), settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD, pf.logOptions.contains("template"), false); // Rapido has to produce every fragment that a full build does
     if (pf.template.hasExtraTemplates()) {
       processExtraTemplates(pf.template.getExtraTemplates());
     }
@@ -922,7 +922,9 @@ public class PublisherIGLoader extends PublisherBase {
       pf.jekyllTimeout = ini.getLongProperty("IG", "jekyll-timeout") * 1000;
     }
 
-    if (pf.template.isDevMode()) {
+    if (pf.template.isDevMode() && !settings.isRapidoMode()) {
+      // (Rapido hashes the template, and clears the temp folder itself when it changes: clearing it here would throw
+      // away what Rapido reuses, in every build with a local template)
       FileUtilities.clearDirectory(pf.tempDir);
     } else {
       File fTempDir = new File(pf.tempDir);
