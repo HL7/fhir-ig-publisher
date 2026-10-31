@@ -25,7 +25,10 @@ import org.hl7.fhir.igtools.renderers.QuestionnaireResponseRenderer;
 import org.hl7.fhir.igtools.renderers.StructureDefinitionRenderer;
 import org.hl7.fhir.igtools.renderers.StructureMapRenderer;
 import org.hl7.fhir.igtools.renderers.ValueSetRenderer;
+import org.hl7.fhir.igtools.spreadsheets.ColumnWidthCache;
 import org.hl7.fhir.igtools.spreadsheets.ObservationSummarySpreadsheetGenerator;
+import org.hl7.fhir.igtools.spreadsheets.ProfileSpreadsheetGenerator;
+import org.hl7.fhir.igtools.spreadsheets.ProfileSpreadsheetPrefetcher;
 import org.hl7.fhir.igtools.web.IGReleaseVersionUpdater;
 import org.hl7.fhir.model.Base;
 import org.hl7.fhir.model.fml.StructureMap;
@@ -315,12 +318,24 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       }
 
       logMessage("Generate Spreadsheets");
-      for (FetchedFile f : pf.changeList) {
-        f.start("generate2");
-        try {
-          generateSpreadsheets(f, false, db);
-        } finally {
-          f.finish("generate2");
+      columnWidths = new ColumnWidthCache();
+      spreadsheetPrefetcher = startSpreadsheetPrefetcher();
+      try {
+        for (FetchedFile f : pf.changeList) {
+          f.start("generate2");
+          try {
+            generateSpreadsheets(f, false, db);
+          } finally {
+            f.finish("generate2");
+          }
+        }
+      } finally {
+        if (spreadsheetPrefetcher != null) {
+          if (spreadsheetPrefetcher.getFallbacks() > 0) {
+            log("Spreadsheets: "+spreadsheetPrefetcher.getFallbacks()+" profile workbook(s) could not be built ahead, and were built in order instead");
+          }
+          spreadsheetPrefetcher.close();
+          spreadsheetPrefetcher = null;
         }
       }
       if (pf.allProfilesCsv != null) {
@@ -333,6 +348,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         pf.otherFilesRun.add(Utilities.path(pf.tempDir, "all-profiles.xlsx"));
         pf.allProfilesXlsx.dump();
       }
+      columnWidths = null;
 
       logMessage("Generate Summaries");
 
@@ -892,6 +908,55 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         fragment(r.fhirType()+"-"+r.getId()+"-contained-index", genContainedIndex(r, clist, null), f.getOutputNames(), start, "contained-index", "Resource", lang);
       }
     }
+  }
+
+  /** shared by the profile workbooks of one Spreadsheets phase */
+  private ColumnWidthCache columnWidths;
+  /** builds the per-profile workbooks of the Spreadsheets phase ahead, on other threads */
+  private ProfileSpreadsheetPrefetcher<FetchedResource> spreadsheetPrefetcher;
+
+  private ColumnWidthCache columnWidths() {
+    if (columnWidths == null) {
+      columnWidths = new ColumnWidthCache();
+    }
+    return columnWidths;
+  }
+
+  /**
+   * The per-profile xlsx workbooks that the Spreadsheets loop below will build, in its order, are handed to a
+   * {@link ProfileSpreadsheetPrefetcher}. Each job renders a deep copy of the profile, taken here on this thread,
+   * with the displays that need the worker context rendered here too. The loop still does everything else in
+   * the same order as before (csv, all-profiles, schematron), and builds a workbook itself whenever the
+   * prefetcher has no result for it.
+   */
+  private ProfileSpreadsheetPrefetcher<FetchedResource> startSpreadsheetPrefetcher() {
+    int threads = ProfileSpreadsheetPrefetcher.defaultThreads();
+    if (threads == 0 || this.settings.isGenerationOff()) {
+      return null;
+    }
+    List<FetchedResource> candidates = new ArrayList<>();
+    for (FetchedFile f : pf.changeList) {
+      if (f.getProcessMode() != FetchedFile.PROCESS_NONE && f.getProcessMode() != FetchedFile.PROCESS_XSLT) {
+        for (FetchedResource r : f.getResources()) {
+          // wantGen(r, "xlsx") without the template check, which is always true for xlsx but counts the calls;
+          // the loop still asks wantGen itself
+          if (r.getResource() instanceof StructureDefinition && ((StructureDefinition) r.getResource()).hasSnapshot()
+              && !Boolean.FALSE.equals(pf.wantGenParams.get("xlsx")) && pf.igpkp.wantGen(r, "xlsx")) {
+            candidates.add(r);
+          }
+        }
+      }
+    }
+    if (candidates.isEmpty()) {
+      return null;
+    }
+    return new ProfileSpreadsheetPrefetcher<>(candidates, threads, r -> {
+      StructureDefinition sd = (StructureDefinition) r.getResource();
+      ProfileSpreadsheetGenerator sdg = new ProfileSpreadsheetGenerator(this.pf.context, true, anyMustSupport(sd), pf.rendererFactory, columnWidths());
+      StructureDefinition copy = sd.copy(Base.COPY_ALL);
+      sdg.precomputeDisplays(copy);
+      return ProfileSpreadsheetPrefetcher.job(sdg, copy);
+    });
   }
 
   private void generateSpreadsheets(FetchedFile f, boolean regen, DBBuilder db) throws Exception {
@@ -1811,12 +1876,19 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       lapsed(null);
       String path = Utilities.path(this.pf.tempDir, sdPrefix + r.getId()+".xlsx");
       f.getOutputNames().add(path);
-      StructureDefinitionSpreadsheetGenerator sdg = new StructureDefinitionSpreadsheetGenerator(this.pf.context, true, anyMustSupport(sd), pf.rendererFactory);
-      sdg.renderStructureDefinition(sd, false);
-      sdg.finish(new FileOutputStream(path));
+      byte[] xlsx = spreadsheetPrefetcher == null ? null : spreadsheetPrefetcher.take(r);
+      if (xlsx != null) {
+        try (FileOutputStream out = new FileOutputStream(path)) {
+          out.write(xlsx);
+        }
+      } else {
+        StructureDefinitionSpreadsheetGenerator sdg = new ProfileSpreadsheetGenerator(this.pf.context, true, anyMustSupport(sd), pf.rendererFactory, columnWidths());
+        sdg.renderStructureDefinition(sd, false);
+        sdg.finish(new FileOutputStream(path));
+      }
       lapsed("xslx");
       if (this.pf.allProfilesXlsx == null) {
-        this.pf.allProfilesXlsx = new StructureDefinitionSpreadsheetGenerator(this.pf.context, true, false, pf.rendererFactory);
+        this.pf.allProfilesXlsx = new ProfileSpreadsheetGenerator(this.pf.context, true, false, pf.rendererFactory, columnWidths());
       }
       this.pf.allProfilesXlsx.renderStructureDefinition(sd, true);
       lapsed("all-xslx");
