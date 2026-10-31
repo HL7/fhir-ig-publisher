@@ -78,8 +78,6 @@ import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 
-import static org.hl7.fhir.services.elementmodel.ElementVisitor.ElementVisitorInstruction.VISIT_CHILDREN;
-
 public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   private static final int EXAMPLE_UPPER_LIMIT = 50;
@@ -2785,7 +2783,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   private boolean usesExtension(Element focus) {
     for (Element child : focus.getChildList()) {
-      if (child.getName().equals("extension") && refersToThisSD(child.getChildValue("url")))
+      if (Utilities.existsInList(child.getName(), "extension", "modifierExtension") && refersToThisSD(child.getChildValue("url")))
         return true;
       if (usesExtension(child))
         return true;
@@ -2795,7 +2793,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   /**
    * The urls (without any version) that usesSD() compares with the url of this SD: the meta.profile values, and
-   * the url of every extension anywhere in the resource
+   * the url of every extension and modifierExtension anywhere in the resource
    */
   private void listUsedUrls(Element resource, Set<String> urls) {
     if (resource.hasChild("meta")) {
@@ -2809,7 +2807,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   private void listExtensionUrls(Element focus, Set<String> urls) {
     for (Element child : focus.getChildList()) {
-      if (child.getName().equals("extension")) {
+      if (Utilities.existsInList(child.getName(), "extension", "modifierExtension")) {
         addUsedUrl(urls, child.getChildValue("url"));
       }
       listExtensionUrls(child, urls);
@@ -2906,7 +2904,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     XhtmlNode x = null;
     try {
       genElement(gen, model.getRows(), pe.buildPEDefinition(sd));
-      x = gen.generate(model, destDir, 0, otherFilesRun);
+      x = gen.generate(model, destDir, false, otherFilesRun);
     } catch (Exception e) {
       x = new XhtmlNode(NodeType.Element, "div").tx("Error: "+e.getMessage());
     }
@@ -2957,7 +2955,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (sdr.hasNonBaseConstraints(element.definition().getConstraintList()) || sdr.hasNonBaseConditions(element.definition().getConditionList())) {
       Piece p = gc.addText(org.hl7.fhir.r5.renderers.StructureDefinitionRenderer.CONSTRAINT_CHAR);
       p.setHint((this.gen.formatPhrase(RenderingI18nContext.STRUC_DEF_AFFECT_CONSTRAINTS)+sdr.listConstraintsAndConditions(element.definition())+")"));
-      p.addStyle(org.hl7.fhir.r5.renderers.StructureDefinitionRenderer.CONSTRAINT_STYLE);
+      p.addNamedStyle("xhtConstraintStyle", org.hl7.fhir.r5.renderers.StructureDefinitionRenderer.CONSTRAINT_STYLE);
       p.setReference(Utilities.pathURL(VersionUtilities.getSpecUrl(context.getFHIRVersion()), "conformance-rules.html#constraints"));
     }
     if (element != null && element.definition().hasExtension(ExtensionDefinitions.EXT_STANDARDS_STATUS)) {

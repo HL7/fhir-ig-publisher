@@ -2,8 +2,6 @@ package org.hl7.fhir.igtools.publisher;
 
 import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_10_50;
 import org.hl7.fhir.convertors.factory.*;
-import org.hl7.fhir.convertors.igs.testing.TestingR4Convertor;
-import org.hl7.fhir.convertors.igs.testing.TestingR5Convertor;
 import org.hl7.fhir.convertors.txClient.TerminologyClientFactory;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.openehr.ArchetypeImporter;
@@ -38,7 +36,6 @@ import org.hl7.fhir.services.context.ContextUtilities;
 import org.hl7.fhir.services.context.IContextResourceLoaderN;
 import org.hl7.fhir.services.fhirpath.TypeDetails;
 import org.hl7.fhir.services.fml.StructureMapTools;
-import org.hl7.fhir.services.renderers.igs.testing.TestingRenderers;
 import org.hl7.fhir.services.utilities.MappingSheetParser;
 import org.hl7.fhir.services.utilities.NPMPackageGenerator;
 import org.hl7.fhir.services.validation.ValidatorSession;
@@ -81,6 +78,7 @@ import org.hl7.fhir.validation.ValidatorSettings;
 import org.hl7.fhir.validation.ValidatorUtils;
 import org.hl7.fhir.validation.instance.InstanceValidator;
 import org.hl7.fhir.validation.profile.ProfileValidator;
+import org.apache.commons.lang3.StringUtils;
 import org.w3._1999.xhtml.B;
 import org.w3c.dom.Document;
 import org.xml.sax.SAXException;
@@ -213,6 +211,9 @@ public class PublisherIGLoader extends PublisherBase {
           switch (indent) {
             case 2:
               String t = line.trim();
+              if (t.contains("@npm:"))
+                t = StringUtils.substringAfter(t, "@npm:");
+              
               if (t.contains(":")) {
                 String name = t.substring(0, t.indexOf(":")).trim();
                 String value = t.substring(t.indexOf(":")+1).trim();
@@ -1294,7 +1295,6 @@ public class PublisherIGLoader extends PublisherBase {
     }
     pf.appendTrailingSlashInDataFile = true;
     pf.includeHeadings = pf.template.getIncludeHeadings();
-    pf.igArtifactsPage = pf.template.getIGArtifactsPage();
     pf.doTransforms = pf.template.getDoTransforms();
     pf.template.getExtraTemplates(pf.extraTemplates);
 
@@ -1788,16 +1788,21 @@ public class PublisherIGLoader extends PublisherBase {
    * incubator version of the resources rather than the base specification version.
    * 
    * Codes currently supported: 
-   *   hl7.fhir.uv.testing - the FHIR Testing IG (TestPlan, TestScript, TestReport)
+   *   hl7.fhir.uv.testing - the FHIR Testing IG (TestPlan, TestScript, TestReport). Accepted, but now a
+   *     no-op: the Testing IG is always in scope (model context, renderers and version convertors)
    */
   private void registerIncubatorIG(String code, List<String> packages) throws Exception {
     switch (code) {
     case "hl7.fhir.uv.testing":
-      org.hl7.fhir.r5.igs.testing.TestingRegistration.register(true);
-      packages.addAll(Arrays.asList(org.hl7.fhir.r5.igs.testing.TestingRegistration.packages()));
-      TestingRenderers.register(pf.rendererFactory);
-      pf.versionConvertorRegistry.register(new TestingR4Convertor());
-      pf.versionConvertorRegistry.register(new TestingR5Convertor());
+      // Not needed: the Testing IG resources are always registered on the shared full core
+      // model context (see ModelContext.fullCoreContext()), which is what the publisher uses,
+      // so registering them again here would change nothing. We'll consider in the future which
+      // version of the Testing IG package is loaded (TestingRegistration.packages() currently
+      // returns the version the code was generated from).
+      // org.hl7.fhir.model.testing.TestingRegistration.register(pf.context.getModelContext(), true);
+      // packages.addAll(Arrays.asList(org.hl7.fhir.model.testing.TestingRegistration.packages()));
+      // likewise, the renderers and version convertors for the Testing IG resources are always
+      // registered (see PublisherFields.makeRendererFactory() and makeVersionConvertorRegistry())
       break;
     default:
       throw new Exception("Unknown value '"+code+"' for parameter incubator-ig: no code has been generated for that IG (see documentation at https://build.fhir.org/ig/FHIR/fhir-tools-ig/CodeSystem-ig-parameters.html)");
@@ -2536,6 +2541,8 @@ public class PublisherIGLoader extends PublisherBase {
     pf.rc.setShowSummaryTable(false);
     pf.rc.setInferResourceConformance(pf.inferResourceConformance);
     pf.rc.setWcagConformant(pf.isWcagConformant());
+    // resources aren't structurally changed once they are loaded, so analysis done while rendering them can be kept
+    pf.rc.setCacheResourceAnalysis(true);
     for (FetchedFile f : pf.fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.getResource() instanceof CanonicalResource) {
@@ -3298,9 +3305,9 @@ public class PublisherIGLoader extends PublisherBase {
       } else if (contentType.contains("xml")) {
         res = new org.hl7.fhir.r5.formats.XmlParser(true).parse(source);
       } else if (contentType.contains("fml")) {
-        // don't need a context to parse, which is good since we don't have one
-        StructureMapUtilities mu = new StructureMapUtilities(null, null, null);
-        res = mu.parse(new String(source), "");
+        StructureMapTools mu = new StructureMapTools(pf.context, null, null);
+        mu.setExceptionsForChecks(false);
+        return mu.parse(new String(source), "");
       } else {
         throw new Exception("Unable to determine file type for "+name);
       }
@@ -3364,7 +3371,8 @@ public class PublisherIGLoader extends PublisherBase {
     for (StructureDefinition sd : pf.context.fetchResourcesByType(StructureDefinition.class)) {
       if (sd.getKind() == StructureDefinition.StructureDefinitionKind.RESOURCE && sd.getDerivation() == StructureDefinition.TypeDerivationRule.SPECIALIZATION) {
         String scope = sd.getUrl().substring(0, sd.getUrl().lastIndexOf("/"));
-        if (!"http://hl7.org/fhir/StructureDefinition".equals(scope) && !isCrossVersionScope(scope)) {
+        if (ExtensionUtilities.readBoolExtension(sd, ExtensionDefinitions.EXT_ADDITIONAL_RESOURCE)
+            || (!"http://hl7.org/fhir/StructureDefinition".equals(scope) && !isCrossVersionScope(scope))) {
           pf.customResourceNames.add(sd.getTypeTail());
         }
       }

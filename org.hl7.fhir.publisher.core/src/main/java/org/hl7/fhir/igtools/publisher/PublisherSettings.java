@@ -19,7 +19,6 @@ public class PublisherSettings {
     @Getter @Setter private boolean cacheVersion;
     @Getter @Setter private String targetOutput;
     @Getter @Setter private boolean publishing = false;
-    @Getter @Setter private String targetOutputNested;
     @Getter private Calendar startTime = Calendar.getInstance();
     @Getter @Setter private boolean rapidoMode;
     @Getter @Setter private boolean watchMode;

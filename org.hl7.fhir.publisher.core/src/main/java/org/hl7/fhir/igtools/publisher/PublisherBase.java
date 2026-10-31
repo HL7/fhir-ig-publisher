@@ -79,7 +79,7 @@ public class PublisherBase implements ILoggingService {
   }
 
   protected boolean isAdditionalResource(FetchedResource r) {
-    return pf.versionConvertorRegistry.isHandled(r.fhirType(), pf.context.getFHIRVersion());
+    return pf.versionConvertorRegistry.isHandled(r.fhirType(), "6.0.0", pf.context.getFHIRVersion());
   }
 
   @Nonnull
@@ -346,10 +346,6 @@ public class PublisherBase implements ILoggingService {
     return p.asString();
   }
 
-  public boolean isChild() {
-    return this.pf.isChild;
-  }
-
   protected String targetUrl() {
     if (settings.getMode() == null)
       return "file://"+ pf.outputDir;
@@ -416,7 +412,7 @@ public class PublisherBase implements ILoggingService {
       jp.compose(bs, VersionConvertorFactory_30_N.convertResource(res));
     } else if (VersionUtilities.isR4Ver(parseVersion)) {
       org.hl7.fhir.r4.formats.JsonParser jp = new org.hl7.fhir.r4.formats.JsonParser();
-      jp.compose(bs, VersionConvertorFactory_40_N.convertResource(res));
+      jp.compose(bs, pf.versionConvertorRegistry.convertToR4(res));
     } else if (VersionUtilities.isR4BVer(parseVersion)) {
       org.hl7.fhir.r4b.formats.JsonParser jp = new org.hl7.fhir.r4b.formats.JsonParser();
       jp.compose(bs, VersionConvertorFactory_43_N.convertResource(res));
@@ -428,7 +424,7 @@ public class PublisherBase implements ILoggingService {
       jp.compose(bs, VersionConvertorFactory_10_N.convertResource(res, new IGR2ConvertorAdvisor5()));
     } else if (VersionUtilities.isR5Ver(parseVersion)) {
       org.hl7.fhir.r5.formats.JsonParser jp = new org.hl7.fhir.r5.formats.JsonParser();
-      jp.compose(bs, VersionConvertorFactory_50_N.convertResource(res));
+      jp.compose(bs, pf.versionConvertorRegistry.convertToR5(res));
     } else {
       org.hl7.fhir.model.core.formats.JsonParser jp = new org.hl7.fhir.model.core.formats.JsonParser(pf.context.getModelContext());
       jp.compose(bs, res);
@@ -559,7 +555,9 @@ public class PublisherBase implements ILoggingService {
     res.add("SubscriptionTopic");
     res.add("Requirements");
     for (String s : pf.customResourceNames) {
-      res.remove(s);
+      if (!pf.context.getModelContext().getContextInformation().hasResource(s)) {
+        res.remove(s);
+      }
     }
     return res;
   }
@@ -1079,10 +1077,6 @@ public class PublisherBase implements ILoggingService {
     this.pf.webTxServer = webTxServer;
   }
 
-  public void setIsChild(boolean newIsChild) {
-    this.pf.isChild = newIsChild;
-  }
-
   public IGKnowledgeProvider getIgpkp() {
     return pf.igpkp;
   }
@@ -1097,10 +1091,6 @@ public class PublisherBase implements ILoggingService {
 
   public ImplementationGuide getPublishedIg() {
     return pf.publishedIg;
-  }
-
-  public String getTargetOutputNested() {
-    return settings.getTargetOutputNested();
   }
 
   protected FetchedResource getResourceForRef(FetchedFile f, String ref) {
