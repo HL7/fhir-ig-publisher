@@ -1652,7 +1652,7 @@ public class PublisherProcessor extends PublisherBase  {
               boolean ok = true;
               String tgturl = null;
               for (StructureMap.StructureMapStructureComponent st : map.getStructureList()) {
-                if (st.getMode() == StructureMap.StructureMapModelMode.TARGET) {
+                if (st.getMode() == StructureMap.StructureMapModelModeVS.TARGET) {
                   if (tgturl == null)
                     tgturl = st.getUrl();
                   else

@@ -187,7 +187,7 @@ public class IpaComparator {
           vi.context = new SimpleWorkerContext.SimpleWorkerContextBuilder(ModelContext.fullCoreContext()).withTerminologyCachePath(Utilities.path(context.getTxCache().getFolder(), vi.version)).fromPackage(core,
                   new PublisherLoader(core, SpecMapManager.fromPackage(core), core.getWebLocation(), null, false, ModelContext.fullCoreContext()).makeLoader(), true);
           //vi.context.initTS();
-          vi.context.connectToTSServer(context.getTxClientManager().getFactory(), context.getTxClientManager().getMasterClient(), false);
+          vi.context.connectToTSServer(context.getTxClientManager().getFactory(), context.getTxClientManager().getMasterClient(), null);
           vi.context.setExpansionParameters(context.getExpansionParameters());
           vi.context.setUcumService(context.getUcumService());
           vi.context.setLocale(context.getLocale());

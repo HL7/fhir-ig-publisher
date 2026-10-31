@@ -1272,7 +1272,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 //        pgen.setPattern(getNamedParam(args, "-pattern"));
 //      }
 //      pgen.execute();
-    } else if (CliParams.hasNamedParam(args, "-help") || CliParams.hasNamedParam(args, "-?") || CliParams.hasNamedParam(args, "/?") || CliParams.hasNamedParam(args, "?") || args.length == 0) {
+    } else if (CliParams.hasNamedParam(args, "-help") || CliParams.hasNamedParam(args, "--help") || CliParams.hasNamedParam(args, "-?") || CliParams.hasNamedParam(args, "/?") || CliParams.hasNamedParam(args, "?") || args.length == 0) {
       System.out.println("");
       System.out.println("To use this publisher to publish a FHIR Implementation Guide, run ");
       System.out.println("with the commands");
@@ -1289,6 +1289,11 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       System.out.println("-tx: (optional) Address to use for terminology server ");
       System.out.println("  (default is https://tx.fhir.org)");
       System.out.println("  use 'n/a' to run without a terminology server");
+      System.out.println("  nominating a server turns the terminology ecosystem off unless -ecosystem is given too");
+      System.out.println("");
+      System.out.println("-ecosystem: (optional) Address of the terminology ecosystem coordination server (tx-reg)");
+      System.out.println("  (default is https://ecosystem.hl7.org/tx-reg)");
+      System.out.println("  use 'n/a' to run without the ecosystem (all terminology requests go to the -tx server)");
       System.out.println("");
       System.out.println("-no-network: (optional) Stop the IG publisher accessing the network");
       System.out.println("  Beware: the ig -pubisher will not function properly if the network is prohibited");
@@ -1726,11 +1731,29 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   public static void setTxServerValue(String[] args, Publisher self) {
     if (CliParams.hasNamedParam(args, "-tx")) {
       self.settings.setTxServer(CliParams.getNamedParam(args, "-tx"));
+      // nominating a terminology server turns the ecosystem off - everything goes to that
+      // server - unless an ecosystem is nominated too (and then the nominated server stands
+      // in for tx.fhir.org in the ecosystem's answers)
+      self.settings.setEcosystem(ecosystemValue(args, null));
     } else if (CliParams.hasNamedParam(args, "-devtx")) {
       self.settings.setTxServer(FhirSettings.getTxFhirDevelopment());
+      self.settings.setEcosystem(ecosystemValue(args, FhirSettings.getTxEcosystem()));
     } else {
       self.settings.setTxServer(FhirSettings.getTxFhirProduction());
+      self.settings.setEcosystem(ecosystemValue(args, FhirSettings.getTxEcosystem()));
     }
+  }
+
+  /**
+   * the -ecosystem parameter: the terminology ecosystem coordination server (tx-reg), 
+   * or 'n/a' for none. null (no ecosystem) when there is no terminology server at all
+   */
+  private static String ecosystemValue(String[] args, String dflt) {
+    if (CliParams.hasNamedParam(args, "-ecosystem")) {
+      String e = CliParams.getNamedParam(args, "-ecosystem");
+      return "n/a".equals(e) ? null : e;
+    }
+    return dflt;
   }
 
   private static String generateIGFromSimplifier(String folder, String output, String canonical, String npmName, String license, List<String> packages) throws Exception {

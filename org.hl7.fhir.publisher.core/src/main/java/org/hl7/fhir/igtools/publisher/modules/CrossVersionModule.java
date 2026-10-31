@@ -42,7 +42,7 @@ import org.hl7.fhir.model.core.ImplementationGuide.ImplementationGuideDefinition
 import org.hl7.fhir.model.core.StructureDefinition.StructureDefinitionContextComponent;
 import org.hl7.fhir.model.core.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.model.core.StructureDefinition.TypeDerivationRule;
-import org.hl7.fhir.model.fml.StructureMap.StructureMapModelMode;
+import org.hl7.fhir.model.fml.StructureMap.StructureMapModelModeVS;
 import org.hl7.fhir.model.fml.StructureMap.StructureMapStructureComponent;
 import org.hl7.fhir.services.renderers.ConceptMapRenderer;
 import org.hl7.fhir.services.renderers.ConceptMapRenderer.RenderMultiRowSortPolicy;
@@ -457,9 +457,9 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
     String tgt = null;
     for (StructureMapStructureComponent u : sm.getStructureList()) {
       String v = VersionUtilities.getNameForVersion(VersionUtilities.getMajMin(u.getUrl()));
-      if (u.getMode() == StructureMapModelMode.SOURCE) {
+      if (u.getMode() == StructureMapModelModeVS.SOURCE) {
         src = v;
-      } else if (u.getMode() == StructureMapModelMode.TARGET) {
+      } else if (u.getMode() == StructureMapModelModeVS.TARGET) {
         tgt = v;
       }
     }
@@ -473,8 +473,8 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
     for (StructureMap sm : engine.getStructureMaps().values()) {
       for (StructureMapStructureComponent u : sm.getStructureList()) {
         if (u.getUrl().equals(url)) {
-          if ((inwards && u.getMode() == StructureMapModelMode.SOURCE) ||
-              (!inwards && u.getMode() == StructureMapModelMode.TARGET)) {
+          if ((inwards && u.getMode() == StructureMapModelModeVS.SOURCE) ||
+              (!inwards && u.getMode() == StructureMapModelModeVS.TARGET)) {
             res.add(sm);
           }
         }

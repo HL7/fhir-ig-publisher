@@ -282,6 +282,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         db.finishResources();
       }
 
+      generateConstants();
       generateViewDefinitions(db);
       if (!pf.changeList.isEmpty()) {
         if (isNewML()) {
@@ -572,6 +573,18 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
   }
 
+  private void generateConstants() throws IOException {
+    fragment("ul-open", "<ul>", pf.otherFilesRun, System.currentTimeMillis(), "ul-open",  "constant", null);
+    fragment("ul-close", "</ul>", pf.otherFilesRun, System.currentTimeMillis(), "ul-close",  "constant", null);
+    fragment("ol-open", "<ol>", pf.otherFilesRun, System.currentTimeMillis(), "ol-open",  "constant", null);
+    fragment("ol-close", "</ol>", pf.otherFilesRun, System.currentTimeMillis(), "ol-close",  "constant", null);
+    fragment("table-grid-open", "<table class=\"grid\">", pf.otherFilesRun, System.currentTimeMillis(), "table-grid-open",  "constant", null);
+    fragment("table-grid-close", "</table>", pf.otherFilesRun, System.currentTimeMillis(), "table-grid-close",  "constant", null);
+    fragment("table-list-open", "<table class=\"list\">", pf.otherFilesRun, System.currentTimeMillis(), "table-list-open",  "constant", null);
+    fragment("table-list-close", "</table>", pf.otherFilesRun, System.currentTimeMillis(), "table-list-close",  "constant", null);
+
+  }
+
   /**
    * Ensure a finished package declares the correct target FHIR core dependency (patching R5/R6 packages
    * that FHIR core's {@code packageForVersion} leaves without one - the base package, the {@code .r5}
@@ -728,20 +741,20 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
               }
               byte[] src = loadTranslationSource(f, l);
               if (f.getPath().endsWith(".md")) {
-                checkMakeFile(processCustomLiquid(db, stripFrontMatter(src), f, lang), dst, f.getOutputNames());
+                checkMakeFile(processCustomLiquid(db, seatMarkdownPage(f, o, stripFrontMatter(src)), f, lang), dst, f.getOutputNames());
               } else {
                 checkMakeFile(processCustomLiquid(db, src, f, lang), dst, f.getOutputNames());
               }
             }
             dst = Utilities.path(this.pf.tempDir, o.getRelativePath());
             if (f.getPath().endsWith(".md")) {
-              checkMakeFile(processCustomLiquid(db, stripFrontMatter(f.getSource()), f, lang), dst, f.getOutputNames());
+              checkMakeFile(processCustomLiquid(db, seatMarkdownPage(f, o, stripFrontMatter(f.getSource())), f, lang), dst, f.getOutputNames());
             } else {
               checkMakeFile(processCustomLiquid(db, f.getSource(), f, lang), dst, f.getOutputNames());
             }
           } else {
             if (f.getPath().endsWith(".md")) {
-              checkMakeFile(processCustomLiquid(db, stripFrontMatter(f.getSource()), f, lang), dst, f.getOutputNames());
+              checkMakeFile(processCustomLiquid(db, seatMarkdownPage(f, o, stripFrontMatter(f.getSource())), f, lang), dst, f.getOutputNames());
             } else {
               checkMakeFile(processCustomLiquid(db, f.getSource(), f, lang), dst, f.getOutputNames());
             }
@@ -912,6 +925,24 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       }
     }
   }
+  /**
+   * An instance of a logical model, loaded as a Binary (see PublisherIGLoader.loadAsElementModel):
+   * the FetchedResource is a Binary, but its element is the logical model's type.
+   */
+  static boolean isLogicalAsBinary(FetchedResource r, Element element) {
+    return "Binary".equals(r.fhirType()) && element != null && !"Binary".equals(element.fhirType());
+  }
+
+  /** The content of a logical model instance (JSON), as a Binary resource (JSON). */
+  private byte[] wrapAsBinary(String id, byte[] content) throws IOException {
+    Binary bin = new Binary(pf.context.getModelContext(), "application/json");
+    bin.setId(id);
+    bin.setContent(content);
+    ByteArrayOutputStream b = new ByteArrayOutputStream();
+    new JsonParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.NORMAL).compose(b, bin);
+    return b.toByteArray();
+  }
+
   private void saveNativeResourceOutputFormats(FetchedFile f, FetchedResource r, Element element, String lang) throws IOException, FileNotFoundException {
     String path;
     if (wantGen(r, "xml") || forHL7orFHIR()) {
@@ -1298,6 +1329,53 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
   }
 
+  /**
+   * Sit the markdown of a template-wrapped page under the page title the template gives it.
+   *
+   * <p>A page with generation=markdown is rendered by the template's md page layout, which emits the
+   * page title as an h2 and then includes the markdown from {@code _includes/<page>.md}. Authors
+   * write that markdown as if it were the whole document (a Keep a Changelog file opens with
+   * '# Changelog' and has a '## [version]' per release), so its headings compete with the title, the
+   * page fails the heading structure checks, and 'page-heading-level' never touches it because it
+   * has more than one root. This is the markdown counterpart of {@link #seatNarrative}, and uses the
+   * same level ({@code pf.narrativeHeadingLevel}) for the same reason.
+   *
+   * <p>Only the {@code _includes} copy of an actual markdown page is seated - other markdown in
+   * {@code _includes} is included at places nobody can know from here. Markdown too deeply nested to
+   * shift is left as it is, and the inspector reports the page.
+   */
+  private byte[] seatMarkdownPage(FetchedFile f, FetchedFile.Output o, byte[] src) throws IOException {
+    if (pf.mdTemplate == null || pf.publishedIg == null || !isTemplatedMarkdownPage(o.getRelativePath(), pf.publishedIg.getDefinition().getPage())) {
+      return src;
+    }
+    String md = new String(src, StandardCharsets.UTF_8);
+    try {
+      String seated = MarkdownHeadingSeater.seat(md, pf.narrativeHeadingLevel);
+      return seated == md ? src : seated.getBytes(StandardCharsets.UTF_8);
+    } catch (FHIRException e) {
+      log("Note: the headings in "+f.getPath()+" could not be fitted under the page heading: "+e.getMessage());
+      return src;
+    }
+  }
+
+  /**
+   * True if relativePath is the {@code _includes} source of a page that {@link #applyPageTemplate}
+   * wraps in the md page template - same tests as there.
+   */
+  private boolean isTemplatedMarkdownPage(String relativePath, ImplementationGuide.ImplementationGuideDefinitionPageComponent page) throws IOException {
+    String p = page.getName();
+    if (p != null && p.endsWith(".html") && page.getGeneration() == ImplementationGuide.GuidePageGeneration.MARKDOWN && !pf.relativeNames.containsKey(p)
+        && relativePath.equals(Utilities.path("_includes", p.substring(0, p.indexOf(".html")) + ".md"))) {
+      return true;
+    }
+    for (ImplementationGuide.ImplementationGuideDefinitionPageComponent childPage : page.getPageList()) {
+      if (isTemplatedMarkdownPage(relativePath, childPage)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private List<ProvenanceDetails> loadProvenanceForBundle(String path, Element bnd, FetchedFile f) throws Exception {
     List<ProvenanceDetails> ret = new ArrayList<>();
     List<Element> entries = bnd.getChildrenByName("entry");
@@ -1516,7 +1594,11 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
     if (wantGen(fr, "content")) {
       long start = System.currentTimeMillis();
-      fragment("CodeSystem-"+prefixForContainer+cs.getId()+"-content", csr.content(this.pf.otherFilesRun), f.getOutputNames(), fr, vars, null, start, "content", "CodeSystem", lang);
+      fragment("CodeSystem-"+prefixForContainer+cs.getId()+"-content", csr.content(this.pf.otherFilesRun, true), f.getOutputNames(), fr, vars, null, start, "content", "CodeSystem", lang);
+    }
+    if (wantGen(fr, "content-noprop")) {
+      long start = System.currentTimeMillis();
+      fragment("CodeSystem-"+prefixForContainer+cs.getId()+"-content-noprop", csr.content(this.pf.otherFilesRun, false), f.getOutputNames(), fr, vars, null, start, "content", "CodeSystem", lang);
     }
     if (wantGen(fr, "xref")) {
       long start = System.currentTimeMillis();
@@ -2513,7 +2595,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
     if (checkMakeFile(FileUtilities.stringToBytes(wrapLiquid(fixedContent)), Utilities.path(pf.tempDir, "_includes", name+(lang == null ? "" : "-" + lang)+".xhtml"), outputTracker)) {
       if (settings.getMode() != PublisherUtils.IGBuildMode.AUTOBUILD && pf.makeQA) {
-        FileUtilities.stringToFile(pageWrap(fixedContent, name), Utilities.path(pf.qaDir, name+".html"));
+        FileUtilities.stringToFile(pageWrap(fixedContent, name), Utilities.path(pf.qaDir, name+(lang == null ? "" : "-" + lang)+".html"));
       }
     }
     // For multi-language IGs, also write a non-suffixed copy for the default language
@@ -5839,7 +5921,38 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
     Element eNN = baseElement;
     jp.compose(baseElement, bsj, OutputStyle.NORMAL, this.pf.igpkp.getCanonical());
-    if (!r.isCustomResource()) {
+    if (!r.isCustomResource() && isLogicalAsBinary(r, element)) {
+      // An instance of a logical model (a type that isn't a resource, and isn't loaded as one) is
+      // loaded as a Binary, and that is how the IG refers to it: Binary/{id}. So that is what
+      // goes in the packages - the instance, wrapped as a Binary, as Binary-{id}.json. (It used
+      // to be written as is, named {logical type}-{id}.json - FeatureDefinition-FeatureDefinition-X.json
+      // for FeatureDefinition-X.json - so the Binary the IG refers to wasn't in the package at all)
+      NPMPackageGenerator.Category cat = isExample(f, r) ? NPMPackageGenerator.Category.EXAMPLE : NPMPackageGenerator.Category.RESOURCE;
+      String name = "Binary-"+r.getId()+".json";
+      if (includedInVersion(r, this.pf.version)) {
+        this.pf.npm.addFile(cat, name, wrapAsBinary(r.getId(), bsj.toByteArray()));
+        if (isNewML()) {
+          for (String l : allLangs()) {
+            Element le = this.pf.langUtils.copyToLanguage(baseElement, l, true, r.getElement().getChildValue("language"), pf.defaultTranslationLang, r.getErrors());
+            ByteArrayOutputStream bsjl = new ByteArrayOutputStream();
+            jp.compose(le, bsjl, OutputStyle.NORMAL, this.pf.igpkp.getCanonical());
+            this.pf.lnpms.get(l).addFile(cat, name, wrapAsBinary(r.getId(), bsjl.toByteArray()));
+          }
+        }
+      }
+      for (String v : this.pf.generateVersions) {
+        String ver = VersionUtilities.versionFromCode(v);
+        if (!includedInVersion(r, ver)) {
+          if (this.pf.cvAnalyser != null) {
+            this.pf.cvAnalyser.recordOmission(ver, r.fhirType()+"/"+r.getId());
+          }
+          continue;
+        }
+        // a Binary is the same in every version, and the instance inside it is not a FHIR resource,
+        // so there is nothing to convert
+        this.pf.vnpms.get(v).addFile(cat, name, wrapAsBinary(r.getId(), bsj.toByteArray()));
+      }
+    } else if (!r.isCustomResource()) {
       if (includedInVersion(r, this.pf.version)) {
         this.pf.npm.addFile(isExample(f,r ) ? NPMPackageGenerator.Category.EXAMPLE : NPMPackageGenerator.Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", bsj.toByteArray());
         if (isNewML()) {
@@ -5925,7 +6038,15 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     saveNativeResourceOutputFormats(f, r, element, "");
     for (String lang : allLangs()) {
       Element e = (Element) element.copy(Base.COPY_DATA);
-      if (this.pf.langUtils.switchLanguage(e, lang, true, r.getElement().getChildValue("language"), pf.defaultTranslationLang, r.getErrors())) {
+      boolean changed = this.pf.langUtils.switchLanguage(e, lang, true, r.getElement().getChildValue("language"), pf.defaultTranslationLang, r.getErrors());
+      // With the multi-language template format, every language folder gets the resource's format
+      // pages (X.json.html etc.), and their "Raw" and "Download" links are relative - to X.json in
+      // that folder. So the raw files have to be there even when there was nothing to translate
+      // (switchLanguage reports no change - a custom resource such as a FeatureDefinition, wrapped
+      // as a Binary, is not marked with a language), or every one of those links is broken.
+      // In the old format the language copies are written over the root files, so there, only
+      // write them when the language actually changed something.
+      if (changed || this.settings.isNewMultiLangTemplateFormat()) {
         saveNativeResourceOutputFormats(f, r, e, lang);
       }
     }

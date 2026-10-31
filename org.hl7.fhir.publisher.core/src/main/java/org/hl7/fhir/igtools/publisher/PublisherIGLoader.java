@@ -1054,11 +1054,11 @@ public class PublisherIGLoader extends PublisherBase {
         pf.context.setCanRunWithoutTerminology(true);
         pf.txLog = null;
       } else {
-        log("Connect to Terminology Server at "+ settings.getTxServer());
-        pf.context.connectToTSServer(new TerminologyClientFactory(pf.version), settings.getTxServer(), "fhir/publisher", pf.txLog, true);
+        log("Connect to Terminology Server at "+ settings.getTxServer()+(settings.getEcosystem() == null ? " (no ecosystem)" : " (ecosystem: "+settings.getEcosystem()+")"));
+        pf.context.connectToTSServer(new TerminologyClientFactory(pf.version), settings.getTxServer(), "fhir/publisher", pf.txLog, settings.getEcosystem());
       }
     } else {
-      pf.context.connectToTSServer(new TerminologyClientFactory(pf.version), pf.webTxServer.getAddress(), "fhir/publisher", pf.txLog, true);
+      pf.context.connectToTSServer(new TerminologyClientFactory(pf.version), pf.webTxServer.getAddress(), "fhir/publisher", pf.txLog, settings.getEcosystem());
     }
     if (expParams != null) {
       /* This call to uncheckedPath is allowed here because the path is used to
@@ -2808,7 +2808,11 @@ public class PublisherIGLoader extends PublisherBase {
     for (String dir : pf.translationSources) {
       File df = new File(Utilities.path(pf.rootDir, dir));
       if (df.exists()) {
-        for (String fn : df.list()) {
+        // sorted, so that translations come in the same order on every machine: File.list() makes no promise
+        // about the order, and the translation extensions are made in the order the units are found
+        String[] names = df.list();
+        Arrays.sort(names);
+        for (String fn : names) {
           if ((fn.startsWith(base+".") || fn.startsWith(base+"-") || fn.startsWith(base+"_")) ||
                   (fn.startsWith(tbase+".") || fn.startsWith(tbase+"-") || fn.startsWith(tbase+"_"))) {
             LanguageFileProducer lp = null;

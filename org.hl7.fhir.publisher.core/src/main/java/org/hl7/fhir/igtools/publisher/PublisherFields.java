@@ -271,7 +271,8 @@ public class PublisherFields {
     int validationLogTime = 0;
     /**
      * The heading level a resource's narrative is seated at when it is composed into a page
-     * (see PublisherGenerator.seatNarrative). 3 suits the stock templates, whose page title is an
+     * (see PublisherGenerator.seatNarrative), and that the headings of a markdown page are seated at
+     * under the template's page title (PublisherGenerator.seatMarkdownPage). 3 suits the stock templates, whose page title is an
      * h2; a template that titles its pages differently overrides it with the IG parameter
      * 'narrative-heading-level'.
      */

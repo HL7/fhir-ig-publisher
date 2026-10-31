@@ -224,7 +224,7 @@ public class JsonXhtmlRenderer implements JsonCreator {
 
   @Override
   public void externalLink(String ref) {
-    b.append("<a href=\""+Utilities.escapeXml(ref)+"\" style=\"color: Maroon\">&#x1F517;</a> ");
+    b.append("<a href=\""+Utilities.escapeXml(ref)+"\" class=\"targetLink\" aria-label=\"Link to the referenced resource (repeats the reference, can be ignored)\">&#x1F517;</a> ");
   }
 
   @Override
