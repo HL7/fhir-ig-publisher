@@ -268,6 +268,8 @@ public class DBBuilder {
   private int lastVSKey;
   private int lastCLKey;
   private int lastVLKey;
+  private boolean listAutoCommit = true;
+  private boolean inList;
 
   private long cumulativeTime;
   
@@ -1233,6 +1235,50 @@ public class DBBuilder {
     }
     time(start);
     System.out.println("DB Cumulative Time invested: "+Utilities.describeDuration(cumulativeTime));
+  }
+
+  /**
+   * Starts a transaction for a run of addToCSList or addToVSList calls. Each of those inserts several
+   * rows, and outside a transaction SQLite commits every row on its own. As before, a row that fails
+   * to insert ends that call (the rest of that entry's rows are not added) and other entries are kept.
+   */
+  public synchronized void startList() {
+    if (con == null) {
+      return;
+    }
+    try {
+      listAutoCommit = con.getAutoCommit();
+      con.setAutoCommit(false);
+      inList = true;
+    } catch (SQLException e) {
+      errors.add(e.getMessage());
+      if (debug) {
+        e.printStackTrace();
+      }
+    }
+  }
+
+  /** Commits the rows added since {@link #startList()}. */
+  public synchronized void finishList() {
+    if (con == null || !inList) {
+      return;
+    }
+    inList = false;
+    try {
+      try {
+        con.commit();
+      } catch (SQLException e) {
+        try { con.rollback(); } catch (SQLException ignored) {}
+        throw e;
+      } finally {
+        con.setAutoCommit(listAutoCommit);
+      }
+    } catch (SQLException e) {
+      errors.add(e.getMessage());
+      if (debug) {
+        e.printStackTrace();
+      }
+    }
   }
 
   public synchronized void addToCSList(int viewType, CodeSystem cs, Set<String> oids, Set<Resource> rl) {
