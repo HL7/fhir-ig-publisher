@@ -1,5 +1,6 @@
 package org.hl7.fhir.igtools.publisher.realm;
 
+import org.hl7.fhir.igtools.publisher.PackageListFetcher;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -244,7 +245,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
 
   private NpmPackage fetchLatestUSCore() throws IOException {
     try {
-      PackageList pl = PackageList.fromUrl("https://hl7.org/fhir/us/core/package-list.json");
+      PackageList pl = PackageListFetcher.fromUrl("https://hl7.org/fhir/us/core/package-list.json");
       for (PackageListEntry v : pl.versions()) {
         if (VersionUtilities.versionMatches(version, v.fhirVersion())) {
           return new FilesystemPackageCacheManager.Builder().build().loadPackage("hl7.fhir.us.core", v.version());
@@ -264,7 +265,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
 
   private NpmPackage fetchLatestUSPH() throws IOException {
     try {
-      PackageList pl = PackageList.fromUrl("https://hl7.org/fhir/us/ph-library/package-list.json");
+      PackageList pl = PackageListFetcher.fromUrl("https://hl7.org/fhir/us/ph-library/package-list.json");
       for (PackageListEntry v : pl.versions()) {
         if (VersionUtilities.versionMatches(version, v.fhirVersion())) {
           return new FilesystemPackageCacheManager.Builder().build().loadPackage("hl7.fhir.us.ph-library", v.version());

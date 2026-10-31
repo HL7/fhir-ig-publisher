@@ -34,6 +34,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
+import java.util.regex.Pattern;
 
 import lombok.Getter;
 import org.apache.commons.io.FileUtils;
@@ -111,6 +113,7 @@ public class Template {
   @Getter Map<String, TemplateFragmentTypeLoader.PrefixGroup> usedFragmentTypes;
   private boolean rapido;
   private boolean devMode;
+  private OutputListener outputListener;
 
   /** unpack the template into /template 
    * 
@@ -199,6 +202,14 @@ public class Template {
   }
 
   public void processTemplateTranslations(String defLang, List<String> langCodes) throws IOException {
+    // it writes the translation files again
+    writing("translations", translationOutputs(), () -> {
+      processTemplateTranslationFiles(defLang, langCodes);
+      return null;
+    });
+  }
+
+  private void processTemplateTranslationFiles(String defLang, List<String> langCodes) throws IOException {
     List<String> allLangCodes = new ArrayList<>();
     allLangCodes.add(defLang);
     allLangCodes.addAll(langCodes);
@@ -373,7 +384,82 @@ public class Template {
     return formatList;
   }
   
+  /**
+   * Told when the template writes to its own folder (templateDir): a script runs, or the translations are processed.
+   * Watch mode uses it for a template that is used in place (template = #template), whose folder is watched: what
+   * the build writes there is the build's own output, not a change that needs another build
+   */
+  public interface OutputListener {
+    /**
+     * @param folder  the folder written to (templateDir)
+     * @param window  what writes: the script target, or "translations"
+     * @param managed the paths (relative to folder, with '/') that are written there as the build's output; other
+     *                changes made meanwhile may be the user's
+     */
+    void writing(String folder, String window, Predicate<String> managed) throws IOException;
+
+    /** the writing has finished (or failed) */
+    void written() throws IOException;
+  }
+
+  private interface Writing<T> {
+    T run() throws IOException, FHIRException;
+  }
+
+  public void setOutputListener(OutputListener outputListener) {
+    this.outputListener = outputListener;
+  }
+
+  /**
+   * What a script target writes to the template folder:
+   * <ul>
+   *   <li>the IG it is given and gives back, under the names it is given (&lt;target&gt;-ig-working.json/xml and
+   *   &lt;target&gt;-ig-updated.xml/json), and what the base template's scripts derive from them
+   *   (&lt;target&gt;-ig-working.1.xml...)</li>
+   *   <li>its outcomes, &lt;target&gt;-validation.json/xml, and the files the base template's scripts gather them
+   *   from (ongenerate-validation-igqa.json...)</li>
+   *   <li>versions.txt (the base template's onGenerate.checkVersions)</li>
+   * </ul>
+   * (see runScriptTargetAnt() and scripts/ant.xml in fhir.base.template). Files directly in the folder only
+   */
+  static Predicate<String> scriptOutputs(String target) {
+    Pattern p = Pattern.compile("(" + Pattern.quote(target) + "-ig-(working|updated)\\.[^/]+"
+        + "|" + Pattern.quote(target) + "-validation[^/]*\\.(json|xml)"
+        + "|versions\\.txt)", Pattern.CASE_INSENSITIVE);
+    return path -> p.matcher(path).matches();
+  }
+
+  /** What processTemplateTranslations() writes: the translation files, directly in translations/ */
+  static Predicate<String> translationOutputs() {
+    Pattern p = Pattern.compile("translations/[^/]+\\.(po|json|xml)");
+    return path -> p.matcher(path).matches();
+  }
+
+  private <T> T writing(String window, Predicate<String> managed, Writing<T> work) throws IOException, FHIRException {
+    if (outputListener == null) {
+      return work.run();
+    }
+    outputListener.writing(templateDir, window, managed);
+    T res;
+    try {
+      res = work.run();
+    } catch (Throwable e) {
+      try {
+        outputListener.written();
+      } catch (IOException e2) {
+        e.addSuppressed(e2); // the failure itself is the one to report
+      }
+      throw e;
+    }
+    outputListener.written();
+    return res;
+  }
+
   private ImplementationGuide runScriptTarget(IWorkerContext context, String target, Map<String, List<ValidationMessage>> messages, ImplementationGuide ig, List<String> fileNames, int modifyIg) throws IOException, FHIRException {
+    return writing(target, scriptOutputs(target), () -> runScriptTargetAnt(context, target, messages, ig, fileNames, modifyIg));
+  }
+
+  private ImplementationGuide runScriptTargetAnt(IWorkerContext context, String target, Map<String, List<ValidationMessage>> messages, ImplementationGuide ig, List<String> fileNames, int modifyIg) throws IOException, FHIRException {
     if (!canExecute) {
       throw new FHIRException("Unable to execute '"+target+"' in script '"+script+"' as the template '"+templateThatCantExecute+"' is not trusted (reason: "+templateReason+")");
     }

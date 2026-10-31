@@ -1,5 +1,6 @@
 package org.hl7.fhir.igtools.publisher.comparators;
 
+import org.hl7.fhir.igtools.publisher.PackageListFetcher;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -150,7 +151,7 @@ public class IpsComparator {
       final String secureCanonical = ManagedWebAccess.makeSecureRef(canonical);
       String ppl = Utilities.pathURL(secureCanonical, "package-list.json");
       logger.logMessage("Fetch "+ppl+" for version check");
-      PackageList pl = PackageList.fromUrl(ppl);
+      PackageList pl = PackageListFetcher.fromUrl(ppl);
       if (!canonical.equals(pl.canonical())) {
         throw new FHIRException("Mismatch canonical URL");
       } else if (!pl.hasPid()) {
