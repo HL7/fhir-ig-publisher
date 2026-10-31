@@ -248,128 +248,131 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     pf.otherFilesRun.add(Utilities.path(pf.outputDir, "package.manifest.json"));
     pf.otherFilesRun.add(Utilities.path(pf.tempDir, "package.db"));
     DBBuilder db = pf.generatingDatabase ? new DBBuilder(Utilities.path(pf.tempDir, "package.db"), pf.context, pf.rc, pf.cu, pf.fileList) : null;
-    copyData();
-    for (String rg : pf.regenList) {
-      regenerate(rg);
-    }
-    for (FetchedFile f : pf.changeList) {
-      for (FetchedResource r : f.getResources()) {
-        if (r.getResource() != null) {
-          if (!r.getResource().hasWebPath()) {
-            r.getResource().setWebPath(pf.igpkp.getLinkFor(r, true));
+    try {
+      copyData();
+      for (String rg : pf.regenList) {
+        regenerate(rg);
+      }
+      for (FetchedFile f : pf.changeList) {
+        for (FetchedResource r : f.getResources()) {
+          if (r.getResource() != null) {
+            if (!r.getResource().hasWebPath()) {
+              r.getResource().setWebPath(pf.igpkp.getLinkFor(r, true));
+            }
           }
-        }
-        if (r.getElement() != null) {
-          if (!r.getElement().hasWebPath()) {
-            r.getElement().setWebPath(pf.igpkp.getLinkFor(r, true));
+          if (r.getElement() != null) {
+            if (!r.getElement().hasWebPath()) {
+              r.getElement().setWebPath(pf.igpkp.getLinkFor(r, true));
+            }
           }
         }
       }
-    }
 
-    updateImplementationGuide();
-    generateDataFile(db);
+      updateImplementationGuide();
+      generateDataFile(db);
 
-    logMessage("Generate Native Outputs");
+      logMessage("Generate Native Outputs");
 
-    for (FetchedFile f : pf.changeList) {
-      f.start("generate1");
+      for (FetchedFile f : pf.changeList) {
+        f.start("generate1");
+        try {
+          generateNativeOutputs(f, false, db);
+        } finally {
+          f.finish("generate1");
+        }
+      }
+      if (db != null) {
+        db.finishResources();
+      }
+
+      generateViewDefinitions(db);
+      if (!pf.changeList.isEmpty()) {
+        if (isNewML()) {
+          for (String l : allLangs()) {
+            generateSummaryOutputsBefore(db, l, pf.rcLangs.get(l));
+          }
+        } else {
+          generateSummaryOutputsBefore(db, null, pf.rc);
+        }
+      }
+      templateBeforeGenerate();
+      if (pf.saveExpansionParams) {
+        new JsonParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.NORMAL).compose(new FileOutputStream(Utilities.path(pf.tempDir, "parameters-expansion-parameters.json")), pf.context.getExpansionParameters());
+        new XmlParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.NORMAL).compose(new FileOutputStream(Utilities.path(pf.tempDir, "parameters-expansion-parameters.xml")), pf.context.getExpansionParameters());
+      }
+
+      logMessage("Generate HTML Outputs");
+      // the resources don't change while the html is generated, so what they use only needs to be worked out once
+      pf.sdUsageCache = new IdentityHashMap<>();
       try {
-        generateNativeOutputs(f, false, db);
+        for (FetchedFile f : pf.changeList) {
+          f.start("generate2");
+          try {
+            generateHtmlOutputs(f, false, db, null);
+          } finally {
+            f.finish("generate2");
+          }
+        }
       } finally {
-        f.finish("generate1");
+        pf.sdUsageCache = null;
       }
-    }
-    if (db != null) {
-      db.finishResources();
-    }
 
-    generateViewDefinitions(db);
-    if (!pf.changeList.isEmpty()) {
-      if (isNewML()) {
-        for (String l : allLangs()) {
-          generateSummaryOutputsBefore(db, l, pf.rcLangs.get(l));
+      logMessage("Generate Spreadsheets");
+      columnWidths = new ColumnWidthCache();
+      spreadsheetPrefetcher = startSpreadsheetPrefetcher();
+      try {
+        for (FetchedFile f : pf.changeList) {
+          f.start("generate2");
+          try {
+            generateSpreadsheets(f, false, db);
+          } finally {
+            f.finish("generate2");
+          }
         }
-      } else {
-        generateSummaryOutputsBefore(db, null, pf.rc);
-      }
-    }
-    templateBeforeGenerate();
-    if (pf.saveExpansionParams) {
-      new JsonParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.NORMAL).compose(new FileOutputStream(Utilities.path(pf.tempDir, "parameters-expansion-parameters.json")), pf.context.getExpansionParameters());
-      new XmlParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.NORMAL).compose(new FileOutputStream(Utilities.path(pf.tempDir, "parameters-expansion-parameters.xml")), pf.context.getExpansionParameters());
-    }
-
-    logMessage("Generate HTML Outputs");
-    // the resources don't change while the html is generated, so what they use only needs to be worked out once
-    pf.sdUsageCache = new IdentityHashMap<>();
-    try {
-      for (FetchedFile f : pf.changeList) {
-        f.start("generate2");
-        try {
-          generateHtmlOutputs(f, false, db, null);
-        } finally {
-          f.finish("generate2");
+      } finally {
+        if (spreadsheetPrefetcher != null) {
+          if (spreadsheetPrefetcher.getFallbacks() > 0) {
+            log("Spreadsheets: "+spreadsheetPrefetcher.getFallbacks()+" profile workbook(s) could not be built ahead, and were built in order instead");
+          }
+          spreadsheetPrefetcher.close();
+          spreadsheetPrefetcher = null;
         }
       }
+      if (pf.allProfilesCsv != null) {
+        pf.allProfilesCsv.dump();
+      }
+      if (pf.allProfilesXlsx != null) {
+        pf.allProfilesXlsx.configure();
+        String path = Utilities.path(pf.tempDir, "all-profiles.xlsx");
+        pf.allProfilesXlsx.finish(new FileOutputStream(path));
+        pf.otherFilesRun.add(Utilities.path(pf.tempDir, "all-profiles.xlsx"));
+        pf.allProfilesXlsx.dump();
+      }
+      columnWidths = null;
+
+      logMessage("Generate Summaries");
+
+
+      for (String s : pf.profileTestCases) {
+        logMessage("Running Profile Tests Cases in "+s);
+        new ProfileTestCaseExecutor(pf.rootDir, pf.context, pf.validator, pf.fileList).execute(s);
+      }
+      if (!pf.changeList.isEmpty()) {
+        if (isNewML()) {
+          for (String l : allLangs()) {
+            generateSummaryOutputsAfter(l, pf.rcLangs.get(l));
+          }
+        } else {
+          generateSummaryOutputsAfter(null, pf.rc);
+        }
+      }
+      pf.template.rapidoSummary();
+      genBasePages();
     } finally {
-      pf.sdUsageCache = null;
-    }
-
-    logMessage("Generate Spreadsheets");
-    columnWidths = new ColumnWidthCache();
-    spreadsheetPrefetcher = startSpreadsheetPrefetcher();
-    try {
-      for (FetchedFile f : pf.changeList) {
-        f.start("generate2");
-        try {
-          generateSpreadsheets(f, false, db);
-        } finally {
-          f.finish("generate2");
-        }
+      // close it even when generation fails, or the open file can't be deleted on Windows
+      if (db != null) {
+        db.closeUp();
       }
-    } finally {
-      if (spreadsheetPrefetcher != null) {
-        if (spreadsheetPrefetcher.getFallbacks() > 0) {
-          log("Spreadsheets: "+spreadsheetPrefetcher.getFallbacks()+" profile workbook(s) could not be built ahead, and were built in order instead");
-        }
-        spreadsheetPrefetcher.close();
-        spreadsheetPrefetcher = null;
-      }
-    }
-    if (pf.allProfilesCsv != null) {
-      pf.allProfilesCsv.dump();
-    }
-    if (pf.allProfilesXlsx != null) {
-      pf.allProfilesXlsx.configure();
-      String path = Utilities.path(pf.tempDir, "all-profiles.xlsx");
-      pf.allProfilesXlsx.finish(new FileOutputStream(path));
-      pf.otherFilesRun.add(Utilities.path(pf.tempDir, "all-profiles.xlsx"));
-      pf.allProfilesXlsx.dump();
-    }
-    columnWidths = null;
-
-    logMessage("Generate Summaries");
-
-
-    for (String s : pf.profileTestCases) {
-      logMessage("Running Profile Tests Cases in "+s);
-      new ProfileTestCaseExecutor(pf.rootDir, pf.context, pf.validator, pf.fileList).execute(s);
-    }
-    if (!pf.changeList.isEmpty()) {
-      if (isNewML()) {
-        for (String l : allLangs()) {
-          generateSummaryOutputsAfter(l, pf.rcLangs.get(l));
-        }
-      } else {
-        generateSummaryOutputsAfter(null, pf.rc);
-      }
-    }
-    pf.template.rapidoSummary();
-    genBasePages();
-
-    if (db != null) {
-      db.closeUp();
     }
     FileUtilities.bytesToFile(pf.extensionTracker.generate(), Utilities.path(pf.tempDir, "usage-stats.json"));
     try {

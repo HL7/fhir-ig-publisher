@@ -1,0 +1,11 @@
+{
+  "resourceType": "StructureDefinition",
+  "id": "CustomRecord",
+  "url": "http://example.org/fhir/StructureDefinition/CustomRecord",
+  "name": "CustomRecord",
+  "status": "draft",
+  "kind": "resource",
+  "abstract": false,
+  "type": "CustomRecord",
+  "derivation": "specialization"
+}

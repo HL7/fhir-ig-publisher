@@ -1,0 +1,17 @@
+{
+  "resourceType": "StructureDefinition",
+  "id": "LogicalRecord",
+  "url": "http://example.org/fhir/StructureDefinition/LogicalRecord",
+  "name": "LogicalRecord",
+  "status": "draft",
+  "kind": "logical",
+  "abstract": false,
+  "type": "LogicalRecord",
+  "derivation": "specialization",
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/tools/StructureDefinition/additional-resource",
+      "valueBoolean": true
+    }
+  ]
+}

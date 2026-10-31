@@ -1,0 +1,17 @@
+{
+  "resourceType": "StructureDefinition",
+  "id": "Patient",
+  "url": "http://hl7.org/fhir/StructureDefinition/Patient",
+  "name": "Patient",
+  "status": "draft",
+  "kind": "resource",
+  "abstract": false,
+  "type": "Patient",
+  "derivation": "specialization",
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/tools/StructureDefinition/additional-resource",
+      "valueBoolean": false
+    }
+  ]
+}
