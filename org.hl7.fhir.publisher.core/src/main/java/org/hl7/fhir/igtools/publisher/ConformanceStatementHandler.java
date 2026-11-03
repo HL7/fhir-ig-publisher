@@ -2,6 +2,7 @@ package org.hl7.fhir.igtools.publisher;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -17,6 +18,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.lang3.StringUtils;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_50_N;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.HTMLInspector.LoadedFile;
 import org.hl7.fhir.igtools.publisher.HTMLInspector.XhtmlNodeHolder;
@@ -373,12 +375,28 @@ class ConformanceStatementHandler {
     
     if (mismatch) {
       String fname = Utilities.path(reqFolder, "Requirements-fromNarrative.json");
-      FileOutputStream fs = new FileOutputStream(fname);
       if (!oldReq.isEmpty())
         messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Requirements/fromNarrative", "There are differences between the requirements found in the narrative and what's found the provided Requirements resource.  A new version has been generated in the root.  It should be used to replace the one in the input folder.",
             IssueSeverity.WARNING));
-        
-      new org.hl7.fhir.model.core.formats.JsonParser(context.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(fs, req);
+
+      try (FileOutputStream fs = new FileOutputStream(fname)) {
+        composeRequirements(fs, req, context);
+      }
+    }
+  }
+
+  /**
+   * Writes the generated Requirements resource in the format the publisher expects when it is copied
+   * into the input folder. In an R4/R4B/R5 IG Requirements is a special type that is authored (and
+   * loaded, see PublisherIGLoader.parseContent) as R5, so it has to be written as R5: otherwise
+   * actor is written in the R6 shape (reference + key) and the next build can't parse it.
+   */
+  static void composeRequirements(OutputStream stream, Requirements req, IWorkerContext context) throws IOException {
+    if (SpecialTypeHandler.handlesType(req.fhirType(), context.getFHIRVersion())) {
+      new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(org.hl7.fhir.r5.formats.IParser.OutputStyle.PRETTY)
+        .compose(stream, VersionConvertorFactory_50_N.convertResource(req));
+    } else {
+      new org.hl7.fhir.model.core.formats.JsonParser(context.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(stream, req);
     }
   }
   
