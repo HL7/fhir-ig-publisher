@@ -287,6 +287,54 @@ class ConformanceStatementHandlerTest {
         loaded.getStatementList().get(0).getExtensionByUrl(ConformanceStatementHandler.EXT_CSACTOR).getValue().primitiveValue());
   }
 
+  /**
+   * https://github.com/HL7/fhir-ig-publisher/issues/1449#issuecomment-6607441479: a file written by an older publisher
+   * (or converted by hand) carries the actor key in requirements-actorkey, which is dropped when it is loaded, so the
+   * actor list must not be treated as up to date, otherwise the regenerated file loses the keys
+   */
+  @Test
+  void regeneratesActorsWhenKeyIsLostOnLoad() throws Exception {
+    ActorDefinition actor = new ActorDefinition();
+    actor.setId("client");
+    actor.setUrl("http://example.org/ig/ActorDefinition/client");
+
+    String legacy = "{\"resourceType\":\"Requirements\",\"id\":\"fromNarrative\",\"status\":\"active\","
+        + "\"actor\":[\"http://example.org/ig/ActorDefinition/client\"],"
+        + "\"_actor\":[{\"extension\":[{\"url\":\"" + ConformanceStatementHandler.EXT_REQACTORKEY + "\",\"valueId\":\"client\"}]}]}";
+    assertFalse(ConformanceStatementHandler.actorsMatch(loadAsSpecialType(legacy.getBytes()), List.of(actor)));
+
+    Requirements req = new Requirements();
+    req.setId("fromNarrative");
+    req.addActor().setReference(actor.getUrl()).setKey(actor.getId());
+    IWorkerContext context = mock(IWorkerContext.class);
+    when(context.getFHIRVersion()).thenReturn("4.0.1");
+    ByteArrayOutputStream stream = new ByteArrayOutputStream();
+    ConformanceStatementHandler.composeRequirements(stream, req, context);
+    assertTrue(ConformanceStatementHandler.actorsMatch(loadAsSpecialType(stream.toByteArray()), List.of(actor)));
+  }
+
+  @Test
+  void actorsMatchRequiresSameUrlsAndKeys() {
+    ActorDefinition client = new ActorDefinition();
+    client.setId("client");
+    client.setUrl("http://example.org/ig/ActorDefinition/client");
+    ActorDefinition server = new ActorDefinition();
+    server.setId("server");
+    server.setUrl("http://example.org/ig/ActorDefinition/server");
+
+    Requirements req = new Requirements();
+    req.addActor().setReference(client.getUrl()).setKey("client");
+    assertTrue(ConformanceStatementHandler.actorsMatch(req, List.of(client)));
+    assertFalse(ConformanceStatementHandler.actorsMatch(req, List.of(client, server)));
+    assertFalse(ConformanceStatementHandler.actorsMatch(req, List.of(server)));
+    req.getActorList().get(0).setKey("other");
+    assertFalse(ConformanceStatementHandler.actorsMatch(req, List.of(client)));
+  }
+
+  private static Requirements loadAsSpecialType(byte[] source) throws Exception {
+    return (Requirements) VersionConvertorFactory_50_N.convertResource(new org.hl7.fhir.r5.formats.JsonParser(true).parse(source));
+  }
+
   private static Stream<String> metadata() {
     return Stream.of(
         "qtyEq1",

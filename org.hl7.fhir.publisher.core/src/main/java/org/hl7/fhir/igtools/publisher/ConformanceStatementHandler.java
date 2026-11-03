@@ -226,15 +226,9 @@ class ConformanceStatementHandler {
         oldReq.put(comp.getKey(), comp);
       }
       req.setStatementList(new ArrayList<>());
-      if (req.getActorList().size()!=this.usedActors.size())
+      if (!actorsMatch(req, usedActors.values()))
         mismatch = true;
-      else {
-        for (ActorDefinition actor: usedActors.values()) {
-          if(!req.hasActor(actor.getUrl()))
-            mismatch = true;
-        }
-      }
-      
+
     } else {
       req = new Requirements();
       req.setId("fromNarrative");
@@ -383,6 +377,26 @@ class ConformanceStatementHandler {
         composeRequirements(fs, req, context);
       }
     }
+  }
+
+  /**
+   * True if the Requirements lists exactly these actors, each with its id as key. A file written by an older
+   * publisher carries the key in the tools extension requirements-actorkey, which is not converted when the
+   * file is loaded as R5, so its actors have no key and the actor list has to be regenerated
+   */
+  static boolean actorsMatch(Requirements req, Collection<ActorDefinition> actors) {
+    if (req.getActorList().size() != actors.size())
+      return false;
+    for (ActorDefinition actor : actors) {
+      boolean found = false;
+      for (Requirements.RequirementsActorComponent actorRef : req.getActorList()) {
+        if (actor.getUrl().equals(actorRef.getReference()) && actor.getId().equals(actorRef.getKey()))
+          found = true;
+      }
+      if (!found)
+        return false;
+    }
+    return true;
   }
 
   /**
