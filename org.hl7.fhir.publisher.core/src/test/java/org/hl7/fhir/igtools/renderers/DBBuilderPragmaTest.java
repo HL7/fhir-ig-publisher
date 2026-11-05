@@ -51,6 +51,10 @@ class DBBuilderPragmaTest {
         ps.executeBatch();
       }
       con.commit();
+      // a tiny page cache makes the rolled-back changes spill to the file, so the rollback has to use the journal
+      try (Statement st = con.createStatement()) {
+        st.execute("PRAGMA cache_size=1");
+      }
       try (PreparedStatement ps = con.prepareStatement("insert into Refs (Key, Ref) values (?, ?)")) {
         for (int i = 0; i < 500; i++) {
           ps.setInt(1, -i);
@@ -89,6 +93,10 @@ class DBBuilderPragmaTest {
         rs.next();
         assertEquals("memory", rs.getString(1));
       }
+      try (ResultSet rs = st.executeQuery("PRAGMA synchronous")) {
+        rs.next();
+        assertEquals(0, rs.getInt(1));
+      }
       try (ResultSet rs = st.executeQuery("select name, value from Metadata")) {
         rs.next();
         assertEquals("name", rs.getString(1));
@@ -96,7 +104,6 @@ class DBBuilderPragmaTest {
       }
     }
     builder.closeUp();
-    assertEquals(false, Files.exists(dir.resolve("package.db-journal")));
   }
 
   @Test
@@ -112,8 +119,13 @@ class DBBuilderPragmaTest {
           rs.next();
           assertEquals(0, rs.getInt(1));
         }
+        // with the default journal mode a -journal file would exist while this transaction is open
+        st.execute("CREATE TABLE T (V integer)");
+        con.setAutoCommit(false);
+        st.execute("insert into T (V) values (1)");
+        assertEquals(false, Files.exists(dir.resolve("p.db-journal")));
+        con.rollback();
       }
     }
-    assertEquals(false, Files.exists(dir.resolve("p.db-journal")));
   }
 }
