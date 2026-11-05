@@ -190,6 +190,7 @@ public class PublicationProcess {
     checkAbsolute(res, templateSrc, "-templates");
     checkAbsolute(res, temp, "-temp");
     checkAbsolute(res, igBuildZipParam, "-zips");
+    checkAbsolute(res, getNamedParam(args, "-binaries"), "-binaries");
     if (res.size() > 0) {
       return res;
     }
@@ -277,6 +278,14 @@ public class PublicationProcess {
             destination, workingRoot, res, src, id, pubSetup, fSource, fRoot, fRegistry, fHistory, 
             jsonXmlClones, igBuildZipDir, prSrc, mode);
       } else {
+        // the release binaries go where the publication request says, or else where the layout rule says. The
+        // location is recorded on the version in the package-list, so changing the rule doesn't move past releases
+        if (prSrc.has(ReleaseBinaries.PROPERTY)) {
+          System.out.println("Release binaries will be held at "+prSrc.asString(ReleaseBinaries.PROPERTY)+" (from the publication request)");
+        } else if (rules.has(ReleaseBinaries.PROPERTY)) {
+          prSrc.set(ReleaseBinaries.PROPERTY, ReleaseBinaries.fromPattern(calcByRule(rules.str(ReleaseBinaries.PROPERTY), p), id, prSrc.asString("version")));
+          System.out.println("Release binaries will be held at "+prSrc.asString(ReleaseBinaries.PROPERTY)+" (from the layout rule)");
+        }
         // check the output
         File fOutput = checkDirectory(Utilities.path(source, "output"), res, "Publication Source");
         File fQA = checkFile(Utilities.path(source, "output", "qa.json"), res, "Publication QA info");
@@ -458,6 +467,10 @@ public class PublicationProcess {
     check(res, prSrc.has("desc") || prSrc.has("descmd"), "Source publication request has no description for v"+version);
     String pathVer = prSrc.asString("path");
     String vCode = pathVer.substring(pathVer.lastIndexOf("/")+1);
+    if (prSrc.has(ReleaseBinaries.PROPERTY)) {
+      String problem = ReleaseBinaries.checkLocation(prSrc.asString(ReleaseBinaries.PROPERTY), pathVer);
+      check(res, problem == null, problem);
+    }
 
 
     check(res, canonicalMisMatch || pathVer.equals(Utilities.pathURL(canonical, vCode)), "Source publication request path is wrong - is '"+pathVer+"', doesn't match expected based on canonical of '"+Utilities.pathURL(canonical, vCode)+"')");
@@ -639,6 +652,7 @@ public class PublicationProcess {
     // ok. all our tests have passed.
     // 1. do the publication build(s)
     List<String> existingFiles = new ArrayList<>();
+    String binariesInstructions = null;
     if (mode == PublicationProcessMode.CREATION) {
       System.out.println("All checks passed. Create an empty history at "+destination);              
     } else {
@@ -687,7 +701,7 @@ public class PublicationProcess {
       System.out.println("Update "+Utilities.path(destination, "package-list.json"));    
       PackageListEntry plVer = updatePackageList(pl, fSource.getAbsolutePath(), prSrc, pathVer,  Utilities.path(destination, "package-list.json"), mode, date,
               npm.fhirVersion(), Utilities.pathURL(pubSetup.asString("url"), tcName), subPackages, prSrc.asString("previouslyPublishedAs"));
-      updatePublishBox(pl, plVer, destVer, destVer, pathVer, destination, fRoot.getAbsolutePath(), false, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null, url, jsonXmlClones);
+      updatePublishBox(pl, plVer, destVer, destVer, pathVer, destination, fRoot.getAbsolutePath(), false, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null, url, jsonXmlClones, true);
 
       if (mode != PublicationProcessMode.WORKING || prSrc.has("movedFrom")) {
         String igSrc = tempM == null ? null : Utilities.path(tempM.getAbsolutePath(), "output");
@@ -719,7 +733,7 @@ public class PublicationProcess {
                 String vCode = pv.substring(pv.lastIndexOf("/")+1);
                 String dv = Utilities.path(fRoot, relPath);
                 System.out.println("Update publish box for version "+v.version()+" @ "+v.path());
-                updatePublishBox(pl, v, dv, dv, pv, destination, fRoot.getAbsolutePath(), false, null, null, null, url, jsonXmlClones);
+                updatePublishBox(pl, v, dv, dv, pv, destination, fRoot.getAbsolutePath(), false, null, null, null, url, jsonXmlClones, ReleaseBinaries.location(v) == null);
               }
             }
           }
@@ -741,11 +755,11 @@ public class PublicationProcess {
           }
           String vCode = tcPath.substring(tcPath.lastIndexOf("/")+1);
           String dv = Utilities.path(destination, vCode);
-          updatePublishBox(pl, tcVer, dv, dv, tcPath, destination, fRoot.getAbsolutePath(), false, null, null, null, url, jsonXmlClones);
+          updatePublishBox(pl, tcVer, dv, dv, tcPath, destination, fRoot.getAbsolutePath(), false, null, null, null, url, jsonXmlClones, ReleaseBinaries.location(tcVer) == null);
         }
         // we do this first in the output so we can get a proper diff
         if (igSrc != null) {
-          updatePublishBox(pl, plVer, igSrc, destination, pathVer, igSrc, fRoot.getAbsolutePath(), true, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null, url, jsonXmlClones);
+          updatePublishBox(pl, plVer, igSrc, destination, pathVer, igSrc, fRoot.getAbsolutePath(), true, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null, url, jsonXmlClones, true);
 
           System.out.println("Check for Files to delete");
           List<String> newFiles = igSrc == null ? new ArrayList<>() : FileUtilities.listAllFiles(igSrc, null);
@@ -773,7 +787,7 @@ public class PublicationProcess {
               ignoreList.add(Utilities.path(dpath, v.path().substring(path.length()+1)));
             }
           }
-          updatePublishBox(pl, pl.current(), dpath, dpath, path, dpath, fRoot.getAbsolutePath(), true, null, null, ignoreList, url, jsonXmlClones);
+          updatePublishBox(pl, pl.current(), dpath, dpath, path, dpath, fRoot.getAbsolutePath(), true, null, null, ignoreList, url, jsonXmlClones, true);
         }
       } else {
         src.cleanFolder(relDest);
@@ -797,6 +811,17 @@ public class PublicationProcess {
       }
       updateRegistry(fRegistry, pl, plVer, npmB, prSrc.asString("registry-description"), prSrc.asString("registry-country"),
               prSrc.asString("registry-authority"), null, replaces);
+      String binariesLocation = ReleaseBinaries.location(plVer);
+      if (binariesLocation != null) {
+        // the binaries are not published with the website: take them out of the version folder for upload
+        String binariesParam = getNamedParam(args, "-binaries");
+        String staging = Utilities.path(binariesParam != null ? binariesParam : Utilities.path(tempDir, "binaries"), npm.name()+"#"+npm.version());
+        List<String> names = ReleaseBinaries.stage(destVer, staging, "http://hl7.org/fhir".equals(pl.canonical()));
+        int count = ReleaseBinaries.relink(destVer, pathVer, binariesLocation, names);
+        System.out.println("  .. "+names.size()+" binaries staged, links to them updated in "+count+" pages");
+        binariesInstructions = ReleaseBinaries.instructions(staging, binariesLocation, names);
+        System.out.println(binariesInstructions);
+      }
       System.out.println("Build is complete. "+src.verb()+" from "+ fRoot.getAbsolutePath());
     }
     new HistoryPageUpdater().updateHistoryPage(history.getAbsolutePath(), destination, templateSrc, !first && !prSrc.has("movedFrom"));
@@ -807,6 +832,9 @@ public class PublicationProcess {
     String anonuncement = buildAnnouncement(pubSetup, prSrc, npm, destination, destVer, pathVer, mode, url, relDest, version, tcName);
     FileUtilities.stringToFile(anonuncement, Utilities.path(igBuildZipDir, npm.name()+"#"+npm.version()+"-announcement.txt"));
     System.out.println("Finished Publishing. "+src.instructions(existingFiles.size()));
+    if (binariesInstructions != null) {
+      System.out.println(binariesInstructions);
+    }
     exitCode = 0;
   }
 
@@ -1033,7 +1061,7 @@ public class PublicationProcess {
   }
 
   private boolean updateFeedAsXml(String file, PackageList pl, PackageListEntry plVer, boolean isPublication, String orgName, NpmPackage npm, String genDate, String username, String version, String gitSrcId, List<String> otherPackages) {
-    String link = Utilities.pathURL(plVer.path(), isPublication ? "index.html" : "package.tgz");
+    String link = isPublication ? Utilities.pathURL(plVer.path(), "index.html") : Utilities.pathURL(ReleaseBinaries.base(plVer), "package.tgz");
     try {
       Document xml = XMLUtil.parseFileToDom(file);
       Element rss = xml.getDocumentElement();
@@ -1093,7 +1121,7 @@ public class PublicationProcess {
   }
 
   private String makeEntry(PackageList pl, PackageListEntry plVer, boolean isPublication, String orgName, NpmPackage npm, String genDate, String username, String version, String gitSrcId) {
-    String link = Utilities.pathURL(plVer.path(), isPublication ? "index.html" : "package.tgz");
+    String link = isPublication ? Utilities.pathURL(plVer.path(), "index.html") : Utilities.pathURL(ReleaseBinaries.base(plVer), "package.tgz");
 
     StringBuilder b = new StringBuilder();
     b.append("    <item>\r\n");
@@ -1117,7 +1145,11 @@ public class PublicationProcess {
     return sdf.format(date);
   }
 
-  private void updatePublishBox(PackageList pl, PackageListEntry plVer, String destVer, String publishedVer, String pathVer, String destination, String rootFolder, boolean current, ServerType serverType, File sft, List<String> ignoreList, String url, boolean jsonXmlClones) throws FileNotFoundException, IOException {
+  /**
+   * @param buildDownload whether to build the full-ig.zip download if it is missing. Not for a past version whose
+   *   binaries are held at its binaries-location: its full-ig.zip was staged for upload when it was published
+   */
+  private void updatePublishBox(PackageList pl, PackageListEntry plVer, String destVer, String publishedVer, String pathVer, String destination, String rootFolder, boolean current, ServerType serverType, File sft, List<String> ignoreList, String url, boolean jsonXmlClones, boolean buildDownload) throws FileNotFoundException, IOException {
     IGReleaseVersionUpdater igvu = new IGReleaseVersionUpdater(destVer, url, rootFolder, ignoreList, null, plVer.json(), destination);
     String fragment = PublishBoxStatementGenerator.genFragment(pl, plVer, pl.current(), pl.canonical(), current, false);
     System.out.println("Publish Box Statement: "+fragment);
@@ -1150,7 +1182,9 @@ public class PublicationProcess {
         new VersionRedirectorGenerator(destination).execute(plVer.version(), plVer.path());
       }
     }
-    new DownloadBuilder(destVer, pl.canonical(), current ?  pl.canonical() : plVer.path(), ignoreList).execute();
+    if (buildDownload) {
+      new DownloadBuilder(destVer, pl.canonical(), current ?  pl.canonical() : plVer.path(), ignoreList).execute();
+    }
 
     
     if (sft != null) {
@@ -1261,6 +1295,9 @@ public class PublicationProcess {
       }
     }
     nv.describe(prSrc.asString("desc"), md, prSrc.asString("changes"));
+    if (prSrc.has(ReleaseBinaries.PROPERTY)) {
+      nv.json().set(ReleaseBinaries.PROPERTY, prSrc.asString(ReleaseBinaries.PROPERTY));
+    }
     nv.clearSubPackages();
     if (subPackages != null) {
       for (String s : subPackages) {
@@ -1423,7 +1460,7 @@ public class PublicationProcess {
         String vCode = pv.substring(pv.lastIndexOf("/")+1);
         String dv = Utilities.path(destination, vCode);
         System.out.println("Update publish box for version "+v.version()+" @ "+v.path());
-        updatePublishBox(pl, v, dv, dv, pv, destination, fRoot.getAbsolutePath(), false, null, null, null, url, false);
+        updatePublishBox(pl, v, dv, dv, pv, destination, fRoot.getAbsolutePath(), false, null, null, null, url, false, ReleaseBinaries.location(v) == null);
       }
     }
 

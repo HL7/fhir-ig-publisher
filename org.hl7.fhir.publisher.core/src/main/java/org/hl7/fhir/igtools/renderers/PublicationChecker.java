@@ -11,6 +11,7 @@ import java.util.Set;
 import org.hl7.fhir.igtools.publisher.PublisherIGLoader;
 import org.hl7.fhir.igtools.publisher.RelatedIG;
 import org.hl7.fhir.igtools.web.PublicationProcess.PublicationProcessMode;
+import org.hl7.fhir.igtools.web.ReleaseBinaries;
 import org.hl7.fhir.model.core.ImplementationGuide;
 import org.hl7.fhir.model.core.ImplementationGuide.ImplementationGuideDependsOnComponent;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
@@ -322,6 +323,14 @@ public class PublicationChecker {
             pr.asString("path").startsWith(Utilities.pathURL(npm.canonical(), pr.asString("version"))+"-") ||
             pr.asString("path").startsWith(Utilities.pathURL(npm.canonical(), pr.asString("sequence"))+"-"),
             "Proposed path for this publication should usually be the canonical with the version or sequence appended and then some kind of label (typically '-snapshot')"+mkWarning());
+      }
+    }
+    if (pr.has(ReleaseBinaries.PROPERTY)) {
+      String location = pr.asString(ReleaseBinaries.PROPERTY);
+      String problem = ReleaseBinaries.checkLocation(location, pr.asString("path"));
+      if (check(messages, problem == null, Utilities.escapeXml(problem)+mkError())) {
+        check(messages, ReleaseBinaries.isGitHubRelease(location), "The binaries-location '"+Utilities.escapeXml(location)+"' is not a GitHub release download URL (https://github.com/{owner}/{repo}/releases/download/{tag}) - check that the release binaries can be uploaded there"+mkWarning());
+        summary.add(new StringPair(ReleaseBinaries.PROPERTY, location));
       }
     }
     PublicationProcessMode mode = null;

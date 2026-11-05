@@ -56,9 +56,11 @@ public class FeedBuilder {
     private String kind;
     private String folder;
     private List<String> subPackages;
+    private String binariesLocation;
     
-    public Publication(String packageId, String title, String canonical, String version, String desc, String date, String path, String status, String sequence, String fhirversion, String kind, String folder, List<String> subPackages) {
+    public Publication(String packageId, String title, String canonical, String version, String desc, String date, String path, String status, String sequence, String fhirversion, String kind, String folder, List<String> subPackages, String binariesLocation) {
       super();
+      this.binariesLocation = binariesLocation;
       this.packageId = packageId;
       this.title = title;
       this.canonical = canonical;
@@ -126,7 +128,7 @@ public class FeedBuilder {
     }
     public String link(boolean forPackage) {
       if (forPackage)
-        return Utilities.pathURL(path, "package.tgz");
+        return Utilities.pathURL(binariesLocation != null ? binariesLocation : path, "package.tgz");
       else
         return Utilities.pathURL(path, "index.html");
     }
@@ -207,11 +209,12 @@ public class FeedBuilder {
   public void processPublication(String orgName, boolean forPackage, StringBuilder b, Publication pub) throws IOException, FileNotFoundException {
     if (forPackage && !pub.isSemVer()) {
       System.out.println("Ignoring package "+pub.title(forPackage)+" as the version ("+pub.getVersion()+") does not conform to semver");
-    } else if (forPackage && !packageExists(pub.folder, pub.subPackages)) {
+    } else if (forPackage && pub.binariesLocation == null && !packageExists(pub.folder, pub.subPackages)) {
       System.out.println("Ignoring package "+pub.title(forPackage)+" as the actual package could not be found at "+pub.folder);
     } else {
+      // the packages of a publication with a binaries-location are not on this website, so can't be checked here
       String desc = pub.desc();
-      if (forPackage && new File(Utilities.path(pub.folder, "package.tgz")).exists()) {
+      if (forPackage && pub.binariesLocation == null && new File(Utilities.path(pub.folder, "package.tgz")).exists()) {
         // open the package, check the details and get the description
         try {
           NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(Utilities.path(pub.folder, "package.tgz")));
@@ -228,17 +231,21 @@ public class FeedBuilder {
       }
       if (forPackage) {
         for (String s : pub.subPackages) {
-          // open the package, check the details and get the description
-          NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(Utilities.path(pub.folder, s+".tgz")), Utilities.path(pub.folder, s+".tgz"));
-          if (!npm.name().equals(s))
-            System.out.println("id mismatch in "+Utilities.path(pub.folder, s+".tgz")+" - expected "+s+" but found "+npm.name());
-          if (!npm.version().equals(pub.version))
-            System.out.println("version mismatch in "+Utilities.path(pub.folder, s+".tgz")+" - expected "+pub.version+" but found "+npm.version());
+          String sdesc = pub.desc();
+          if (pub.binariesLocation == null) {
+            // open the package, check the details and get the description
+            NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(Utilities.path(pub.folder, s+".tgz")), Utilities.path(pub.folder, s+".tgz"));
+            if (!npm.name().equals(s))
+              System.out.println("id mismatch in "+Utilities.path(pub.folder, s+".tgz")+" - expected "+s+" but found "+npm.name());
+            if (!npm.version().equals(pub.version))
+              System.out.println("version mismatch in "+Utilities.path(pub.folder, s+".tgz")+" - expected "+pub.version+" but found "+npm.version());
+            sdesc = npm.description();
+          }
 
           String url = Utilities.pathURL(root(pub.link(forPackage)), s+".tgz");
           b.append("    <item>\r\n");
           b.append("      <title>"+Utilities.escapeXml(s)+"#"+pub.getVersion()+"</title>\r\n");
-          b.append("      <description>"+Utilities.escapeXml(npm.description())+"</description>\r\n");
+          b.append("      <description>"+Utilities.escapeXml(sdesc)+"</description>\r\n");
           b.append("      <link>"+Utilities.escapeXml(url)+"</link>\r\n");
           b.append("      <guid isPermaLink=\"true\">"+Utilities.escapeXml(url)+"</guid>\r\n");
           b.append("      <dc:creator>"+orgName+"</dc:creator>\r\n");
@@ -326,7 +333,9 @@ public class FeedBuilder {
             subPackages.add(a.getAsString());
           }
         }
-        pubs.add(new Publication(vpackageId, title, canonical, version, desc, date, path, status, sequence, fhirversion, kind, getCorrectPath(path, rootUrl, rootFolder), subPackages));
+        String binariesLocation = JsonUtilities.str(v, ReleaseBinaries.PROPERTY);
+        pubs.add(new Publication(vpackageId, title, canonical, version, desc, date, path, status, sequence, fhirversion, kind, getCorrectPath(path, rootUrl, rootFolder), subPackages,
+            Utilities.noString(binariesLocation) ? null : binariesLocation));
       }
     }
   }
