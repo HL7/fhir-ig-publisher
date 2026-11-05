@@ -1926,6 +1926,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       f.getOutputNames().add(path);
       ProfileUtilities pu = new ProfileUtilities(this.pf.context, this.pf.errors, this.pf.igpkp);
       pu.generateCsv(new FileOutputStream(path), sd, true);
+      addToAllProfilesCsv(pu, sd);
     }
     if (wantGen(r, "xlsx")) {
       lapsed(null);
@@ -1935,8 +1936,8 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       sdg.renderStructureDefinition(sd, false);
       sdg.finish(new FileOutputStream(path));
       lapsed("xslx");
+      addToAllProfilesXlsx(sd);
     }
-    addToAllProfiles(r, sd, this.pf.errors);
 
     if (!regen && sd.getDerivation() == StructureDefinition.TypeDerivationRule.CONSTRAINT && wantGen(r, "sch")) {
       String path = Utilities.path(this.pf.tempDir, sdPrefix + r.getId()+".sch");
@@ -1955,21 +1956,29 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
    */
   private void addToAllProfiles(FetchedResource r, StructureDefinition sd, List<ValidationMessage> errors) throws Exception {
     if (wantGen(r, "csv")) {
-      if (this.pf.allProfilesCsv == null) {
-        this.pf.allProfilesCsv = new  org.hl7.fhir.services.utilities.CSVWriter(new FileOutputStream(Utilities.path(this.pf.tempDir, "all-profiles.csv")), this.pf.context, true);
-        this.pf.otherFilesRun.add(Utilities.path(this.pf.tempDir, "all-profiles.csv"));
-
-      }
-      new ProfileUtilities(this.pf.context, errors, this.pf.igpkp).addToCSV(this.pf.allProfilesCsv, sd);
+      addToAllProfilesCsv(new ProfileUtilities(this.pf.context, errors, this.pf.igpkp), sd);
     }
     if (wantGen(r, "xlsx")) {
       lapsed(null);
-      if (this.pf.allProfilesXlsx == null) {
-        this.pf.allProfilesXlsx = new StructureDefinitionSpreadsheetGenerator(this.pf.context, true, false, pf.rendererFactory);
-      }
-      this.pf.allProfilesXlsx.renderStructureDefinition(sd, true);
-      lapsed("all-xslx");
+      addToAllProfilesXlsx(sd);
     }
+  }
+
+  private void addToAllProfilesCsv(ProfileUtilities pu, StructureDefinition sd) throws Exception {
+    if (this.pf.allProfilesCsv == null) {
+      this.pf.allProfilesCsv = new  org.hl7.fhir.services.utilities.CSVWriter(new FileOutputStream(Utilities.path(this.pf.tempDir, "all-profiles.csv")), this.pf.context, true);
+      this.pf.otherFilesRun.add(Utilities.path(this.pf.tempDir, "all-profiles.csv"));
+
+    }
+    pu.addToCSV(this.pf.allProfilesCsv, sd);
+  }
+
+  private void addToAllProfilesXlsx(StructureDefinition sd) throws Exception {
+    if (this.pf.allProfilesXlsx == null) {
+      this.pf.allProfilesXlsx = new StructureDefinitionSpreadsheetGenerator(this.pf.context, true, false, pf.rendererFactory);
+    }
+    this.pf.allProfilesXlsx.renderStructureDefinition(sd, true);
+    lapsed("all-xslx");
   }
 
   /**
