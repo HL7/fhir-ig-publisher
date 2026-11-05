@@ -289,6 +289,8 @@ public class HTMLInspector {
   private Map<String, FragmentUseRecord> fragmentUses = new HashMap<>();
   private List<RelatedIG> relatedIGs;
   private List<ExternalReference> externalReferences = new ArrayList<>();
+  // the same entries, by url, so that adding one doesn't look at all the others
+  private Map<String, List<ExternalReference>> externalReferencesByUrl = new HashMap<>();
   private Map<String, XhtmlNode> imageRefs = new HashMap<>();
   private Map<String, String> copyrights = new HashMap<>();
   // the text of the last parent of a text node with a copyright mark, while the tree hasn't changed since: when a
@@ -1903,14 +1905,17 @@ public class HTMLInspector {
           else if (f.isLangRedirect) {
             String fn = filename.replace(rootFolder, rootFolder+"/"+csHandler.getPrimaryLang());
             return checkTarget(fn, ref, rref, tgtList, bh, x, parent);
+          } else if (f.targets.contains(name)) {
+            return true;
           } else {
+            // only needed for the message about the link that can't be resolved
             tgtList.append(" (valid targets: "+(f.targets.size() > 40 ? Integer.toString(f.targets.size())+" targets"  :  f.targets.toString())+")");
             for (String s : f.targets) {
               if (s.equalsIgnoreCase(name)) {
                 tgtList.append(" - case is wrong ('"+s+"')");
               }
             }
-            return f.targets.contains(name);
+            return false;
           }
         }
       } else {
@@ -1929,12 +1934,15 @@ public class HTMLInspector {
             ref.contains("snomed.org") || ref.contains("iana.org") || ref.contains("ietf.org") || ref.contains("w3.org") || ref.endsWith(".gov") || ref.contains(".gov/")) {
       return;
     }
-    for (ExternalReference exr : externalReferences) {
-      if (exr.getType() == type && exr.getUrl().equals(ref) && x.allText().equals(exr.getXhtml().allText())) {
+    List<ExternalReference> sameUrl = externalReferencesByUrl.computeIfAbsent(ref, k -> new ArrayList<>());
+    for (ExternalReference exr : sameUrl) {
+      if (exr.getType() == type && x.allText().equals(exr.getXhtml().allText())) {
         return;
       }
     }
-    externalReferences.add(new ExternalReference(type, ref, x, stripLeadSlash(source.replace(rootFolder, ""))));
+    ExternalReference exr = new ExternalReference(type, ref, x, stripLeadSlash(source.replace(rootFolder, "")));
+    externalReferences.add(exr);
+    sameUrl.add(exr);
   }
 
   private String stripLeadSlash(String s) {
