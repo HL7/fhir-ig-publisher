@@ -4500,7 +4500,7 @@ public class PublisherIGLoader extends PublisherBase {
           r.setElement(e).setId(id).setTitle(e.getChildValue("name"));
           r.setResource(res);
         }
-        if (new AdjunctFileLoader(pf.binaryPaths, pf.cql).replaceAttachments1(file, r, metadataResourceNames())) {
+        if (new AdjunctFileLoader(pf.binaryPaths, pf.cql, isDebugLogging()).replaceAttachments1(file, r, metadataResourceNames())) {
           altered = true;
         }
         if (isNewML()) {
