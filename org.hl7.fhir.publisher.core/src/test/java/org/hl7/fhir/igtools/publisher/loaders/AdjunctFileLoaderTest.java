@@ -40,7 +40,7 @@ class AdjunctFileLoaderTest {
     FetchedResource resource = new FetchedResource("Library/example");
     resource.setResource(library);
 
-    AdjunctFileLoader loader = new AdjunctFileLoader(List.of(tempDir.toString()), null);
+    AdjunctFileLoader loader = new AdjunctFileLoader(List.of(tempDir.toString()), null, false);
     assertTrue(loader.replaceAttachments2(new FetchedFile("input.json"), resource));
 
     assertNull(attachment.getId());
