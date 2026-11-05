@@ -37,6 +37,8 @@ class PublisherRapidoWatchTest {
     buildTracker.setBooleanProperty("status", "complete", true, null);
     buildTracker.save();
 
+    HierarchicalTableGenerator.uuid = "a-new-session"; // as resetForRebuild leaves it
+
     // the patient changes: the observation that refers to it is built again, the other patient isn't
     List<FetchedFile> changes = build(new IniFile(dir.resolve(".build-tracker.ini").toString()), 3);
 
