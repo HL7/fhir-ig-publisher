@@ -28,7 +28,7 @@
         <maven.compiler.testTarget>17</maven.compiler.testTarget>
         <logback.version>1.6.5</logback.version>
         <log4jVersion>2.26.1</log4jVersion>
-        <jackson_version>2.22.3</jackson_version>
+        <jackson_version>2.22.4</jackson_version>
         <jackson_annotations_version>2.22</jackson_annotations_version>
         <nedap-healthcare-archie.version>3.19.0</nedap-healthcare-archie.version>
     </properties>
@@ -132,7 +132,7 @@
             <dependency>
                 <groupId>com.google.guava</groupId>
                 <artifactId>guava</artifactId>
-                <version>33.3.1-jre</version>
+                <version>33.7.2-jre</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.commons</groupId>
@@ -191,12 +191,12 @@
             <dependency>
                 <groupId>io.opentelemetry</groupId>
                 <artifactId>opentelemetry-api</artifactId>
-                <version>1.66.0</version>
+                <version>1.67.0</version>
             </dependency>
             <dependency>
                 <groupId>io.opentelemetry</groupId>
                 <artifactId>opentelemetry-context</artifactId>
-                <version>1.66.0</version>
+                <version>1.67.0</version>
             </dependency>
             <dependency>
                 <groupId>io.opentelemetry.instrumentation</groupId>
