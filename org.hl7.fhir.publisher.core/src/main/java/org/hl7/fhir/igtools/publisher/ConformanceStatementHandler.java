@@ -373,12 +373,13 @@ class ConformanceStatementHandler {
     
     if (mismatch) {
       String fname = Utilities.path(reqFolder, "Requirements-fromNarrative.json");
-      FileOutputStream fs = new FileOutputStream(fname);
       if (!oldReq.isEmpty())
         messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Requirements/fromNarrative", "There are differences between the requirements found in the narrative and what's found the provided Requirements resource.  A new version has been generated in the root.  It should be used to replace the one in the input folder.",
             IssueSeverity.WARNING));
         
-      new org.hl7.fhir.model.core.formats.JsonParser(context.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(fs, req);
+      try (FileOutputStream fs = new FileOutputStream(fname)) {
+        new org.hl7.fhir.model.core.formats.JsonParser(context.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(fs, req);
+      }
     }
   }
   

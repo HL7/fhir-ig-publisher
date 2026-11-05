@@ -51,6 +51,15 @@ public class PublisherTests {
         assertEquals("No Implementation Guide Specified (-ig parameter)", e.getMessage());
     }
 
+    @Test
+    public void watchModeWatchesTheFolderOfTheIg() throws IOException {
+        // -ig can name the IG's folder, or its ig.ini
+        Path ig = Files.createDirectories(tempDir.resolve("watched-ig"));
+        Path ini = Files.writeString(ig.resolve("ig.ini"), "[IG]");
+        assertEquals(ig.toAbsolutePath().normalize(), Publisher.watchRoot(ig.toString()));
+        assertEquals(ig.toAbsolutePath().normalize(), Publisher.watchRoot(ini.toString()));
+    }
+
     static final String PATH_DELIMITER = "/";
 
     public static InputStream getResourceAsInputStream(Class<?> clazz, String... resourcePath) {

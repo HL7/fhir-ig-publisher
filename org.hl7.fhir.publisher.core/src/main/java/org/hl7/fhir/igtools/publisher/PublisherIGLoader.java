@@ -247,6 +247,16 @@ public class PublisherIGLoader extends PublisherBase {
     }
   }
 
+  // null if they can't be read: watch mode then reports the changes in input by their events
+  private Map<Path, String> inputStates(Path input) {
+    try {
+      return FileChangeMonitor.fileStates(input);
+    } catch (IOException e) {
+      log("Unable to read the files in " + input + ", so watch mode may take what the module writes for edits: " + e.getMessage());
+      return null;
+    }
+  }
+
   private IniFile checkNewIg() throws IOException {
     if (settings.getConfigFile() == null)
       return null;
@@ -285,9 +295,17 @@ public class PublisherIGLoader extends PublisherBase {
     pf.module = loadModule(ini.getStringProperty("IG", "module"));
     if (pf.module.useRoutine("preProcess")) {
       log("== Ask "+ pf.module.name()+" to pre-process the IG ============================");
+      Path input = Paths.get(Utilities.path(pf.rootDir, "input"));
+      Map<Path, String> inputBefore = settings.isWatchMode() ? inputStates(input) : null;
       if (!pf.module.preProcess(pf.rootDir)) {
         throw new Exception("Process terminating due to Module failure");
       } else {
+        Map<Path, String> inputAfter = inputBefore == null ? null : inputStates(input);
+        if (inputAfter != null) {
+          // so that watch mode doesn't take what it wrote for an edit
+          pf.inputBeforeModule = inputBefore;
+          pf.moduleWrites = FileChangeMonitor.changedFiles(inputBefore, inputAfter);
+        }
         log("== Done ====================================================================");
       }
     }
@@ -1056,11 +1074,11 @@ public class PublisherIGLoader extends PublisherBase {
         pf.context.setCanRunWithoutTerminology(true);
         pf.txLog = null;
       } else {
-        log("Connect to Terminology Server at "+ settings.getTxServer());
-        pf.context.connectToTSServer(new TerminologyClientFactory(pf.version), settings.getTxServer(), "fhir/publisher", pf.txLog, true);
+        log("Connect to Terminology Server at "+ settings.getTxServer()+(settings.getEcosystem() == null ? " (no ecosystem)" : " (ecosystem: "+settings.getEcosystem()+")"));
+        pf.context.connectToTSServer(new TerminologyClientFactory(pf.version), settings.getTxServer(), "fhir/publisher", pf.txLog, settings.getEcosystem());
       }
     } else {
-      pf.context.connectToTSServer(new TerminologyClientFactory(pf.version), pf.webTxServer.getAddress(), "fhir/publisher", pf.txLog, true);
+      pf.context.connectToTSServer(new TerminologyClientFactory(pf.version), pf.webTxServer.getAddress(), "fhir/publisher", pf.txLog, settings.getEcosystem());
     }
     if (expParams != null) {
       /* This call to uncheckedPath is allowed here because the path is used to
@@ -2810,7 +2828,11 @@ public class PublisherIGLoader extends PublisherBase {
     for (String dir : pf.translationSources) {
       File df = new File(Utilities.path(pf.rootDir, dir));
       if (df.exists()) {
-        for (String fn : df.list()) {
+        // sorted, so that translations come in the same order on every machine: File.list() makes no promise
+        // about the order, and the translation extensions are made in the order the units are found
+        String[] names = df.list();
+        Arrays.sort(names);
+        for (String fn : names) {
           if ((fn.startsWith(base+".") || fn.startsWith(base+"-") || fn.startsWith(base+"_")) ||
                   (fn.startsWith(tbase+".") || fn.startsWith(tbase+"-") || fn.startsWith(tbase+"_"))) {
             LanguageFileProducer lp = null;
@@ -4122,7 +4144,7 @@ public class PublisherIGLoader extends PublisherBase {
   }
 
 
-  private void loadPrePages() throws Exception {
+  void loadPrePages() throws Exception {
     if (pf.prePagesDirs.isEmpty())
       return;
 
@@ -4155,12 +4177,11 @@ public class PublisherIGLoader extends PublisherBase {
       }
       addFile(dir, false);
     }
+    // the fetched paths are canonical, and basePath may not be (a symlink, or an 8.3 short name on Windows)
+    String canonicalBasePath = new File(basePath).getCanonicalPath();
     for (String link : dir.getFiles()) {
       FetchedFile f = this.pf.fetcher.fetch(link);
-      if (basePath.startsWith("/var") && f.getPath().startsWith("/private/var")) {
-        f.setPath(f.getPath().substring(8));
-      }
-      f.setRelativePath(f.getPath().substring(basePath.length()+1));
+      f.setRelativePath(f.getPath().substring(canonicalBasePath.length()+1));
       if (f.isFolder())
         loadPrePages(f, basePath);
       else

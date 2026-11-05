@@ -191,58 +191,108 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 
     String rootDir = settings.getConfigFile();
     FileChangeMonitor monitor = null;
+    Path watchRoot = null;
     if (settings.isWatchMode()) {
+      watchRoot = watchRoot(rootDir);
+      Path igIni = new File(rootDir).isFile() ? Paths.get(rootDir).toAbsolutePath().normalize() : watchRoot.resolve("ig.ini");
       monitor = new FileChangeMonitor(Arrays.asList(
-              FileChangeMonitor.MonitoredPath.file(Paths.get(Utilities.path(rootDir, "ig.ini"))),
-              FileChangeMonitor.MonitoredPath.file(Paths.get(Utilities.path(rootDir, "sushi-config.yaml"))),
-              FileChangeMonitor.MonitoredPath.file(Paths.get(Utilities.path(rootDir, "publication-request.json"))),
-              FileChangeMonitor.MonitoredPath.file(Paths.get(Utilities.path(rootDir, "sushi-ignoreWarnings.txt"))),
-              FileChangeMonitor.MonitoredPath.recursive(Paths.get(Utilities.path(rootDir, "input"))),
-              FileChangeMonitor.MonitoredPath.recursive(Paths.get(Utilities.path(rootDir, "fsh-generated")))
+              FileChangeMonitor.MonitoredPath.file(igIni),
+              FileChangeMonitor.MonitoredPath.file(watchRoot.resolve("sushi-config.yaml")),
+              FileChangeMonitor.MonitoredPath.file(watchRoot.resolve("publication-request.json")),
+              FileChangeMonitor.MonitoredPath.file(watchRoot.resolve("sushi-ignoreWarnings.txt")),
+              FileChangeMonitor.MonitoredPath.recursive(watchRoot.resolve("input")),
+              FileChangeMonitor.MonitoredPath.recursive(watchRoot.resolve("fsh-generated"))
       ));
     }
 
-    do {
-      pf = new PublisherFields();
-      loader.setPf(pf);
-      processor.setPf(pf);
-      generator.setPf(pf);
-      pf.resolver = this;
-      setLogger(this);
+    // in watch mode, what a module's pre-processing wrote in input, in any build so far
+    Set<Path> moduleOutputs = new HashSet<>();
+    try {
+      do {
+        pf = new PublisherFields();
+        loader.setPf(pf);
+        processor.setPf(pf);
+        generator.setPf(pf);
+        pf.resolver = this;
+        setLogger(this);
 
-      pf.tt = new TimeTracker();
-      loader.initialize();
-      if (pf.validator != null) {
-        pf.validator.setTracker(this);
-      }
+        pf.tt = new TimeTracker();
+        loader.initialize();
+        if (pf.validator != null) {
+          pf.validator.setTracker(this);
+        }
 
-      if (pf.isBuildingTemplate) {
-        packageTemplate();
-      } else {
-        log("Load IG");
+        if (pf.isBuildingTemplate) {
+          packageTemplate();
+        } else {
+          log("Load IG");
+          try {
+            createIg();
+          } catch (Exception e) {
+            recordOutcome(e, null);
+            throw e;
+          }
+        }
+        if (pf.templateLoaded && new File(rootDir).exists()) {
+          FileUtilities.clearDirectory(Utilities.path(rootDir, "template"));
+        }
+        if (pf.folderToDelete != null) {
+          try {
+            FileUtilities.clearDirectory(pf.folderToDelete);
+            new File(pf.folderToDelete).delete();
+          } catch (Throwable e) {
+            // nothing
+          }
+        }
+      } while (monitor != null && thereIsAFileChange(monitor, buildOutputs(watchRoot), moduleWrites(watchRoot, moduleOutputs)));
+    } finally {
+      if (monitor != null) {
+        // its thread would keep the JVM running
         try {
-          createIg();
-        } catch (Exception e) {
-          recordOutcome(e, null);
-          throw e;
+          monitor.close();
+        } catch (IOException e) {
+          System.out.println("Unable to close the file monitor: " + e.getMessage());
         }
       }
-      if (pf.templateLoaded && new File(rootDir).exists()) {
-        FileUtilities.clearDirectory(Utilities.path(rootDir, "template"));
-      }
-      if (pf.folderToDelete != null) {
-        try {
-          FileUtilities.clearDirectory(pf.folderToDelete);
-          new File(pf.folderToDelete).delete();
-        } catch (Throwable e) {
-          // nothing
-        }
-      }
-    } while (monitor != null && thereIsAFileChange(monitor));
+    }
   }
 
-  private boolean thereIsAFileChange(FileChangeMonitor monitor) throws InterruptedException {
-    monitor.startMonitoring();
+  /**
+   * the IG's folder, for watch mode: -ig names it, or its ig.ini
+   */
+  static Path watchRoot(String configFile) {
+    File f = new File(configFile).getAbsoluteFile();
+    return (f.isFile() ? f.getParentFile() : f).toPath().normalize();
+  }
+
+  /**
+   * the watched files and folders that this build wrote to, so that what it wrote doesn't start another build
+   */
+  private List<Path> buildOutputs(Path watchRoot) {
+    List<Path> outputs = new ArrayList<>();
+    if (pf.isSushi) {
+      outputs.add(watchRoot.resolve("fsh-generated"));
+    }
+    return outputs;
+  }
+
+  /**
+   * what a module that pre-processes the IG wrote in input (e.g. the cross-version module): the edits in input are then
+   * found by comparing its files with how they were before the module ran. What it wrote is known by path, from this
+   * build and those before (on Windows, a file it hasn't closed may not look changed yet), so a user's edit made while
+   * it ran, to a file it also writes, is taken for its own. It doesn't write FSH, so input/fsh is watched as usual
+   */
+  private FileChangeMonitor.FolderWrites moduleWrites(Path watchRoot, Set<Path> moduleOutputs) {
+    if (pf.moduleWrites == null) {
+      return null;
+    }
+    moduleOutputs.addAll(pf.moduleWrites);
+    return new FileChangeMonitor.FolderWrites(watchRoot.resolve("input"), pf.inputBeforeModule, moduleOutputs,
+        List.of(watchRoot.resolve("input").resolve("fsh")));
+  }
+
+  private boolean thereIsAFileChange(FileChangeMonitor monitor, List<Path> buildOutputs, FileChangeMonitor.FolderWrites moduleWrites) throws InterruptedException {
+    monitor.startMonitoring(buildOutputs, moduleWrites);
     System.out.println("Watching for changes (Cascais:Rapido mode)");
     while (true) {
       if (monitor.hasChanges()) {
@@ -250,6 +300,8 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         monitor.clearChanges();
         monitor.stopMonitoring();
         return true;
+      } else if (!monitor.isWatching()) {
+        throw new IllegalStateException("No longer watching for changes (see the error above): run the IG Publisher again");
       } else {
         Thread.sleep(100);
       }
@@ -1186,7 +1238,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 //        pgen.setPattern(getNamedParam(args, "-pattern"));
 //      }
 //      pgen.execute();
-    } else if (CliParams.hasNamedParam(args, "-help") || CliParams.hasNamedParam(args, "-?") || CliParams.hasNamedParam(args, "/?") || CliParams.hasNamedParam(args, "?") || args.length == 0) {
+    } else if (CliParams.hasNamedParam(args, "-help") || CliParams.hasNamedParam(args, "--help") || CliParams.hasNamedParam(args, "-?") || CliParams.hasNamedParam(args, "/?") || CliParams.hasNamedParam(args, "?") || args.length == 0) {
       System.out.println("");
       System.out.println("To use this publisher to publish a FHIR Implementation Guide, run ");
       System.out.println("with the commands");
@@ -1203,6 +1255,11 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       System.out.println("-tx: (optional) Address to use for terminology server ");
       System.out.println("  (default is https://tx.fhir.org)");
       System.out.println("  use 'n/a' to run without a terminology server");
+      System.out.println("  nominating a server turns the terminology ecosystem off unless -ecosystem is given too");
+      System.out.println("");
+      System.out.println("-ecosystem: (optional) Address of the terminology ecosystem coordination server (tx-reg)");
+      System.out.println("  (default is https://ecosystem.hl7.org/tx-reg)");
+      System.out.println("  use 'n/a' to run without the ecosystem (all terminology requests go to the -tx server)");
       System.out.println("");
       System.out.println("-no-network: (optional) Stop the IG publisher accessing the network");
       System.out.println("  Beware: the ig -pubisher will not function properly if the network is prohibited");
@@ -1640,11 +1697,29 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   public static void setTxServerValue(String[] args, Publisher self) {
     if (CliParams.hasNamedParam(args, "-tx")) {
       self.settings.setTxServer(CliParams.getNamedParam(args, "-tx"));
+      // nominating a terminology server turns the ecosystem off - everything goes to that
+      // server - unless an ecosystem is nominated too (and then the nominated server stands
+      // in for tx.fhir.org in the ecosystem's answers)
+      self.settings.setEcosystem(ecosystemValue(args, null));
     } else if (CliParams.hasNamedParam(args, "-devtx")) {
       self.settings.setTxServer(FhirSettings.getTxFhirDevelopment());
+      self.settings.setEcosystem(ecosystemValue(args, FhirSettings.getTxEcosystem()));
     } else {
       self.settings.setTxServer(FhirSettings.getTxFhirProduction());
+      self.settings.setEcosystem(ecosystemValue(args, FhirSettings.getTxEcosystem()));
     }
+  }
+
+  /**
+   * the -ecosystem parameter: the terminology ecosystem coordination server (tx-reg), 
+   * or 'n/a' for none. null (no ecosystem) when there is no terminology server at all
+   */
+  private static String ecosystemValue(String[] args, String dflt) {
+    if (CliParams.hasNamedParam(args, "-ecosystem")) {
+      String e = CliParams.getNamedParam(args, "-ecosystem");
+      return "n/a".equals(e) ? null : e;
+    }
+    return dflt;
   }
 
   private static String generateIGFromSimplifier(String folder, String output, String canonical, String npmName, String license, List<String> packages) throws Exception {

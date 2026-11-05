@@ -42,7 +42,7 @@ import org.hl7.fhir.model.core.ImplementationGuide.ImplementationGuideDefinition
 import org.hl7.fhir.model.core.StructureDefinition.StructureDefinitionContextComponent;
 import org.hl7.fhir.model.core.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.model.core.StructureDefinition.TypeDerivationRule;
-import org.hl7.fhir.model.fml.StructureMap.StructureMapModelMode;
+import org.hl7.fhir.model.fml.StructureMap.StructureMapModelModeVS;
 import org.hl7.fhir.model.fml.StructureMap.StructureMapStructureComponent;
 import org.hl7.fhir.services.renderers.ConceptMapRenderer;
 import org.hl7.fhir.services.renderers.ConceptMapRenderer.RenderMultiRowSortPolicy;
@@ -96,7 +96,10 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
     try {
       cleanup(path);
       if (engine.process(path)) {
-        ImplementationGuide ig = (ImplementationGuide) new XmlParser(cu.getWorker().getModelContext()).parse(new FileInputStream(Utilities.path(path, "input", "xver-ig.xml")));
+        ImplementationGuide ig;
+        try (FileInputStream in = new FileInputStream(Utilities.path(path, "input", "xver-ig.xml"))) {
+          ig = (ImplementationGuide) new XmlParser(cu.getWorker().getModelContext()).parse(in);
+        }
         ImplementationGuideDefinitionPageComponent resPage = ig.getPageByName("cross-version-resources.html");
         ImplementationGuideDefinitionPageComponent dtPage = ig.getPageByName("cross-version-types.html");
         resPage.getPageList().clear();
@@ -118,15 +121,21 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
         engine.logProgress("Generating extensions");
         FileUtilities.createDirectory(Utilities.path(path, "temp", "xver", "x-extensions"));
         for (StructureDefinition sd : engine.getExtensions()) {
-          new JsonParser(cu.getWorker().getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(path, "temp", "xver", "x-extensions", "StructureDefinition-"+sd.getId()+".json")), sd);
+          try (FileOutputStream out = new FileOutputStream(Utilities.path(path, "temp", "xver", "x-extensions", "StructureDefinition-"+sd.getId()+".json"))) {
+            new JsonParser(cu.getWorker().getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(out, sd);
+          }
           genExtensionPage(path, sd);
         }  
         for (ValueSet vs : engine.getNewValueSets().values()) {
-          new JsonParser(cu.getWorker().getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(path, "temp", "xver", "x-extensions", "ValueSet-"+vs.getId()+".json")), vs);
+          try (FileOutputStream out = new FileOutputStream(Utilities.path(path, "temp", "xver", "x-extensions", "ValueSet-"+vs.getId()+".json"))) {
+            new JsonParser(cu.getWorker().getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(out, vs);
+          }
         }
         genSummaryPages(path);
         genZips(path); 
-        new XmlParser(cu.getWorker().getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(path, "input", "xver-ig.xml")), ig);
+        try (FileOutputStream out = new FileOutputStream(Utilities.path(path, "input", "xver-ig.xml"))) {
+          new XmlParser(cu.getWorker().getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(out, ig);
+        }
 
         return true;
       } else {
@@ -457,9 +466,9 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
     String tgt = null;
     for (StructureMapStructureComponent u : sm.getStructureList()) {
       String v = VersionUtilities.getNameForVersion(VersionUtilities.getMajMin(u.getUrl()));
-      if (u.getMode() == StructureMapModelMode.SOURCE) {
+      if (u.getMode() == StructureMapModelModeVS.SOURCE) {
         src = v;
-      } else if (u.getMode() == StructureMapModelMode.TARGET) {
+      } else if (u.getMode() == StructureMapModelModeVS.TARGET) {
         tgt = v;
       }
     }
@@ -473,8 +482,8 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
     for (StructureMap sm : engine.getStructureMaps().values()) {
       for (StructureMapStructureComponent u : sm.getStructureList()) {
         if (u.getUrl().equals(url)) {
-          if ((inwards && u.getMode() == StructureMapModelMode.SOURCE) ||
-              (!inwards && u.getMode() == StructureMapModelMode.TARGET)) {
+          if ((inwards && u.getMode() == StructureMapModelModeVS.SOURCE) ||
+              (!inwards && u.getMode() == StructureMapModelModeVS.TARGET)) {
             res.add(sm);
           }
         }
