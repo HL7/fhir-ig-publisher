@@ -29,6 +29,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import org.hl7.fhir.igtools.publisher.NewLocationRedirects;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
@@ -183,14 +184,17 @@ public class IGReleaseRedirectionBuilder {
           String path = Utilities.path(folder, s, "index.php");
           String p = s.replace("/", "-");
           String litPath = Utilities.path(folder, p);
-          if (new File(litPath+".xml").exists() && new File(litPath+".json").exists()) 
+          if (new File(litPath+".xml").exists() && new File(litPath+".json").exists())
             createPhpRedirect(path, map.get(s), Utilities.pathURL(vpath, p));
         }
       }
     }
+    for (Map.Entry<String, String[]> e : loadNewLocations().entrySet()) {
+      createPhpRedirect(Utilities.path(folder, e.getKey(), "index.php"), e.getValue()[0], e.getValue()[1]);
+    }
   }
-  
-  public void buildCloudRedirections() throws IOException {    
+
+  public void buildCloudRedirections() throws IOException {
     Map<String, String> map = createMap(false);
     if (map != null) {
       for (String s : map.keySet()) {
@@ -198,10 +202,13 @@ public class IGReleaseRedirectionBuilder {
           String path = Utilities.path(folder, s, "index.html");
           String p = s.replace("/", "-");
           String litPath = Utilities.path(folder, p);
-          if (new File(litPath+".xml").exists() && new File(litPath+".json").exists()) 
+          if (new File(litPath+".xml").exists() && new File(litPath+".json").exists())
             createHtmlRedirect(path, map.get(s), Utilities.pathURL(vpath, p));
         }
       }
+    }
+    for (Map.Entry<String, String[]> e : loadNewLocations().entrySet()) {
+      createHtmlRedirect(Utilities.path(folder, e.getKey(), "index.html"), e.getValue()[0], e.getValue()[1]);
     }
   }
   
@@ -210,8 +217,14 @@ public class IGReleaseRedirectionBuilder {
     if (map == null) {
       System.out.println("!!! no map, "+folder);
     } else {
+      // the web.config sends every request for Type/* to the redirector for Type, so the redirectors also have to
+      // send the artifacts that are now published elsewhere to their new location
+      Map<String, String[]> moved = loadNewLocations();
       // we need to generate a web config, and the redirectors
       Set<String> rtl = listResourceTypes(map);
+      for (String s : moved.keySet()) {
+        rtl.add(s.substring(0, s.indexOf("/")));
+      }
       if (rtl.isEmpty()) {
         if (!folder.contains("smart-app-launch") && !folder.contains("davinci-deqm")) {
           System.out.println("!!! empty map, "+folder);
@@ -219,7 +232,7 @@ public class IGReleaseRedirectionBuilder {
       } else {
         generateWebConfig(rtl, isCoreRoot);
         for (String rt : rtl) {
-          generateRedirect(rt, map);
+          generateRedirect(rt, map, moved);
         }
         if (isCoreRoot) {
           for (String s : map.keySet()) {
@@ -240,18 +253,27 @@ public class IGReleaseRedirectionBuilder {
     }
   }
 
-  private void generateRedirect(String rt, Map<String, String> map) throws IOException {
-    if (!rt.contains(":")) {      
+  private void generateRedirect(String rt, Map<String, String> map, Map<String, String[]> moved) throws IOException {
+    if (!rt.contains(":")) {
       StringBuilder b = new StringBuilder();
       countTotal++;
 
       String root = Utilities.pathURL(canonical, rt);
-      b.append("<%@ language=\"javascript\"%>\r\n" + 
-          "\r\n" + 
-          "<%\r\n" + 
+      b.append("<%@ language=\"javascript\"%>\r\n" +
+          "\r\n" +
+          "<%\r\n" +
           "  var s = String(Request.ServerVariables(\"HTTP_ACCEPT\"));\r\n" +
-          "  var id = Request.QueryString(\"id\");\r\n"+
-          "  if (s.indexOf(\"application/json+fhir\") > -1) \r\n" + 
+          "  var id = Request.QueryString(\"id\");\r\n");
+      // artifacts now published elsewhere go to their new location, in the format asked for
+      for (String s : moved.keySet()) {
+        if (s.startsWith(rt+"/")) {
+          b.append("  if (id == \""+s.substring(rt.length()+1)+"\") {\r\n" +
+              aspFormatRedirects(moved.get(s)[0], moved.get(s)[1]) +
+              "  } else");
+        }
+      }
+      b.append(
+          "  if (s.indexOf(\"application/json+fhir\") > -1) \r\n" +
           "    Response.Redirect(\""+root+"-\"+id+\".json2\");\r\n" + 
           "  else if (s.indexOf(\"application/fhir+json\") > -1) \r\n" + 
           "    Response.Redirect(\""+root+"-\"+id+\".json1\");\r\n" + 
@@ -357,6 +379,9 @@ public class IGReleaseRedirectionBuilder {
         }
       }
     }
+    for (Map.Entry<String, String[]> e : loadNewLocations().entrySet()) {
+      createAspRedirect(Utilities.path(folder, e.getKey(), "index.asp"), e.getValue()[0], e.getValue()[1]);
+    }
   }
 
   public void buildLitespeedRedirections() throws IOException {
@@ -377,6 +402,13 @@ public class IGReleaseRedirectionBuilder {
           createLitespeedRedirect(path, map.get(s), Utilities.pathURL(vpath, head(file.getName())));
         }
       }
+    }
+    for (Map.Entry<String, String[]> e : loadNewLocations().entrySet()) {
+      File of = new File(Utilities.path(folder, e.getKey(), "index.asp"));
+      if (of.exists()) {
+        of.delete();
+      }
+      createLitespeedRedirect(Utilities.path(folder, e.getKey(), "index.php"), e.getValue()[0], e.getValue()[1]);
     }
   }
 
@@ -437,34 +469,65 @@ public class IGReleaseRedirectionBuilder {
   }
 
   private Map<String, String> createMap(boolean isCore) throws IOException {
+    JsonObject json = loadSpecInternals();
+    if (json == null) {
+      return null;
+    }
+    Map<String, String> res = parseSpecDetails(json);
+    if (isCore) {
+      scanAdditionalFiles(res);
+    }
+    return res;
+  }
+
+  private JsonObject loadSpecInternals() throws IOException {
     if (new File(Utilities.path(folder, "spec.internals")).exists()) {
-      JsonObject json = null;
       try {
-        json = JsonParser.parseObjectFromFile(Utilities.path(folder, "spec.internals"));
+        return JsonParser.parseObjectFromFile(Utilities.path(folder, "spec.internals"));
       } catch (Exception e) {
         return null;
       }
-      Map<String, String> res = parseSpecDetails(json);
-      if (isCore) {
-        scanAdditionalFiles(res);      
-      }
-      return res;
     }
     File f = new File(Utilities.path(folder, "package.tgz"));
     if (!f.exists())
       return null;
     pkg = NpmPackage.fromPackage(new FileInputStream(f));
-    JsonObject json = null;
     try {
-      json = JsonParser.parseObject(pkg.load("other", "spec.internals"));
+      return JsonParser.parseObject(pkg.load("other", "spec.internals"));
     } catch (Exception e) {
       return null;
     }
-    Map<String, String> res = parseSpecDetails(json);
-    if (isCore) {
-      scanAdditionalFiles(res);      
+  }
+
+  /**
+   * @return the artifacts that were in this IG and are now published in another one, from the new-location extensions
+   *   of the IG (Type/id : [the new page, the base of the new source files]). Their canonical URLs redirect there
+   */
+  private Map<String, String[]> loadNewLocations() throws IOException {
+    Map<String, String[]> res = new HashMap<>();
+    JsonObject json = loadSpecInternals();
+    if (json != null && json.has(NewLocationRedirects.SPEC_INTERNALS_KEY)) {
+      for (JsonProperty p : json.getJsonObject(NewLocationRedirects.SPEC_INTERNALS_KEY).getProperties()) {
+        if (p.getName().contains("/") && p.getValue().isJsonObject() && p.getValue().asJsonObject().has("source")) {
+          JsonObject t = p.getValue().asJsonObject();
+          res.put(p.getName(), new String[] {t.asString("page"), t.asString("source")});
+        }
+      }
     }
     return res;
+  }
+
+  /**
+   * @return the redirects by format of the ASP template, for the body of a script that has the accept header in s
+   */
+  private String aspFormatRedirects(String urlHtml, String urlSrc) {
+    String t = ASP_TEMPLATE.substring(ASP_TEMPLATE.indexOf("  if (s.indexOf"), ASP_TEMPLATE.indexOf("\r\n\r\n%>"));
+    t = t.replace("{{html}}", urlHtml).replace("{{literal}}", urlSrc);
+    StringBuilder b = new StringBuilder();
+    for (String line : t.split("\r\n")) {
+      b.append("  ").append(line).append("\r\n");
+    }
+    return b.toString();
   }
 
   private void scanAdditionalFiles(Map<String, String> res) throws IOException {

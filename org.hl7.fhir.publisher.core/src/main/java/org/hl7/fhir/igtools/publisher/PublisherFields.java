@@ -265,6 +265,7 @@ public class PublisherFields {
     boolean hasTranslations;
     String defaultTranslationLang;
     List<String> translationLangs = new ArrayList<String>();
+    NewLocationRedirects newLocations;
     List<String> translationSources = new ArrayList<String>();
     List<String> usedLangFiles = new ArrayList<String>();
     List<String> viewDefinitions = new ArrayList<String>();

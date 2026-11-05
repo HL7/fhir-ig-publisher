@@ -370,6 +370,19 @@ public class SpecMapManager {
     this.base2 = PackageHacker.fixPackageUrl(base2);
   }
 
+  /**
+   * Record that content which was in this IG (Type/id of an artifact, or a page name) is now found at page, and for
+   * an artifact, that its source files are now {source}.json and {source}.xml
+   */
+  public void newLocation(String local, String page, String source) {
+    JsonObject target = new JsonObject();
+    target.add("page", page);
+    if (source != null) {
+      target.add("source", source);
+    }
+    spec.forceObject(NewLocationRedirects.SPEC_INTERNALS_KEY).set(local, target);
+  }
+
   public void target(String tgt) {
     if (!targetSet.contains(tgt)) {
       targetSet.add(tgt);

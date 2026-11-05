@@ -782,6 +782,13 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     return canonical;
   }
 
+  /**
+   * @return the template's default publishing configuration for each resource type (e.g. the names of its pages)
+   */
+  public JsonObject getDefaultConfig() {
+    return defaultConfig;
+  }
+
   public String getLinkFor(FetchedResource r, boolean replace) {
     String base = getProperty(r, "base");
     if (base!=null) {
