@@ -33,6 +33,7 @@ import org.hl7.fhir.services.context.IWorkerContext;
 import org.hl7.fhir.services.renderers.DataRenderer;
 import org.hl7.fhir.services.renderers.RendererFactory;
 import org.hl7.fhir.services.renderers.spreadsheets.StructureDefinitionSpreadsheetGenerator;
+import org.hl7.fhir.services.renderers.utils.RenderingContext;
 import org.openxmlformats.schemas.spreadsheetml.x2006.main.CTAutoFilter;
 import org.openxmlformats.schemas.spreadsheetml.x2006.main.CTCustomFilter;
 import org.openxmlformats.schemas.spreadsheetml.x2006.main.CTCustomFilters;
@@ -45,9 +46,9 @@ import org.openxmlformats.schemas.spreadsheetml.x2006.main.STFilterOperator;
  * <ul>
  *   <li>the workbook's shared strings go through a {@link CachingSharedStringsTable};</li>
  *   <li>column auto-sizing goes through a {@link ColumnWidthCache}, shared by all the profile workbooks of a build;</li>
- *   <li>{@link #precomputeDisplays(StructureDefinition)} works out, up front, the few values the generator
- *   renders through the worker context (identifiers, contacts, jurisdictions, keywords), so that
- *   {@link #renderStructureDefinition} can then run on another thread without touching the context.</li>
+ *   <li>{@link #detachFromContext(StructureDefinition)} works out, up front, the few values the generator
+ *   renders through the worker context (identifiers, contacts, jurisdictions, keywords), and then lets go of the
+ *   context, so that {@link #renderStructureDefinition} can run on another thread without it.</li>
  * </ul>
  * {@link #configureSheet(Sheet, StructureDefinition)} is a copy of the core method (core 7.0.2) with only the
  * {@code autoSizeColumn} calls changed, and the styles are made by a copy of core's. ProfileSpreadsheetGeneratorTest checks the two give the same workbook.
@@ -111,11 +112,14 @@ public class ProfileSpreadsheetGenerator extends StructureDefinitionSpreadsheetG
 
   /**
    * Renders now, on this thread, every value of sd that the generator would otherwise render through the worker
-   * context, and makes the generator use those answers. After this, rendering sd (the same object) needs
-   * nothing from the context. Asking for any other value fails with {@link IllegalStateException} instead of
-   * reaching the context.
+   * context, makes the generator use those answers, and then drops the generator's references to the worker
+   * context and the renderer factory, so that the generator can go to another thread. After this, rendering sd
+   * (the same object) needs nothing from the context. Asking for any other value fails with
+   * {@link IllegalStateException}, and any use of the context fails with a NullPointerException, instead of
+   * reaching the context from that thread. (The core class's xml and json parsers keep the model context,
+   * which they use to compose values; that is all the rendering still reads.)
    */
-  public void precomputeDisplays(StructureDefinition sd) {
+  public void detachFromContext(StructureDefinition sd) {
     Map<DataType, String> displays = new IdentityHashMap<>();
     for (Coding k : sd.getKeywordList()) {
       displays.put(k, dr.displayDataType(k));
@@ -129,14 +133,16 @@ public class ProfileSpreadsheetGenerator extends StructureDefinitionSpreadsheetG
     for (CodeableConcept j : sd.getJurisdictionList()) {
       displays.put(j, dr.displayDataType(j));
     }
-    dr = new PrecomputedDisplays(dr, displays);
+    dr = new PrecomputedDisplays(displays);
+    context = null;
   }
 
+  /** answers displayDataType from a fixed map; it has no rendering context, so it can't reach the worker context */
   private static class PrecomputedDisplays extends DataRenderer {
     private final Map<DataType, String> displays;
 
-    PrecomputedDisplays(DataRenderer renderer, Map<DataType, String> displays) {
-      super(renderer.getContext());
+    PrecomputedDisplays(Map<DataType, String> displays) {
+      super((RenderingContext) null);
       this.displays = displays;
     }
 

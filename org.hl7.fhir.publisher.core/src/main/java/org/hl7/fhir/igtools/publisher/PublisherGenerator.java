@@ -925,12 +925,13 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
   /**
    * The per-profile xlsx workbooks that the Spreadsheets loop below will build, in its order, are handed to a
    * {@link ProfileSpreadsheetPrefetcher}. Each job renders a deep copy of the profile, taken here on this thread,
-   * with the displays that need the worker context rendered here too. The loop still does everything else in
-   * the same order as before (csv, all-profiles, schematron), and builds a workbook itself whenever the
-   * prefetcher has no result for it.
+   * with the displays that need the worker context rendered here too, by a generator that then lets go of the
+   * context. This only happens when the user has asked for extra threads (-threads). The loop still does
+   * everything else in the same order as before (csv, all-profiles, schematron), and builds a workbook itself
+   * whenever the prefetcher has no result for it.
    */
   private ProfileSpreadsheetPrefetcher<FetchedResource> startSpreadsheetPrefetcher() {
-    int threads = ProfileSpreadsheetPrefetcher.defaultThreads();
+    int threads = this.settings.getThreads();
     if (threads == 0 || this.settings.isGenerationOff()) {
       return null;
     }
@@ -954,7 +955,8 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       StructureDefinition sd = (StructureDefinition) r.getResource();
       ProfileSpreadsheetGenerator sdg = new ProfileSpreadsheetGenerator(this.pf.context, true, anyMustSupport(sd), pf.rendererFactory, columnWidths());
       StructureDefinition copy = sd.copy(Base.COPY_ALL);
-      sdg.precomputeDisplays(copy);
+      // the job runs on a worker thread, so it must not see the context: detach the generator from it here
+      sdg.detachFromContext(copy);
       return ProfileSpreadsheetPrefetcher.job(sdg, copy);
     });
   }

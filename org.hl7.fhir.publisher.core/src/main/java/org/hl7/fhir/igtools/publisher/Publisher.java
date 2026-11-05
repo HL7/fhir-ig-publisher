@@ -1301,6 +1301,10 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       System.out.println("-packages: a directory to load packages (*.tgz) from before resolving dependencies");
       System.out.println("           this parameter can be present multiple times");
       System.out.println("");
+      System.out.println("-threads [n]: (optional) let the publisher use up to n threads beyond its own for work");
+      System.out.println("  that can be done in parallel (at most one less than the number of cores).");
+      System.out.println("  The default is 0: the publisher runs on one thread");
+      System.out.println("");
       System.out.println("-po: (optional) Load translations from a .po file at runtime. Repeatable.");
       System.out.println("     Overrides shipped properties for the bundle+locale derived from the filename");
       System.out.println("     (e.g. validator-messages-de.po, rendering-phrases-pt_BR.po).");
@@ -1608,6 +1612,12 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       }
       if (CliParams.hasNamedParam(args, "-no-sushi")) {
         self.settings.setNoSushi(true);
+      }
+      if (CliParams.hasNamedParam(args, "-threads")) {
+        String value = CliParams.getNamedParam(args, "-threads");
+        int cores = Runtime.getRuntime().availableProcessors();
+        self.settings.setThreads(PublisherSettings.parseThreads(value, cores));
+        System.out.println("Using up to " + self.settings.getThreads() + " extra thread(s) (asked for " + value.trim() + ", " + cores + " cores)");
       }
       if (CliParams.hasNamedParam(args, PACKAGE_CACHE_FOLDER_PARAM)) {
         self.settings.setPackageCacheFolder(CliParams.getNamedParam(args, PACKAGE_CACHE_FOLDER_PARAM));

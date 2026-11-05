@@ -2,6 +2,7 @@ package org.hl7.fhir.igtools.spreadsheets;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -15,6 +16,8 @@ import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -45,8 +48,10 @@ import org.hl7.fhir.model.core.StructureDefinition;
 import org.hl7.fhir.model.core.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.model.core.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.services.renderers.DataRenderer;
 import org.hl7.fhir.services.renderers.RendererFactory;
 import org.hl7.fhir.services.renderers.spreadsheets.StructureDefinitionSpreadsheetGenerator;
+import org.hl7.fhir.services.renderers.utils.RenderingContext;
 import org.hl7.fhir.services.terminology.ValidationResult;
 import org.hl7.fhir.utilities.validation.ValidationOptions;
 import org.junit.jupiter.api.BeforeEach;
@@ -284,7 +289,7 @@ class ProfileSpreadsheetGeneratorTest {
 
     ProfileSpreadsheetGenerator g = new ProfileSpreadsheetGenerator(worker, true, true, rf, new ColumnWidthCache());
     StructureDefinition copy = sd.copy(Base.COPY_ALL);
-    g.precomputeDisplays(copy);
+    g.detachFromContext(copy);
     clearInvocations(worker);
     byte[] actual = ProfileSpreadsheetPrefetcher.job(g, copy).render();
     verifyNoInteractions(worker);
@@ -294,10 +299,38 @@ class ProfileSpreadsheetGeneratorTest {
   }
 
   @Test
+  void detachedGeneratorHoldsNoContext() throws Exception {
+    ProfileSpreadsheetGenerator g = new ProfileSpreadsheetGenerator(worker, true, true, rf, new ColumnWidthCache());
+    assertTrue(referencesContext(g), "guards the check itself");
+    g.detachFromContext(profile("d", 7, 5, 0).copy(Base.COPY_ALL));
+    assertFalse(referencesContext(g));
+  }
+
+  /** whether g, or its data renderer, has a field that holds the worker context, the renderer factory or a rendering context */
+  private boolean referencesContext(Object g) throws IllegalAccessException {
+    for (Class<?> c = g.getClass(); c != null && c != Object.class; c = c.getSuperclass()) {
+      for (Field f : c.getDeclaredFields()) {
+        if (Modifier.isStatic(f.getModifiers())) {
+          continue;
+        }
+        f.setAccessible(true);
+        Object v = f.get(g);
+        if (v == worker || v == rf || v instanceof RenderingContext) {
+          return true;
+        }
+        if (v instanceof DataRenderer && referencesContext(v)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  @Test
   void precomputedDisplaysRefuseOtherObjects() throws Exception {
     StructureDefinition sd = profile("d", 6, 5, 0);
     ProfileSpreadsheetGenerator g = new ProfileSpreadsheetGenerator(worker, true, true, rf, new ColumnWidthCache());
-    g.precomputeDisplays(sd.copy(Base.COPY_ALL));
+    g.detachFromContext(sd.copy(Base.COPY_ALL));
     // the original's identifiers are other objects than the copy's, so rendering the original must not silently work
     assertThrows(IllegalStateException.class, () -> g.renderStructureDefinition(sd, false));
   }

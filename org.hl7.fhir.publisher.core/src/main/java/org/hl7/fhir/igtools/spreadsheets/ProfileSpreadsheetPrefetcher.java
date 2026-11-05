@@ -18,10 +18,11 @@ import org.hl7.fhir.model.core.StructureDefinition;
  * the publisher's own (single-threaded, in-order) loop, which then just writes the bytes.
  * <p>
  * Each task gets everything it reads up front, on the publisher's thread: a deep copy of the profile and a
- * generator whose context-backed displays are already rendered (see
- * {@link ProfileSpreadsheetGenerator#precomputeDisplays}). So a task touches no object that the publisher's
- * thread, or another task, uses at the same time. The only state tasks share is the {@link ColumnWidthCache},
- * which is thread-safe, and POI/java2d internals, which are safe for separate workbooks.
+ * generator whose context-backed displays are already rendered and which no longer holds the worker context or
+ * the renderer factory (see {@link ProfileSpreadsheetGenerator#detachFromContext}). So a task touches no object
+ * that the publisher's thread, or another task, uses at the same time. The only state tasks share is the
+ * {@link ColumnWidthCache}, which is thread-safe, the model context that core's parsers compose values with, and
+ * POI/java2d internals, which are safe for separate workbooks.
  * <p>
  * {@link #take} returns null when there is no result, for whatever reason (not a candidate, the task failed,
  * interrupted). The caller then generates the workbook itself the usual way, so failures behave and are
@@ -124,20 +125,10 @@ public class ProfileSpreadsheetPrefetcher<K> implements AutoCloseable {
     executor.shutdownNow();
   }
 
-  /** the number of worker threads to use, or 0 for none: one per core beyond the publisher's own, at most 3 */
-  public static int defaultThreads() {
-    String s = System.getProperty("ig.spreadsheet.threads");
-    if (s != null) {
-      try {
-        return Math.max(0, Integer.parseInt(s.trim()));
-      } catch (NumberFormatException e) {
-        // fall through to the default
-      }
-    }
-    return Math.max(0, Math.min(3, Runtime.getRuntime().availableProcessors() - 1));
-  }
-
-  /** a {@link Job} for one profile workbook */
+  /**
+   * a {@link Job} for one profile workbook; generator must have been detached from the worker context
+   * ({@link ProfileSpreadsheetGenerator#detachFromContext}) for sd, since the job runs on a worker thread
+   */
   public static Job job(ProfileSpreadsheetGenerator generator, StructureDefinition sd) {
     return () -> {
       generator.renderStructureDefinition(sd, false);
