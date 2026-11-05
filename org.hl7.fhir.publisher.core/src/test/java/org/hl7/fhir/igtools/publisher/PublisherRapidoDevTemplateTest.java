@@ -13,6 +13,8 @@ import java.nio.file.Path;
 import org.hl7.fhir.igtools.templates.Template;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.logging.ILoggingService;
+import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -24,6 +26,14 @@ class PublisherRapidoDevTemplateTest {
 
   @TempDir
   Path dir;
+
+  private final String uuid = HierarchicalTableGenerator.uuid;
+
+  @AfterEach
+  void restoreUuid() {
+    // a differential build takes the uuid of the last build
+    HierarchicalTableGenerator.uuid = uuid;
+  }
 
   @Test
   void aTemplateInDevelopmentIsComparedWithTheLastBuild() throws Exception {
