@@ -17,7 +17,10 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
@@ -67,6 +70,45 @@ class XhtmlParsePrefetcherTest {
     try (XhtmlParsePrefetcher p = XhtmlParsePrefetcher.start(List.of("a", "b"), 1, path -> Collections.emptyList())) {
       assertNotNull(p);
     }
+  }
+
+  /** how many distinct worker threads a prefetcher started with extraThreads runs jobs on, when every job blocks */
+  private static int workersFor(int extraThreads, int expected) throws InterruptedException {
+    List<String> paths = new ArrayList<>();
+    for (int i = 0; i < 64; i++) {
+      paths.add("p" + i);
+    }
+    Set<Thread> seen = ConcurrentHashMap.newKeySet();
+    CountDownLatch release = new CountDownLatch(1);
+    try (XhtmlParsePrefetcher p = XhtmlParsePrefetcher.start(paths, extraThreads, path -> {
+      seen.add(Thread.currentThread());
+      release.await();
+      return Collections.emptyList();
+    })) {
+      assertNotNull(p);
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+      while (seen.size() < expected && System.nanoTime() < deadline) {
+        Thread.sleep(10);
+      }
+      // give any worker beyond the expected ones time to show up
+      Thread.sleep(200);
+      return seen.size();
+    } finally {
+      release.countDown();
+    }
+  }
+
+  @Test
+  void startsOneWorkerPerExtraThread() throws InterruptedException {
+    assumeTrue(Runtime.getRuntime().availableProcessors() >= 3);
+    assertEquals(2, workersFor(2, 2));
+  }
+
+  @Test
+  void startsNoMoreWorkersThanSpareCores() throws InterruptedException {
+    int cores = Runtime.getRuntime().availableProcessors();
+    assumeTrue(cores >= 2);
+    assertEquals(cores - 1, workersFor(cores + 4, cores - 1));
   }
 
   @Test
