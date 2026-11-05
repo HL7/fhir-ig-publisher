@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -53,6 +54,19 @@ class XhtmlParsePrefetcherTest {
       started.countDown();
       return job.run(path);
     };
+  }
+
+  @Test
+  void oneThreadMeansNoPrefetching() {
+    assertNull(XhtmlParsePrefetcher.start(List.of("a", "b"), 1, path -> Collections.emptyList()));
+  }
+
+  @Test
+  void aSecondThreadStartsAPrefetcher() {
+    assumeTrue(Runtime.getRuntime().availableProcessors() >= 2);
+    try (XhtmlParsePrefetcher p = XhtmlParsePrefetcher.start(List.of("a", "b"), 2, path -> Collections.emptyList())) {
+      assertNotNull(p);
+    }
   }
 
   @Test

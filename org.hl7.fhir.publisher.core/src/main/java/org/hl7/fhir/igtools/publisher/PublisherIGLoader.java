@@ -1168,6 +1168,7 @@ public class PublisherIGLoader extends PublisherBase {
     // (a normal local build has no mode set at all - null means manual, as elsewhere in the publisher)
     pf.inspector.setAccessibilityPanel(pf.accessibilityChecks && (settings.getMode() == null || settings.getMode() == PublisherUtils.IGBuildMode.MANUAL));
     pf.inspector.setPcm(pf.pcm);
+    pf.inspector.setThreads(settings.getThreads());
 
     for (String name : pf.customResourceNames) {
       // if it's already defined (transition from R6) we scrub the existing definition

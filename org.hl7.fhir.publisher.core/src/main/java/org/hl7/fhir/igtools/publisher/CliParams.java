@@ -10,6 +10,8 @@ public class CliParams {
 
 	public static final String SSRF_PROTECTION_ENABLED_PARAM = "-ssrf-protection-enabled";
 
+	public static final String THREADS = "-threads";
+
 	public static String getNamedParam(String[] args, String param) {
 	  boolean found = false;
 	  for (String a : args) {
@@ -35,6 +37,28 @@ public class CliParams {
 		}
 	  }
 	  return values;
+	}
+
+	/**
+	 * The -threads setting: the most threads the publisher may use, counting the main thread.
+	 *
+	 * @return 1 if the parameter isn't there
+	 * @throws IllegalArgumentException if the value isn't a whole number of 1 or more
+	 */
+	public static int getThreads(String[] args) {
+	  if (!hasNamedParam(args, THREADS)) {
+		return 1;
+	  }
+	  String value = getNamedParam(args, THREADS);
+	  try {
+		int threads = Integer.parseInt(value == null ? "" : value.trim());
+		if (threads >= 1) {
+		  return threads;
+		}
+	  } catch (NumberFormatException e) {
+		// reported below
+	  }
+	  throw new IllegalArgumentException(THREADS+" needs a whole number of 1 or more, not '"+value+"'");
 	}
 
 	public static boolean hasNamedParam(String[] args, String param) {

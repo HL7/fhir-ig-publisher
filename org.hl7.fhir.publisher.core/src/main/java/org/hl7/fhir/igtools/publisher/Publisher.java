@@ -1301,6 +1301,9 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       System.out.println("-packages: a directory to load packages (*.tgz) from before resolving dependencies");
       System.out.println("           this parameter can be present multiple times");
       System.out.println("");
+      System.out.println("-threads: (optional) the most threads the publisher may use at once (default 1).");
+      System.out.println("     More than 1 lets some steps use spare cores, at the cost of more load on the machine");
+      System.out.println("");
       System.out.println("-po: (optional) Load translations from a .po file at runtime. Repeatable.");
       System.out.println("     Overrides shipped properties for the bundle+locale derived from the filename");
       System.out.println("     (e.g. validator-messages-de.po, rendering-phrases-pt_BR.po).");
@@ -1410,6 +1413,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
           Publisher self = new Publisher();
           self.setConfigFile(determineActualIG(ig, null));
           setTxServerValue(args, self);
+          self.settings.setThreads(CliParams.getThreads(args));
           if (CliParams.hasNamedParam(args, "-resetTx")) {
             self.settings.setCacheOption(PublisherUtils.CacheOption.CLEAR_ALL);
           } else if (CliParams.hasNamedParam(args, "-resetTxErrors")) {
@@ -1506,6 +1510,11 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       if (CliParams.hasNamedParam(args, "-generation-off")) {
         self.settings.setGenerationOff(true);
         System.out.println("Running without generation to shorten the run time (editor process only)");
+      }
+
+      self.settings.setThreads(CliParams.getThreads(args));
+      if (self.settings.getThreads() > 1) {
+        System.out.println("Using up to " + self.settings.getThreads() + " threads");
       }
 
       // deprecated

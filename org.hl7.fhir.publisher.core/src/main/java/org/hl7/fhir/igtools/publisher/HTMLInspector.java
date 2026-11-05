@@ -276,6 +276,11 @@ public class HTMLInspector {
    * browser) to the bottom of every page. Local builds only, and not if the IG turns 'accessibility-checks' off.
    */
   @Getter @Setter private boolean accessibilityPanel = false;
+  /**
+   * The most threads the checks may use, counting the thread that runs them, from the -threads setting.
+   * Above 1, the spare threads parse pages ahead of the load and check loops.
+   */
+  @Getter @Setter private int threads = 1;
   private List<String> parseProblems = new ArrayList<>();
   private List<String> publishBoxProblems = new ArrayList<>();
   private Set<String> exceptions = new HashSet<>();
@@ -356,7 +361,7 @@ public class HTMLInspector {
     // load files
     int i = 0;
     int c = loadList.size() / 40;
-    try (XhtmlParsePrefetcher prefetcher = XhtmlParsePrefetcher.start(loadList, this::prefetchForLoad)) {
+    try (XhtmlParsePrefetcher prefetcher = XhtmlParsePrefetcher.start(loadList, threads, this::prefetchForLoad)) {
       int index = 0;
       for (String s : loadList) {
         loadFile(s, rootFolder, messages, prefetcher == null ? null : prefetcher.take(index));
@@ -393,7 +398,7 @@ public class HTMLInspector {
         parseList.add(cache.get(s).getFilename());
       }
     }
-    XhtmlParsePrefetcher prefetcher = XhtmlParsePrefetcher.start(parseList, this::prefetchForCheck);
+    XhtmlParsePrefetcher prefetcher = XhtmlParsePrefetcher.start(parseList, threads, this::prefetchForCheck);
     int parseIndex = 0;
     try {
       for (String s : checkList) {

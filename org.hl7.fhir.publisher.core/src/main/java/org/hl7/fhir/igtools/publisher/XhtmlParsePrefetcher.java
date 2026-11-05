@@ -111,11 +111,13 @@ public class XhtmlParsePrefetcher implements AutoCloseable {
   private boolean closed;
 
   /**
-   * @return a prefetcher, or null when there is no spare processor to run it on or fewer than two
-   *         files (callers then just parse, see {@link #parse})
+   * @param maxThreads the most threads the publisher may use, counting the walking thread (see
+   *        {@link PublisherSettings#getThreads}); workers get the rest, up to one per spare processor
+   * @return a prefetcher, or null when that leaves no thread to prefetch on or there are fewer than
+   *         two files (callers then just parse, see {@link #parse})
    */
-  public static XhtmlParsePrefetcher start(List<String> paths, Job job) {
-    int threads = Math.min(3, Runtime.getRuntime().availableProcessors() - 1);
+  public static XhtmlParsePrefetcher start(List<String> paths, int maxThreads, Job job) {
+    int threads = Math.min(maxThreads, Runtime.getRuntime().availableProcessors()) - 1;
     if (threads < 1 || paths.size() < 2) {
       return null;
     }
