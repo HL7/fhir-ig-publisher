@@ -1,5 +1,6 @@
 package org.hl7.fhir.igtools.publisher.xig;
 
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -110,7 +111,7 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
   }
 
   public void produce(FilesystemPackageCacheManager pcm) throws IOException, FHIRException, EOperationOutcome {
-    org.hl7.fhir.utilities.json.parser.JsonParser.compose(info.getJson(), new FileOutputStream(Utilities.path(target, "registry.json")));
+    org.hl7.fhir.utilities.json.parser.JsonParser.compose(info.getJson(), new File(Utilities.path(target, "registry.json")));
     info.setJson(null);
 
     System.out.println("Generate...");
@@ -325,7 +326,9 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
   private void renderResource(String pid, CanonicalResource cr) throws FHIRException, IOException, EOperationOutcome {
     new RendererFactory().factory(cr, rc).renderResource(ResourceWrapper.forResource(rc.getContextUtilities(), cr));
     String s = new XhtmlComposer(false, true).compose(cr.getText().getDiv());
-    new JsonParser(info.getCtxt().getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(target, cr.getUserString("filebase")+".json")), cr);
+    try (FileOutputStream out = new FileOutputStream(Utilities.path(target, cr.getUserString("filebase")+".json"))) {
+      new JsonParser(info.getCtxt().getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(out, cr);
+    }
     //    new XmlParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(target, cr.getUserString("filebase")+".xml")), cr);
     genPage(cr.fhirType()+"-"+cr.getIdBase(), summaryForResource(pid, cr) + s, Utilities.path(target, cr.getUserString("filebase")+".html"));  
     cr.setText(null);

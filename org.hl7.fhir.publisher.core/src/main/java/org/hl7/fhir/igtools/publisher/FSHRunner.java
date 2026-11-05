@@ -54,7 +54,10 @@ public class FSHRunner {
         */
         String fshVersion = null;
         if (fshIni.exists()) {
-            IniFile ini = new IniFile(new FileInputStream(fshIni));
+            IniFile ini;
+            try (FileInputStream in = new FileInputStream(fshIni)) {
+              ini = new IniFile(in);
+            }
             if (ini.hasProperty("FSH", "timeout")) {
                 fshTimeout = ini.getLongProperty("FSH", "timeout") * 1000;
             }

@@ -783,7 +783,10 @@ public class PublicationProcess {
         opl.setNowPublishedAs(npm.canonical());
         opl.save(previousPackageFile.getAbsolutePath());
       }
-      NpmPackage npmB = NpmPackage.fromPackage(new FileInputStream(Utilities.path(destVer, "package.tgz")));
+      NpmPackage npmB;
+      try (FileInputStream in = new FileInputStream(Utilities.path(destVer, "package.tgz"))) {
+        npmB = NpmPackage.fromPackage(in);
+      }
       updateFeed(fRoot, destVer, pl, plVer, pubSetup.forceObject("feeds").asString("package"), false, src, pubSetup.forceObject("website").asString("org"), npmB, genDateS(genDate), username, version, gitSrcId, subPackages);
       updateFeed(fRoot, destVer, pl, plVer, pubSetup.forceObject("feeds").asString("publication"), true, src, pubSetup.forceObject("website").asString("org"), npmB, genDateS(genDate), username, version, gitSrcId, subPackages);
       new PackageRegistryBuilder(workingRoot).update(destination.substring(workingRoot.length()+1), pl);
@@ -1429,7 +1432,10 @@ public class PublicationProcess {
 
     String username = getComputerName();
 
-    NpmPackage npmB = NpmPackage.fromPackage(new FileInputStream(Utilities.path(destVer, "package.tgz")));
+    NpmPackage npmB;
+    try (FileInputStream in = new FileInputStream(Utilities.path(destVer, "package.tgz"))) {
+      npmB = NpmPackage.fromPackage(in);
+    }
     updateFeed(fRoot, destVer, pl, plVer, pubSetup.forceObject("feeds").asString("package"), false, src, pubSetup.forceObject("website").asString("org"), npmB, genDateS(dd), username, version, null, null);
     updateFeed(fRoot, destVer, pl, plVer, pubSetup.forceObject("feeds").asString("publication"), true, src, pubSetup.forceObject("website").asString("org"), npmB, genDateS(dd), username, version, null, null);
     new PackageRegistryBuilder(workingRoot).updateForWithdrawal(destination.substring(workingRoot.length()+1), pl, prSrc.asString("registry-reason"));

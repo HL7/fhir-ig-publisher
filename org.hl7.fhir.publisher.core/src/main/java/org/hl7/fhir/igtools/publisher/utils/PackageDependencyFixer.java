@@ -33,7 +33,10 @@ public class PackageDependencyFixer {
         if (f.getName().endsWith(".tgz")) {
           try {
 //            System.out.println("Package "+f.getAbsolutePath());
-            NpmPackage pck = NpmPackage.fromPackage(new FileInputStream(f));
+            NpmPackage pck;
+            try (FileInputStream in = new FileInputStream(f)) {
+              pck = NpmPackage.fromPackage(in);
+            }
             boolean save = false;
             JsonObject json = JsonParser.parseObject(pck.load("package", "package.json"));
             JsonObject dep = json.getJsonObject("dependencies");
@@ -50,7 +53,9 @@ public class PackageDependencyFixer {
 //            System.out.println("Package "+json.asString("name")+" depends on "+CommaSeparatedStringBuilder.join(",", deps));            
             if (save) {
               f.renameTo(new File(FileUtilities.changeFileExt(f.getAbsolutePath(), ".tgz-old")));
-              pck.save(new FileOutputStream(f));
+              try (FileOutputStream out = new FileOutputStream(f)) {
+                pck.save(out);
+              }
             }
           } catch (Exception e) {
 //            System.out.println("Error processing "+f.getAbsolutePath()+": "+e.getMessage());

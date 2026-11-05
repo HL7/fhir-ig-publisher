@@ -44,7 +44,10 @@ public class IGPackageChecker {
     if (!f.exists()) {
       makePackage(pf, name, ver, fhirversion, date);
     } else {
-      NpmPackage pck = NpmPackage.fromPackage(new FileInputStream(f));
+      NpmPackage pck;
+      try (FileInputStream in = new FileInputStream(f)) {
+        pck = NpmPackage.fromPackage(in);
+      }
       JsonObject json = pck.getNpm();
       checkJsonProp(pf, json, "version", ver);
       checkJsonProp(pf, json, "name", pckId);
@@ -121,7 +124,9 @@ public class IGPackageChecker {
         json.remove(propName);
       }
       json.add(propName, value);
-      pck.save(new FileOutputStream(pf));      
+      try (FileOutputStream out = new FileOutputStream(pf)) {
+        pck.save(out);
+      }
     }
   }
 

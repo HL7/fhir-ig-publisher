@@ -83,6 +83,7 @@ public class XIGExtensionHandler {
       entries.add("<li><a href=\"extension-summary-"+g.toLowerCase()+".html\">"+g+"</a>: "+urls.size()+" extensions</li>\r\n");
       p.println("");
     }
+    p.close();
     StringBuilder b = header("Extension Analysis");
     b.append("<ul>\r\n");
     for (String s : Utilities.sorted(entries)) {

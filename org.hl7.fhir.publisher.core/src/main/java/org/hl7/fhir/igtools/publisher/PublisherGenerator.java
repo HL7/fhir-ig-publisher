@@ -454,6 +454,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           addFileToNpm(NPMPackageGenerator.Category.OTHER, "publication-request.json", FileUtilities.fileToBytes(pr));
         }
         pf.npm.finish();
+        reportRenamedPackageFiles(pf.npm);
         ensureCorePackageDependency(pf.npm);
         for (NPMPackageGenerator vnpm : pf.vnpms.values()) {
           vnpm.finish();
@@ -473,15 +474,23 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
         if (settings.getMode() == null || settings.getMode() == PublisherUtils.IGBuildMode.MANUAL) {
           if (settings.isCacheVersion()) {
-            pf.pcm.addPackageToCache(pf.packageId(), pf.publishedIg.getVersion(), new FileInputStream(pf.npm.filename()), "[output]");
+            try (FileInputStream in = new FileInputStream(pf.npm.filename())) {
+              pf.pcm.addPackageToCache(pf.packageId(), pf.publishedIg.getVersion(), in, "[output]");
+            }
           } else {
-            pf.pcm.addPackageToCache(pf.packageId(), "dev", new FileInputStream(pf.npm.filename()), "[output]");
+            try (FileInputStream in = new FileInputStream(pf.npm.filename())) {
+              pf.pcm.addPackageToCache(pf.packageId(), "dev", in, "[output]");
+            }
             if (pf.branchName != null) {
-              pf.pcm.addPackageToCache(pf.packageId(), "dev$"+ pf.branchName, new FileInputStream(pf.npm.filename()), "[output]");
+              try (FileInputStream in = new FileInputStream(pf.npm.filename())) {
+                pf.pcm.addPackageToCache(pf.packageId(), "dev$"+ pf.branchName, in, "[output]");
+              }
             }
           }
         } else if (settings.getMode() == PublisherUtils.IGBuildMode.PUBLICATION) {
-          pf.pcm.addPackageToCache(pf.packageId(), pf.publishedIg.getVersion(), new FileInputStream(pf.npm.filename()), "[output]");
+          try (FileInputStream in = new FileInputStream(pf.npm.filename())) {
+            pf.pcm.addPackageToCache(pf.packageId(), pf.publishedIg.getVersion(), in, "[output]");
+          }
         }
         JsonArray json = new JsonArray();
         for (String s : pf.generateVersions) {
@@ -628,7 +637,10 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       gen.setModes(Set.of("api", "tx", "cnt", "expansions", "pin"));
       gen.setVerbose(false);
 
-      NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(Utilities.path(pf.outputDir, "package.tgz")));
+      NpmPackage npm;
+      try (FileInputStream in = new FileInputStream(Utilities.path(pf.outputDir, "package.tgz"))) {
+        npm = NpmPackage.fromPackage(in);
+      }
       gen.generateCombinedPackage(npm);
     } catch (Exception e) {
       log("Error generating combined package: "+e.getMessage());
@@ -968,13 +980,13 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         path = Utilities.path(this.pf.tempDir, r.fhirType()+"-"+r.getId()+".xml");
       }
       f.getOutputNames().add(path);
-      FileOutputStream stream = new FileOutputStream(path);
-      org.hl7.fhir.services.elementmodel.XmlParser xp = new org.hl7.fhir.services.elementmodel.XmlParser(this.pf.context);
-      if (suppressId(f, r)) {
-        xp.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
+      try (FileOutputStream stream = new FileOutputStream(path)) {
+        org.hl7.fhir.services.elementmodel.XmlParser xp = new org.hl7.fhir.services.elementmodel.XmlParser(this.pf.context);
+        if (suppressId(f, r)) {
+          xp.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
+        }
+        xp.compose(element, stream, OutputStyle.PRETTY, this.pf.igpkp.getCanonical());
       }
-      xp.compose(element, stream, OutputStyle.PRETTY, this.pf.igpkp.getCanonical());
-      stream.close();
     }
     if (wantGen(r, "json") || forHL7orFHIR()) {
       if (this.settings.isNewMultiLangTemplateFormat() && lang != null) {
@@ -983,13 +995,13 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         path = Utilities.path(this.pf.tempDir, r.fhirType()+"-"+r.getId()+".json");
       }
       f.getOutputNames().add(path);
-      FileOutputStream stream = new FileOutputStream(path);
-      org.hl7.fhir.services.elementmodel.JsonParser jp = new org.hl7.fhir.services.elementmodel.JsonParser(this.pf.context);
-      if (suppressId(f, r)) {
-        jp.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
+      try (FileOutputStream stream = new FileOutputStream(path)) {
+        org.hl7.fhir.services.elementmodel.JsonParser jp = new org.hl7.fhir.services.elementmodel.JsonParser(this.pf.context);
+        if (suppressId(f, r)) {
+          jp.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
+        }
+        jp.compose(element, stream, OutputStyle.PRETTY, this.pf.igpkp.getCanonical());
       }
-      jp.compose(element, stream, OutputStyle.PRETTY, this.pf.igpkp.getCanonical());
-      stream.close();
     }
     if (wantGen(r, "ttl")) {
       if (this.settings.isNewMultiLangTemplateFormat() && lang != null) {
@@ -998,13 +1010,13 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         path = Utilities.path(this.pf.tempDir, r.fhirType()+"-"+r.getId()+".ttl");
       }
       f.getOutputNames().add(path);
-      FileOutputStream stream = new FileOutputStream(path);
-      org.hl7.fhir.services.elementmodel.TurtleParser tp = new org.hl7.fhir.services.elementmodel.TurtleParser(this.pf.context);
-      if (suppressId(f, r)) {
-        tp.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
+      try (FileOutputStream stream = new FileOutputStream(path)) {
+        org.hl7.fhir.services.elementmodel.TurtleParser tp = new org.hl7.fhir.services.elementmodel.TurtleParser(this.pf.context);
+        if (suppressId(f, r)) {
+          tp.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
+        }
+        tp.compose(element, stream, OutputStyle.PRETTY, this.pf.igpkp.getCanonical());
       }
-      tp.compose(element, stream, OutputStyle.PRETTY, this.pf.igpkp.getCanonical());
-      stream.close();
     }
   }
 
@@ -1126,9 +1138,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
     if (wantGen(r, "jekyll-data") && this.pf.produceJekyllData) {
       org.hl7.fhir.services.elementmodel.JsonParser jp = new org.hl7.fhir.services.elementmodel.JsonParser(this.pf.context);
-      FileOutputStream bs = new FileOutputStream(Utilities.path(this.pf.tempDir, "_data", r.fhirType()+"-"+r.getId()+".json"));
-      jp.compose(langElement, bs, OutputStyle.NORMAL, null);
-      bs.close();
+      try (FileOutputStream bs = new FileOutputStream(Utilities.path(this.pf.tempDir, "_data", r.fhirType()+"-"+r.getId()+".json"))) {
+        jp.compose(langElement, bs, OutputStyle.NORMAL, null);
+      }
     }
     if (wantGen(r, "ttl")) {
       genWrapper(null, r, template, this.pf.igpkp.getProperty(r, "format"), f.getOutputNames(), vars, "ttl", "", false, lang, lrc);
@@ -1635,7 +1647,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         String path = Utilities.path(this.pf.tempDir, "CodeSystem-"+prefixForContainer + cs.getId()+".xlsx");
         f.getOutputNames().add(path);
         vsg.renderCodeSystem(cs);
-        vsg.finish(new FileOutputStream(path));
+        try (FileOutputStream out = new FileOutputStream(path)) {
+          vsg.finish(out);
+        }
       }
     }
   }
@@ -1745,7 +1759,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         String path = Utilities.path(this.pf.tempDir, "ValueSet-"+prefixForContainer + r.getId()+".xlsx");
         f.getOutputNames().add(path);
         vsg.renderValueSet(vs);
-        vsg.finish(new FileOutputStream(path));
+        try (FileOutputStream out = new FileOutputStream(path)) {
+          vsg.finish(out);
+        }
       }
     }
 
@@ -1802,7 +1818,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       String path = Utilities.path(this.pf.tempDir, prefixForContainer + r.getId()+".xlsx");
       f.getOutputNames().add(path);
       cmg.renderConceptMap(cm);
-      cmg.finish(new FileOutputStream(path));
+      try (FileOutputStream out = new FileOutputStream(path)) {
+        cmg.finish(out);
+      }
     }
   }
 
@@ -1876,9 +1894,11 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     if (wantGen(r, "swagger") || wantGen(r, "openapi")) {
       String lp = isNewML() && lang != null && !lang.equals(this.pf.defaultTranslationLang) ? "-"+lang : "";
       org.hl7.fhir.services.openapi.Writer oa = null;
-      if (this.pf.openApiTemplate != null)
-        oa = new org.hl7.fhir.services.openapi.Writer(new FileOutputStream(Utilities.path(this.pf.tempDir, cpbs.getId()+ lp+".openapi.json")), new FileInputStream(Utilities.path(FileUtilities.getDirectoryForFile(this.settings.getConfigFile()), this.pf.openApiTemplate)));
-      else
+      if (this.pf.openApiTemplate != null) {
+        try (FileInputStream template = new FileInputStream(Utilities.path(FileUtilities.getDirectoryForFile(this.settings.getConfigFile()), this.pf.openApiTemplate))) {
+          oa = new org.hl7.fhir.services.openapi.Writer(new FileOutputStream(Utilities.path(this.pf.tempDir, cpbs.getId()+ lp+".openapi.json")), template);
+        }
+      } else
         oa = new Writer(new FileOutputStream(Utilities.path(this.pf.tempDir, cpbs.getId()+ lp+".openapi.json")));
       String lic = license();
       String displ = this.pf.context.validateCode(new ValidationOptions(FhirPublication.R5, "en-US"), new Coding("http://hl7.org/fhir/spdx-license",  lic, null), null).getDisplay();
@@ -1897,7 +1917,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       String path = Utilities.path(this.pf.tempDir, sdPrefix + r.getId()+".csv");
       f.getOutputNames().add(path);
       ProfileUtilities pu = new ProfileUtilities(this.pf.context, this.pf.errors, this.pf.igpkp);
-      pu.generateCsv(new FileOutputStream(path), sd, true);
+      try (FileOutputStream out = new FileOutputStream(path)) {
+        pu.generateCsv(out, sd, true);
+      }
       if (this.pf.allProfilesCsv == null) {
         this.pf.allProfilesCsv = new  org.hl7.fhir.services.utilities.CSVWriter(new FileOutputStream(Utilities.path(this.pf.tempDir, "all-profiles.csv")), this.pf.context, true);
         this.pf.otherFilesRun.add(Utilities.path(this.pf.tempDir, "all-profiles.csv"));
@@ -1911,7 +1933,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       f.getOutputNames().add(path);
       StructureDefinitionSpreadsheetGenerator sdg = new StructureDefinitionSpreadsheetGenerator(this.pf.context, true, anyMustSupport(sd), pf.rendererFactory);
       sdg.renderStructureDefinition(sd, false);
-      sdg.finish(new FileOutputStream(path));
+      try (FileOutputStream out = new FileOutputStream(path)) {
+        sdg.finish(out);
+      }
       lapsed("xslx");
       if (this.pf.allProfilesXlsx == null) {
         this.pf.allProfilesXlsx = new StructureDefinitionSpreadsheetGenerator(this.pf.context, true, false, pf.rendererFactory);
@@ -1923,7 +1947,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     if (!regen && sd.getDerivation() == StructureDefinition.TypeDerivationRule.CONSTRAINT && wantGen(r, "sch")) {
       String path = Utilities.path(this.pf.tempDir, sdPrefix + r.getId()+".sch");
       f.getOutputNames().add(path);
-      new ProfileUtilities(this.pf.context, this.pf.errors, this.pf.igpkp).generateSchematrons(new FileOutputStream(path), sd);
+      try (FileOutputStream out = new FileOutputStream(path)) {
+        new ProfileUtilities(this.pf.context, this.pf.errors, this.pf.igpkp).generateSchematrons(out, sd);
+      }
       addFileToNpm(NPMPackageGenerator.Category.SCHEMATRON, sdPrefix + r.getId()+".sch", FileUtilities.fileToBytes(Utilities.path(this.pf.tempDir, sdPrefix + r.getId()+".sch")));
     }
 //    if (wantGen(r, "sch"))
@@ -2956,7 +2982,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     ObservationSummarySpreadsheetGenerator vsg = new ObservationSummarySpreadsheetGenerator(pf.context, pf.rendererFactory);
     pf.otherFilesRun.add(path);
     vsg.generate(cvr.getObservations());
-    vsg.finish(new FileOutputStream(path));
+    try (FileOutputStream out = new FileOutputStream(path)) {
+      vsg.finish(out);
+    }
     start = System.currentTimeMillis();
     fragment("summary-extensions", cvr.getExtensionSummary(), pf.otherFilesRun, start, "summary-extensions", "Cross", lang);
     start = System.currentTimeMillis();
@@ -4615,6 +4643,28 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     fd.add("errors", e);
     fd.add("warnings", w);
     //    fd.add("hints", i);
+  }
+
+  /**
+   * A file whose path in the package would be too long for a tar entry is put in the package under
+   * a shortened name (NPMPackageGenerator.shortenForTar). For resources (the package and examples
+   * folders) that doesn't matter - they are found through the index - but a file in any other folder
+   * (tests, other...) is found by its name, so in effect it is missing from the package. That's an
+   * error for the IG as a whole (there's no resource or page to file it against).
+   */
+  private void reportRenamedPackageFiles(NPMPackageGenerator npm) {
+    for (Map.Entry<String, String> e : npm.getRenamedFiles().entrySet()) {
+      String original = e.getKey();
+      String folder = original.substring(0, original.lastIndexOf('/') + 1);
+      if (!Utilities.existsInList(folder, "package/", "package/examples/")) {
+        String name = original.startsWith("package/") ? original.substring(8) : original;
+        pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.TOOLONG, "package.tgz",
+            "The file '"+name+"' is not in the package under its own name: its path in the package ('"+original+"') is "+
+            original.getBytes(StandardCharsets.UTF_8).length+" characters, and a package entry must be less than 100, so it was renamed to '"+
+            e.getValue().substring(8)+"', and anything that looks for it by name won't find it. Give it a shorter name",
+            ValidationMessage.IssueSeverity.ERROR));
+      }
+    }
   }
 
   private void addTestDir(File dir, String t) throws FileNotFoundException, IOException {

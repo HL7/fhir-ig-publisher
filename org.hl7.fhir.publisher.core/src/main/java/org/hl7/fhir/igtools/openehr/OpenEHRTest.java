@@ -24,7 +24,10 @@ public class OpenEHRTest {
   
   public void test() throws FileNotFoundException, ADLParseException, IOException, ParserConfigurationException, SAXException {
     ArchetypeImporter ai = new ArchetypeImporter(null, "http://openehr.org/fhir/uv/test");
-    ProcessedArchetype pa = ai.importArchetype(new FileInputStream("/Users/grahamegrieve/Downloads/openEHR-EHR-OBSERVATION.blood_pressure.v2.adl"), "openEHR-EHR-OBSERVATION.blood_pressure.v2.adl");
+    ProcessedArchetype pa;
+    try (FileInputStream in = new FileInputStream("/Users/grahamegrieve/Downloads/openEHR-EHR-OBSERVATION.blood_pressure.v2.adl")) {
+      pa = ai.importArchetype(in, "openEHR-EHR-OBSERVATION.blood_pressure.v2.adl");
+    }
     System.out.println();
     String json = new JsonParser(ModelContext.fullCoreContext()).setOutputStyle(OutputStyle.PRETTY).composeString(pa.getBnd());
     FileUtilities.stringToFile(json, "/Users/grahamegrieve/temp/igs/FHIR-sample-ig#master/input/resources/Bundle-openEHR-EHR-OBSERVATION.blood-pressure.v2.json");

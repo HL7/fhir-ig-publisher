@@ -45,7 +45,10 @@ public class AIProcessor {
   public void processNewTemplates(List<String> langs) throws IOException {
     // processing new templates is different to old template because of the layout with regard to
     // languages, and because there's a specific .ai file
-    NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(Utilities.path(rootDir, "package.tgz")));
+    NpmPackage npm;
+    try (FileInputStream in = new FileInputStream(Utilities.path(rootDir, "package.tgz"))) {
+      npm = NpmPackage.fromPackage(in);
+    }
 
     for (String lang : langs) {
       processFolderNew(new File(Utilities.path(rootDir, lang)), npm, lang);
@@ -68,7 +71,10 @@ public class AIProcessor {
    * @throws IOException
    */
   public void processOldTemplates() throws IOException {
-    NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(Utilities.path(rootDir, "package.tgz")));
+    NpmPackage npm;
+    try (FileInputStream in = new FileInputStream(Utilities.path(rootDir, "package.tgz"))) {
+      npm = NpmPackage.fromPackage(in);
+    }
     processFolderOld(new File(rootDir), npm);
   }
 

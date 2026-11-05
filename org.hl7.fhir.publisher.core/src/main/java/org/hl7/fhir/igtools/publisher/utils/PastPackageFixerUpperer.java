@@ -36,10 +36,15 @@ public class PastPackageFixerUpperer {
         execute(f);
       } else if (f.getName().endsWith(".tgz")) {
         try {
-          NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(f));
+          NpmPackage npm;
+          try (FileInputStream in = new FileInputStream(f)) {
+            npm = NpmPackage.fromPackage(in);
+          }
           if (checkPackage(f.getAbsolutePath(), npm)) {
             try {
-              npm.save(new FileOutputStream(f));           
+              try (FileOutputStream out = new FileOutputStream(f)) {
+                npm.save(out);
+              }
             } catch (Exception e) {
               System.out.println("Error writing "+f.getAbsolutePath()+": "+e.getMessage());
               e.printStackTrace();

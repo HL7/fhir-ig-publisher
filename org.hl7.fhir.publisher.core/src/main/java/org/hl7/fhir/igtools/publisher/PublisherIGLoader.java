@@ -329,6 +329,10 @@ public class PublisherIGLoader extends PublisherBase {
     }
     pf.templateManager.loadTemplateOverrides(ini, pf.rootDir);
     pf.template = pf.templateManager.loadTemplate(templateName, pf.rootDir, pf.packageId(), settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD, pf.logOptions.contains("template"), settings.isRapidoMode());
+    if (settings.isRapidoMode() && pf.template.isDevMode()) {
+      // the temp folder is cleared on every run for a template in development, so every rapido build is a complete one (see Publisher.checkDependencies)
+      log("Rapido Mode: the template is in development mode (a local folder), so -rapido has no effect: every build is a complete build");
+    }
     if (pf.template.hasExtraTemplates()) {
       processExtraTemplates(pf.template.getExtraTemplates());
     }
@@ -650,7 +654,10 @@ public class PublisherIGLoader extends PublisherBase {
         case "additional-resource": {
           pf.additionalResourceFiles.add(p.getValue());
           try {
-            StructureDefinition sd = (StructureDefinition) new XmlParser(ModelContext.fullCoreContext()).parse(new FileInputStream(Utilities.path(pf.rootDir, p.getValue())));
+            StructureDefinition sd;
+            try (FileInputStream in = new FileInputStream(Utilities.path(pf.rootDir, p.getValue()))) {
+              sd = (StructureDefinition) new XmlParser(ModelContext.fullCoreContext()).parse(in);
+            }
             if (sd.hasExtension(ExtensionDefinitions.EXT_ADDITIONAL_RESOURCE)) {
               sd.getExtensionByUrl(ExtensionDefinitions.EXT_ADDITIONAL_RESOURCE).setValue(new BooleanType(true));
             } else {
@@ -1539,20 +1546,20 @@ public class PublisherIGLoader extends PublisherBase {
         }
       } else {
         this.pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.NOTFOUND, path, "Supressed messages file is not using the new format (see https://confluence.hl7.org/display/FHIR/Implementation+Guide+Parameters)", ValidationMessage.IssueSeverity.ERROR));
-        InputStreamReader r = new InputStreamReader(new FileInputStream(messageFile));
-        StringBuilder b = new StringBuilder();
-        while (r.ready()) {
-          char c = (char) r.read();
-          if (c == '\r' || c == '\n') {
-            if (b.length() > 0)
-              this.pf.suppressedMessages.add(b.toString(), "?pub-msg-2?");
-            b = new StringBuilder();
-          } else
-            b.append(c);
+        try (InputStreamReader r = new InputStreamReader(new FileInputStream(messageFile))) {
+          StringBuilder b = new StringBuilder();
+          while (r.ready()) {
+            char c = (char) r.read();
+            if (c == '\r' || c == '\n') {
+              if (b.length() > 0)
+                this.pf.suppressedMessages.add(b.toString(), "?pub-msg-2?");
+              b = new StringBuilder();
+            } else
+              b.append(c);
+          }
+          if (b.length() > 0)
+            this.pf.suppressedMessages.add(b.toString(), "?pub-msg-3?");
         }
-        if (b.length() > 0)
-          this.pf.suppressedMessages.add(b.toString(), "?pub-msg-3?");
-        r.close();
       }
     }
   }
@@ -1582,7 +1589,9 @@ public class PublisherIGLoader extends PublisherBase {
       pi = pf.pcm.loadPackage(VersionUtilities.packageForVersion(v), v);
     } else {
       log("Load Core from provided file "+ pf.igPack);
-      pi = NpmPackage.fromPackage(new FileInputStream(pf.igPack));
+      try (FileInputStream in = new FileInputStream(pf.igPack)) {
+        pi = NpmPackage.fromPackage(in);
+      }
     }
     if (pi == null) {
       throw new Error("Unable to load core package!");
@@ -4130,10 +4139,12 @@ public class PublisherIGLoader extends PublisherBase {
 
   private List<LanguageFileProducer.TranslationUnit> loadTranslations(File f, String ext) throws FileNotFoundException, IOException, ParserConfigurationException, SAXException {
     try {
-      switch (ext) {
-        case "po": return new PoGetTextProducer().loadSource(new FileInputStream(f));
-        case "xliff": return new XLIFFProducer().loadSource(new FileInputStream(f));
-        case "json": return new JsonLangFileProducer().loadSource(new FileInputStream(f));
+      try (FileInputStream in = new FileInputStream(f)) {
+        switch (ext) {
+          case "po": return new PoGetTextProducer().loadSource(in);
+          case "xliff": return new XLIFFProducer().loadSource(in);
+          case "json": return new JsonLangFileProducer().loadSource(in);
+        }
       }
     } catch (Exception e) {
       throw new FHIRException("Error parsing "+f.getAbsolutePath()+": "+e.getMessage(), e);
@@ -4489,7 +4500,7 @@ public class PublisherIGLoader extends PublisherBase {
           r.setElement(e).setId(id).setTitle(e.getChildValue("name"));
           r.setResource(res);
         }
-        if (new AdjunctFileLoader(pf.binaryPaths, pf.cql).replaceAttachments1(file, r, metadataResourceNames())) {
+        if (new AdjunctFileLoader(pf.binaryPaths, pf.cql, isDebugLogging()).replaceAttachments1(file, r, metadataResourceNames())) {
           altered = true;
         }
         if (isNewML()) {
@@ -4856,7 +4867,7 @@ public class PublisherIGLoader extends PublisherBase {
             bc.setStatus(Enumerations.PublicationStatus.DRAFT);
           }
         }
-        if (new AdjunctFileLoader(this.pf.binaryPaths, this.pf.cql).replaceAttachments2(f, r)) {
+        if (new AdjunctFileLoader(this.pf.binaryPaths, this.pf.cql, isDebugLogging()).replaceAttachments2(f, r)) {
           altered = true;
         }
         if (this.pf.oidRoot != null && !hasOid(bc.getIdentifierList())) {
