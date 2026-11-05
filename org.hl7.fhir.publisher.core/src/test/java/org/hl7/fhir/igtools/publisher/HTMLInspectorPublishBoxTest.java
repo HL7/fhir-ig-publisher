@@ -56,7 +56,7 @@ class HTMLInspectorPublishBoxTest {
     return "<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"en\"><head><title>t</title></head><body>" + body + "</body></html>";
   }
 
-  private static List<ValidationMessage> check(File root, File req, Map<String, String> statusMessagesLang) throws IOException {
+  private static HTMLInspector inspector(File root, File req) throws IOException {
     IWorkerContext context = mock(IWorkerContext.class);
     when(context.getLocale()).thenReturn(Locale.ENGLISH);
     when(context.getModelContext()).thenReturn(ModelContext.fullCoreContext());
@@ -68,7 +68,7 @@ class HTMLInspectorPublishBoxTest {
     inspector.setExemptHtmlPatterns(new ArrayList<>());
     inspector.setReqFolder(req.getAbsolutePath());
     inspector.setIg(new ImplementationGuide().setUrl("http://example.org/ig/ImplementationGuide/example.ig"));
-    return inspector.check(STATUS, statusMessagesLang);
+    return inspector;
   }
 
   @Test
@@ -88,7 +88,7 @@ class HTMLInspectorPublishBoxTest {
 
     Map<String, String> langs = new HashMap<>();
     langs.put("de", "Statusmeldung");
-    check(root, req, langs);
+    inspector(root, req).check(STATUS, langs);
 
     assertTrue(FileUtilities.fileToString(en).contains("<p id=\"publish-box\">" + STATUS));
     assertTrue(FileUtilities.fileToString(de).contains("<p id=\"publish-box\">Statusmeldung"));
@@ -106,12 +106,41 @@ class HTMLInspectorPublishBoxTest {
     FileUtilities.stringToFile(page(PLACEHOLDER + "<p>text</p>").replace("<html", "<html <"), broken);
     FileUtilities.stringToFile("the page is missing " + PLACEHOLDER, notes);
 
-    List<ValidationMessage> messages = check(root, req, new HashMap<>());
+    HTMLInspector inspector = inspector(root, req);
+    List<ValidationMessage> messages = inspector.check(STATUS, new HashMap<>());
 
     assertTrue(FileUtilities.fileToString(broken).contains("<p id=\"publish-box\">" + STATUS));
     assertTrue(messages.stream().anyMatch(m -> "HTML_PARSING_FAILED".equals(m.getMessageId()) && m.getLocation().endsWith("broken.html")));
     // a file that isn't html is left as it is
     assertEquals("the page is missing " + PLACEHOLDER, FileUtilities.fileToString(notes));
+    // neither is reported as missing the publish box
+    assertEquals("Unable to Parse: broken.html", inspector.getPublishboxParsingSummary());
+  }
+
+  @Test
+  void publishBoxIsFilledInWhenTheRootElementIsHtml() throws IOException {
+    File root = new File(dir.toFile(), "output");
+    File req = new File(dir.toFile(), "req");
+    root.mkdirs();
+    req.mkdirs();
+    File htm = new File(root, "page.htm");
+    File prefixed = new File(root, "prefixed.html");
+    File xml = new File(root, "Binary-x.xml");
+    FileUtilities.stringToFile(page(PLACEHOLDER + "<p>text</p>"), htm);
+    FileUtilities.stringToFile("<h:html xmlns:h=\"http://www.w3.org/1999/xhtml\" lang=\"fr\"><h:head><h:title>t</h:title></h:head><h:body>"
+      + PLACEHOLDER + "<h:p>text</h:p></h:body></h:html>", prefixed);
+    String xmlSource = "<div xmlns=\"http://www.w3.org/1999/xhtml\">" + PLACEHOLDER + "</div>";
+    FileUtilities.stringToFile(xmlSource, xml);
+
+    Map<String, String> langs = new HashMap<>();
+    langs.put("fr", "Message de statut");
+    HTMLInspector inspector = inspector(root, req);
+    inspector.check(STATUS, langs);
+
+    assertTrue(FileUtilities.fileToString(htm).contains("<p id=\"publish-box\">" + STATUS));
+    assertTrue(FileUtilities.fileToString(prefixed).contains("<p id=\"publish-box\">Message de statut"));
+    assertEquals(xmlSource, FileUtilities.fileToString(xml));
+    assertEquals("No Problems", inspector.getPublishboxParsingSummary());
   }
 
   @Test
@@ -122,6 +151,7 @@ class HTMLInspectorPublishBoxTest {
     assertEquals("de", HTMLInspector.getLang("<html\n  xml:lang='de'\n>"));
     assertEquals(null, HTMLInspector.getLang("<html data-lang=\"en\">"));
     assertEquals(null, HTMLInspector.getLang("<div lang=\"en\">"));
+    assertEquals("fr", HTMLInspector.getLang("<h:html xmlns:h=\"http://www.w3.org/1999/xhtml\" lang=\"fr\">"));
     assertEquals(null, HTMLInspector.getLang(HTMLInspector.rootStartTag("{\"lang\" : \"en\"}")));
   }
 
@@ -140,7 +170,8 @@ class HTMLInspectorPublishBoxTest {
     FileUtilities.stringToFile("{\"resourceType\" : \"Patient\"}", new File(root, "Patient-x.json"));
     Files.write(new File(root, "image.png").toPath(), new byte[] {(byte) 0x89, 'P', 'N', 'G', 0, 1, 2, 3});
 
-    List<ValidationMessage> messages = check(root, req, new HashMap<>());
+    HTMLInspector inspector = inspector(root, req);
+    List<ValidationMessage> messages = inspector.check(STATUS, new HashMap<>());
 
     String aNow = FileUtilities.fileToString(a);
     assertTrue(aNow.contains("<p id=\"publish-box\">" + STATUS), aNow);
@@ -155,5 +186,7 @@ class HTMLInspectorPublishBoxTest {
     // the anchor in the status message is found; the json and png files aren't reported
     assertEquals(List.of("HTML_LINK_CHECK_FAILED: The link 'a.html#no-such-anchor' for \"missing\" cannot be resolved (valid targets: [a, status-anchor, publish-box])"),
       problems);
+    // only b is missing the publish box; the json and png files aren't html
+    assertEquals("Missing Publish Box: b.html", inspector.getPublishboxParsingSummary());
   }
 }

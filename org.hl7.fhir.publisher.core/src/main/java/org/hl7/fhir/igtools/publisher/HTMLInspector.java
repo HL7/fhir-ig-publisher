@@ -820,7 +820,12 @@ public class HTMLInspector {
       return null;
     }
     Matcher m = ROOT_NAME.matcher(rootTag);
-    return m.lookingAt() ? m.group(1).toLowerCase() : null;
+    if (!m.lookingAt()) {
+      return null;
+    }
+    // as the parser does, ignore any namespace prefix
+    String name = m.group(1).toLowerCase();
+    return name.substring(name.indexOf(':') + 1);
   }
 
   private static boolean isHtmlOrSvg(String rootTag) {
