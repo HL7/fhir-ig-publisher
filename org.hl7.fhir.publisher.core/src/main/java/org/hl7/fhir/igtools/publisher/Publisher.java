@@ -241,6 +241,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
               throw e;
             }
             // keep watching: the next save may fix it
+            session.buildFailed();
             log("Publishing Content Failed: " + e.getMessage());
             log("");
             log("Stack Dump (for debugging):");
@@ -390,6 +391,10 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
             Thread.sleep(250);
           } while (monitor.hasChanges() && System.currentTimeMillis() < giveUp);
           changes = session.changesSinceBuildStart();
+          if (changes.isEmpty() && session.savedSinceFailure()) {
+            System.out.println("=== File saved after the build failed: building again ===");
+            return true;
+          }
         } else if (!monitor.isWatching()) {
           throw new IllegalStateException("No longer watching for changes (see the error above): run the IG Publisher again");
         } else {

@@ -2,6 +2,7 @@ package org.hl7.fhir.igtools.publisher;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.FileVisitOption;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
@@ -14,6 +15,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -108,12 +110,25 @@ public class SourceSnapshot {
    * read again, unless they were modified just before previous was taken.
    */
   public static SourceSnapshot take(Collection<Path> roots, SourceSnapshot previous) throws IOException {
+    return take(roots, previous, Collections.emptySet());
+  }
+
+  /**
+   * As take(roots, previous), leaving out the directories in excluded (absolute, normalised) and what is below them
+   */
+  public static SourceSnapshot take(Collection<Path> roots, SourceSnapshot previous, Collection<Path> excluded) throws IOException {
     Map<Path, Entry> entries = new HashMap<>();
     long start = System.currentTimeMillis();
     for (Path root : roots) {
       Path r = root.toAbsolutePath();
       if (Files.isDirectory(r)) {
-        Files.walkFileTree(r, new SimpleFileVisitor<Path>() {
+        // links are followed: a linked file (or folder, or root) is read as what it links to
+        Files.walkFileTree(r, EnumSet.of(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE, new SimpleFileVisitor<Path>() {
+          @Override
+          public FileVisitResult preVisitDirectory(Path d, BasicFileAttributes attrs) {
+            return excluded.contains(d.normalize()) ? FileVisitResult.SKIP_SUBTREE : FileVisitResult.CONTINUE;
+          }
+
           @Override
           public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
             if (attrs.isRegularFile()) {
@@ -214,6 +229,23 @@ public class SourceSnapshot {
       }
     }
     return new SourceSnapshot(res);
+  }
+
+  /**
+   * Whether any file was saved (its size or modified time changed), added or removed since before, whatever its
+   * content
+   */
+  public boolean savedSince(SourceSnapshot before) {
+    if (entries.size() != before.entries.size()) {
+      return true;
+    }
+    for (Map.Entry<Path, Entry> e : entries.entrySet()) {
+      Entry old = before.entries.get(e.getKey());
+      if (old == null || old.size != e.getValue().size || !old.modified.equals(e.getValue().modified)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /** The files that differ in content between before and this snapshot */

@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.PackageList;
 
@@ -15,6 +16,13 @@ import org.hl7.fhir.utilities.npm.PackageList;
 public class PackageListFetcher {
 
   private static volatile Map<String, String> remembered; // url -> json text
+
+  interface Fetch {
+    JsonObject fetch(String url) throws IOException;
+  }
+
+  // what fetches a list that isn't remembered (replaced in tests)
+  static Fetch fetch = JsonParser::parseObjectFromUrl;
 
   private PackageListFetcher() {
   }
@@ -38,7 +46,7 @@ public class PackageListFetcher {
     }
     String json = memo.get(url);
     if (json == null) {
-      json = JsonParser.compose(JsonParser.parseObjectFromUrl(url), false);
+      json = JsonParser.compose(fetch.fetch(url), false);
       memo.put(url, json);
     }
     // a new PackageList each time, so a caller can't change what the next one sees
