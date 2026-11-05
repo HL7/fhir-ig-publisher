@@ -213,4 +213,19 @@ class RapidoTrackerTest {
     assertEquals("VS", RapidoTracker.singleValue(vs, "name"));
     assertNull(RapidoTracker.singleValue(new Element("LogicalModel", mock(Property.class)), "name"));
   }
+
+  /** run from an IDE or the build, the publisher is a folder of classes: compiling a class again changes the publisher */
+  @Test
+  void aClassCompiledAgainChangesThePublisher(@TempDir Path dir) throws Exception {
+    Path cls = dir.resolve("org").resolve("Publisher.class");
+    Files.createDirectories(cls.getParent());
+    Files.write(cls, new byte[] {1, 2});
+    long folderTime = dir.toFile().lastModified();
+    String before = RapidoTracker.codeHash(dir.toFile());
+    assertEquals(before, RapidoTracker.codeHash(dir.toFile()));
+
+    Files.write(cls, new byte[] {1, 2, 3});
+    dir.toFile().setLastModified(folderTime);
+    assertNotEquals(before, RapidoTracker.codeHash(dir.toFile()));
+  }
 }

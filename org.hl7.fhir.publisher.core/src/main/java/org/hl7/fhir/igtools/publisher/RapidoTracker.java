@@ -10,6 +10,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Calendar;
@@ -25,6 +26,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import org.hl7.fhir.igtools.publisher.RapidoDependencyAnalyser.FileNode;
 import org.hl7.fhir.igtools.publisher.RapidoDependencyAnalyser.FileResult;
@@ -437,8 +439,7 @@ public class RapidoTracker {
     Hasher jar = new Hasher();
     jar.add(IGVersionUtil.getVersion());
     try {
-      File jf = new File(RapidoTracker.class.getProtectionDomain().getCodeSource().getLocation().toURI());
-      jar.add(jf.getAbsolutePath()).add(Long.toString(jf.length())).add(Long.toString(jf.lastModified()));
+      jar.add(codeHash(new File(RapidoTracker.class.getProtectionDomain().getCodeSource().getLocation().toURI())));
     } catch (Exception e) {
       jar.add(Long.toString(System.nanoTime())); // can't tell what the publisher is, so assume it changed
     }
@@ -483,6 +484,25 @@ public class RapidoTracker {
     }
     otherFiles.putAll(scanOtherFiles());
     global.put("other-files", hashOtherFiles(otherFiles));
+  }
+
+  /**
+   * The publisher's code: a jar, or (run from an IDE or the build) a folder of classes, whose own length and date don't
+   * change when the classes in it are compiled again
+   */
+  static String codeHash(File f) throws IOException {
+    Hasher h = new Hasher().add(f.getAbsolutePath());
+    if (f.isDirectory()) {
+      try (Stream<Path> s = Files.walk(f.toPath())) {
+        for (Path p : (Iterable<Path>) s.filter(Files::isRegularFile).sorted()::iterator) {
+          File c = p.toFile();
+          h.add(p.toString()).add(Long.toString(c.length())).add(Long.toString(c.lastModified()));
+        }
+      }
+    } else {
+      h.add(Long.toString(f.length())).add(Long.toString(f.lastModified()));
+    }
+    return h.finish();
   }
 
   private static String hashOtherFiles(Map<String, String> files) {
