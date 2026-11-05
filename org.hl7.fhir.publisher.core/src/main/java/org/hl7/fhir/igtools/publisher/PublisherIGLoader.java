@@ -3,6 +3,7 @@ package org.hl7.fhir.igtools.publisher;
 import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_10_50;
 import org.hl7.fhir.convertors.factory.*;
 import org.hl7.fhir.convertors.txClient.TerminologyClientFactory;
+import org.hl7.fhir.services.client.ITerminologyClientFactoryN;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.openehr.ArchetypeImporter;
 import org.hl7.fhir.igtools.openehr.CKMClient;
@@ -1075,10 +1076,10 @@ public class PublisherIGLoader extends PublisherBase {
         pf.txLog = null;
       } else {
         log("Connect to Terminology Server at "+ settings.getTxServer()+(settings.getEcosystem() == null ? " (no ecosystem)" : " (ecosystem: "+settings.getEcosystem()+")"));
-        pf.context.connectToTSServer(new TerminologyClientFactory(pf.version), settings.getTxServer(), "fhir/publisher", pf.txLog, settings.getEcosystem());
+        pf.context.connectToTSServer(txClientFactory(), settings.getTxServer(), "fhir/publisher", pf.txLog, settings.getEcosystem());
       }
     } else {
-      pf.context.connectToTSServer(new TerminologyClientFactory(pf.version), pf.webTxServer.getAddress(), "fhir/publisher", pf.txLog, settings.getEcosystem());
+      pf.context.connectToTSServer(txClientFactory(), pf.webTxServer.getAddress(), "fhir/publisher", pf.txLog, settings.getEcosystem());
     }
     if (expParams != null) {
       /* This call to uncheckedPath is allowed here because the path is used to
@@ -1607,6 +1608,16 @@ public class PublisherIGLoader extends PublisherBase {
       }
     }
     return sp;
+  }
+
+  private ITerminologyClientFactoryN txClientFactory() {
+    ITerminologyClientFactoryN res = new TerminologyClientFactory(pf.version);
+    if (settings.isRapidoMode()) {
+      // a call that got no answer from the server means the next build can't reuse this one
+      pf.txFailures = new RapidoTracker.TxFailures(res);
+      res = pf.txFailures;
+    }
+    return res;
   }
 
   private Parameters makeExpProfile() {

@@ -7,7 +7,10 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -26,12 +29,14 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 import org.hl7.fhir.igtools.publisher.RapidoDependencyAnalyser.FileNode;
 import org.hl7.fhir.igtools.publisher.RapidoDependencyAnalyser.FileResult;
 import org.hl7.fhir.igtools.publisher.RapidoDependencyAnalyser.Hasher;
 import org.hl7.fhir.igtools.publisher.RapidoDependencyAnalyser.ResourceNode;
+import org.hl7.fhir.model.IModelContext;
 import org.hl7.fhir.model.core.CanonicalResource;
 import org.hl7.fhir.model.core.DateTimeType;
 import org.hl7.fhir.model.core.DomainResource;
@@ -40,8 +45,12 @@ import org.hl7.fhir.model.core.StructureDefinition;
 import org.hl7.fhir.model.core.ValueSet;
 import org.hl7.fhir.model.core.formats.JsonParser;
 import org.hl7.fhir.model.utilities.formats.OutputStyle;
+import org.hl7.fhir.services.client.EFhirClientException;
+import org.hl7.fhir.services.client.ITerminologyClientFactoryN;
+import org.hl7.fhir.services.client.ITerminologyClientN;
 import org.hl7.fhir.services.elementmodel.Element;
 import org.hl7.fhir.utilities.FileUtilities;
+import org.hl7.fhir.utilities.ToolingClientLogger;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 import org.hl7.fhir.utilities.json.model.JsonArray;
@@ -225,6 +234,9 @@ public class RapidoTracker {
     }
     if (!Integer.valueOf(STATE_VERSION).equals(old.asInteger("version"))) {
       return "state from a different version";
+    }
+    if (old.has("txFailures")) {
+      return "terminology server calls failed in the last build ("+old.asInteger("txFailures")+")";
     }
     JsonObject og = old.getJsonObject("global");
     for (Map.Entry<String, String> e : global.entrySet()) {
@@ -775,6 +787,14 @@ public class RapidoTracker {
   public void save() throws IOException {
     JsonObject state = new JsonObject();
     state.add("version", STATE_VERSION);
+    File sf = new File(stateFile);
+    FileUtilities.createDirectory(sf.getParent());
+    if (pf.txFailures != null && pf.txFailures.count() > 0) {
+      // what the build made from those calls isn't what the server would have said, so none of it can be reused
+      state.add("txFailures", pf.txFailures.count());
+      writeState(state, sf);
+      return;
+    }
     state.add("uuid", uuid);
     state.add("fileSet", fileSetHash);
     // the template can write into the IG folder as well (the HL7 template copies the IG's Jira spec file there), so the
@@ -819,9 +839,46 @@ public class RapidoTracker {
       files.set(key, nf);
     }
     state.add("files", files);
-    File sf = new File(stateFile);
-    FileUtilities.createDirectory(sf.getParent());
     writeState(state, sf);
+  }
+
+  /**
+   * For a Rapido build, the terminology client factory: counts the calls that got no answer from the terminology
+   * server (it was down, or the call timed out). An error the server answered with is an answer like any other
+   */
+  public static class TxFailures implements ITerminologyClientFactoryN {
+    private final ITerminologyClientFactoryN factory;
+    private final AtomicInteger count = new AtomicInteger();
+
+    public TxFailures(ITerminologyClientFactoryN factory) {
+      this.factory = factory;
+    }
+
+    public int count() {
+      return count.get();
+    }
+
+    @Override
+    public ITerminologyClientN makeClientN(IModelContext context, String id, String url, String userAgent, ToolingClientLogger logger) throws URISyntaxException {
+      ITerminologyClientN client = factory.makeClientN(context, id, url, userAgent, logger);
+      return (ITerminologyClientN) Proxy.newProxyInstance(ITerminologyClientN.class.getClassLoader(), new Class<?>[] {ITerminologyClientN.class}, (p, m, args) -> {
+        try {
+          Object res = m.invoke(client, args);
+          return res == client ? p : res;
+        } catch (InvocationTargetException e) {
+          Throwable t = e.getCause();
+          if (!(t instanceof EFhirClientException && ((EFhirClientException) t).hasServerErrors() && ((EFhirClientException) t).getCode() < 500)) {
+            count.incrementAndGet();
+          }
+          throw t;
+        }
+      });
+    }
+
+    @Override
+    public String getVersion() {
+      return factory.getVersion();
+    }
   }
 
   private JsonObject newFile(FetchedFile f) {
