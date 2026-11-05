@@ -29,7 +29,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.lang.reflect.Field;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
@@ -62,7 +61,6 @@ import org.hl7.fhir.igtools.renderers.*;
 import org.hl7.fhir.igtools.renderers.ValidationPresenter.IGLanguageInformation;
 import org.hl7.fhir.igtools.ui.IGPublisherUI;
 import org.hl7.fhir.igtools.web.*;
-import org.hl7.fhir.services.comparison.ResourceComparer;
 import org.hl7.fhir.services.context.*;
 import org.hl7.fhir.services.elementmodel.Element;
 import org.hl7.fhir.services.elementmodel.ElementVisitor;
@@ -293,28 +291,8 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     settings.getNoValidate().addAll(cliNoValidate);
     HierarchicalTableGenerator.ACTIVE_TABLES = false;
     HierarchicalTableGenerator.uuid = UUIDUtilities.makeUuidLC();
-    resetComparisonIds();
-  }
-
-  /**
-   * The comparisons (previous version, IPA, IPS, imposes) are numbered by a counter that only a fresh start resets
-   * (ResourceComparer.counter): without this, a rebuild names their pages sd-21-..., sd-22-..., where a build writes
-   * sd-1-..., sd-2-.... If it can't be reset (the core library changed), the rebuild fails rather than write pages
-   * under other names than a build does
-   */
-  static void resetComparisonIds() {
-    resetCounter(ResourceComparer.class, "counter");
-  }
-
-  static void resetCounter(Class<?> c, String field) {
-    try {
-      Field f = c.getDeclaredField(field);
-      f.setAccessible(true);
-      f.setInt(null, 0);
-    } catch (Exception e) {
-      throw new IllegalStateException("Watch mode can't rebuild: unable to reset " + c.getName() + "." + field
-          + ", which numbers the comparison pages (" + e + "); restart the publisher instead", e);
-    }
+    // not yet ResourceComparer.counter: until the core can reset it, a rebuild numbers the comparison pages on from
+    // where the last build stopped
   }
 
   private void build(String rootDir) throws Exception {
