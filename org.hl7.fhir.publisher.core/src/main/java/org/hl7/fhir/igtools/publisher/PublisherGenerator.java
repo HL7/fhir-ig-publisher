@@ -350,7 +350,12 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
             // any messages from adding the rows were recorded with the rest of the phase, and have just been replayed
             for (FetchedResource r : f.getResources()) {
               if (r.getResource() instanceof StructureDefinition) {
-                addToAllProfiles(r, (StructureDefinition) r.getResource(), new ArrayList<>());
+                try {
+                  addToAllProfiles(r, (StructureDefinition) r.getResource(), new ArrayList<>());
+                } catch (Exception e) {
+                  // as in generateResourceSpreadsheets, the profile gets no row (e.g. it has no snapshot); the error
+                  // was recorded with the phase, and has just been replayed
+                }
               }
             }
           } else {
