@@ -25,7 +25,8 @@ import org.hl7.fhir.igtools.templates.Template;
  *   <li>the source files as the last SUSHI run saw them, so SUSHI is not run again when only page content changed</li>
  * </ul>
  *
- * Every rebuild is still a complete build: only work whose inputs are known not to have changed is skipped.
+ * What a rebuild generates again is decided by -rapido, as for any build: the files that changed and the files that
+ * depend on them.
  */
 public class WatchSession {
 

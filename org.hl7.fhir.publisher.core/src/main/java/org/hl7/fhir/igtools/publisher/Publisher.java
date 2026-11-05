@@ -1072,26 +1072,12 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     buildTracker.setBooleanProperty("status", "complete", false, null);
     buildTracker.setBooleanProperty("status", "started", true, null);
 
-    if (settings.isWatchMode()) {
-      // in watch mode, every build is complete, so that its output is the same as a fresh build's (a rebuild is
-      // faster because of what it doesn't need to do again, see WatchSession, not because it builds less). So the
-      // build doesn't need to know what changed, and the tracker forgets the hashes: the next build without watch
-      // mode is complete too, since what it would compare them with may have changed several times since
-      log("Rapido Mode: Complete Build (watch mode)");
-      buildTracker.removeSection("source");
-      buildTracker.removeSection("tracked");
-      buildTracker.setStringProperty("status", "uuid", HierarchicalTableGenerator.uuid, null);
-      buildTracker.save();
-      pf.changeList.addAll(pf.fileList);
-      loader.clearTempFolder();
-      return;
-    }
-
     // first, we load all the direct dependency lists
+    DependencyElementVisitor.Index index = new DependencyElementVisitor.Index(pf.fileList);
     for (FetchedFile f : pf.fileList) {
       if (igf != f) {
         if (f.getDependencies() == null) {
-          loadDependencyList(f, igf);
+          loadDependencyList(f, igf, index);
         }
       }
     }
@@ -1145,17 +1131,17 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     }
   }
 
-  private void loadDependencyList(FetchedFile f, FetchedFile igf) {
+  private void loadDependencyList(FetchedFile f, FetchedFile igf, DependencyElementVisitor.Index index) {
     f.setDependencies(new ArrayList<FetchedFile>());
     f.getDependencies().add(igf); // everything is dependent on the IG
 
     for (FetchedResource r : f.getResources()) {
-      loadDepedencies(f, r, f.getDependencies());
+      loadDepedencies(f, r, f.getDependencies(), index);
     }
   }
 
-  private void loadDepedencies(FetchedFile f, FetchedResource r, List<FetchedFile> dependencies) {
-    ElementVisitor.IElementVisitor depVisitor = new DependencyElementVisitor(pf.fileList, dependencies, f);
+  private void loadDepedencies(FetchedFile f, FetchedResource r, List<FetchedFile> dependencies, DependencyElementVisitor.Index index) {
+    ElementVisitor.IElementVisitor depVisitor = new DependencyElementVisitor(index, dependencies, f);
     new ElementVisitor(depVisitor).visit(r, r.getElement());
   }
 
