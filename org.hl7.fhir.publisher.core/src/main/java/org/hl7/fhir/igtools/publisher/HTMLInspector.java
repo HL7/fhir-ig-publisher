@@ -34,6 +34,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.annotation.Nonnull;
 
@@ -693,10 +695,21 @@ public class HTMLInspector {
     Boolean hl7State = null;
     XhtmlNode x = null;
     boolean htmlName = f.getName().endsWith(".html") || f.getName().endsWith(".xhtml") || f.getName().endsWith(".svg");
-    String content = null;
+    boolean lr = false;
     try {
-      content = FileUtilities.fileToString(f);
-      x = new XhtmlParser().setMustBeWellFormed(strict).parse(content, null);
+      String src = FileUtilities.fileToString(f);
+      lr = src.contains("lang-redirects.js");
+      hl7State = src.contains(RELEASE_HTML_MARKER);
+      String rootTag = rootStartTag(src);
+      if (hl7State && (htmlName || isHtmlOrSvg(rootTag))) {
+        // fill in the publish box before parsing, so the page is parsed once, as it is written
+        try {
+          src = fillPublishBox(src, f, getLang(rootTag));
+        } catch (IOException e1) {
+          hl7State = false;
+        }
+      }
+      x = new XhtmlParser().setMustBeWellFormed(strict).parse(src, null);
       if (x.getElement("html")==null && x.getElement("svg")==null && !htmlName) {
         // We don't want resources being treated as HTML.  We'll check the HTML of the narrative in the page representation
         x = null;
@@ -708,35 +721,10 @@ public class HTMLInspector {
         parseProblems.add(f.getName());
       }
     }
-    boolean lr = false;
-    if (x != null) {
-
-      String src = content;
-      try {
-        lr = src.contains("lang-redirects.js");
-        hl7State = src.contains(RELEASE_HTML_MARKER);
-        if (hl7State) {
-          String msg = statusMessageDef;
-          String lang = getLang(x);
-          if (statusMessagesLang.containsKey(lang)) {
-            msg = statusMessagesLang.get(lang);
-          }
-          src = src.replace(RELEASE_HTML_MARKER, START_HTML_MARKER + msg + END_HTML_MARKER);
-          if (packageId.startsWith("hl7.") && f.getName().equals("index.html") && isCIBuild) {
-            int index = src.indexOf(END_HTML_MARKER) + END_HTML_MARKER.length();
-            String pl = PLAIN_LANG_INSERTION;
-            pl = pl.replace("{0}", packageId);
-            pl = pl.replace("{1}", version);
-            pl = pl.replace("{2}", HierarchicalTableGenerator.uuid);
-            src = src.substring(0, index) + pl + src.substring(index);
-          }
-          FileUtilities.stringToFile(src, f);
-          x = new XhtmlParser().setMustBeWellFormed(strict).parse(src, null);
-        }
-        // otherwise the file is still what was parsed above
-      } catch (Exception e1) {
-        hl7State = false;
-      }
+    if (x == null) {
+      // not checked as html, so the publish box and language redirect states don't apply
+      hl7State = null;
+      lr = false;
     }
     LoadedFile lf = new LoadedFile(s, getPath(s, base), f.lastModified(), iteration, hl7State, findExemptionComment(x) || Utilities.existsInList(f.getName(), "searchform.html"), x != null);
     lf.isLangRedirect = lr;
@@ -774,22 +762,98 @@ public class HTMLInspector {
     //    }
   }
 
-  private String getLang(XhtmlNode x) {
-    if (!"html".equals(x.getName())) {
-      for (XhtmlNode t : x.getChildNodes()) {
-        if ("html".equals(t.getName())) {
-          x = t;
-          break;
-        }
+  private String fillPublishBox(String src, File f, String lang) throws IOException {
+    String msg = statusMessageDef;
+    if (statusMessagesLang.containsKey(lang)) {
+      msg = statusMessagesLang.get(lang);
+    }
+    src = src.replace(RELEASE_HTML_MARKER, START_HTML_MARKER + msg + END_HTML_MARKER);
+    if (packageId.startsWith("hl7.") && f.getName().equals("index.html") && isCIBuild) {
+      int index = src.indexOf(END_HTML_MARKER) + END_HTML_MARKER.length();
+      String pl = PLAIN_LANG_INSERTION;
+      pl = pl.replace("{0}", packageId);
+      pl = pl.replace("{1}", version);
+      pl = pl.replace("{2}", HierarchicalTableGenerator.uuid);
+      src = src.substring(0, index) + pl + src.substring(index);
+    }
+    FileUtilities.stringToFile(src, f);
+    return src;
+  }
+
+  /**
+   * The start tag of the root element (e.g. {@code <html lang="en">}), found by skipping the
+   * whitespace, comments, doctype and processing instructions in front of it, as the parser does;
+   * null if the source doesn't start with a tag.
+   */
+  static String rootStartTag(String src) {
+    int i = 0;
+    while (true) {
+      while (i < src.length() && (Character.isWhitespace(src.charAt(i)) || src.charAt(i) == '\uFEFF')) {
+        i++;
       }
+      int end;
+      if (src.startsWith("<!--", i)) {
+        end = src.indexOf("-->", i + 4);
+        end = end < 0 ? -1 : end + 3;
+      } else if (src.startsWith("<!", i) || src.startsWith("<?", i)) {
+        end = src.indexOf('>', i + 2);
+        end = end < 0 ? -1 : end + 1;
+      } else {
+        break;
+      }
+      if (end < 0) {
+        return null;
+      }
+      i = end;
     }
-    if (x.getAttribute("lang") != null) {
-      return x.getAttribute("lang");
+    if (!src.startsWith("<", i)) {
+      return null;
     }
-    if (x.getAttribute("xml:lang") != null) {
-      return x.getAttribute("xml:lang");
+    int end = src.indexOf('>', i);
+    return end < 0 ? null : src.substring(i, end + 1);
+  }
+
+  private static final Pattern ROOT_NAME = Pattern.compile("<([^\\s/>]+)");
+
+  private static String rootName(String rootTag) {
+    if (rootTag == null) {
+      return null;
     }
-    return null;
+    Matcher m = ROOT_NAME.matcher(rootTag);
+    return m.lookingAt() ? m.group(1).toLowerCase() : null;
+  }
+
+  private static boolean isHtmlOrSvg(String rootTag) {
+    return Utilities.existsInList(rootName(rootTag), "html", "svg");
+  }
+
+  /**
+   * The page language: the lang (or else xml:lang) attribute of the root html element, as given in
+   * its start tag; null if the root element isn't html or has neither attribute.
+   */
+  static String getLang(String rootTag) {
+    if (!"html".equals(rootName(rootTag))) {
+      return null;
+    }
+    String lang = attribute(rootTag, LANG_ATTRIBUTE);
+    return lang != null ? lang : attribute(rootTag, XML_LANG_ATTRIBUTE);
+  }
+
+  private static final Pattern LANG_ATTRIBUTE = attributePattern("lang");
+  private static final Pattern XML_LANG_ATTRIBUTE = attributePattern("xml:lang");
+
+  private static Pattern attributePattern(String name) {
+    return Pattern.compile("\\s" + Pattern.quote(name) + "\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)'|([^\\s/>]+))");
+  }
+
+  private static String attribute(String tag, Pattern attribute) {
+    Matcher m = attribute.matcher(tag);
+    String value = null;
+    while (m.find()) {
+      // the parser keeps the last of repeated attributes
+      value = m.group(1) != null ? m.group(1) : m.group(2) != null ? m.group(2) : m.group(3);
+    }
+    return value;
   }
 
   private String getPath(String s, String base) {
