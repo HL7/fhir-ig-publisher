@@ -655,9 +655,9 @@ public class HTMLInspector {
 
   public void saveFile(LoadedFile lf, XhtmlNode x) throws IOException {
     new File(lf.getFilename()).delete();
-    FileOutputStream f = new FileOutputStream(lf.getFilename());
-    new XhtmlComposer(XhtmlComposer.HTML).composeDocument(f, x);
-    f.close();
+    try (FileOutputStream f = new FileOutputStream(lf.getFilename())) {
+      new XhtmlComposer(XhtmlComposer.HTML).composeDocument(f, x);
+    }
   }
 
   private void checkGoneFiles() {

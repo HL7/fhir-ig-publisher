@@ -54,7 +54,10 @@ public class TemplateChanger {
     // load publish.ini
     File iniF = new File(Utilities.path(folder, "publish.ini"));
     check(iniF.exists(), "The folder "+folder+" does not contain a publish.ini file");
-    IniFile ini = new IniFile(new FileInputStream(iniF));
+    IniFile ini;
+    try (FileInputStream in = new FileInputStream(iniF)) {
+      ini = new IniFile(in);
+    }
     
     thb = ini.getStringProperty("template", "head-begin");
     the = ini.getStringProperty("template", "head-end");

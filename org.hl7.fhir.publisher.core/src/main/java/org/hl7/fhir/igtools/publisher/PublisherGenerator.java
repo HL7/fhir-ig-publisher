@@ -295,8 +295,12 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       }
       templateBeforeGenerate();
       if (pf.saveExpansionParams) {
-        new JsonParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.NORMAL).compose(new FileOutputStream(Utilities.path(pf.tempDir, "parameters-expansion-parameters.json")), pf.context.getExpansionParameters());
-        new XmlParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.NORMAL).compose(new FileOutputStream(Utilities.path(pf.tempDir, "parameters-expansion-parameters.xml")), pf.context.getExpansionParameters());
+        try (FileOutputStream stream = new FileOutputStream(Utilities.path(pf.tempDir, "parameters-expansion-parameters.json"))) {
+          new JsonParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.NORMAL).compose(stream, pf.context.getExpansionParameters());
+        }
+        try (FileOutputStream stream = new FileOutputStream(Utilities.path(pf.tempDir, "parameters-expansion-parameters.xml"))) {
+          new XmlParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.NORMAL).compose(stream, pf.context.getExpansionParameters());
+        }
       }
 
       logMessage("Generate HTML Outputs");
@@ -330,7 +334,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       if (pf.allProfilesXlsx != null) {
         pf.allProfilesXlsx.configure();
         String path = Utilities.path(pf.tempDir, "all-profiles.xlsx");
-        pf.allProfilesXlsx.finish(new FileOutputStream(path));
+        try (FileOutputStream stream = new FileOutputStream(path)) {
+          pf.allProfilesXlsx.finish(stream);
+        }
         pf.otherFilesRun.add(Utilities.path(pf.tempDir, "all-profiles.xlsx"));
         pf.allProfilesXlsx.dump();
       }
@@ -458,15 +464,23 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
         if (settings.getMode() == null || settings.getMode() == PublisherUtils.IGBuildMode.MANUAL) {
           if (settings.isCacheVersion()) {
-            pf.pcm.addPackageToCache(pf.packageId(), pf.publishedIg.getVersion(), new FileInputStream(pf.npm.filename()), "[output]");
+            try (FileInputStream in = new FileInputStream(pf.npm.filename())) {
+              pf.pcm.addPackageToCache(pf.packageId(), pf.publishedIg.getVersion(), in, "[output]");
+            }
           } else {
-            pf.pcm.addPackageToCache(pf.packageId(), "dev", new FileInputStream(pf.npm.filename()), "[output]");
+            try (FileInputStream in = new FileInputStream(pf.npm.filename())) {
+              pf.pcm.addPackageToCache(pf.packageId(), "dev", in, "[output]");
+            }
             if (pf.branchName != null) {
-              pf.pcm.addPackageToCache(pf.packageId(), "dev$"+ pf.branchName, new FileInputStream(pf.npm.filename()), "[output]");
+              try (FileInputStream in = new FileInputStream(pf.npm.filename())) {
+                pf.pcm.addPackageToCache(pf.packageId(), "dev$"+ pf.branchName, in, "[output]");
+              }
             }
           }
         } else if (settings.getMode() == PublisherUtils.IGBuildMode.PUBLICATION) {
-          pf.pcm.addPackageToCache(pf.packageId(), pf.publishedIg.getVersion(), new FileInputStream(pf.npm.filename()), "[output]");
+          try (FileInputStream in = new FileInputStream(pf.npm.filename())) {
+            pf.pcm.addPackageToCache(pf.packageId(), pf.publishedIg.getVersion(), in, "[output]");
+          }
         }
         JsonArray json = new JsonArray();
         for (String s : pf.generateVersions) {
@@ -613,7 +627,10 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       gen.setModes(Set.of("api", "tx", "cnt", "expansions", "pin"));
       gen.setVerbose(false);
 
-      NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(Utilities.path(pf.outputDir, "package.tgz")));
+      NpmPackage npm;
+      try (FileInputStream in = new FileInputStream(Utilities.path(pf.outputDir, "package.tgz"))) {
+        npm = NpmPackage.fromPackage(in);
+      }
       gen.generateCombinedPackage(npm);
     } catch (Exception e) {
       log("Error generating combined package: "+e.getMessage());
@@ -953,13 +970,13 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         path = Utilities.path(this.pf.tempDir, r.fhirType()+"-"+r.getId()+".xml");
       }
       f.getOutputNames().add(path);
-      FileOutputStream stream = new FileOutputStream(path);
-      org.hl7.fhir.services.elementmodel.XmlParser xp = new org.hl7.fhir.services.elementmodel.XmlParser(this.pf.context);
-      if (suppressId(f, r)) {
-        xp.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
+      try (FileOutputStream stream = new FileOutputStream(path)) {
+        org.hl7.fhir.services.elementmodel.XmlParser xp = new org.hl7.fhir.services.elementmodel.XmlParser(this.pf.context);
+        if (suppressId(f, r)) {
+          xp.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
+        }
+        xp.compose(element, stream, OutputStyle.PRETTY, this.pf.igpkp.getCanonical());
       }
-      xp.compose(element, stream, OutputStyle.PRETTY, this.pf.igpkp.getCanonical());
-      stream.close();
     }
     if (wantGen(r, "json") || forHL7orFHIR()) {
       if (this.settings.isNewMultiLangTemplateFormat() && lang != null) {
@@ -968,13 +985,13 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         path = Utilities.path(this.pf.tempDir, r.fhirType()+"-"+r.getId()+".json");
       }
       f.getOutputNames().add(path);
-      FileOutputStream stream = new FileOutputStream(path);
-      org.hl7.fhir.services.elementmodel.JsonParser jp = new org.hl7.fhir.services.elementmodel.JsonParser(this.pf.context);
-      if (suppressId(f, r)) {
-        jp.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
+      try (FileOutputStream stream = new FileOutputStream(path)) {
+        org.hl7.fhir.services.elementmodel.JsonParser jp = new org.hl7.fhir.services.elementmodel.JsonParser(this.pf.context);
+        if (suppressId(f, r)) {
+          jp.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
+        }
+        jp.compose(element, stream, OutputStyle.PRETTY, this.pf.igpkp.getCanonical());
       }
-      jp.compose(element, stream, OutputStyle.PRETTY, this.pf.igpkp.getCanonical());
-      stream.close();
     }
     if (wantGen(r, "ttl")) {
       if (this.settings.isNewMultiLangTemplateFormat() && lang != null) {
@@ -983,13 +1000,13 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         path = Utilities.path(this.pf.tempDir, r.fhirType()+"-"+r.getId()+".ttl");
       }
       f.getOutputNames().add(path);
-      FileOutputStream stream = new FileOutputStream(path);
-      org.hl7.fhir.services.elementmodel.TurtleParser tp = new org.hl7.fhir.services.elementmodel.TurtleParser(this.pf.context);
-      if (suppressId(f, r)) {
-        tp.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
+      try (FileOutputStream stream = new FileOutputStream(path)) {
+        org.hl7.fhir.services.elementmodel.TurtleParser tp = new org.hl7.fhir.services.elementmodel.TurtleParser(this.pf.context);
+        if (suppressId(f, r)) {
+          tp.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
+        }
+        tp.compose(element, stream, OutputStyle.PRETTY, this.pf.igpkp.getCanonical());
       }
-      tp.compose(element, stream, OutputStyle.PRETTY, this.pf.igpkp.getCanonical());
-      stream.close();
     }
   }
 
@@ -1111,9 +1128,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
     if (wantGen(r, "jekyll-data") && this.pf.produceJekyllData) {
       org.hl7.fhir.services.elementmodel.JsonParser jp = new org.hl7.fhir.services.elementmodel.JsonParser(this.pf.context);
-      FileOutputStream bs = new FileOutputStream(Utilities.path(this.pf.tempDir, "_data", r.fhirType()+"-"+r.getId()+".json"));
-      jp.compose(langElement, bs, OutputStyle.NORMAL, null);
-      bs.close();
+      try (FileOutputStream bs = new FileOutputStream(Utilities.path(this.pf.tempDir, "_data", r.fhirType()+"-"+r.getId()+".json"))) {
+        jp.compose(langElement, bs, OutputStyle.NORMAL, null);
+      }
     }
     if (wantGen(r, "ttl")) {
       genWrapper(null, r, template, this.pf.igpkp.getProperty(r, "format"), f.getOutputNames(), vars, "ttl", "", false, lang, lrc);
@@ -1620,7 +1637,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         String path = Utilities.path(this.pf.tempDir, "CodeSystem-"+prefixForContainer + cs.getId()+".xlsx");
         f.getOutputNames().add(path);
         vsg.renderCodeSystem(cs);
-        vsg.finish(new FileOutputStream(path));
+        try (FileOutputStream out = new FileOutputStream(path)) {
+          vsg.finish(out);
+        }
       }
     }
   }
@@ -1730,7 +1749,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         String path = Utilities.path(this.pf.tempDir, "ValueSet-"+prefixForContainer + r.getId()+".xlsx");
         f.getOutputNames().add(path);
         vsg.renderValueSet(vs);
-        vsg.finish(new FileOutputStream(path));
+        try (FileOutputStream out = new FileOutputStream(path)) {
+          vsg.finish(out);
+        }
       }
     }
 
@@ -1787,7 +1808,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       String path = Utilities.path(this.pf.tempDir, prefixForContainer + r.getId()+".xlsx");
       f.getOutputNames().add(path);
       cmg.renderConceptMap(cm);
-      cmg.finish(new FileOutputStream(path));
+      try (FileOutputStream out = new FileOutputStream(path)) {
+        cmg.finish(out);
+      }
     }
   }
 
@@ -1861,9 +1884,11 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     if (wantGen(r, "swagger") || wantGen(r, "openapi")) {
       String lp = isNewML() && lang != null && !lang.equals(this.pf.defaultTranslationLang) ? "-"+lang : "";
       org.hl7.fhir.services.openapi.Writer oa = null;
-      if (this.pf.openApiTemplate != null)
-        oa = new org.hl7.fhir.services.openapi.Writer(new FileOutputStream(Utilities.path(this.pf.tempDir, cpbs.getId()+ lp+".openapi.json")), new FileInputStream(Utilities.path(FileUtilities.getDirectoryForFile(this.settings.getConfigFile()), this.pf.openApiTemplate)));
-      else
+      if (this.pf.openApiTemplate != null) {
+        try (FileInputStream template = new FileInputStream(Utilities.path(FileUtilities.getDirectoryForFile(this.settings.getConfigFile()), this.pf.openApiTemplate))) {
+          oa = new org.hl7.fhir.services.openapi.Writer(new FileOutputStream(Utilities.path(this.pf.tempDir, cpbs.getId()+ lp+".openapi.json")), template);
+        }
+      } else
         oa = new Writer(new FileOutputStream(Utilities.path(this.pf.tempDir, cpbs.getId()+ lp+".openapi.json")));
       String lic = license();
       String displ = this.pf.context.validateCode(new ValidationOptions(FhirPublication.R5, "en-US"), new Coding("http://hl7.org/fhir/spdx-license",  lic, null), null).getDisplay();
@@ -1882,7 +1907,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       String path = Utilities.path(this.pf.tempDir, sdPrefix + r.getId()+".csv");
       f.getOutputNames().add(path);
       ProfileUtilities pu = new ProfileUtilities(this.pf.context, this.pf.errors, this.pf.igpkp);
-      pu.generateCsv(new FileOutputStream(path), sd, true);
+      try (FileOutputStream out = new FileOutputStream(path)) {
+        pu.generateCsv(out, sd, true);
+      }
       if (this.pf.allProfilesCsv == null) {
         this.pf.allProfilesCsv = new  org.hl7.fhir.services.utilities.CSVWriter(new FileOutputStream(Utilities.path(this.pf.tempDir, "all-profiles.csv")), this.pf.context, true);
         this.pf.otherFilesRun.add(Utilities.path(this.pf.tempDir, "all-profiles.csv"));
@@ -1896,7 +1923,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       f.getOutputNames().add(path);
       StructureDefinitionSpreadsheetGenerator sdg = new StructureDefinitionSpreadsheetGenerator(this.pf.context, true, anyMustSupport(sd), pf.rendererFactory);
       sdg.renderStructureDefinition(sd, false);
-      sdg.finish(new FileOutputStream(path));
+      try (FileOutputStream out = new FileOutputStream(path)) {
+        sdg.finish(out);
+      }
       lapsed("xslx");
       if (this.pf.allProfilesXlsx == null) {
         this.pf.allProfilesXlsx = new StructureDefinitionSpreadsheetGenerator(this.pf.context, true, false, pf.rendererFactory);
@@ -1908,7 +1937,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     if (!regen && sd.getDerivation() == StructureDefinition.TypeDerivationRule.CONSTRAINT && wantGen(r, "sch")) {
       String path = Utilities.path(this.pf.tempDir, sdPrefix + r.getId()+".sch");
       f.getOutputNames().add(path);
-      new ProfileUtilities(this.pf.context, this.pf.errors, this.pf.igpkp).generateSchematrons(new FileOutputStream(path), sd);
+      try (FileOutputStream out = new FileOutputStream(path)) {
+        new ProfileUtilities(this.pf.context, this.pf.errors, this.pf.igpkp).generateSchematrons(out, sd);
+      }
       addFileToNpm(NPMPackageGenerator.Category.SCHEMATRON, sdPrefix + r.getId()+".sch", FileUtilities.fileToBytes(Utilities.path(this.pf.tempDir, sdPrefix + r.getId()+".sch")));
     }
 //    if (wantGen(r, "sch"))
@@ -2941,7 +2972,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     ObservationSummarySpreadsheetGenerator vsg = new ObservationSummarySpreadsheetGenerator(pf.context, pf.rendererFactory);
     pf.otherFilesRun.add(path);
     vsg.generate(cvr.getObservations());
-    vsg.finish(new FileOutputStream(path));
+    try (FileOutputStream out = new FileOutputStream(path)) {
+      vsg.finish(out);
+    }
     start = System.currentTimeMillis();
     fragment("summary-extensions", cvr.getExtensionSummary(), pf.otherFilesRun, start, "summary-extensions", "Cross", lang);
     start = System.currentTimeMillis();
@@ -4306,8 +4339,12 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         exp.addEntry().setResource(vs).setFullUrl(vs.getUrl());
       }
 
-      new JsonParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(pf.outputDir, "expansions.json")), exp);
-      new XmlParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(pf.outputDir, "expansions.xml")), exp);
+      try (FileOutputStream stream = new FileOutputStream(Utilities.path(pf.outputDir, "expansions.json"))) {
+        new JsonParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(stream, exp);
+      }
+      try (FileOutputStream stream = new FileOutputStream(Utilities.path(pf.outputDir, "expansions.xml"))) {
+        new XmlParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(stream, exp);
+      }
       ZipGenerator zip = new ZipGenerator(Utilities.path(pf.outputDir, "expansions.json.zip"));
       zip.addFileName("expansions.json", Utilities.path(pf.outputDir, "expansions.json"), false);
       zip.close();
