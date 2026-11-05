@@ -438,6 +438,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           addFileToNpm(NPMPackageGenerator.Category.OTHER, "publication-request.json", FileUtilities.fileToBytes(pr));
         }
         pf.npm.finish();
+        reportRenamedPackageFiles(pf.npm);
         ensureCorePackageDependency(pf.npm);
         for (NPMPackageGenerator vnpm : pf.vnpms.values()) {
           vnpm.finish();
@@ -4596,6 +4597,28 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     fd.add("errors", e);
     fd.add("warnings", w);
     //    fd.add("hints", i);
+  }
+
+  /**
+   * A file whose path in the package would be too long for a tar entry is put in the package under
+   * a shortened name (NPMPackageGenerator.shortenForTar). For resources (the package and examples
+   * folders) that doesn't matter - they are found through the index - but a file in any other folder
+   * (tests, other...) is found by its name, so in effect it is missing from the package. That's an
+   * error for the IG as a whole (there's no resource or page to file it against).
+   */
+  private void reportRenamedPackageFiles(NPMPackageGenerator npm) {
+    for (Map.Entry<String, String> e : npm.getRenamedFiles().entrySet()) {
+      String original = e.getKey();
+      String folder = original.substring(0, original.lastIndexOf('/') + 1);
+      if (!Utilities.existsInList(folder, "package/", "package/examples/")) {
+        String name = original.startsWith("package/") ? original.substring(8) : original;
+        pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.TOOLONG, "package.tgz",
+            "The file '"+name+"' is not in the package under its own name: its path in the package ('"+original+"') is "+
+            original.getBytes(StandardCharsets.UTF_8).length+" characters, and a package entry must be less than 100, so it was renamed to '"+
+            e.getValue().substring(8)+"', and anything that looks for it by name won't find it. Give it a shorter name",
+            ValidationMessage.IssueSeverity.ERROR));
+      }
+    }
   }
 
   private void addTestDir(File dir, String t) throws FileNotFoundException, IOException {
