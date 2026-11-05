@@ -247,6 +247,16 @@ public class PublisherIGLoader extends PublisherBase {
     }
   }
 
+  // null if they can't be read: watch mode then reports the changes in input by their events
+  private Map<Path, String> inputStates(Path input) {
+    try {
+      return FileChangeMonitor.fileStates(input);
+    } catch (IOException e) {
+      log("Unable to read the files in " + input + ", so watch mode may take what the module writes for edits: " + e.getMessage());
+      return null;
+    }
+  }
+
   private IniFile checkNewIg() throws IOException {
     if (settings.getConfigFile() == null)
       return null;
@@ -285,9 +295,17 @@ public class PublisherIGLoader extends PublisherBase {
     pf.module = loadModule(ini.getStringProperty("IG", "module"));
     if (pf.module.useRoutine("preProcess")) {
       log("== Ask "+ pf.module.name()+" to pre-process the IG ============================");
+      Path input = Paths.get(Utilities.path(pf.rootDir, "input"));
+      Map<Path, String> inputBefore = settings.isWatchMode() ? inputStates(input) : null;
       if (!pf.module.preProcess(pf.rootDir)) {
         throw new Exception("Process terminating due to Module failure");
       } else {
+        Map<Path, String> inputAfter = inputBefore == null ? null : inputStates(input);
+        if (inputAfter != null) {
+          // so that watch mode doesn't take what it wrote for an edit
+          pf.inputBeforeModule = inputBefore;
+          pf.moduleWrites = FileChangeMonitor.changedFiles(inputBefore, inputAfter);
+        }
         log("== Done ====================================================================");
       }
     }

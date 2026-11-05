@@ -1,5 +1,6 @@
 package org.hl7.fhir.igtools.publisher;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -14,7 +15,7 @@ import java.util.stream.Collectors;
  * - macOS: Polling-based (fast, reliable)
  * - Other OS: WatchService-based (efficient)
  */
-public class FileChangeMonitor {
+public class FileChangeMonitor implements Closeable {
   private final FileChangeMonitorImpl impl;
 
   public static class FileChangeEvent {
@@ -65,7 +66,12 @@ public class FileChangeMonitor {
   }
 
   public FileChangeMonitor(List<MonitoredPath> pathsToMonitor) throws IOException {
-    if (isMacOS()) {
+    this(pathsToMonitor, isMacOS());
+  }
+
+  // polling can be chosen on any OS, for testing
+  FileChangeMonitor(List<MonitoredPath> pathsToMonitor, boolean polling) throws IOException {
+    if (polling) {
       System.out.println("Detected macOS - using polling-based file monitor");
       impl = new PollingFileChangeMonitorImpl(pathsToMonitor, 200);
     } else {
@@ -86,11 +92,205 @@ public class FileChangeMonitor {
   }
 
   public void startMonitoring() {
-    impl.startMonitoring();
+    impl.startMonitoring(Collections.emptyList(), null);
+  }
+
+  /**
+   * Start monitoring after a build. The changes made while not monitoring are reported, except those to
+   * buildOutputs: the files and folders that the build itself wrote to (e.g. fsh-generated, when SUSHI ran)
+   */
+  public void startMonitoring(Collection<Path> buildOutputs) {
+    impl.startMonitoring(buildOutputs, null);
+  }
+
+  /**
+   * As startMonitoring(buildOutputs), and the edits in the folder of folderWrites are found by comparing its files
+   */
+  public void startMonitoring(Collection<Path> buildOutputs, FolderWrites folderWrites) {
+    impl.startMonitoring(buildOutputs, folderWrites);
+  }
+
+  /**
+   * What a step of the build wrote in a watched folder (e.g. a module's pre-processing, in input). The folder's events
+   * can't tell those writes from the user's edits (events for the folders themselves, lost events), so its files are
+   * compared instead: what changed since before the step ran is an edit, unless the step writes that path
+   */
+  public static class FolderWrites {
+    private final Path folder;
+    private final Map<Path, String> beforeStep;
+    private final Set<Path> written;
+    private final List<Path> notWritten;
+
+    /**
+     * @param beforeStep the fileStates of the folder before the step ran
+     * @param written the paths the step writes: changes to them are ignored, whatever they are
+     * @param notWritten folders in folder that the step doesn't write to: their events are reported as usual
+     */
+    public FolderWrites(Path folder, Map<Path, String> beforeStep, Set<Path> written, List<Path> notWritten) {
+      this.folder = folder.toAbsolutePath().normalize();
+      this.beforeStep = beforeStep;
+      this.written = new HashSet<>(normalised(written));
+      this.notWritten = normalised(notWritten);
+    }
+
+    private boolean covers(Path path) {
+      return path.startsWith(folder) && outputFor(path, notWritten) == null;
+    }
+
+    // the files edited since before the step ran; ignored counts the step's writes
+    private List<FileChangeEvent> edits(int[] ignored) {
+      Map<Path, String> now;
+      try {
+        now = fileStates(folder);
+      } catch (IOException e) {
+        // a rebuild, rather than an edit missed
+        System.out.println("Unable to look for changes in " + folder + " (edits may have been missed): " + e.getMessage());
+        return List.of(new FileChangeEvent(folder, FileChangeEvent.ChangeType.MODIFIED));
+      }
+      List<FileChangeEvent> edits = new ArrayList<>();
+      // (an edit within the file system's timestamp resolution that keeps the size isn't seen)
+      for (Path path : changedFiles(beforeStep, now)) {
+        if (!covers(path)) {
+          // reported by its events
+        } else if (written.contains(path)) {
+          ignored[0]++;
+        } else {
+          edits.add(new FileChangeEvent(path, !beforeStep.containsKey(path) ? FileChangeEvent.ChangeType.CREATED
+              : !now.containsKey(path) ? FileChangeEvent.ChangeType.DELETED : FileChangeEvent.ChangeType.MODIFIED));
+        }
+      }
+      return edits;
+    }
+  }
+
+  /**
+   * the modified time and size of each file in a folder, so that changedFiles can tell what a step of the build wrote
+   */
+  static Map<Path, String> fileStates(Path folder) throws IOException {
+    Map<Path, String> states = new HashMap<>();
+    if (Files.isDirectory(folder)) {
+      Files.walkFileTree(folder, new SimpleFileVisitor<Path>() {
+        @Override
+        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+          states.put(file.toAbsolutePath().normalize(), attrs.lastModifiedTime() + "/" + attrs.size());
+          return FileVisitResult.CONTINUE;
+        }
+
+        @Override
+        public FileVisitResult visitFileFailed(Path file, IOException exc) {
+          // e.g. an editor's temporary file, gone already
+          return FileVisitResult.CONTINUE;
+        }
+      });
+    }
+    return states;
+  }
+
+  static Set<Path> changedFiles(Map<Path, String> before, Map<Path, String> after) {
+    Set<Path> changed = new HashSet<>();
+    for (Map.Entry<Path, String> e : after.entrySet()) {
+      if (!e.getValue().equals(before.get(e.getKey()))) {
+        changed.add(e.getKey());
+      }
+    }
+    for (Path p : before.keySet()) {
+      if (!after.containsKey(p)) {
+        changed.add(p);
+      }
+    }
+    return changed;
+  }
+
+  private static List<Path> normalised(Collection<Path> paths) {
+    return paths.stream().map(p -> p.toAbsolutePath().normalize()).collect(Collectors.toList());
+  }
+
+  // the build output that path is, or is in; null if none
+  private static Path outputFor(Path path, List<Path> buildOutputs) {
+    Path p = path.toAbsolutePath().normalize();
+    for (Path output : buildOutputs) {
+      if (p.startsWith(output)) {
+        return output;
+      }
+    }
+    return null;
+  }
+
+  private static Path folderOf(Path output) {
+    return Files.isDirectory(output) || output.getParent() == null ? output : output.getParent();
+  }
+
+  // what is ignored when monitoring starts again after a build: the build's outputs, and the folder that's compared instead
+  private static class Ignored {
+    private final List<Path> outputs;
+    private final FolderWrites compared;
+    private final Set<Path> where = new HashSet<>();
+    private int count;
+
+    Ignored(Collection<Path> outputs, FolderWrites compared) {
+      this.outputs = normalised(outputs);
+      this.compared = compared;
+    }
+
+    static Ignored none() {
+      return new Ignored(Collections.emptyList(), null);
+    }
+
+    boolean isEmpty() {
+      return outputs.isEmpty() && compared == null;
+    }
+
+    // whether the change to path isn't to be reported (by its event)
+    boolean covers(Path path) {
+      Path p = path.toAbsolutePath().normalize();
+      return (compared != null && compared.covers(p)) || outputFor(p, outputs) != null;
+    }
+
+    void count(Path path) {
+      Path output = outputFor(path, outputs);
+      if (output != null) {
+        count++;
+        where.add(folderOf(output));
+      }
+    }
+
+    boolean ignores(Path path) {
+      if (covers(path)) {
+        count(path);
+        return true;
+      }
+      return false;
+    }
+
+    List<FileChangeEvent> comparedEdits() {
+      if (compared == null) {
+        return Collections.emptyList();
+      }
+      int[] writes = new int[1];
+      List<FileChangeEvent> edits = compared.edits(writes);
+      if (writes[0] > 0) {
+        count += writes[0];
+        where.add(compared.folder);
+      }
+      return edits;
+    }
+
+    void log() {
+      if (count > 0) {
+        System.out.println("Ignored " + count + " changes made by the build, in " + where.stream().sorted().map(Path::toString).collect(Collectors.joining(", ")));
+      }
+    }
   }
 
   public boolean hasChanges() {
     return impl.hasChanges();
+  }
+
+  /**
+   * false if monitoring isn't started, or has stopped because of an error (which was printed)
+   */
+  public boolean isWatching() {
+    return impl.isWatching();
   }
 
   public List<FileChangeEvent> getChanges() {
@@ -125,10 +325,16 @@ public class FileChangeMonitor {
     impl.stopMonitoring();
   }
 
+  @Override
+  public void close() throws IOException {
+    impl.close();
+  }
+
   // Private interface for implementations
   private interface FileChangeMonitorImpl {
-    void startMonitoring();
+    void startMonitoring(Collection<Path> buildOutputs, FolderWrites folderWrites);
     boolean hasChanges();
+    boolean isWatching();
     List<FileChangeEvent> getChanges();
     List<Path> getChangedFiles();
     void printChanges();
@@ -137,28 +343,40 @@ public class FileChangeMonitor {
     FileChangeEvent waitForChange() throws InterruptedException;
     void clearChanges();
     void stopMonitoring();
+    void close() throws IOException;
   }
 
   // WatchService implementation (Linux, Windows)
   private static class WatchServiceFileChangeMonitorImpl implements FileChangeMonitorImpl {
     private final WatchService watchService;
     private final Map<WatchKey, Path> watchKeys;
-    private final Set<Path> monitoredFiles;
+    // directories that are only watched for some of their files (MonitoredPath.file): directory -> those files
+    private final Map<Path, Set<Path>> monitoredFiles;
+    // directories watched with their sub-directories, so that a new sub-directory is watched too
+    private final Set<Path> recursiveDirs = ConcurrentHashMap.newKeySet();
+    // the MonitoredPath.recursive folders (absolute)
+    private final Set<Path> recursiveRoots = ConcurrentHashMap.newKeySet();
+    // recursive folders that don't exist (yet, or any more), watched for in their parent (e.g. fsh-generated before SUSHI runs)
+    private final Set<Path> awaitedDirs = ConcurrentHashMap.newKeySet();
     private ExecutorService executor;
+    private Future<?> task;
     private final BlockingQueue<FileChangeEvent> changeQueue;
     private volatile boolean monitoring;
 
     public WatchServiceFileChangeMonitorImpl(List<MonitoredPath> pathsToMonitor) throws IOException {
       this.watchService = FileSystems.getDefault().newWatchService();
       this.watchKeys = new ConcurrentHashMap<>();
-      this.monitoredFiles = ConcurrentHashMap.newKeySet();
+      this.monitoredFiles = new ConcurrentHashMap<>();
       this.executor = Executors.newSingleThreadExecutor();
       this.changeQueue = new LinkedBlockingQueue<>();
       this.monitoring = false;
 
       for (MonitoredPath monitoredPath : pathsToMonitor) {
-        Path path = monitoredPath.path;
+        Path path = monitoredPath.path.toAbsolutePath().normalize();
 
+        if (monitoredPath.recursive) {
+          recursiveRoots.add(path);
+        }
         if (Files.isDirectory(path)) {
           if (monitoredPath.recursive) {
             registerRecursive(path);
@@ -166,23 +384,86 @@ public class FileChangeMonitor {
             registerDirectory(path);
           }
         } else if (Files.exists(path)) {
-          monitoredFiles.add(path.toAbsolutePath());
+          monitoredFiles.computeIfAbsent(path.getParent(), d -> ConcurrentHashMap.newKeySet()).add(path);
           registerDirectory(path.getParent());
+        } else if (monitoredPath.recursive) {
+          awaitDirectory(path, Ignored.none());
         }
       }
     }
 
+    // folders that can't be read, or that are gone by the time they're registered, are skipped
     private void registerRecursive(Path directory) throws IOException {
       Files.walkFileTree(directory, new SimpleFileVisitor<Path>() {
         @Override
-        public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-          registerDirectory(dir);
+        public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+          try {
+            registerDirectory(dir);
+          } catch (IOException e) {
+            System.out.println("Unable to watch " + dir + ": " + e.getMessage());
+            return FileVisitResult.SKIP_SUBTREE;
+          }
+          recursiveDirs.add(dir.toAbsolutePath().normalize());
+          return FileVisitResult.CONTINUE;
+        }
+
+        @Override
+        public FileVisitResult visitFileFailed(Path file, IOException exc) {
+          if (Files.exists(file, LinkOption.NOFOLLOW_LINKS)) {
+            System.out.println("Unable to watch " + file + ": " + exc.getMessage());
+          }
           return FileVisitResult.CONTINUE;
         }
       });
     }
 
-    private void registerDirectory(Path directory) throws IOException {
+    // watch the parent folder for the folder to be made; if it's there already (made again before this), watch it now
+    private void awaitDirectory(Path directory, Ignored ignored) throws IOException {
+      Path dir = directory.toAbsolutePath().normalize();
+      Path parent = dir.getParent();
+      if (parent != null && Files.isDirectory(parent)) {
+        if (!recursiveDirs.contains(parent)) {
+          monitoredFiles.computeIfAbsent(parent, d -> ConcurrentHashMap.newKeySet());
+        }
+        awaitedDirs.add(dir);
+        registerDirectory(parent);
+        if (Files.isDirectory(dir, LinkOption.NOFOLLOW_LINKS) && awaitedDirs.remove(dir)) {
+          watchNewDirectory(dir, ignored);
+        }
+      } else {
+        System.out.println("Unable to watch for " + dir + ": " + parent + " isn't a folder");
+      }
+    }
+
+    // a folder made after monitoring started (e.g. by git, or a new input/images/x): watch it, and report what's in it already
+    private void watchNewDirectory(Path directory, Ignored ignored) {
+      try {
+        registerRecursive(directory);
+        Files.walkFileTree(directory, new SimpleFileVisitor<Path>() {
+          @Override
+          public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+            report(file.toAbsolutePath().normalize(), FileChangeEvent.ChangeType.CREATED, ignored);
+            return FileVisitResult.CONTINUE;
+          }
+
+          @Override
+          public FileVisitResult visitFileFailed(Path file, IOException exc) {
+            return FileVisitResult.CONTINUE;
+          }
+        });
+      } catch (IOException e) {
+        System.out.println("Unable to watch " + directory + ": " + e.getMessage());
+      }
+    }
+
+    private void report(Path path, FileChangeEvent.ChangeType changeType, Ignored ignored) {
+      if (!ignored.ignores(path)) {
+        changeQueue.offer(new FileChangeEvent(path, changeType));
+      }
+    }
+
+    private void registerDirectory(Path dir) throws IOException {
+      Path directory = dir.toAbsolutePath().normalize();
       WatchKey key = directory.register(
               watchService,
               StandardWatchEventKinds.ENTRY_CREATE,
@@ -193,7 +474,7 @@ public class FileChangeMonitor {
     }
 
     @Override
-    public void startMonitoring() {
+    public void startMonitoring(Collection<Path> buildOutputs, FolderWrites folderWrites) {
       if (monitoring) return;
 
       // If executor was shutdown, create a new one
@@ -201,52 +482,158 @@ public class FileChangeMonitor {
         executor = Executors.newSingleThreadExecutor();
       }
       monitoring = true;
+      Ignored ignored = new Ignored(buildOutputs, folderWrites);
+      try {
+        reportPendingEvents(ignored);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+      // after the pending events: an edit made since is in the files compared, or in the events that follow
+      ignored.comparedEdits().forEach(changeQueue::offer);
+      ignored.log();
 
-      executor.submit(() -> {
+      task = executor.submit(() -> {
         try {
           while (monitoring) {
             WatchKey key = watchService.poll(100, TimeUnit.MILLISECONDS);
-            if (key == null) continue;
-
-            Path directory = watchKeys.get(key);
-            if (directory == null) continue;
-
-            for (WatchEvent<?> event : key.pollEvents()) {
-              WatchEvent.Kind<?> kind = event.kind();
-              if (kind == StandardWatchEventKinds.OVERFLOW) continue;
-
-              @SuppressWarnings("unchecked")
-              WatchEvent<Path> ev = (WatchEvent<Path>) event;
-              Path filename = ev.context();
-              Path changedPath = directory.resolve(filename).toAbsolutePath();
-
-              if (!monitoredFiles.isEmpty() && !monitoredFiles.contains(changedPath)) {
-                continue;
+            if (key != null) {
+              try {
+                processEvents(key, Ignored.none());
+              } catch (RuntimeException e) {
+                // keep watching: the console says it is
+                System.out.println("Error processing file changes: " + e);
+                e.printStackTrace(System.out);
               }
-
-              FileChangeEvent.ChangeType changeType;
-              if (kind == StandardWatchEventKinds.ENTRY_CREATE) {
-                changeType = FileChangeEvent.ChangeType.CREATED;
-              } else if (kind == StandardWatchEventKinds.ENTRY_MODIFY) {
-                changeType = FileChangeEvent.ChangeType.MODIFIED;
-              } else if (kind == StandardWatchEventKinds.ENTRY_DELETE) {
-                changeType = FileChangeEvent.ChangeType.DELETED;
-              } else {
-                continue;
-              }
-
-              changeQueue.offer(new FileChangeEvent(changedPath, changeType));
-            }
-
-            boolean valid = key.reset();
-            if (!valid) {
-              watchKeys.remove(key);
             }
           }
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
+        } catch (Throwable e) {
+          if (monitoring) {
+            System.out.println("No longer watching for changes: " + e);
+            e.printStackTrace(System.out);
+          }
         }
       });
+    }
+
+    @Override
+    public boolean isWatching() {
+      return monitoring && task != null && !task.isDone();
+    }
+
+    /**
+     * The watch service queues events while nothing is monitoring. Those in the folders the build wrote to are the
+     * build's own (e.g. SUSHI's output in fsh-generated): reporting them would start another build straight away.
+     * The others are edits made while the build ran, and need another build
+     */
+    private void reportPendingEvents(Ignored ignored) throws InterruptedException {
+      WatchKey key;
+      // a short wait, for the events of the build's last writes to arrive
+      while ((key = watchService.poll(50, TimeUnit.MILLISECONDS)) != null) {
+        try {
+          processEvents(key, ignored);
+        } catch (RuntimeException e) {
+          // keep watching
+          System.out.println("Error processing file changes: " + e);
+          e.printStackTrace(System.out);
+        }
+      }
+    }
+
+    private void processEvents(WatchKey key, Ignored ignored) {
+      Path directory = watchKeys.get(key);
+      try {
+        if (directory != null) {
+          for (WatchEvent<?> event : key.pollEvents()) {
+            try {
+              processEvent(directory, event, ignored);
+            } catch (RuntimeException e) {
+              System.out.println("Error processing a change in " + directory + ": " + e);
+              e.printStackTrace(System.out);
+              // so that the change isn't lost
+              report(directory, FileChangeEvent.ChangeType.MODIFIED, ignored);
+            }
+          }
+        }
+      } finally {
+        resetKey(key, directory, ignored);
+      }
+    }
+
+    private void processEvent(Path directory, WatchEvent<?> event, Ignored ignored) {
+      WatchEvent.Kind<?> kind = event.kind();
+      Path changedPath;
+      FileChangeEvent.ChangeType changeType;
+      if (kind == StandardWatchEventKinds.OVERFLOW) {
+        // events were lost, so something in the directory changed
+        changedPath = directory;
+        changeType = FileChangeEvent.ChangeType.MODIFIED;
+        if (recursiveDirs.contains(directory)) {
+          // and folders made in it then weren't seen
+          try {
+            registerRecursive(directory);
+          } catch (IOException e) {
+            System.out.println("Unable to watch " + directory + ": " + e.getMessage());
+          }
+        }
+        // nor folders waited for in it
+        for (Path awaited : new ArrayList<>(awaitedDirs)) {
+          if (directory.equals(awaited.getParent()) && Files.isDirectory(awaited, LinkOption.NOFOLLOW_LINKS) && awaitedDirs.remove(awaited)) {
+            watchNewDirectory(awaited, ignored);
+          }
+        }
+      } else {
+        @SuppressWarnings("unchecked")
+        WatchEvent<Path> ev = (WatchEvent<Path>) event;
+        Path filename = ev.context();
+        changedPath = directory.resolve(filename);
+
+        if (kind == StandardWatchEventKinds.ENTRY_CREATE && Files.isDirectory(changedPath, LinkOption.NOFOLLOW_LINKS)
+            && (recursiveDirs.contains(directory) || awaitedDirs.remove(changedPath))) {
+          watchNewDirectory(changedPath, ignored);
+        }
+        if (kind == StandardWatchEventKinds.ENTRY_MODIFY && Files.isDirectory(changedPath, LinkOption.NOFOLLOW_LINKS)) {
+          // (Windows) something in a sub-folder changed: that folder's own events say what
+          return;
+        }
+
+        Set<Path> files = monitoredFiles.get(directory);
+        if (files != null && !files.contains(changedPath)) {
+          return;
+        }
+
+        if (kind == StandardWatchEventKinds.ENTRY_CREATE) {
+          changeType = FileChangeEvent.ChangeType.CREATED;
+        } else if (kind == StandardWatchEventKinds.ENTRY_MODIFY) {
+          changeType = FileChangeEvent.ChangeType.MODIFIED;
+        } else if (kind == StandardWatchEventKinds.ENTRY_DELETE) {
+          changeType = FileChangeEvent.ChangeType.DELETED;
+        } else {
+          return;
+        }
+      }
+      report(changedPath, changeType, ignored);
+    }
+
+    private void resetKey(WatchKey key, Path directory, Ignored ignored) {
+      boolean valid = key.reset();
+      if (!valid) {
+        watchKeys.remove(key);
+        // unless it was made again, and watched again already
+        if (directory != null && !watchKeys.containsValue(directory)) {
+          recursiveDirs.remove(directory);
+          System.out.println("No longer watching " + directory + ": it was deleted or moved");
+          if (recursiveRoots.contains(directory)) {
+            // watched again when it's made again (or now, if it has been)
+            try {
+              awaitDirectory(directory, ignored);
+            } catch (IOException e) {
+              System.out.println("Unable to watch for " + directory + ": " + e.getMessage());
+            }
+          }
+        }
+      }
     }
 
     @Override
@@ -333,6 +720,7 @@ public class FileChangeMonitor {
       changeQueue.clear();
     }
 
+    // the watch service is left open, so that monitoring can be started again
     @Override
     public void stopMonitoring() {
       monitoring = false;
@@ -342,14 +730,17 @@ public class FileChangeMonitor {
           if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
             executor.shutdownNow();
           }
-          watchService.close();
         } catch (InterruptedException e) {
           executor.shutdownNow();
           Thread.currentThread().interrupt();
-        } catch (IOException e) {
-          System.err.println("Error closing watch service: " + e.getMessage());
         }
       }
+    }
+
+    @Override
+    public void close() throws IOException {
+      stopMonitoring();
+      watchService.close();
     }
   }
 
@@ -358,6 +749,7 @@ public class FileChangeMonitor {
     private final Map<Path, FileSnapshot> fileSnapshots;
     private final List<MonitoredPath> monitoredPaths;
     private ScheduledExecutorService scheduler;
+    private ScheduledFuture<?> task;
     private final BlockingQueue<FileChangeEvent> changeQueue;
     private volatile boolean monitoring;
     private final long pollIntervalMs;
@@ -434,6 +826,11 @@ public class FileChangeMonitor {
           snapshots.put(file, new FileSnapshot(file));
           return FileVisitResult.CONTINUE;
         }
+
+        @Override
+        public FileVisitResult visitFileFailed(Path file, IOException exc) {
+          return FileVisitResult.CONTINUE;
+        }
       });
     }
 
@@ -447,9 +844,16 @@ public class FileChangeMonitor {
       }
     }
 
+    // compares with the files as they were when it last looked, so the changes made while not monitoring are reported,
+    // except those to the build's outputs: those files are taken as they are now
     @Override
-    public void startMonitoring() {
+    public void startMonitoring(Collection<Path> buildOutputs, FolderWrites folderWrites) {
       if (monitoring) return;
+      Ignored ignored = new Ignored(buildOutputs, folderWrites);
+      acceptBuildOutputs(ignored);
+      // after looking at the files, so that an edit made since is found by either
+      ignored.comparedEdits().forEach(changeQueue::offer);
+      ignored.log();
 
       // If scheduler was shutdown, create a new one
       if (scheduler.isShutdown() || scheduler.isTerminated()) {
@@ -458,18 +862,48 @@ public class FileChangeMonitor {
 
       monitoring = true;
 
-      scheduler.scheduleAtFixedRate(() -> {
+      task = scheduler.scheduleAtFixedRate(() -> {
         try {
           checkForChanges();
         } catch (Exception e) {
           System.err.println("Error checking for changes: " + e.getMessage());
+        } catch (Error e) {
+          // this ends the checks
+          System.out.println("No longer watching for changes: " + e);
+          e.printStackTrace(System.out);
+          throw e;
         }
       }, pollIntervalMs, pollIntervalMs, TimeUnit.MILLISECONDS);
     }
 
-    private void checkForChanges() {
-      Map<Path, FileSnapshot> currentSnapshots = new ConcurrentHashMap<>();
+    @Override
+    public boolean isWatching() {
+      return monitoring && task != null && !task.isDone();
+    }
 
+    // the files of the build's outputs (and of the folder compared instead) are taken as they are now
+    private void acceptBuildOutputs(Ignored ignored) {
+      if (ignored.isEmpty()) {
+        return;
+      }
+      Map<Path, FileSnapshot> currentSnapshots = scan();
+      for (Path path : new ArrayList<>(fileSnapshots.keySet())) {
+        if (!currentSnapshots.containsKey(path) && ignored.ignores(path)) {
+          fileSnapshots.remove(path);
+        }
+      }
+      for (Map.Entry<Path, FileSnapshot> entry : currentSnapshots.entrySet()) {
+        if (ignored.covers(entry.getKey())) {
+          FileSnapshot old = fileSnapshots.put(entry.getKey(), entry.getValue());
+          if (old == null || old.hasChanged(entry.getValue())) {
+            ignored.count(entry.getKey());
+          }
+        }
+      }
+    }
+
+    private Map<Path, FileSnapshot> scan() {
+      Map<Path, FileSnapshot> currentSnapshots = new ConcurrentHashMap<>();
       for (MonitoredPath monitoredPath : monitoredPaths) {
         try {
           if (Files.isDirectory(monitoredPath.path)) {
@@ -485,6 +919,11 @@ public class FileChangeMonitor {
           // Directory might have been deleted, continue
         }
       }
+      return currentSnapshots;
+    }
+
+    private void checkForChanges() {
+      Map<Path, FileSnapshot> currentSnapshots = scan();
 
       for (Map.Entry<Path, FileSnapshot> entry : fileSnapshots.entrySet()) {
         Path path = entry.getKey();
@@ -607,6 +1046,11 @@ public class FileChangeMonitor {
           Thread.currentThread().interrupt();
         }
       }
+    }
+
+    @Override
+    public void close() {
+      stopMonitoring();
     }
   }
 
