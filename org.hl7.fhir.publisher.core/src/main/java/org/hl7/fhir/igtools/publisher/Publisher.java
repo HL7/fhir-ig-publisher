@@ -241,11 +241,15 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
               throw e;
             }
             // keep watching: the next save may fix it
-            session.buildFailed();
             log("Publishing Content Failed: " + e.getMessage());
             log("");
             log("Stack Dump (for debugging):");
             e.printStackTrace();
+            try {
+              session.buildFailed();
+            } catch (IOException e2) {
+              log("Unable to read the watched files after the failure (saving a file without changing it won't build again): " + e2.getMessage());
+            }
           }
         }
         first = false;

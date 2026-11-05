@@ -2,7 +2,6 @@ package org.hl7.fhir.igtools.publisher;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.FileVisitOption;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
@@ -15,7 +14,6 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -122,8 +120,8 @@ public class SourceSnapshot {
     for (Path root : roots) {
       Path r = root.toAbsolutePath();
       if (Files.isDirectory(r)) {
-        // links are followed: a linked file (or folder, or root) is read as what it links to
-        Files.walkFileTree(r, EnumSet.of(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE, new SimpleFileVisitor<Path>() {
+        // linked folders aren't read, as the file monitor doesn't watch them either
+        Files.walkFileTree(r, new SimpleFileVisitor<Path>() {
           @Override
           public FileVisitResult preVisitDirectory(Path d, BasicFileAttributes attrs) {
             return excluded.contains(d.normalize()) ? FileVisitResult.SKIP_SUBTREE : FileVisitResult.CONTINUE;
@@ -133,6 +131,16 @@ public class SourceSnapshot {
           public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
             if (attrs.isRegularFile()) {
               addEntry(entries, file, attrs, previous, start);
+            } else if (attrs.isSymbolicLink()) {
+              // a linked file is read as what it links to, so that pointing it at another file is a change
+              try {
+                BasicFileAttributes target = Files.readAttributes(file, BasicFileAttributes.class);
+                if (target.isRegularFile()) {
+                  addEntry(entries, file, target, previous, start);
+                }
+              } catch (IOException e) {
+                unreadable(file, e);
+              }
             }
             return FileVisitResult.CONTINUE;
           }

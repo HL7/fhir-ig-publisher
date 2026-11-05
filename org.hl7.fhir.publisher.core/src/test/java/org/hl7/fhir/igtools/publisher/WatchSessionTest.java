@@ -286,16 +286,14 @@ class WatchSessionTest {
   }
 
   @Test
-  void aLinkedTemplateFolderIsWatched() throws IOException {
+  void aLinkedFolderIsNotRead() throws IOException {
+    // the file monitor doesn't watch it, and what a module writes through it isn't known as the module's
     WatchSession s = session();
-    write("real-template/includes/fragment-header.html", "<header/>");
-    Path linked = dir.resolve("my-template");
-    Files.createSymbolicLink(linked, dir.resolve("real-template"));
+    write("shared/a.md", "a");
+    Files.createSymbolicLink(dir.resolve("input/shared"), dir.resolve("shared"));
     s.startBuild();
-    s.watchTemplateFolders(Collections.singletonList(linked.toString()));
-    write("real-template/includes/fragment-header.html", "<header>edited</header>");
-    assertEquals(Collections.singleton(linked.resolve("includes/fragment-header.html").toAbsolutePath()),
-        s.changesSinceBuildStart().getModified());
+    write("shared/a.md", "edited");
+    assertTrue(s.changesSinceBuildStart().isEmpty());
   }
 
   @Test
