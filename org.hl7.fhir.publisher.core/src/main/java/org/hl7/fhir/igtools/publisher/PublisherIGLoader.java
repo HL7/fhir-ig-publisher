@@ -4867,7 +4867,7 @@ public class PublisherIGLoader extends PublisherBase {
             bc.setStatus(Enumerations.PublicationStatus.DRAFT);
           }
         }
-        if (new AdjunctFileLoader(this.pf.binaryPaths, this.pf.cql).replaceAttachments2(f, r)) {
+        if (new AdjunctFileLoader(this.pf.binaryPaths, this.pf.cql, isDebugLogging()).replaceAttachments2(f, r)) {
           altered = true;
         }
         if (this.pf.oidRoot != null && !hasOid(bc.getIdentifierList())) {
