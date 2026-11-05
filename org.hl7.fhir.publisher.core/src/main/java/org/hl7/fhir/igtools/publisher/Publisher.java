@@ -1414,7 +1414,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
           Publisher self = new Publisher();
           self.setConfigFile(determineActualIG(ig, null));
           setTxServerValue(args, self);
-          self.settings.setThreads(CliParams.getThreads(args, Runtime.getRuntime().availableProcessors()));
+          setThreadsValue(args, self);
           if (CliParams.hasNamedParam(args, "-resetTx")) {
             self.settings.setCacheOption(PublisherUtils.CacheOption.CLEAR_ALL);
           } else if (CliParams.hasNamedParam(args, "-resetTxErrors")) {
@@ -1513,11 +1513,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         System.out.println("Running without generation to shorten the run time (editor process only)");
       }
 
-      int cores = Runtime.getRuntime().availableProcessors();
-      self.settings.setThreads(CliParams.getThreads(args, cores));
-      if (CliParams.hasNamedParam(args, CliParams.THREADS)) {
-        System.out.println("Using up to " + self.settings.getThreads() + " extra thread(s) (-threads " + CliParams.getNamedParam(args, CliParams.THREADS).trim() + ", " + cores + " cores)");
-      }
+      setThreadsValue(args, self);
 
       // deprecated
       if (CliParams.hasNamedParam(args, "-new-template-format")) {
@@ -1732,6 +1728,15 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   private static String removePassword(String string) {
     // TODO Auto-generated method stub
     return null;
+  }
+
+  /** reads -threads into the settings and, if it was given, says how many extra threads the run may use */
+  private static void setThreadsValue(String[] args, Publisher self) {
+    int cores = Runtime.getRuntime().availableProcessors();
+    self.settings.setThreads(CliParams.getThreads(args, cores));
+    if (CliParams.hasNamedParam(args, CliParams.THREADS)) {
+      System.out.println("Using up to " + self.settings.getThreads() + " extra thread(s) (-threads " + CliParams.getNamedParam(args, CliParams.THREADS).trim() + ", " + cores + " cores)");
+    }
   }
 
   public static void setTxServerValue(String[] args, Publisher self) {
