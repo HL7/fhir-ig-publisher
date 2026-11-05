@@ -265,6 +265,16 @@ public class WatchSession {
     return res;
   }
 
+  /**
+   * The build wrote these files (e.g. a module's pre-processing, in input): as they are now, they are part of the
+   * build's sources, not a change that needs another build
+   */
+  public void buildWrote(Collection<Path> files) throws IOException {
+    if (buildStart != null && !files.isEmpty()) {
+      buildStart = buildStart.withFiles(files, SourceSnapshot.take(files, buildStart));
+    }
+  }
+
   /** What changed in the watched files since the current (or last) build started */
   public SourceSnapshot.Changes changesSinceBuildStart() throws IOException {
     SourceSnapshot now = SourceSnapshot.take(watched, buildStart);

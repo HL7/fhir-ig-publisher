@@ -99,6 +99,21 @@ class WatchSessionTest {
   }
 
   @Test
+  void whatTheBuildWroteIsNotAChange() throws IOException {
+    // e.g. what a module's pre-processing wrote in input, while the user edited another file
+    WatchSession s = session();
+    s.startBuild();
+    Path written = dir.resolve("input/resources/Generated.json").toAbsolutePath();
+    Path deleted = dir.resolve("input/images/a.png").toAbsolutePath();
+    write("input/resources/Generated.json", "{}");
+    Files.delete(deleted);
+    write("input/pagecontent/index.md", "# Home, edited");
+    s.buildWrote(Arrays.asList(written, deleted));
+    SourceSnapshot.Changes c = s.changesSinceBuildStart();
+    assertEquals(Collections.singleton(dir.resolve("input/pagecontent/index.md").toAbsolutePath()), c.all());
+  }
+
+  @Test
   void withTree() throws IOException {
     session();
     SourceSnapshot before = SourceSnapshot.take(roots(), null);

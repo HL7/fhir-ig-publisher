@@ -17,7 +17,7 @@ import org.hl7.fhir.model.core.StructureDefinition;
 import org.hl7.fhir.model.fml.StructureMap;
 import org.hl7.fhir.model.fml.StructureMap.StructureMapGroupComponent;
 import org.hl7.fhir.model.fml.StructureMap.StructureMapGroupInputComponent;
-import org.hl7.fhir.model.fml.StructureMap.StructureMapInputMode;
+import org.hl7.fhir.model.fml.StructureMap.StructureMapInputModeVS;
 import org.hl7.fhir.model.fml.StructureMap.StructureMapStructureComponent;
 import org.hl7.fhir.services.renderers.Renderer.RenderingStatus;
 import org.hl7.fhir.services.renderers.utils.RenderingContext;
@@ -70,7 +70,7 @@ public class MappingSummaryRenderer {
       for (StructureMapGroupInputComponent input : group.getInputList()) {
         String url = resolveType(input.getType(), map, input.getMode());
         if (Utilities.isAbsoluteUrl(url)) {
-          if (input.getMode() == StructureMapInputMode.SOURCE) {
+          if (input.getMode() == StructureMapInputModeVS.SOURCE) {
             sources.add(url);
           } else {
             targets.add(url);
@@ -80,7 +80,7 @@ public class MappingSummaryRenderer {
     }
   }
 
-  private String resolveType(String type, StructureMap map, StructureMapInputMode mode) {
+  private String resolveType(String type, StructureMap map, StructureMapInputModeVS mode) {
     if (Utilities.isAbsoluteUrl(type)) {
       return type;
     }
