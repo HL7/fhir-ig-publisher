@@ -57,13 +57,17 @@ class HTMLInspectorPublishBoxTest {
   }
 
   private static HTMLInspector inspector(File root, File req) throws IOException {
+    return inspector(root, req, "example.ig", false);
+  }
+
+  private static HTMLInspector inspector(File root, File req, String packageId, boolean isCIBuild) throws IOException {
     IWorkerContext context = mock(IWorkerContext.class);
     when(context.getLocale()).thenReturn(Locale.ENGLISH);
     when(context.getModelContext()).thenReturn(ModelContext.fullCoreContext());
     // an existing Requirements/fromNarrative, so that reporting a message doesn't need a rendering context
     when(context.fetchResource(eq(Requirements.class), anyString(), any())).thenReturn(new Requirements());
     HTMLInspector inspector = new HTMLInspector(context, root.getAbsolutePath(), new ArrayList<>(), new ArrayList<>(), LOG,
-      "http://example.org/ig", "example.ig", "0.1.0", new HashMap<>(), new ArrayList<>(), null, false, null, new ArrayList<>(), false,
+      "http://example.org/ig", packageId, "0.1.0", new HashMap<>(), new ArrayList<>(), null, isCIBuild, null, new ArrayList<>(), false,
       new ArrayList<>(), null);
     inspector.setExemptHtmlPatterns(new ArrayList<>());
     inspector.setReqFolder(req.getAbsolutePath());
@@ -115,6 +119,28 @@ class HTMLInspectorPublishBoxTest {
     assertEquals("the page is missing " + PLACEHOLDER, FileUtilities.fileToString(notes));
     // neither is reported as missing the publish box
     assertEquals("Unable to Parse: broken.html", inspector.getPublishboxParsingSummary());
+  }
+
+  @Test
+  void plainLanguageSummaryIsAddedToTheHl7CiBuildHomePage() throws IOException {
+    File root = new File(dir.toFile(), "output");
+    File req = new File(dir.toFile(), "req");
+    root.mkdirs();
+    req.mkdirs();
+    File index = new File(root, "index.html");
+    File other = new File(root, "other.html");
+    FileUtilities.stringToFile(page(PLACEHOLDER + "<p>home</p>"), index);
+    FileUtilities.stringToFile(page(PLACEHOLDER + "<p>other</p>"), other);
+
+    inspector(root, req, "hl7.fhir.test", true).check(STATUS, new HashMap<>());
+
+    String indexNow = FileUtilities.fileToString(index);
+    int box = indexNow.indexOf("<p id=\"publish-box\">" + STATUS);
+    int plainLang = indexNow.indexOf("<!--PlainLangHeader-->");
+    assertTrue(box >= 0 && plainLang > box, indexNow);
+    assertTrue(indexNow.contains("hl7.fhir.test"), indexNow);
+    assertTrue(FileUtilities.fileToString(other).contains("<p id=\"publish-box\">" + STATUS));
+    assertFalse(FileUtilities.fileToString(other).contains("PlainLangHeader"));
   }
 
   @Test
