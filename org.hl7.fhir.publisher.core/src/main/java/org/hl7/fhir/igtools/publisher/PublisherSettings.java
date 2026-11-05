@@ -38,10 +38,10 @@ public class PublisherSettings {
     @Getter private final List<String> noValidate = new ArrayList<String>();
     @Getter @Setter String jekyllCommand = "jekyll";
     /**
-     * The most threads the publisher may use for its own work at the same time, counting the main
-     * thread (-threads). 1, the default, keeps the work on the main thread, so a build doesn't load
-     * more than one core unless the user asks for it. Anything that does work in parallel takes its
-     * thread count from here.
+     * How many threads, beyond its own, the publisher may use for work that it can do in parallel
+     * (-threads). 0, the default, means none: the publisher does everything on one thread, so a build
+     * doesn't load more than one core unless the user asks for it. Anything that does work in parallel
+     * takes its thread count from here.
      */
-    @Getter @Setter private int threads = 1;
+    @Getter @Setter private int threads = 0;
 }

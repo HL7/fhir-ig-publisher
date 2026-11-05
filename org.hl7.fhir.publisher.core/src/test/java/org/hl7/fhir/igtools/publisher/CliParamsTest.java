@@ -46,21 +46,30 @@ class CliParamsTest {
   }
 
   @Test
-  void getThreads_defaultsToOne() {
-    assertEquals(1, CliParams.getThreads(new String[]{"-ig", "x"}));
-    assertEquals(1, new PublisherSettings().getThreads());
+  void getThreads_offByDefault() {
+    assertEquals(0, CliParams.getThreads(new String[]{"-ig", "x"}, 16));
+    assertEquals(0, new PublisherSettings().getThreads());
   }
 
   @Test
-  void getThreads_readsTheValue() {
-    assertEquals(4, CliParams.getThreads(new String[]{"-ig", "x", "-threads", "4"}));
+  void getThreads_usesTheNumberAskedFor() {
+    assertEquals(12, CliParams.getThreads(new String[]{"-ig", "x", "-threads", "12"}, 16));
+    assertEquals(0, CliParams.getThreads(new String[]{"-threads", "0"}, 16));
+    assertEquals(4, CliParams.getThreads(new String[]{"-threads", " 4 "}, 16));
   }
 
   @Test
-  void getThreads_rejectsValuesBelowOneOrNotWholeNumbers() {
-    for (String v : new String[]{"0", "-2", "two", "1.5", ""}) {
-      assertThrows(IllegalArgumentException.class, () -> CliParams.getThreads(new String[]{"-threads", v}), v);
+  void getThreads_capsAtOneLessThanTheCores() {
+    assertEquals(15, CliParams.getThreads(new String[]{"-threads", "15"}, 16));
+    assertEquals(15, CliParams.getThreads(new String[]{"-threads", "64"}, 16));
+    assertEquals(0, CliParams.getThreads(new String[]{"-threads", "4"}, 1));
+  }
+
+  @Test
+  void getThreads_rejectsValuesThatAreNotACount() {
+    for (String v : new String[]{"-1", "two", "1.5", ""}) {
+      assertThrows(IllegalArgumentException.class, () -> CliParams.getThreads(new String[]{"-threads", v}, 16), v);
     }
-    assertThrows(IllegalArgumentException.class, () -> CliParams.getThreads(new String[]{"-ig", "x", "-threads"}));
+    assertThrows(IllegalArgumentException.class, () -> CliParams.getThreads(new String[]{"-ig", "x", "-threads"}, 16));
   }
 }

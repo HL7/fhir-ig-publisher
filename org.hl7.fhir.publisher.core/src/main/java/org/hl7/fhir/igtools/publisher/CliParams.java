@@ -40,25 +40,27 @@ public class CliParams {
 	}
 
 	/**
-	 * The -threads setting: the most threads the publisher may use, counting the main thread.
+	 * The -threads setting: how many threads, beyond its own, the publisher may use for work that it can do
+	 * in parallel.
 	 *
-	 * @return 1 if the parameter isn't there
-	 * @throws IllegalArgumentException if the value isn't a whole number of 1 or more
+	 * @param cores the number of cores (Runtime.availableProcessors())
+	 * @return the number asked for, but no more than cores - 1; 0 if the parameter isn't there
+	 * @throws IllegalArgumentException if the value isn't a whole number of 0 or more
 	 */
-	public static int getThreads(String[] args) {
+	public static int getThreads(String[] args, int cores) {
 	  if (!hasNamedParam(args, THREADS)) {
-		return 1;
+		return 0;
 	  }
 	  String value = getNamedParam(args, THREADS);
 	  try {
 		int threads = Integer.parseInt(value == null ? "" : value.trim());
-		if (threads >= 1) {
-		  return threads;
+		if (threads >= 0) {
+		  return Math.min(threads, Math.max(0, cores - 1));
 		}
 	  } catch (NumberFormatException e) {
 		// reported below
 	  }
-	  throw new IllegalArgumentException(THREADS+" needs a whole number of 1 or more, not '"+value+"'");
+	  throw new IllegalArgumentException(THREADS+" needs a whole number of 0 or more, not '"+value+"'");
 	}
 
 	public static boolean hasNamedParam(String[] args, String param) {

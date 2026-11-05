@@ -57,14 +57,14 @@ class XhtmlParsePrefetcherTest {
   }
 
   @Test
-  void oneThreadMeansNoPrefetching() {
-    assertNull(XhtmlParsePrefetcher.start(List.of("a", "b"), 1, path -> Collections.emptyList()));
+  void noExtraThreadsMeansNoPrefetching() {
+    assertNull(XhtmlParsePrefetcher.start(List.of("a", "b"), 0, path -> Collections.emptyList()));
   }
 
   @Test
-  void aSecondThreadStartsAPrefetcher() {
+  void anExtraThreadStartsAPrefetcher() {
     assumeTrue(Runtime.getRuntime().availableProcessors() >= 2);
-    try (XhtmlParsePrefetcher p = XhtmlParsePrefetcher.start(List.of("a", "b"), 2, path -> Collections.emptyList())) {
+    try (XhtmlParsePrefetcher p = XhtmlParsePrefetcher.start(List.of("a", "b"), 1, path -> Collections.emptyList())) {
       assertNotNull(p);
     }
   }

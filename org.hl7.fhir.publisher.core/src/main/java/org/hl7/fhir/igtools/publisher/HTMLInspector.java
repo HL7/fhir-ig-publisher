@@ -277,10 +277,10 @@ public class HTMLInspector {
    */
   @Getter @Setter private boolean accessibilityPanel = false;
   /**
-   * The most threads the checks may use, counting the thread that runs them, from the -threads setting.
-   * Above 1, the spare threads parse pages ahead of the load and check loops.
+   * How many threads, beyond the one that runs them, the checks may use to parse pages ahead of the load and
+   * check loops, from the -threads setting. 0, the default, means none.
    */
-  @Getter @Setter private int threads = 1;
+  @Getter @Setter private int threads = 0;
   private List<String> parseProblems = new ArrayList<>();
   private List<String> publishBoxProblems = new ArrayList<>();
   private Set<String> exceptions = new HashSet<>();

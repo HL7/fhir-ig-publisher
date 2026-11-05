@@ -36,8 +36,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Running the HTML check with spare threads, which parse pages ahead, has to give the same messages and leave the
- * same files as running it on one thread, which is the default and doesn't start any.
+ * Running the HTML check with extra threads, which parse pages ahead, has to give the same messages and leave the
+ * same files as running it with none, which is the default and doesn't start any.
  */
 class HTMLInspectorPrefetchTest {
 
@@ -137,24 +137,24 @@ class HTMLInspectorPrefetchTest {
   }
 
   @Test
-  void spareThreadsGiveTheSameResultAsOne() throws IOException {
-    Run one = run("one", 1);
-    Run four = run("four", 4);
-    assertFalse(one.sawPrefetchThread, "one thread, the default, must not start prefetch threads");
+  void extraThreadsGiveTheSameResultAsNone() throws IOException {
+    Run none = run("none", 0);
+    Run three = run("three", 3);
+    assertFalse(none.sawPrefetchThread, "no extra threads, the default, must not start prefetch threads");
     if (Runtime.getRuntime().availableProcessors() >= 2) {
-      assertTrue(four.sawPrefetchThread, "spare threads should have been used");
+      assertTrue(three.sawPrefetchThread, "extra threads should have been used");
     }
-    assertFalse(one.messages.isEmpty());
-    assertEquals(one.messages, four.messages);
-    assertEquals(one.files, four.files);
-    assertTrue(one.files.get("index.html").contains("Draft"), "the publish box should have been filled in");
-    assertTrue(one.files.get("de" + File.separator + "index.html").contains("Entwurf"), "the publish box should be in the page's language");
+    assertFalse(none.messages.isEmpty());
+    assertEquals(none.messages, three.messages);
+    assertEquals(none.files, three.files);
+    assertTrue(none.files.get("index.html").contains("Draft"), "the publish box should have been filled in");
+    assertTrue(none.files.get("de" + File.separator + "index.html").contains("Entwurf"), "the publish box should be in the page's language");
   }
 
   @Test
-  void theDefaultIsOneThread() throws IOException {
+  void theDefaultIsNoExtraThreads() throws IOException {
     HTMLInspector inspector = new HTMLInspector(null, "root", new ArrayList<>(), new ArrayList<>(), null, "http://example.org/ig",
         "example.ig", "0.1.0", null, new ArrayList<>(), null, false, null, new ArrayList<>(), false, new ArrayList<>(), null);
-    assertEquals(1, inspector.getThreads());
+    assertEquals(0, inspector.getThreads());
   }
 }
