@@ -49,6 +49,7 @@ public class ProfileSpreadsheetPrefetcher<K> implements AutoCloseable {
   private final int window;
   private int submitted;
   private int fallbacks;
+  private String firstFailure;
 
   /**
    * @param candidates the profiles in the order the publisher's loop will ask for them
@@ -77,7 +78,7 @@ public class ProfileSpreadsheetPrefetcher<K> implements AutoCloseable {
       try {
         job = factory.prepare(key);
       } catch (Exception e) {
-        fallbacks++; // the caller's own path will meet the same problem and report it
+        failed(key, e); // the caller's own path will meet the same problem and report it
         continue;
       }
       if (job != null) {
@@ -102,7 +103,7 @@ public class ProfileSpreadsheetPrefetcher<K> implements AutoCloseable {
     try {
       return task.get();
     } catch (ExecutionException e) {
-      fallbacks++;
+      failed(key, e.getCause() == null ? e : e.getCause());
       return null;
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
@@ -111,9 +112,21 @@ public class ProfileSpreadsheetPrefetcher<K> implements AutoCloseable {
     }
   }
 
+  private void failed(K key, Throwable cause) {
+    fallbacks++;
+    if (firstFailure == null) {
+      firstFailure = key + ": " + cause;
+    }
+  }
+
   /** the number of profiles that failed to prepare or render, and so were left to the caller */
   public int getFallbacks() {
     return fallbacks;
+  }
+
+  /** the profile and the exception of the first failure, or null if none failed */
+  public String getFirstFailure() {
+    return firstFailure;
   }
 
   @Override

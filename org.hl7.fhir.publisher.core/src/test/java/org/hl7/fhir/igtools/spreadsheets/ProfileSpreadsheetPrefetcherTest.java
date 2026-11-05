@@ -46,6 +46,7 @@ class ProfileSpreadsheetPrefetcherTest {
       // out of order: a key further on is prepared on demand
       assertNull(p.take("not-a-candidate"));
       assertEquals(0, p.getFallbacks());
+      assertNull(p.getFirstFailure());
     }
     try (ProfileSpreadsheetPrefetcher<String> p = new ProfileSpreadsheetPrefetcher<>(keys, 2, k -> () -> k.getBytes())) {
       assertArrayEquals("k15".getBytes(), p.take("k15"));
@@ -80,6 +81,19 @@ class ProfileSpreadsheetPrefetcherTest {
       assertNull(p.take("k4"));
       assertArrayEquals("k5".getBytes(), p.take("k5"));
       assertEquals(3, p.getFallbacks(), "k1, k3 and k4; k2 had nothing to do");
+      assertEquals("k1: java.lang.IllegalArgumentException: prepare failed", p.getFirstFailure());
+    }
+  }
+
+  @Test
+  void reportsTheCauseOfARenderFailure() {
+    try (ProfileSpreadsheetPrefetcher<String> p = new ProfileSpreadsheetPrefetcher<>(keys(2), 1, k -> () -> {
+      throw new IllegalStateException("render failed for " + k);
+    })) {
+      assertNull(p.take("k0"));
+      assertNull(p.take("k1"));
+      assertEquals(2, p.getFallbacks());
+      assertEquals("k0: java.lang.IllegalStateException: render failed for k0", p.getFirstFailure());
     }
   }
 

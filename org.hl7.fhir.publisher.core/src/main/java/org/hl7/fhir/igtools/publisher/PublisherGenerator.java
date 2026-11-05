@@ -332,7 +332,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       } finally {
         if (spreadsheetPrefetcher != null) {
           if (spreadsheetPrefetcher.getFallbacks() > 0) {
-            log("Spreadsheets: "+spreadsheetPrefetcher.getFallbacks()+" profile workbook(s) could not be built ahead, and were built in order instead");
+            log("Spreadsheets: "+spreadsheetPrefetcher.getFallbacks()+" profile workbook(s) could not be built ahead, and were built in order instead (first: "+spreadsheetPrefetcher.getFirstFailure()+")");
           }
           spreadsheetPrefetcher.close();
           spreadsheetPrefetcher = null;

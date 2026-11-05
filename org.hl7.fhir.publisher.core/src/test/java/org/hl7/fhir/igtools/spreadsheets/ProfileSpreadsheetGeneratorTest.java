@@ -274,6 +274,45 @@ class ProfileSpreadsheetGeneratorTest {
   }
 
   @Test
+  void concurrentWorkbooksMatchCore() throws Exception {
+    // as in a build with -threads: workers build detached profile workbooks while this thread builds the
+    // all-profiles workbook, all sharing one width cache
+    List<StructureDefinition> profiles = new ArrayList<>();
+    List<byte[]> expected = new ArrayList<>();
+    StructureDefinitionSpreadsheetGenerator c = new StructureDefinitionSpreadsheetGenerator(worker, true, false, rf);
+    for (int p = 0; p < 12; p++) {
+      StructureDefinition sd = profile("c" + p, 20 + p, 30 + 5 * p, p % 3);
+      profiles.add(sd);
+      expected.add(core(sd, true));
+      c.renderStructureDefinition(sd, true);
+    }
+    c.configure();
+    ByteArrayOutputStream bc = new ByteArrayOutputStream();
+    c.finish(bc);
+
+    ColumnWidthCache widths = new ColumnWidthCache();
+    ProfileSpreadsheetGenerator all = new ProfileSpreadsheetGenerator(worker, true, false, rf, widths);
+    try (ProfileSpreadsheetPrefetcher<StructureDefinition> p = new ProfileSpreadsheetPrefetcher<>(profiles, 4, sd -> {
+      ProfileSpreadsheetGenerator g = new ProfileSpreadsheetGenerator(worker, true, true, rf, widths);
+      StructureDefinition copy = sd.copy(Base.COPY_ALL);
+      g.detachFromContext(copy);
+      return ProfileSpreadsheetPrefetcher.job(g, copy);
+    })) {
+      for (int i = 0; i < profiles.size(); i++) {
+        all.renderStructureDefinition(profiles.get(i), true);
+        byte[] actual = p.take(profiles.get(i));
+        assertTrue(actual != null, "built ahead: " + p.getFirstFailure());
+        assertSameWorkbook(expected.get(i), actual);
+      }
+      assertEquals(0, p.getFallbacks());
+    }
+    all.configure();
+    ByteArrayOutputStream bo = new ByteArrayOutputStream();
+    all.finish(bo);
+    assertSameWorkbook(bc.toByteArray(), bo.toByteArray());
+  }
+
+  @Test
   void titleCountMatchesCore() throws Exception {
     // the header row of a profile without mappings has exactly one cell per title
     try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(core(profile("t", 1, 3, 0), false)))) {

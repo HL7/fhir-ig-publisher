@@ -59,7 +59,7 @@ public class ProfileSpreadsheetGenerator extends StructureDefinitionSpreadsheetG
   static final int TITLE_COUNT = 36;
 
   private final boolean hideMustSupportFalse;
-  private final ColumnWidthCache widths;
+  private ColumnWidthCache widths;
 
   public ProfileSpreadsheetGenerator(IWorkerContext context, boolean valuesAsXml, boolean hideMustSupportFalse,
                                      RendererFactory renderer, ColumnWidthCache widths) {
@@ -153,6 +153,13 @@ public class ProfileSpreadsheetGenerator extends StructureDefinitionSpreadsheetG
       }
       return displays.get(type);
     }
+  }
+
+  @Override
+  public void dump() {
+    super.dump();
+    // the cache is shared by the whole Spreadsheets phase; don't keep it alive through the generator
+    widths = null;
   }
 
   @Override
