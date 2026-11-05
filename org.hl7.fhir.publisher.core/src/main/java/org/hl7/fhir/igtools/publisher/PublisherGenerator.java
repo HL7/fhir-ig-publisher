@@ -285,18 +285,32 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       generateConstants();
       generateViewDefinitions(db);
       if (!pf.changeList.isEmpty()) {
-        if (isNewML()) {
-          for (String l : allLangs()) {
-            generateSummaryOutputsBefore(db, l, pf.rcLangs.get(l));
+        // the code system and value set lists add a few rows to the database for each entry
+        if (db != null) {
+          db.startList();
+        }
+        try {
+          if (isNewML()) {
+            for (String l : allLangs()) {
+              generateSummaryOutputsBefore(db, l, pf.rcLangs.get(l));
+            }
+          } else {
+            generateSummaryOutputsBefore(db, null, pf.rc);
           }
-        } else {
-          generateSummaryOutputsBefore(db, null, pf.rc);
+        } finally {
+          if (db != null) {
+            db.finishList();
+          }
         }
       }
       templateBeforeGenerate();
       if (pf.saveExpansionParams) {
-        new JsonParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.NORMAL).compose(new FileOutputStream(Utilities.path(pf.tempDir, "parameters-expansion-parameters.json")), pf.context.getExpansionParameters());
-        new XmlParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.NORMAL).compose(new FileOutputStream(Utilities.path(pf.tempDir, "parameters-expansion-parameters.xml")), pf.context.getExpansionParameters());
+        try (FileOutputStream stream = new FileOutputStream(Utilities.path(pf.tempDir, "parameters-expansion-parameters.json"))) {
+          new JsonParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.NORMAL).compose(stream, pf.context.getExpansionParameters());
+        }
+        try (FileOutputStream stream = new FileOutputStream(Utilities.path(pf.tempDir, "parameters-expansion-parameters.xml"))) {
+          new XmlParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.NORMAL).compose(stream, pf.context.getExpansionParameters());
+        }
       }
 
       logMessage("Generate HTML Outputs");
@@ -330,7 +344,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       if (pf.allProfilesXlsx != null) {
         pf.allProfilesXlsx.configure();
         String path = Utilities.path(pf.tempDir, "all-profiles.xlsx");
-        pf.allProfilesXlsx.finish(new FileOutputStream(path));
+        try (FileOutputStream stream = new FileOutputStream(path)) {
+          pf.allProfilesXlsx.finish(stream);
+        }
         pf.otherFilesRun.add(Utilities.path(pf.tempDir, "all-profiles.xlsx"));
         pf.allProfilesXlsx.dump();
       }
@@ -1118,9 +1134,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       genWrapper(null, r, template, this.pf.igpkp.getProperty(r, "format"), f.getOutputNames(), vars, "ttl", "", false, lang, lrc);
     }
     org.hl7.fhir.services.elementmodel.XmlParser xp = new org.hl7.fhir.services.elementmodel.XmlParser(this.pf.context);
-    ByteArrayOutputStream bs = new ByteArrayOutputStream();
-    xp.compose(langElement, bs, OutputStyle.NORMAL, null);
-    int size = bs.size();
+    // the xml, json and ttl views only use Prism for small resources; finding that out doesn't need the whole xml
+    Element sizeElement = langElement;
+    boolean prism = OutputSizeCheck.isSmallerThan(stream -> xp.compose(sizeElement, stream, OutputStyle.NORMAL, null), PRISM_SIZE_LIMIT);
 
     Element e = langElement;
     if (SpecialTypeHandler.handlesType(r.fhirType(), this.pf.context.getFHIRVersion()) && !pf.customResourceNames.contains(r.fhirType())) {
@@ -1133,7 +1149,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     if (wantGen(r, "xml-html")) {
       long start = System.currentTimeMillis();
       XmlXHtmlRenderer x = new XmlXHtmlRenderer();
-      x.setPrism(size < PRISM_SIZE_LIMIT);
+      x.setPrism(prism);
       xp.setLinkResolver(this.pf.igpkp);
       xp.setShowDecorations(false);
       if (suppressId(f, r)) {
@@ -1145,7 +1161,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     if (wantGen(r, "json-html")) {
       long start = System.currentTimeMillis();
       JsonXhtmlRenderer j = new JsonXhtmlRenderer();
-      j.setPrism(size < PRISM_SIZE_LIMIT);
+      j.setPrism(prism);
       org.hl7.fhir.services.elementmodel.JsonParser jp = new org.hl7.fhir.services.elementmodel.JsonParser(this.pf.context);
       jp.setLinkResolver(this.pf.igpkp);
       jp.setAllowComments(true);
@@ -1166,7 +1182,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       }
       ttl.setStyle(OutputStyle.PRETTY);
       ttl.compose(e, rdf, "");
-      fragment(r.fhirType()+"-"+r.getId()+"-ttl-html", rdf.asHtml(size < PRISM_SIZE_LIMIT), f.getOutputNames(), r, vars, "ttl", start, "ttl-html", "Resource", lang);
+      fragment(r.fhirType()+"-"+r.getId()+"-ttl-html", rdf.asHtml(prism), f.getOutputNames(), r, vars, "ttl", start, "ttl-html", "Resource", lang);
     }
 
     generateHtml(f, r, res, langElement, vars, lrc, lang);
@@ -3474,21 +3490,20 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
   }
 
-  private void templateBeforeGenerate() throws IOException, FHIRException {
+  void templateBeforeGenerate() throws IOException, FHIRException {
     if (pf.template != null) {
       logMessage("Run Template");
       TimeTracker.Session tts = pf.tt.start("template");
       List<String> newFileList = new ArrayList<String>();
       checkOutcomes(pf.template.beforeGenerateEvent(pf.context, pf.publishedIg, pf.tempDir, pf.otherFilesRun, newFileList, allLangs()));
+      // the fetched paths are canonical, and tempDir may not be (a symlink, or an 8.3 short name on Windows)
+      String canonicalTempDir = new File(this.pf.tempDir).getCanonicalPath();
       for (String newFile: newFileList) {
         if (!newFile.isEmpty()) {
           try {
             FetchedFile f = this.pf.fetcher.fetch(Utilities.path(this.pf.repoRoot, newFile));
             String dir = FileUtilities.getDirectoryForFile(f.getPath());
-            if (this.pf.tempDir.startsWith("/var") && dir.startsWith("/private/var")) {
-              dir = dir.substring(8);
-            }
-            String relative = this.pf.tempDir.length() > dir.length() ? "" : dir.substring(this.pf.tempDir.length());
+            String relative = canonicalTempDir.length() > dir.length() ? "" : dir.substring(canonicalTempDir.length());
             if (relative.length() > 0)
               relative = relative.substring(1);
             f.setRelativePath(f.getPath().substring( FileUtilities.getDirectoryForFile(f.getPath()).length()+1));
@@ -4306,8 +4321,12 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         exp.addEntry().setResource(vs).setFullUrl(vs.getUrl());
       }
 
-      new JsonParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(pf.outputDir, "expansions.json")), exp);
-      new XmlParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(pf.outputDir, "expansions.xml")), exp);
+      try (FileOutputStream stream = new FileOutputStream(Utilities.path(pf.outputDir, "expansions.json"))) {
+        new JsonParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(stream, exp);
+      }
+      try (FileOutputStream stream = new FileOutputStream(Utilities.path(pf.outputDir, "expansions.xml"))) {
+        new XmlParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(stream, exp);
+      }
       ZipGenerator zip = new ZipGenerator(Utilities.path(pf.outputDir, "expansions.json.zip"));
       zip.addFileName("expansions.json", Utilities.path(pf.outputDir, "expansions.json"), false);
       zip.close();
