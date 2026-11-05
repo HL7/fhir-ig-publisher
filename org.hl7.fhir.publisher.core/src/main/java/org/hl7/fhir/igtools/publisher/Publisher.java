@@ -193,58 +193,108 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 
     String rootDir = settings.getConfigFile();
     FileChangeMonitor monitor = null;
+    Path watchRoot = null;
     if (settings.isWatchMode()) {
+      watchRoot = watchRoot(rootDir);
+      Path igIni = new File(rootDir).isFile() ? Paths.get(rootDir).toAbsolutePath().normalize() : watchRoot.resolve("ig.ini");
       monitor = new FileChangeMonitor(Arrays.asList(
-              FileChangeMonitor.MonitoredPath.file(Paths.get(Utilities.path(rootDir, "ig.ini"))),
-              FileChangeMonitor.MonitoredPath.file(Paths.get(Utilities.path(rootDir, "sushi-config.yaml"))),
-              FileChangeMonitor.MonitoredPath.file(Paths.get(Utilities.path(rootDir, "publication-request.json"))),
-              FileChangeMonitor.MonitoredPath.file(Paths.get(Utilities.path(rootDir, "sushi-ignoreWarnings.txt"))),
-              FileChangeMonitor.MonitoredPath.recursive(Paths.get(Utilities.path(rootDir, "input"))),
-              FileChangeMonitor.MonitoredPath.recursive(Paths.get(Utilities.path(rootDir, "fsh-generated")))
+              FileChangeMonitor.MonitoredPath.file(igIni),
+              FileChangeMonitor.MonitoredPath.file(watchRoot.resolve("sushi-config.yaml")),
+              FileChangeMonitor.MonitoredPath.file(watchRoot.resolve("publication-request.json")),
+              FileChangeMonitor.MonitoredPath.file(watchRoot.resolve("sushi-ignoreWarnings.txt")),
+              FileChangeMonitor.MonitoredPath.recursive(watchRoot.resolve("input")),
+              FileChangeMonitor.MonitoredPath.recursive(watchRoot.resolve("fsh-generated"))
       ));
     }
 
-    do {
-      pf = new PublisherFields();
-      loader.setPf(pf);
-      processor.setPf(pf);
-      generator.setPf(pf);
-      pf.resolver = this;
-      setLogger(this);
+    // in watch mode, what a module's pre-processing wrote in input, in any build so far
+    Set<Path> moduleOutputs = new HashSet<>();
+    try {
+      do {
+        pf = new PublisherFields();
+        loader.setPf(pf);
+        processor.setPf(pf);
+        generator.setPf(pf);
+        pf.resolver = this;
+        setLogger(this);
 
-      pf.tt = new TimeTracker();
-      loader.initialize();
-      if (pf.validator != null) {
-        pf.validator.setTracker(this);
-      }
+        pf.tt = new TimeTracker();
+        loader.initialize();
+        if (pf.validator != null) {
+          pf.validator.setTracker(this);
+        }
 
-      if (pf.isBuildingTemplate) {
-        packageTemplate();
-      } else {
-        log("Load IG");
+        if (pf.isBuildingTemplate) {
+          packageTemplate();
+        } else {
+          log("Load IG");
+          try {
+            createIg();
+          } catch (Exception e) {
+            recordOutcome(e, null);
+            throw e;
+          }
+        }
+        if (pf.templateLoaded && new File(rootDir).exists()) {
+          FileUtilities.clearDirectory(Utilities.path(rootDir, "template"));
+        }
+        if (pf.folderToDelete != null) {
+          try {
+            FileUtilities.clearDirectory(pf.folderToDelete);
+            new File(pf.folderToDelete).delete();
+          } catch (Throwable e) {
+            // nothing
+          }
+        }
+      } while (monitor != null && thereIsAFileChange(monitor, buildOutputs(watchRoot), moduleWrites(watchRoot, moduleOutputs)));
+    } finally {
+      if (monitor != null) {
+        // its thread would keep the JVM running
         try {
-          createIg();
-        } catch (Exception e) {
-          recordOutcome(e, null);
-          throw e;
+          monitor.close();
+        } catch (IOException e) {
+          System.out.println("Unable to close the file monitor: " + e.getMessage());
         }
       }
-      if (pf.templateLoaded && new File(rootDir).exists()) {
-        FileUtilities.clearDirectory(Utilities.path(rootDir, "template"));
-      }
-      if (pf.folderToDelete != null) {
-        try {
-          FileUtilities.clearDirectory(pf.folderToDelete);
-          new File(pf.folderToDelete).delete();
-        } catch (Throwable e) {
-          // nothing
-        }
-      }
-    } while (monitor != null && thereIsAFileChange(monitor));
+    }
   }
 
-  private boolean thereIsAFileChange(FileChangeMonitor monitor) throws InterruptedException {
-    monitor.startMonitoring();
+  /**
+   * the IG's folder, for watch mode: -ig names it, or its ig.ini
+   */
+  static Path watchRoot(String configFile) {
+    File f = new File(configFile).getAbsoluteFile();
+    return (f.isFile() ? f.getParentFile() : f).toPath().normalize();
+  }
+
+  /**
+   * the watched files and folders that this build wrote to, so that what it wrote doesn't start another build
+   */
+  private List<Path> buildOutputs(Path watchRoot) {
+    List<Path> outputs = new ArrayList<>();
+    if (pf.isSushi) {
+      outputs.add(watchRoot.resolve("fsh-generated"));
+    }
+    return outputs;
+  }
+
+  /**
+   * what a module that pre-processes the IG wrote in input (e.g. the cross-version module): the edits in input are then
+   * found by comparing its files with how they were before the module ran. What it wrote is known by path, from this
+   * build and those before (on Windows, a file it hasn't closed may not look changed yet), so a user's edit made while
+   * it ran, to a file it also writes, is taken for its own. It doesn't write FSH, so input/fsh is watched as usual
+   */
+  private FileChangeMonitor.FolderWrites moduleWrites(Path watchRoot, Set<Path> moduleOutputs) {
+    if (pf.moduleWrites == null) {
+      return null;
+    }
+    moduleOutputs.addAll(pf.moduleWrites);
+    return new FileChangeMonitor.FolderWrites(watchRoot.resolve("input"), pf.inputBeforeModule, moduleOutputs,
+        List.of(watchRoot.resolve("input").resolve("fsh")));
+  }
+
+  private boolean thereIsAFileChange(FileChangeMonitor monitor, List<Path> buildOutputs, FileChangeMonitor.FolderWrites moduleWrites) throws InterruptedException {
+    monitor.startMonitoring(buildOutputs, moduleWrites);
     System.out.println("Watching for changes (Cascais:Rapido mode)");
     while (true) {
       if (monitor.hasChanges()) {
@@ -252,6 +302,8 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         monitor.clearChanges();
         monitor.stopMonitoring();
         return true;
+      } else if (!monitor.isWatching()) {
+        throw new IllegalStateException("No longer watching for changes (see the error above): run the IG Publisher again");
       } else {
         Thread.sleep(100);
       }
