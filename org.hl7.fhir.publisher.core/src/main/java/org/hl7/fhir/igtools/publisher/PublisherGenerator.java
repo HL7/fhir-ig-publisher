@@ -85,6 +85,7 @@ import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationOptions;
 import org.hl7.fhir.utilities.xhtml.*;
 import org.hl7.fhir.utilities.xml.XMLUtil;
+import org.hl7.fhir.utilities.xml.XmlEscaper;
 import org.hl7.fhir.validation.special.PackageReGenerator;
 import org.w3c.dom.Document;
 import org.xml.sax.InputSource;
@@ -5913,12 +5914,10 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       bsj = new ByteArrayOutputStream();
       jp.compose(eNN, bsj, OutputStyle.PRETTY, this.pf.igpkp.getCanonical());
     }
-    byte[] includeJson = bsj.toByteArray();
     String path = Utilities.path(this.pf.tempDir, "_includes", r.fhirType()+"-"+r.getId()+".json");
-    FileUtilities.bytesToFile(includeJson, path);
+    FileUtilities.bytesToFile(bsj.toByteArray(), path);
     String pathEsc = Utilities.path(this.pf.tempDir, "_includes", r.fhirType()+"-"+r.getId()+".escaped.json");
-    // the same bytes as XmlEscaper.convert(path, pathEsc), built from what was just written instead of byte-by-byte
-    EscapedJsonWriter.write(includeJson, pathEsc);
+    XmlEscaper.convert(path, pathEsc);
 
     saveNativeResourceOutputFormats(f, r, element, "");
     for (String lang : allLangs()) {
@@ -5928,7 +5927,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       }
     }
 
-    return includeJson;
+    return bsj.toByteArray();
   }
 
 
