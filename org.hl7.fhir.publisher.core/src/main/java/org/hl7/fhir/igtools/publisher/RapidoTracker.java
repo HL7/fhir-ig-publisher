@@ -49,6 +49,7 @@ import org.hl7.fhir.services.client.EFhirClientException;
 import org.hl7.fhir.services.client.ITerminologyClientFactoryN;
 import org.hl7.fhir.services.client.ITerminologyClientN;
 import org.hl7.fhir.services.elementmodel.Element;
+import org.hl7.fhir.standalone.terminology.client.TerminologyClientManager;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.ToolingClientLogger;
 import org.hl7.fhir.utilities.Utilities;
@@ -789,9 +790,10 @@ public class RapidoTracker {
     state.add("version", STATE_VERSION);
     File sf = new File(stateFile);
     FileUtilities.createDirectory(sf.getParent());
-    if (pf.txFailures != null && pf.txFailures.count() > 0) {
+    int txFailures = txFailures();
+    if (txFailures > 0) {
       // what the build made from those calls isn't what the server would have said, so none of it can be reused
-      state.add("txFailures", pf.txFailures.count());
+      state.add("txFailures", txFailures);
       writeState(state, sf);
       return;
     }
@@ -842,6 +844,19 @@ public class RapidoTracker {
     writeState(state, sf);
   }
 
+  /** the terminology calls of this build that got no answer, including the ones that ask the registry which server to use */
+  private int txFailures() {
+    int res = pf.txFailures == null ? 0 : pf.txFailures.count();
+    if (pf.context != null && pf.context.getTxClientManager() != null) {
+      for (TerminologyClientManager.InternalLogEvent e : pf.context.getTxClientManager().getInternalLog()) {
+        if (e.isError()) {
+          res++; // the registry couldn't be reached, so the build asked the main server instead
+        }
+      }
+    }
+    return res;
+  }
+
   /**
    * For a Rapido build, the terminology client factory: counts the calls that got no answer from the terminology
    * server (it was down, or the call timed out). An error the server answered with is an answer like any other
@@ -867,7 +882,7 @@ public class RapidoTracker {
           return res == client ? p : res;
         } catch (InvocationTargetException e) {
           Throwable t = e.getCause();
-          if (!(t instanceof EFhirClientException && ((EFhirClientException) t).hasServerErrors() && ((EFhirClientException) t).getCode() < 500)) {
+          if (!isAnswer(t)) {
             count.incrementAndGet();
           }
           throw t;
@@ -878,6 +893,15 @@ public class RapidoTracker {
     @Override
     public String getVersion() {
       return factory.getVersion();
+    }
+
+    /** an error the server answered with: not one that says it couldn't answer (5xx, a timeout, too many requests) */
+    private static boolean isAnswer(Throwable t) {
+      if (!(t instanceof EFhirClientException) || !((EFhirClientException) t).hasServerErrors()) {
+        return false;
+      }
+      int code = ((EFhirClientException) t).getCode();
+      return code < 500 && code != 408 && code != 429;
     }
   }
 

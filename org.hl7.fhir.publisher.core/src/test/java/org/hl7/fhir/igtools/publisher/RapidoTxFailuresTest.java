@@ -14,12 +14,15 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import org.hl7.fhir.model.core.OperationOutcome;
 import org.hl7.fhir.model.core.ValueSet;
 import org.hl7.fhir.services.client.EFhirClientException;
 import org.hl7.fhir.services.client.ITerminologyClientFactoryN;
 import org.hl7.fhir.services.client.ITerminologyClientN;
+import org.hl7.fhir.standalone.context.SimpleWorkerContext;
+import org.hl7.fhir.standalone.terminology.client.TerminologyClientManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -91,6 +94,27 @@ class RapidoTxFailuresTest {
     when(server.expandValueset(any(), any())).thenThrow(new EFhirClientException(503, "Service Unavailable", new OperationOutcome()));
     RapidoTracker next = buildAndNext(() -> assertThrows(EFhirClientException.class, this::expand));
     assertTrue(next.isCompleteBuild());
+  }
+
+  @Test
+  void tooManyRequestsIsNotReused() throws Exception {
+    // a proxy's text error page becomes an OperationOutcome, but it isn't an answer about the content
+    when(server.expandValueset(any(), any())).thenThrow(new EFhirClientException(429, "Too Many Requests", new OperationOutcome()));
+    RapidoTracker next = buildAndNext(() -> assertThrows(EFhirClientException.class, this::expand));
+    assertTrue(next.isCompleteBuild());
+  }
+
+  @Test
+  void aRegistryThatCouldNotBeReachedIsNotReused() throws Exception {
+    // the build asked the main server instead of the one the registry would have chosen
+    TerminologyClientManager.InternalLogEvent event = mock(TerminologyClientManager.InternalLogEvent.class);
+    when(event.isError()).thenReturn(true);
+    TerminologyClientManager manager = mock(TerminologyClientManager.class);
+    when(manager.getInternalLog()).thenReturn(List.of(event));
+    pf.context = mock(SimpleWorkerContext.class);
+    when(pf.context.getTxClientManager()).thenReturn(manager);
+    RapidoTracker next = buildAndNext(() -> { });
+    assertEquals("terminology server calls failed in the last build (1)", next.getReason());
   }
 
   @Test
