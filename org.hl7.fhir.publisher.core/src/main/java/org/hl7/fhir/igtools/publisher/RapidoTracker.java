@@ -440,6 +440,10 @@ public class RapidoTracker {
     jar.add(IGVersionUtil.getVersion());
     try {
       jar.add(codeHash(new File(RapidoTracker.class.getProtectionDomain().getCodeSource().getLocation().toURI())));
+      // run from an IDE or the build, the core libraries are on the class path rather than in the publisher's jar
+      for (String s : String.valueOf(System.getProperty("java.class.path")).split(File.pathSeparator)) {
+        jar.add(codeHash(new File(s)));
+      }
     } catch (Exception e) {
       jar.add(Long.toString(System.nanoTime())); // can't tell what the publisher is, so assume it changed
     }
