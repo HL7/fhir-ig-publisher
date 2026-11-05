@@ -157,6 +157,9 @@ class HTMLInspectorPublishBoxTest {
       + PLACEHOLDER + "<h:p>text</h:p></h:body></h:html>", prefixed);
     String xmlSource = "<div xmlns=\"http://www.w3.org/1999/xhtml\">" + PLACEHOLDER + "</div>";
     FileUtilities.stringToFile(xmlSource, xml);
+    // an html file name is enough, whatever the root element
+    File fragment = new File(root, "fragment.html");
+    FileUtilities.stringToFile(xmlSource, fragment);
 
     Map<String, String> langs = new HashMap<>();
     langs.put("fr", "Message de statut");
@@ -166,6 +169,7 @@ class HTMLInspectorPublishBoxTest {
     assertTrue(FileUtilities.fileToString(htm).contains("<p id=\"publish-box\">" + STATUS));
     assertTrue(FileUtilities.fileToString(prefixed).contains("<p id=\"publish-box\">Message de statut"));
     assertEquals(xmlSource, FileUtilities.fileToString(xml));
+    assertTrue(FileUtilities.fileToString(fragment).contains("<p id=\"publish-box\">" + STATUS));
     assertEquals("No Problems", inspector.getPublishboxParsingSummary());
   }
 

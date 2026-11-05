@@ -21,10 +21,15 @@ package org.hl7.fhir.igtools.publisher;
  */
 
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -697,22 +702,25 @@ public class HTMLInspector {
     boolean htmlName = f.getName().endsWith(".html") || f.getName().endsWith(".xhtml") || f.getName().endsWith(".svg");
     boolean lr = false;
     try {
-      String src = FileUtilities.fileToString(f);
-      lr = src.contains("lang-redirects.js");
-      hl7State = src.contains(RELEASE_HTML_MARKER);
-      String rootTag = rootStartTag(src);
-      if (hl7State && (htmlName || isHtmlOrSvg(rootTag))) {
-        // fill in the publish box before parsing, so the page is parsed once, as it is written
-        try {
-          src = fillPublishBox(src, f, getLang(rootTag));
-        } catch (IOException e1) {
-          hl7State = false;
+      // files that aren't markup aren't read in full; the parser would give up at the first character
+      if (htmlName || startsWithTag(f)) {
+        String src = FileUtilities.fileToString(f);
+        lr = src.contains("lang-redirects.js");
+        hl7State = src.contains(RELEASE_HTML_MARKER);
+        String rootTag = rootStartTag(src);
+        if (hl7State && (htmlName || isHtmlOrSvg(rootTag))) {
+          // fill in the publish box before parsing, so the page is parsed once, as it is written
+          try {
+            src = fillPublishBox(src, f, getLang(rootTag));
+          } catch (IOException e1) {
+            hl7State = false;
+          }
         }
-      }
-      x = new XhtmlParser().setMustBeWellFormed(strict).parse(src, null);
-      if (x.getElement("html")==null && x.getElement("svg")==null && !htmlName) {
-        // We don't want resources being treated as HTML.  We'll check the HTML of the narrative in the page representation
-        x = null;
+        x = new XhtmlParser().setMustBeWellFormed(strict).parse(src, null);
+        if (x.getElement("html")==null && x.getElement("svg")==null && !htmlName) {
+          // We don't want resources being treated as HTML.  We'll check the HTML of the narrative in the page representation
+          x = null;
+        }
       }
     } catch (FHIRFormatError | IOException e) {
       x = null;
@@ -760,6 +768,16 @@ public class HTMLInspector {
     //    } catch (IOException e) {
     //      messages.add(new ValidationMessage(Source.HtmlChecker, IssueType.STRUCTURE, s, "failed security testing: "+e.getMessage(), IssueSeverity.ERROR));
     //    }
+  }
+
+  private static boolean startsWithTag(File f) throws IOException {
+    try (Reader r = new BufferedReader(new InputStreamReader(new FileInputStream(f), StandardCharsets.UTF_8))) {
+      int c;
+      do {
+        c = r.read();
+      } while (c != -1 && (Character.isWhitespace(c) || c == 0xFEFF));
+      return c == '<';
+    }
   }
 
   private String fillPublishBox(String src, File f, String lang) throws IOException {
