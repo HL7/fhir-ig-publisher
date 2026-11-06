@@ -73,6 +73,15 @@ public class OutputFolderSync {
     Result result = new Result();
     // a folder that is a link (output linked into a web server's folder, say) is synced where it points
     staged = staged.toRealPath();
+    boolean exists = Files.isDirectory(target);
+    if (!exists) {
+      Files.createDirectories(target);
+    }
+    target = target.toRealPath();
+    if (staged.startsWith(target) || target.startsWith(staged)) {
+      // everything in the target that isn't staged, the staging folder itself included, would be deleted
+      throw new IOException("The folder " + target + " holds, or is inside, the staging folder " + staged);
+    }
     Map<String, BasicFileAttributes> stagedFiles = new HashMap<>();
     Set<String> stagedDirs = new HashSet<>();
     // what can't be listed here would look stale, and be deleted from the target
@@ -80,13 +89,9 @@ public class OutputFolderSync {
 
     Map<String, BasicFileAttributes> targetFiles = new HashMap<>();
     Set<String> targetDirs = new HashSet<>();
-    if (Files.isDirectory(target)) {
-      target = target.toRealPath();
+    if (exists) {
       // what can't be listed here is left alone
       list(target, targetFiles, targetDirs, result);
-    } else {
-      Files.createDirectories(target);
-      target = target.toRealPath();
     }
 
     for (String rel : targetFiles.keySet()) {
@@ -226,7 +231,11 @@ public class OutputFolderSync {
         Files.deleteIfExists(copy);
         throw ex;
       }
-      Files.delete(from);
+      try {
+        Files.delete(from);
+      } catch (IOException ex) {
+        // the file is in place; the staging folder is emptied at the start of the next build
+      }
     }
   }
 

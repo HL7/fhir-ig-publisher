@@ -3,6 +3,7 @@ package org.hl7.fhir.igtools.publisher;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.Mockito.mock;
 
 import java.io.File;
@@ -24,7 +25,7 @@ class WatchOutputPathsTest {
   }
 
   @Test
-  void nestedFolders() {
+  void nestedFolders() throws Exception {
     assertTrue(PublisherIGLoader.nested(p("temp", ".watch-output"), p("temp", ".watch-output")));
     // output is the IG's root folder, or inside the staging folder
     assertTrue(PublisherIGLoader.nested(p("temp", ".watch-output"), p()));
@@ -98,9 +99,29 @@ class WatchOutputPathsTest {
   void anOutputFolderThatHoldsTheStagingFolderIsNotSynced() throws Exception {
     // the sync would delete everything in it that the build didn't write
     for (String output : new String[] {p(), p("temp"), p("temp", ".watch-output", "out")}) {
-      PublisherFields pf = watchSetUp(true, output, null);
-      assertEquals(null, pf.watchOutputDir, output);
-      assertEquals(output, pf.outputDir);
+      for (boolean watch : new boolean[] {true, false}) {
+        new File(output).mkdirs();
+        PublisherFields pf = watchSetUp(watch, output, null);
+        assertEquals(null, pf.watchOutputDir, output);
+        assertEquals(output, pf.outputDir);
+        assertTrue(new File(output).isDirectory(), output);
+      }
+    }
+  }
+
+  @Test
+  void anOutputFolderLinkedToAFolderThatHoldsTheStagingFolderIsNotSynced() throws Exception {
+    Files.createDirectories(dir.resolve("temp"));
+    for (String to : new String[] {"", "temp"}) {
+      Path link = dir.resolve("out-link" + to);
+      try {
+        Files.createSymbolicLink(link, dir.resolve(to));
+      } catch (UnsupportedOperationException | java.io.IOException e) {
+        assumeTrue(false, "can't make a link here");
+      }
+      PublisherFields pf = watchSetUp(true, link.toString(), null);
+      assertEquals(null, pf.watchOutputDir, link.toString());
+      assertEquals(link.toString(), pf.outputDir);
     }
   }
 

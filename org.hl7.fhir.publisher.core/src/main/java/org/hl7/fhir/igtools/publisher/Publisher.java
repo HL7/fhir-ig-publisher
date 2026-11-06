@@ -663,6 +663,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     OutputFolderSync.Result r;
     try {
       r = OutputFolderSync.sync(Paths.get(pf.outputDir), Paths.get(pf.watchOutputDir));
+      pf.watchOutputSynced = true;
     } catch (IOException e) {
       log("Unable to update "+ pf.watchOutputDir +" (it still has the output of the last build that succeeded): "+e);
       return;
@@ -680,6 +681,10 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
    */
   private void recordWatchFailure(Throwable e) {
     if (pf == null || pf.watchOutputDir == null || settings.getDestDir() != null) {
+      return;
+    }
+    if (pf.watchOutputSynced) {
+      // it failed after the output folder was brought up to date
       return;
     }
     log("The build failed, so the pages in "+ pf.watchOutputDir +" are still those of the last build that succeeded");

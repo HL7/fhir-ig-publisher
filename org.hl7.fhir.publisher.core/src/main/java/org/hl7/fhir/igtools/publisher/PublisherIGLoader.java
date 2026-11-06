@@ -1446,7 +1446,7 @@ public class PublisherIGLoader extends PublisherBase {
     if (settings.isWatchMode()) {
       log("The output folder "+ pf.outputDir +" is, or is inside, the temp folder's "+ WATCH_OUTPUT_STAGING +", so it is emptied on each rebuild");
     }
-    if (new File(staging).exists()) {
+    if (new File(staging).exists() && !nested(staging, pf.outputDir)) {
       // left by a watch session: it isn't part of this build
       try {
         FileUtils.deleteDirectory(new File(staging));
@@ -1457,10 +1457,20 @@ public class PublisherIGLoader extends PublisherBase {
   }
 
   /** whether one folder is the other or inside it */
-  static boolean nested(String a, String b) {
-    Path pa = Paths.get(a).toAbsolutePath().normalize();
-    Path pb = Paths.get(b).toAbsolutePath().normalize();
+  static boolean nested(String a, String b) throws IOException {
+    Path pa = realPath(a);
+    Path pb = realPath(b);
     return pa.startsWith(pb) || pb.startsWith(pa);
+  }
+
+  /** the path with links followed, as far as it exists */
+  private static Path realPath(String s) throws IOException {
+    Path p = Paths.get(s).toAbsolutePath().normalize();
+    Path existing = p;
+    while (existing != null && !Files.exists(existing)) {
+      existing = existing.getParent();
+    }
+    return existing == null ? p : existing.toRealPath().resolve(existing.relativize(p));
   }
 
   public void clearTempFolder() throws Exception {

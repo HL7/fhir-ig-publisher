@@ -375,4 +375,17 @@ class OutputFolderSyncTest {
       }
     }
   }
+
+  @Test
+  void aTargetThatHoldsTheStagingFolderIsLeftAlone() throws IOException {
+    Path staged = staged();
+    write(staged, "index.html", "new");
+    write(dir, "input/page.md", "source");
+
+    assertThrows(IOException.class, () -> OutputFolderSync.sync(staged, dir));
+    assertThrows(IOException.class, () -> OutputFolderSync.sync(dir, staged.resolve("out")));
+
+    assertEquals("source", read(dir, "input/page.md"));
+    assertEquals("new", read(staged, "index.html"));
+  }
 }
