@@ -100,10 +100,10 @@ class RapidoQaMessagesTest {
   }
 
   /**
-   * What validating a resource leaves behind for the rest of the build: the code systems the terminology server doesn't
-   * know (only the first code from one gets the server's answer), and the code systems used (a realm IG that uses SNOMED
-   * CT gets a warning when it doesn't fix the edition). Here the first example uses SNOMED CT, and all three use a code
-   * system the server doesn't know; only the last one changes, so a differential build reuses the first two
+   * What validating a resource leaves behind for the rest of the build: the profiles it validated each element against
+   * (the qa page's signposts), and what the build checks after validation (a realm IG that uses SNOMED CT without fixing
+   * the edition gets a warning). Three examples of a profile, the first with a SNOMED CT code, and all with a code system
+   * that isn't known; only the last one changes, so a differential build reuses the first two
    */
   @Test
   void aReusedValidationLeavesTheBuildAsValidatingWould() throws Exception {
