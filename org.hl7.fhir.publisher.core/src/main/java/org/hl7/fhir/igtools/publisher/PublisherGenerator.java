@@ -400,7 +400,23 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
     printMemUsage();
     log("Reclaiming memory...");
-    cleanOutput(pf.tempDir);
+    if (pf.hasCheckedDependencies) {
+      // rapido: a differential build keeps what the files it didn't generate wrote in an earlier build
+      RapidoOutputs.Change change = new RapidoOutputs(pf.vsCache, pf.tempDir).update(pf.fileList, pf.changeList);
+      if (change != null) {
+        pf.otherFilesRun.addAll(change.getKept());
+        for (String gone : change.getGone()) {
+          if (!isValidFile(gone)) { // unless something else wrote it in this build
+            new File(gone).delete();
+          }
+        }
+        cleanOutput(pf.tempDir);
+      } else {
+        log("Rapido Mode: what the unchanged files wrote in the temp folder isn't known, so nothing is removed from it");
+      }
+    } else {
+      cleanOutput(pf.tempDir);
+    }
     for (FetchedFile f : pf.fileList) {
       f.trim();
     }
