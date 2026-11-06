@@ -145,6 +145,11 @@ public class PageRebuild {
     }
   }
 
+  /** False if the build has already found why its state can't be reused */
+  public boolean mayBeReusable() {
+    return notReusable == null;
+  }
+
   public String getNotReusable() {
     if (notReusable != null) {
       return notReusable;

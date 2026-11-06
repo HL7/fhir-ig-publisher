@@ -1,6 +1,7 @@
 package org.hl7.fhir.igtools.publisher;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -327,6 +328,18 @@ class RegeneratePagesTest {
       write("input/translations/ru/pagecontent/index.md", "# Главная страница");
       List<String> reason = new ArrayList<>();
       assertEquals(Collections.singletonList(page), state.pagesFor(SourceSnapshot.take(roots, before).changesSince(before), reason), reason.toString());
+    } finally {
+      state.discard();
+    }
+  }
+
+  @Test
+  void noPageRebuildWhenTheTerminologyIsUnloadedEarly() throws Exception {
+    pf.txUnloadEarly = true;
+    PageRebuild state = checked();
+    try {
+      assertFalse(state.mayBeReusable());
+      assertTrue(state.getNotReusable().contains("tx-unload-early"), state.getNotReusable());
     } finally {
       state.discard();
     }
