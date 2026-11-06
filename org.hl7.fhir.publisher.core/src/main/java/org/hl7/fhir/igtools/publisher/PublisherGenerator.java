@@ -1304,6 +1304,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           }
           for (String fn : br.getFilenames()) {
             this.pf.otherFilesRun.add(Utilities.path(this.pf.tempDir, fn));
+            f.getOutputNames().add(Utilities.path(this.pf.tempDir, fn)); // for -rapido (see RapidoOutputs)
           }
         }
         fragment(rX.fhirType()+"-"+rX.getId()+"-html", html, f.getOutputNames(), rX, vars, null, start, "html", "Resource", lang);
@@ -1902,6 +1903,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       oa.commit();
       if (lang == null) {
         this.pf.otherFilesRun.add(Utilities.path(this.pf.tempDir, cpbs.getId()+lp+ ".openapi.json"));
+        f.getOutputNames().add(Utilities.path(this.pf.tempDir, cpbs.getId()+lp+ ".openapi.json")); // for -rapido (see RapidoOutputs)
         addFileToNpm(NPMPackageGenerator.Category.OPENAPI, cpbs.getId()+ lp+".openapi.json", FileUtilities.fileToBytes(Utilities.path(this.pf.tempDir, cpbs.getId()+lp+".openapi.json")));
       }
     }
@@ -2375,6 +2377,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         String filename = "Library-"+r.getId()+(counter == 0 ? "" : "-"+Integer.toString(counter))+"."+extension;
         FileUtilities.bytesToFile(att.getData(), Utilities.path(this.pf.tempDir, filename));
         this.pf.otherFilesRun.add(Utilities.path(this.pf.tempDir, filename));
+        f.getOutputNames().add(Utilities.path(this.pf.tempDir, filename)); // for -rapido (see RapidoOutputs)
       }
       counter++;
     }
@@ -5621,6 +5624,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       }
       gen.finish();
       this.pf.otherFilesRun.add(Utilities.path(this.pf.tempDir, id+".tgz"));
+      f.getOutputNames().add(Utilities.path(this.pf.tempDir, id+".tgz")); // for -rapido (see RapidoOutputs)
     }
 
   }
