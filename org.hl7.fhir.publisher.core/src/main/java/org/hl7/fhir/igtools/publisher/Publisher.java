@@ -1369,6 +1369,10 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       System.out.println("-packages: a directory to load packages (*.tgz) from before resolving dependencies");
       System.out.println("           this parameter can be present multiple times");
       System.out.println("");
+      System.out.println("-threads [n]: (optional) let the publisher use up to n threads beyond its own for work");
+      System.out.println("     that it can do in parallel (at most one less than the number of cores), at the cost");
+      System.out.println("     of more load on the machine. The default is 0: the publisher runs on one thread");
+      System.out.println("");
       System.out.println("-po: (optional) Load translations from a .po file at runtime. Repeatable.");
       System.out.println("     Overrides shipped properties for the bundle+locale derived from the filename");
       System.out.println("     (e.g. validator-messages-de.po, rendering-phrases-pt_BR.po).");
@@ -1478,6 +1482,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
           Publisher self = new Publisher();
           self.setConfigFile(determineActualIG(ig, null));
           setTxServerValue(args, self);
+          setThreadsValue(args, self);
           if (CliParams.hasNamedParam(args, "-resetTx")) {
             self.settings.setCacheOption(PublisherUtils.CacheOption.CLEAR_ALL);
           } else if (CliParams.hasNamedParam(args, "-resetTxErrors")) {
@@ -1575,6 +1580,8 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         self.settings.setGenerationOff(true);
         System.out.println("Running without generation to shorten the run time (editor process only)");
       }
+
+      setThreadsValue(args, self);
 
       // deprecated
       if (CliParams.hasNamedParam(args, "-new-template-format")) {
@@ -1789,6 +1796,15 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   private static String removePassword(String string) {
     // TODO Auto-generated method stub
     return null;
+  }
+
+  /** reads -threads into the settings and, if it was given, says how many extra threads the run may use */
+  private static void setThreadsValue(String[] args, Publisher self) {
+    int cores = Runtime.getRuntime().availableProcessors();
+    self.settings.setThreads(CliParams.getThreads(args, cores));
+    if (CliParams.hasNamedParam(args, CliParams.THREADS)) {
+      System.out.println("Using up to " + self.settings.getThreads() + " extra thread(s) (-threads " + CliParams.getNamedParam(args, CliParams.THREADS).trim() + ", " + cores + " cores)");
+    }
   }
 
   public static void setTxServerValue(String[] args, Publisher self) {
