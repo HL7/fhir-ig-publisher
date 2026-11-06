@@ -69,16 +69,22 @@ public class OutputFolderSync {
 
   public static Result sync(Path staged, Path target) throws IOException {
     Result result = new Result();
+    // a folder that is a link (output linked into a web server's folder, say) is synced where it points
+    staged = staged.toRealPath();
     Map<String, BasicFileAttributes> stagedFiles = new HashMap<>();
     Set<String> stagedDirs = new HashSet<>();
-    list(staged, stagedFiles, stagedDirs);
+    // what can't be listed here would look stale, and be deleted from the target
+    list(staged, stagedFiles, stagedDirs, null);
 
     Map<String, BasicFileAttributes> targetFiles = new HashMap<>();
     Set<String> targetDirs = new HashSet<>();
     if (Files.isDirectory(target)) {
-      list(target, targetFiles, targetDirs);
+      target = target.toRealPath();
+      // what can't be listed here is left alone
+      list(target, targetFiles, targetDirs, result);
     } else {
       Files.createDirectories(target);
+      target = target.toRealPath();
     }
 
     for (String rel : targetFiles.keySet()) {
@@ -131,9 +137,21 @@ public class OutputFolderSync {
     return result;
   }
 
-  /** the files and folders under root, by their path relative to it */
-  private static void list(Path root, Map<String, BasicFileAttributes> files, Set<String> dirs) throws IOException {
+  /**
+   * the files and folders under root, by their path relative to it. If result is given, an entry that can't be read is
+   * reported there and left out, else it fails the listing
+   */
+  private static void list(Path root, Map<String, BasicFileAttributes> files, Set<String> dirs, Result result) throws IOException {
     Files.walkFileTree(root, new SimpleFileVisitor<Path>() {
+      @Override
+      public FileVisitResult visitFileFailed(Path file, IOException e) throws IOException {
+        if (result == null || file.equals(root)) {
+          throw e;
+        }
+        result.failures.add("Unable to read " + root.relativize(file) + ": " + describe(e));
+        return FileVisitResult.CONTINUE;
+      }
+
       @Override
       public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
         if (!dir.equals(root)) {

@@ -162,6 +162,77 @@ class OutputFolderSyncTest {
   }
 
   @Test
+  void comparesWholeBlocksAndEmptyFiles() throws IOException {
+    Path staged = staged();
+    Path target = target();
+    String block = "y".repeat(64 * 1024);
+    write(staged, "one-block.html", block.substring(1) + "B");
+    write(staged, "two-blocks.html", block + block.substring(1) + "B");
+    write(staged, "two-blocks-same.html", block + block);
+    write(staged, "empty.html", "");
+    writeOld(target, "one-block.html", block.substring(1) + "A");
+    writeOld(target, "two-blocks.html", block + block.substring(1) + "A");
+    writeOld(target, "two-blocks-same.html", block + block);
+    writeOld(target, "empty.html", "");
+
+    OutputFolderSync.Result r = OutputFolderSync.sync(staged, target);
+
+    assertEquals(2, r.getWritten());
+    assertEquals(2, r.getUnchanged());
+    assertTrue(read(target, "one-block.html").endsWith("B"));
+    assertTrue(read(target, "two-blocks.html").endsWith("B"));
+    assertEquals(OLD, Files.getLastModifiedTime(target.resolve("empty.html")));
+  }
+
+  @Test
+  void syncsWhereALinkedOutputFolderPoints() throws IOException {
+    Path staged = staged();
+    Path real = Files.createDirectories(dir.resolve("web-root"));
+    write(staged, "new.html", "new");
+    write(staged, "same.html", "same");
+    writeOld(real, "same.html", "same");
+    write(real, "stale.html", "old");
+    try {
+      Files.createSymbolicLink(target(), real);
+    } catch (UnsupportedOperationException | IOException e) {
+      assumeTrue(false, "can't make a link here");
+    }
+
+    OutputFolderSync.Result r = OutputFolderSync.sync(staged, target());
+
+    assertTrue(Files.isSymbolicLink(target()));
+    assertEquals(Set.of("new.html", "same.html"), contents(real));
+    assertEquals(OLD, Files.getLastModifiedTime(real.resolve("same.html")));
+    assertTrue(r.getFailures().isEmpty(), r.getFailures().toString());
+  }
+
+  @Test
+  void leavesAFolderItCantReadAloneAndCarriesOn() throws IOException {
+    Path staged = staged();
+    Path target = target();
+    write(staged, "index.html", "new");
+    write(target, "index.html", "old");
+    write(target, "private/secret.html", "kept");
+    File priv = target.resolve("private").toFile();
+    assumeTrue(priv.setReadable(false, false) && !Files.isReadable(target.resolve("private")));
+    try {
+      OutputFolderSync.Result r = OutputFolderSync.sync(staged, target);
+
+      assertEquals("new", read(target, "index.html"));
+      assertEquals(1, r.getFailures().size(), r.getFailures().toString());
+      assertTrue(r.getFailures().get(0).contains("private"), r.getFailures().toString());
+    } finally {
+      priv.setReadable(true, false);
+    }
+    assertEquals("kept", read(target, "private/secret.html"));
+  }
+
+  /*
+   * On a file system that ignores case (Windows, macOS) the stale name has to be deleted before the new one is moved
+   * in, or the old case stays. On Linux the names are different files, so this only checks the result; the order is
+   * also what aFileCanBecomeAFolderAndAFolderAFile depends on
+   */
+  @Test
   void aNameThatOnlyChangedCaseGetsTheNewCase() throws IOException {
     Path staged = staged();
     Path target = target();

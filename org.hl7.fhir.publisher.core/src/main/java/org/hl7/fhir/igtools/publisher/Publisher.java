@@ -516,7 +516,8 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         ex.printStackTrace();
       }
       if (pf.watchOutputDir != null) {
-        log("The build failed, so "+ pf.watchOutputDir +" still has the output of the last build that succeeded");
+        log("The build failed, so the pages in "+ pf.watchOutputDir +" are still those of the last build that succeeded");
+        recordFailureInOutput();
       }
       throw e;
     } finally {
@@ -528,15 +529,19 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     }
   }
 
+  private String stagedPath(String path) {
+    return stagedPath(path, pf.watchOutputDir, pf.outputDir);
+  }
+
   /**
    * in watch mode, a path in the output folder is written in the staging folder that the build writes to
    */
-  private String stagedPath(String path) {
-    if (pf.watchOutputDir != null) {
-      Path out = Paths.get(pf.watchOutputDir).toAbsolutePath().normalize();
+  static String stagedPath(String path, String watchOutputDir, String stagingDir) {
+    if (watchOutputDir != null) {
+      Path out = Paths.get(watchOutputDir).toAbsolutePath().normalize();
       Path p = Paths.get(path).toAbsolutePath().normalize();
       if (p.startsWith(out)) {
-        return Paths.get(pf.outputDir).toAbsolutePath().normalize().resolve(out.relativize(p)).toString();
+        return Paths.get(stagingDir).toAbsolutePath().normalize().resolve(out.relativize(p)).toString();
       }
     }
     return path;
@@ -544,19 +549,43 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 
   /**
    * in watch mode, moves what changed from the staging folder into the output folder, and deletes what the build no
-   * longer produced
+   * longer produced. The build itself succeeded, so a failure here is logged rather than failing it
    */
-  private void syncWatchOutput() throws IOException {
+  private void syncWatchOutput() {
     if (pf.watchOutputDir == null) {
       return;
     }
     long start = System.nanoTime();
-    OutputFolderSync.Result r = OutputFolderSync.sync(Paths.get(pf.outputDir), Paths.get(pf.watchOutputDir));
+    OutputFolderSync.Result r;
+    try {
+      r = OutputFolderSync.sync(Paths.get(pf.outputDir), Paths.get(pf.watchOutputDir));
+    } catch (IOException e) {
+      log("Unable to update "+ pf.watchOutputDir +" (it still has the output of the last build that succeeded): "+e.getMessage());
+      return;
+    }
     for (String s : r.getFailures()) {
       log("  "+s);
     }
     log("Updated "+ pf.watchOutputDir +": "+r.getWritten()+" written, "+r.getDeleted()+" deleted, "+r.getUnchanged()+" unchanged"
-        +(r.getFailures().isEmpty() ? "" : ", "+r.getFailures().size()+" failed")+" ("+DurationUtil.presentDuration(System.nanoTime() - start)+")");
+        +(r.getFailures().isEmpty() ? "" : ", "+r.getFailures().size()+" failed (tried again on the next rebuild)")
+        +" ("+DurationUtil.presentDuration(System.nanoTime() - start)+")");
+  }
+
+  /**
+   * in watch mode, a failed build isn't synced, but tools that read qa.json in the output folder should see that it failed
+   */
+  private void recordFailureInOutput() {
+    if (settings.getDestDir() != null) {
+      return;
+    }
+    try {
+      File qa = new File(Utilities.path(pf.outputDir, "qa.json"));
+      if (qa.exists()) {
+        FileUtilities.copyFile(qa, new File(Utilities.path(pf.watchOutputDir, "qa.json")));
+      }
+    } catch (IOException e) {
+      log("Unable to record the failure in "+ pf.watchOutputDir +"/qa.json: "+e.getMessage());
+    }
   }
 
   /**
