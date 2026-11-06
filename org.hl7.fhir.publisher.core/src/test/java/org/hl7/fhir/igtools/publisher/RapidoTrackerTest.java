@@ -73,6 +73,21 @@ class RapidoTrackerTest {
     assertEquals(xml, xml(vs));
   }
 
+  /** a narrative in a language, as the renderers write it for each of the IG's languages (the namespace first) */
+  @Test
+  void anExpansionInALanguageReadBackIsWrittenAsBefore() throws Exception {
+    ValueSet vs = expansion();
+    vs.getText().getDiv().setAttribute("xmlns", "http://www.w3.org/1999/xhtml").setAttribute("xml:lang", "uz").setAttribute("lang", "uz").setAttribute("data-fhir", "generated");
+    String xml = xml(vs);
+    String json = json(vs);
+
+    ValueSet read = RapidoTracker.readExpansion(new JsonParser(ModelContext.fullCoreContext()),
+        RapidoTracker.saveExpansion(new JsonParser(ModelContext.fullCoreContext()), vs));
+
+    assertEquals(json, json(read));
+    assertEquals(xml, xml(read));
+  }
+
   @Test
   void anExpansionThroughPlainJsonLosesTheEmptyCell() throws Exception {
     // what saveExpansion is for: a plain JSON round trip writes the cell as <td/>

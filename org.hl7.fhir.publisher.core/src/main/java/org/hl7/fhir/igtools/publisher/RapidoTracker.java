@@ -1550,7 +1550,18 @@ public class RapidoTracker {
 
   private static void restoreEmptyText(DomainResource dr) {
     if (dr.hasText() && dr.getText().hasDiv()) {
-      restoreEmptyText(dr.getText().getDiv());
+      XhtmlNode div = dr.getText().getDiv();
+      // the composers write the attributes in order, and the parser reads xml:lang before the namespace: as the
+      // renderers made it, the namespace is the first
+      String ns = div.getNsDecl();
+      if (ns != null && !"xmlns".equals(div.getAttributes().keySet().iterator().next())) {
+        Map<String, String> attributes = new LinkedHashMap<>(div.getAttributes());
+        attributes.remove("xmlns");
+        div.getAttributes().clear();
+        div.getAttributes().put("xmlns", ns);
+        div.getAttributes().putAll(attributes);
+      }
+      restoreEmptyText(div);
     }
     for (Resource c : dr.getContained()) {
       if (c instanceof DomainResource) {
