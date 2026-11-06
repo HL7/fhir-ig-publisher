@@ -487,14 +487,14 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       checkForSnomedVersion();
       if (pf.txLog != null) {
         if (ManagedFileAccess.file(pf.txLog).exists()) {
-           FileUtilities.copyFile(pf.txLog, Utilities.path(pf.rootDir, "output", "qa-tx.html"));
+           FileUtilities.copyFile(pf.txLog, stagedPath(Utilities.path(pf.rootDir, "output", "qa-tx.html")));
         }
       }
       deleteDuplicateMessages();
       ValidationPresenter val = new ValidationPresenter(pf.version, workingVersion(), pf.igpkp, pf.rootDir, pf.npmName,
           IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), pf.realmRules, pf.previousVersionComparator, pf.ipaComparator, pf.ipsComparator,
           new DependencyRenderer(pf.pcm, pf.outputDir, pf.npmName, pf.templateManager, pf.dependencyList, pf.context, pf.markdownEngine, pf.rc, pf.specMaps, pf.effectiveBaseIg).setFetchedPackageLists(pf.fetchedPackageLists).render(pf.getEffectiveBaseIg(), true, false, false), new HTAAnalysisRenderer(pf.context, pf.outputDir, pf.markdownEngine).render(pf.packageId(), pf.fileList, pf.publishedIg.present()),
-          new PublicationChecker(pf.repoRoot, pf.historyPage, pf.markdownEngine, findReleaseLabelString(), pf.getEffectiveBaseIg(), pf.relatedIGs).check(), renderGlobals(), pf.copyrightYear, pf.context, scanForR5Extensions(), pf.modifierExtensions,
+          new PublicationChecker(pf.repoRoot, pf.historyPage, pf.markdownEngine, findReleaseLabelString(), pf.getEffectiveBaseIg(), pf.relatedIGs).setOutputFolder(stagedPath(Utilities.path(pf.repoRoot, "output"))).check(), renderGlobals(), pf.copyrightYear, pf.context, scanForR5Extensions(), pf.modifierExtensions,
           generateDraftDependencies(), pf.noNarrativeResources, pf.noValidateResources, settings.isValidationOff(), settings.isGenerationOff(), pf.dependentIgFinder, pf.context.getTxClientManager(),
           fragments, makeLangInfo(), pf.relatedIGs);
       val.setValidationFlags(pf.hintAboutNonMustSupport, pf.anyExtensionsAllowed, pf.checkAggregation, pf.autoLoad, pf.showReferenceMessages, pf.noExperimentalContent, pf.displayWarnings);
@@ -507,12 +507,16 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       recordOutcome(null, val);
       buildTracker.setBooleanProperty("status", "complete", true, null);
       buildTracker.save();
+      syncWatchOutput();
       log("Finished @ "+nowString()+". Max Memory Used = "+Utilities.describeSize(pf.maxMemory)+logSummary());
     } catch (Exception e) {
       try {
         recordOutcome(e, null);
       } catch (Exception ex) {
         ex.printStackTrace();
+      }
+      if (pf.watchOutputDir != null) {
+        log("The build failed, so "+ pf.watchOutputDir +" still has the output of the last build that succeeded");
       }
       throw e;
     } finally {
@@ -522,6 +526,37 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       // make the next attempt ask for all of it again.
       saveTerminologyCache();
     }
+  }
+
+  /**
+   * in watch mode, a path in the output folder is written in the staging folder that the build writes to
+   */
+  private String stagedPath(String path) {
+    if (pf.watchOutputDir != null) {
+      Path out = Paths.get(pf.watchOutputDir).toAbsolutePath().normalize();
+      Path p = Paths.get(path).toAbsolutePath().normalize();
+      if (p.startsWith(out)) {
+        return Paths.get(pf.outputDir).toAbsolutePath().normalize().resolve(out.relativize(p)).toString();
+      }
+    }
+    return path;
+  }
+
+  /**
+   * in watch mode, moves what changed from the staging folder into the output folder, and deletes what the build no
+   * longer produced
+   */
+  private void syncWatchOutput() throws IOException {
+    if (pf.watchOutputDir == null) {
+      return;
+    }
+    long start = System.nanoTime();
+    OutputFolderSync.Result r = OutputFolderSync.sync(Paths.get(pf.outputDir), Paths.get(pf.watchOutputDir));
+    for (String s : r.getFailures()) {
+      log("  "+s);
+    }
+    log("Updated "+ pf.watchOutputDir +": "+r.getWritten()+" written, "+r.getDeleted()+" deleted, "+r.getUnchanged()+" unchanged"
+        +(r.getFailures().isEmpty() ? "" : ", "+r.getFailures().size()+" failed")+" ("+DurationUtil.presentDuration(System.nanoTime() - start)+")");
   }
 
   /**
@@ -1235,7 +1270,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   }
 
   public String getQAFile() throws IOException {
-    return Utilities.path(pf.outputDir, "qa.html");
+    return Utilities.path(finalOutputDir(), "qa.html");
   }
 
 

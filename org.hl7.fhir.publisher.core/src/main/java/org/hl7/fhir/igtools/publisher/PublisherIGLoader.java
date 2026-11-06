@@ -112,6 +112,8 @@ public class PublisherIGLoader extends PublisherBase {
    * mirroring the pattern already used for {@code ig-link-dependency}. The exact URL is not yet
    * ratified in the tools IG (Open Question) and is isolated here so a rename is one line.
    */
+  // in watch mode, the folder in temp that the build writes its output to (Jekyll skips names that start with a dot)
+  public static final String WATCH_OUTPUT_STAGING = ".watch-output";
   public static final String EXT_IG_DEP_VERSION = "http://hl7.org/fhir/tools/StructureDefinition/ig-dependency-for-version";
 
   /**
@@ -1022,6 +1024,15 @@ public class PublisherIGLoader extends PublisherBase {
 
     logDebugMessage(LogCategory.INIT, "Output: "+ pf.outputDir);
     forceDir(pf.outputDir);
+    String staging = Utilities.path(pf.tempDir, WATCH_OUTPUT_STAGING);
+    if (settings.isWatchMode() && !nested(staging, pf.outputDir)) {
+      // the output folder isn't emptied: the build writes to a staging folder, and when it succeeds what
+      // changed is moved into the output folder, so the pages there can be browsed while a rebuild runs
+      pf.watchOutputDir = pf.outputDir;
+      pf.outputDir = staging;
+      logDebugMessage(LogCategory.INIT, "Staging: "+ pf.outputDir);
+      forceDir(pf.outputDir);
+    }
     FileUtilities.clearDirectory(pf.outputDir);
     if (pf.qaDir != null) {
       logDebugMessage(LogCategory.INIT, "QA Dir: "+ pf.qaDir);
@@ -1371,9 +1382,20 @@ public class PublisherIGLoader extends PublisherBase {
     return dsi;
   }
 
+  /** whether one folder is the other or inside it */
+  static boolean nested(String a, String b) {
+    Path pa = Paths.get(a).toAbsolutePath().normalize();
+    Path pb = Paths.get(b).toAbsolutePath().normalize();
+    return pa.startsWith(pb) || pb.startsWith(pa);
+  }
+
   public void clearTempFolder() throws Exception {
     logDebugMessage(LogCategory.INIT, "Temp: "+ pf.tempDir);
-    FileUtilities.clearDirectory(pf.tempDir);
+    if (pf.watchOutputDir != null) {
+      FileUtilities.clearDirectory(pf.tempDir, WATCH_OUTPUT_STAGING);
+    } else {
+      FileUtilities.clearDirectory(pf.tempDir);
+    }
     forceDir(pf.tempDir);
     forceDir(Utilities.path(pf.tempDir, "_includes"));
     forceDir(Utilities.path(pf.tempDir, "_data"));

@@ -37,6 +37,7 @@ public class PublicationChecker {
   private ImplementationGuide ig;
   private List<RelatedIG> relatedIgs;
   private FilesystemPackageCacheManager pcm;
+  private String outputFolder; // where the generated output is, if not in the root folder's output folder
 
   public PublicationChecker(String folder, String historyPage, MarkDownProcessor markdownEngine, String releaseLabel, ImplementationGuide ig, List<RelatedIG> relatedIgs) {
     super();
@@ -48,6 +49,15 @@ public class PublicationChecker {
     this.relatedIgs = relatedIgs;
   }
   
+  public PublicationChecker setOutputFolder(String outputFolder) {
+    this.outputFolder = outputFolder;
+    return this;
+  }
+
+  private String outputFolder() throws IOException {
+    return outputFolder != null ? outputFolder : Utilities.path(folder, "output");
+  }
+
   /**
    * returns html for the qa page 
    * @param string 
@@ -167,11 +177,11 @@ public class PublicationChecker {
 
   private JsonObject checkFolder(List<String> messages, List<StringPair> summary) throws IOException {
     check(messages, !exists("package-list.json"), "The file package-list.json should not exist in the root folder"+mkError());
-    check(messages, !exists("output", "package-list.json"), "The file package-list.json should not exist in generated output"+mkError());
-    if (check(messages, exists("output", "package.tgz"), "No output package found - can't check publication details"+mkWarning())) {
+    check(messages, !new File(Utilities.path(outputFolder(), "package-list.json")).exists(), "The file package-list.json should not exist in generated output"+mkError());
+    if (check(messages, new File(Utilities.path(outputFolder(), "package.tgz")).exists(), "No output package found - can't check publication details"+mkWarning())) {
       NpmPackage npm = null;
       try {
-        try (FileInputStream in = new FileInputStream(Utilities.path(folder, "output", "package.tgz"))) {
+        try (FileInputStream in = new FileInputStream(Utilities.path(outputFolder(), "package.tgz"))) {
           npm = NpmPackage.fromPackage(in);
         }
       } catch (Exception e) {

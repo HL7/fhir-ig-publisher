@@ -85,6 +85,8 @@ public class PublisherFields {
     String tempDir;
     String tempLangDir;
     String outputDir;
+    // in watch mode, the output folder: the build writes to outputDir, a staging folder that is synced into it
+    String watchOutputDir;
     String specPath;
     String qaDir;
     String version;
