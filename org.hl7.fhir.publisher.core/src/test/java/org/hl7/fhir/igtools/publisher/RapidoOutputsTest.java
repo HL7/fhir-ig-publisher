@@ -3,6 +3,7 @@ package org.hl7.fhir.igtools.publisher;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.nio.file.Files;
@@ -79,6 +80,25 @@ class RapidoOutputsTest {
     RapidoOutputs.Change change = new RapidoOutputs(cache, temp).update(List.of(folder2, page2), List.of(page2));
     assertEquals(Set.of(), change.getKept());
     assertEquals(Set.of(), change.getGone());
+  }
+
+  @Test
+  void theOutputsAreCompleteOnlyWhileAllOfThemAreInTheTempFolder() throws Exception {
+    String temp = dir.resolve("temp").toString();
+    String cache = dir.resolve("cache").toString();
+    Files.createDirectories(dir.resolve("cache"));
+    assertFalse(new RapidoOutputs(cache, temp).isComplete(), "no record");
+
+    Files.createDirectories(dir.resolve("temp").resolve("en"));
+    Files.writeString(dir.resolve("temp").resolve("a.md"), "a");
+    Files.writeString(dir.resolve("temp").resolve("en").resolve("a.md"), "a");
+    FetchedFile page = file("a.md", temp, "a.md", "en/a.md");
+    new RapidoOutputs(cache, temp).update(List.of(page), List.of(page));
+    assertTrue(new RapidoOutputs(cache, temp).isComplete());
+
+    // the temp folder was cleared (or partly) since
+    Files.delete(dir.resolve("temp").resolve("en").resolve("a.md"));
+    assertFalse(new RapidoOutputs(cache, temp).isComplete());
   }
 
   @Test

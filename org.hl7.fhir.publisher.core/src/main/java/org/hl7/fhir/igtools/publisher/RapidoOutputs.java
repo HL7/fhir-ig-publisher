@@ -116,9 +116,26 @@ public class RapidoOutputs {
     return change;
   }
 
-  /** whether there is a record of what the files wrote (a differential build needs one to clear the temp folder) */
-  public boolean exists() {
-    return record.exists();
+  /**
+   * whether there is a record of what the files wrote, and all of it is still in the temp folder (a differential build
+   * needs the record to clear the temp folder, and the files of the unchanged sources, which it doesn't write again)
+   */
+  public boolean isComplete() throws IOException {
+    JsonObject recorded = read();
+    if (recorded == null) {
+      return false;
+    }
+    for (JsonProperty p : recorded.getProperties()) {
+      if (!(p.getValue() instanceof JsonArray)) {
+        return false;
+      }
+      for (String name : ((JsonArray) p.getValue()).asStrings()) {
+        if (!new File(Utilities.path(tempDir, name)).exists()) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
   private JsonObject read() {
