@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,6 +34,8 @@ class PublisherRapidoWatchTest {
     buildTracker.setStringProperty("tracked", "ig.json", "1", null);
     buildTracker.setStringProperty("tracked", "page.md", Long.toString(37 * 9 + 1), null);
     buildTracker.save();
+    // and what it wrote in the temp folder
+    Files.writeString(dir.resolve(".build-outputs.json"), "{}");
     build(buildTracker, 2);
     buildTracker.setBooleanProperty("status", "complete", true, null);
     buildTracker.save();
@@ -59,6 +62,8 @@ class PublisherRapidoWatchTest {
     publisher.getSettings().setWatchMode(true);
     PublisherFields pf = new PublisherFields();
     pf.logger = mock(ILoggingService.class);
+    pf.vsCache = dir.toString();
+    pf.tempDir = dir.resolve("temp").toString();
     pf.template = mock(Template.class);
     pf.fileList.addAll(List.of(ig, patient, other, observation, page));
     publisher.setPf(pf);

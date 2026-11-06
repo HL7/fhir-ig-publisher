@@ -1122,6 +1122,13 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       pf.changeList.clear();
       pf.changeList.addAll(pf.fileList);
       buildTracker.setStringProperty("status", "uuid", HierarchicalTableGenerator.uuid, null);
+    } else if (!new RapidoOutputs(pf.vsCache, pf.tempDir).exists()) {
+      // without it, a differential build can't tell what to clear from the temp folder (see RapidoOutputs)
+      log("Rapido Mode: Complete Build (no record of what the last build wrote in the temp folder)");
+      pf.changeList.clear();
+      pf.changeList.addAll(pf.fileList);
+      loader.clearTempFolder();
+      buildTracker.setStringProperty("status", "uuid", HierarchicalTableGenerator.uuid, null);
     } else {
       log("Rapido Mode: Differential Build ("+pf.changeList.size()+" files)");
       for (String s : Utilities.sorted(changed)) {

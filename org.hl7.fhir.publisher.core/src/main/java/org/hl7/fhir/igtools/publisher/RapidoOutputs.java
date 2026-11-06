@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 import org.hl7.fhir.utilities.FileUtilities;
@@ -95,11 +96,16 @@ public class RapidoOutputs {
     }
     if (before != null) {
       written.addAll(change.kept);
+      // a file renamed in case only is the same file on macOS and Windows: it is still written
+      Set<String> writtenAnyCase = new HashSet<>();
+      for (String w : written) {
+        writtenAnyCase.add(w.toLowerCase(Locale.ROOT));
+      }
       for (JsonProperty p : before.getProperties()) {
         if (p.getValue() instanceof JsonArray) {
           for (String name : ((JsonArray) p.getValue()).asStrings()) {
             String path = Utilities.path(tempDir, name);
-            if (!written.contains(path)) {
+            if (!writtenAnyCase.contains(path.toLowerCase(Locale.ROOT))) {
               change.gone.add(path);
             }
           }
@@ -108,6 +114,11 @@ public class RapidoOutputs {
     }
     FileUtilities.stringToFile(JsonParser.compose(now, false), record);
     return change;
+  }
+
+  /** whether there is a record of what the files wrote (a differential build needs one to clear the temp folder) */
+  public boolean exists() {
+    return record.exists();
   }
 
   private JsonObject read() {
