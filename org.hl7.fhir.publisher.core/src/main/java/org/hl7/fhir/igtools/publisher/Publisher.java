@@ -61,6 +61,7 @@ import org.hl7.fhir.igtools.renderers.*;
 import org.hl7.fhir.igtools.renderers.ValidationPresenter.IGLanguageInformation;
 import org.hl7.fhir.igtools.ui.IGPublisherUI;
 import org.hl7.fhir.igtools.web.*;
+import org.hl7.fhir.services.comparison.ResourceComparer;
 import org.hl7.fhir.services.context.*;
 import org.hl7.fhir.services.elementmodel.Element;
 import org.hl7.fhir.services.elementmodel.ElementVisitor;
@@ -296,8 +297,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     settings.getNoValidate().addAll(cliNoValidate);
     HierarchicalTableGenerator.ACTIVE_TABLES = false;
     HierarchicalTableGenerator.uuid = UUIDUtilities.makeUuidLC();
-    // not yet ResourceComparer.counter: until the core can reset it, a rebuild numbers the comparison pages on from
-    // where the last build stopped
+    ResourceComparer.resetCounter(); // comparison page ids
   }
 
   private void build(String rootDir) throws Exception {
