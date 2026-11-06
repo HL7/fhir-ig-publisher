@@ -543,12 +543,20 @@ public class RapidoTracker {
     return other.finish();
   }
   // getCanonicalPath doesn't resolve links on Windows (JDK-8003887), so it can't spot a loop there
-  private static String realPath(Path p) {
+  private static Path realPath(Path p) {
     try {
-      return p.toRealPath().toString();
+      return p.toRealPath();
     } catch (IOException e) {
-      return canonical(p.toString());
+      return p.toAbsolutePath().normalize();
     }
+  }
+
+  /**
+   * whether p is a file to read: on Windows, a file that is a reparse point but not a link (a OneDrive file that is only
+   * online, say) isn't a regular file for java.nio, but is one for java.io and the build. A FIFO or socket is neither
+   */
+  private static boolean isFile(Path p) {
+    return Files.isRegularFile(p) || (!Files.isDirectory(p) && p.toFile().isFile());
   }
 
   private static String canonical(String s) {
@@ -587,11 +595,11 @@ public class RapidoTracker {
    * under a POSIX locale) is still read, and a change to it seen. Such names can decode to the same string, so a name is
    * made unique among those in its folder
    */
-  private static void listTree(Path dir, String rel, Set<String> skip, Map<String, String> files, Set<String> visited) {
+  private static void listTree(Path dir, String rel, Set<String> skip, Map<String, String> files, Set<Path> visited) {
     if (skip.contains(canonical(dir.toString()))) {
       return;
     }
-    if (Files.isRegularFile(dir)) {
+    if (isFile(dir)) {
       try {
         files.put(rel, new Hasher().add(Files.readAllBytes(dir)).finish());
       } catch (IOException e) {
@@ -606,7 +614,8 @@ public class RapidoTracker {
       }
       return; // else a link to nothing, a socket, ...: not read by anything
     }
-    String real = realPath(dir);
+    // a Path, not its name: names that decode the same are different folders
+    Path real = realPath(dir);
     if (!visited.add(real)) {
       // a link to a folder that's already been listed (possibly one that contains it)
       files.put(rel + "/", "(same as "+real+")");
@@ -651,13 +660,16 @@ public class RapidoTracker {
     if (skip.contains(canonical(dir.toString()))) {
       return;
     }
-    if (Files.isRegularFile(dir)) {
+    if (isFile(dir)) {
       byte[] b = Files.readAllBytes(dir);
       h.add(dir.toAbsolutePath().toString()).add(b);
       if (fshIndex != null && !fshIndex[0] && new String(b, StandardCharsets.ISO_8859_1).contains("fsh-index")) {
         fshIndex[0] = true;
       }
       return;
+    }
+    if (!Files.isDirectory(dir)) {
+      return; // a FIFO, a socket, ...: not read by anything
     }
     List<Path> list = list(dir);
     if (list == null) {
