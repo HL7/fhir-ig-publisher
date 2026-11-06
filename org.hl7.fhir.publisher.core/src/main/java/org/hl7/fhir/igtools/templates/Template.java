@@ -27,21 +27,41 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.lang.reflect.Field;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
 import java.util.regex.Pattern;
 
 import lombok.Getter;
 import org.apache.commons.io.FileUtils;
+import org.apache.tools.ant.AntClassLoader;
+import org.apache.tools.ant.AntTypeDefinition;
+import org.apache.tools.ant.BuildException;
+import org.apache.tools.ant.BuildListener;
+import org.apache.tools.ant.ComponentHelper;
 import org.apache.tools.ant.DefaultLogger;
+import org.apache.tools.ant.ExtensionPoint;
 import org.apache.tools.ant.Project;
 import org.apache.tools.ant.ProjectHelper;
+import org.apache.tools.ant.PropertyHelper;
+import org.apache.tools.ant.RuntimeConfigurable;
+import org.apache.tools.ant.Target;
+import org.apache.tools.ant.Task;
+import org.apache.tools.ant.UnknownElement;
+import org.apache.tools.ant.property.LocalProperties;
 import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_40_50;
 import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_40_N;
 import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_50_N;
@@ -102,6 +122,8 @@ public class Template {
   private String targetOnCheck;
   private String templateThatCantExecute;
   private Project antProject;
+  // the only listener the script's project is given (see whyOnCheckMaySeeOutput())
+  private BuildListener antLogger;
   private JsonObject defaults;
   private JsonArray extraTemplates;
   private JsonArray preProcess;
@@ -162,6 +184,7 @@ public class Template {
         consoleLogger.setMessageOutputLevel(Project.MSG_ERR);        
       }
       antProject.addBuildListener(consoleLogger);
+      antLogger = consoleLogger;
       antProject.setBasedir(root);
       antProject.setProperty("ig.root", root);
       antProject.setProperty("ig.template", templateDir);
@@ -907,6 +930,279 @@ public class Template {
   public boolean hasPreProcess() {
     return preProcess != null;
   }
+
+  /** Whether the template has a script that runs on the output after Jekyll */
+  public boolean hasOnCheck() {
+    return targetOnCheck != null;
+  }
+
+  /**
+   * What the template's check may run and still be known not to look at the output: these Ant tasks, as Ant defines
+   * them (by class: a template can define its own under the same name), and these elements in them, each with the
+   * attributes it may have. Of those, the ones that name a file or folder (PATH_ATTRIBUTES) must be in the template
+   * folder, and the ones that are patterns (PATTERN_ATTRIBUTES) must stay in the folder they're in
+   */
+  private static final Map<String, Class<?>> BLIND_TASKS = Map.of(
+      "echo", org.apache.tools.ant.taskdefs.Echo.class,
+      "concat", org.apache.tools.ant.taskdefs.Concat.class,
+      "replaceregexp", org.apache.tools.ant.taskdefs.optional.ReplaceRegExp.class);
+  private static final Map<String, Set<String>> BLIND_ELEMENTS = Map.of(
+      "echo", Set.of("file", "message", "append", "encoding", "level"),
+      "concat", Set.of("destfile", "encoding", "outputencoding", "append", "fixlastline", "eol"),
+      "replaceregexp", Set.of("file", "match", "replace", "flags", "byline", "encoding"),
+      "fileset", Set.of("dir", "includes", "excludes", "defaultexcludes", "casesensitive"),
+      "filterchain", Set.of(),
+      "tailfilter", Set.of("lines", "skip"),
+      "headfilter", Set.of("lines", "skip"));
+  private static final Set<String> PATH_ATTRIBUTES = Set.of("file", "destfile", "dir");
+  private static final Set<String> PATTERN_ATTRIBUTES = Set.of("includes", "excludes");
+
+  // a property expansion that evaluates something (${toString:id}, ${ant.refid:id}...) rather than reading a property
+  private static final Pattern EVALUATED_PROPERTY = Pattern.compile("\\$\\{[^}]*:");
+
+  /**
+   * Why the template's check (onCheck) may look at the output, in outputDir; null if it can't. It can't if all it
+   * runs - its target, and the targets that target depends on, including those that extend an extension point it
+   * depends on (extensionOf), whatever file they're in - is tasks that only read and write files in the template
+   * folder (see BLIND_TASKS), the template folder has no links (a link could lead to the output), and nothing the
+   * script ran before is left to run with it (another listener on the script's project, another way to expand
+   * properties, a target, task or condition of the script's own kind). Anything else, or anything that can't be told
+   * for sure, is a reason it may. (What isn't looked at: what code the script ran before hides on purpose, like a
+   * thread left running; and, where the file system doesn't tell how many names a file has, hard links.)
+   */
+  public String whyOnCheckMaySeeOutput(String outputDir) {
+    if (targetOnCheck == null) {
+      return null;
+    }
+    if (antProject == null) {
+      return "it has no script";
+    }
+    try {
+      return whyOnCheckMaySee(Paths.get(outputDir));
+    } catch (IOException | ReflectiveOperationException | RuntimeException e) {
+      return "it can't be told (" + e + ")";
+    }
+  }
+
+  private String whyOnCheckMaySee(Path output) throws IOException, ReflectiveOperationException {
+    Path tmpl = Paths.get(templateDir).toAbsolutePath().normalize();
+    if (output.toAbsolutePath().normalize().startsWith(tmpl)
+        || (Files.exists(output) && output.toRealPath().startsWith(tmpl.toRealPath()))) {
+      return "the output is in the template folder";
+    }
+    String why = whyFolderMayLeadOut(tmpl);
+    if (why != null) {
+      return why;
+    }
+    for (BuildListener l : antProject.getBuildListeners()) {
+      // Ant's own class loaders listen, for when the build is over
+      if (l != antLogger && l.getClass() != AntClassLoader.class) {
+        return "its script's project has other listeners (" + l.getClass().getName() + ")";
+      }
+    }
+    if (!onlyAntsPropertyEvaluation()) {
+      return "its script expands properties its own way";
+    }
+    // a property may hold what it refers to (value="${ant.refid:id}"), and what that is is evaluated when it's used
+    PropertyHelper ph = PropertyHelper.getPropertyHelper(antProject);
+    for (Map<String, Object> props : List.of(ph.getProperties(), ph.getUserProperties())) {
+      for (Map.Entry<String, Object> p : props.entrySet()) {
+        if (p.getValue() != null && p.getValue().getClass() != String.class) {
+          return "property '" + p.getKey() + "' holds a " + p.getValue().getClass().getName();
+        }
+      }
+    }
+    List<Target> run;
+    try {
+      run = antProject.topoSort(targetOnCheck, antProject.getTargets(), false);
+    } catch (BuildException e) {
+      return "its targets can't be ordered (" + e.getMessage() + ")";
+    }
+    ComponentHelper components = ComponentHelper.getComponentHelper(antProject);
+    if (components.getClass() != ComponentHelper.class || components.getProject() != antProject) {
+      return "its script makes tasks its own way";
+    }
+    for (Target t : run) {
+      if (t.getClass() != Target.class && t.getClass() != ExtensionPoint.class) {
+        return "target '" + t.getName() + "' is a " + t.getClass().getName();
+      }
+      why = t.getProject() != antProject ? "belongs to another project" : whyTargetMaySee(t);
+      if (why != null) {
+        return "target '" + t.getName() + "' " + why;
+      }
+      for (Task task : t.getTasks()) {
+        String tag = task.getClass() == UnknownElement.class ? ((UnknownElement) task).getTag() : task.getTaskName();
+        Class<?> cls = BLIND_TASKS.get(tag);
+        AntTypeDefinition def = cls == null ? null : components.getDefinition(tag);
+        // Ant's own definition: a macro or preset of the template's own is a subclass, and a taskdef may load the
+        // class from elsewhere
+        if (task.getClass() != UnknownElement.class || def == null || def.getClass() != AntTypeDefinition.class
+            || def.getExposedClass(antProject) != cls || def.getTypeClass(antProject) != cls) {
+          return "target '" + t.getName() + "' runs " + tag;
+        }
+        why = whyElementMaySeeOutput((UnknownElement) task, tmpl);
+        if (why != null) {
+          return "target '" + t.getName() + "': " + why;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Why a target may run more than its tasks (see whyElementMaySeeOutput()): a condition (if, unless) that may
+   * evaluate something, or one that isn't a property's, or something to run that isn't one of its tasks
+   */
+  private static String whyTargetMaySee(Target t) throws ReflectiveOperationException {
+    Target plain = new Target();
+    plain.setIf("x");
+    plain.setUnless("x");
+    for (String c : new String[] {"if", "unless"}) {
+      Object cond = field(Target.class, c + "Condition", t);
+      String prop = "if".equals(c) ? t.getIf() : t.getUnless();
+      if (cond != null && (cond.getClass() != field(Target.class, c + "Condition", plain).getClass() || capturedBy(cond) != t)) {
+        return "has a condition of its own (" + cond.getClass().getName() + ")";
+      }
+      // the condition is a property's name, and a name with ':' may be evaluated (toString:id), what it expands to too
+      if (prop != null && (prop.contains(":") || prop.contains("$"))) {
+        return c + "=\"" + prop + "\"";
+      }
+    }
+    List<?> children = (List<?>) field(Target.class, "children", t);
+    for (Object c : children) {
+      if (!(c instanceof Task)) {
+        return "runs " + c.getClass().getName();
+      }
+    }
+    return null;
+  }
+
+  /** The target a condition made by Target.setIf(String) reads its property's name from */
+  private static Object capturedBy(Object cond) throws ReflectiveOperationException {
+    Object res = null;
+    int n = 0;
+    for (Field f : cond.getClass().getDeclaredFields()) {
+      if (!java.lang.reflect.Modifier.isStatic(f.getModifiers())) {
+        f.setAccessible(true);
+        res = f.get(cond);
+        n++;
+      }
+    }
+    return n == 1 ? res : null;
+  }
+
+  private static Object field(Class<?> cls, String name, Object o) throws ReflectiveOperationException {
+    Field f = cls.getDeclaredField(name);
+    f.setAccessible(true);
+    return f.get(o);
+  }
+
+  /** Why what is in this folder may lead out of it: a symbolic link (or junction), or a file with another name (a hard link) */
+  private static String whyFolderMayLeadOut(Path folder) throws IOException {
+    boolean unix = folder.getFileSystem().supportedFileAttributeViews().contains("unix");
+    Path real = folder.toRealPath();
+    try (Stream<Path> files = Files.walk(folder)) {
+      for (Path p : (Iterable<Path>) files::iterator) {
+        BasicFileAttributes a = Files.readAttributes(p, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+        // (on Windows, what isn't a file or a folder may be a junction, or only a file in the cloud)
+        if (a.isSymbolicLink() || (unix && a.isOther()) || ((a.isDirectory() || a.isOther()) && !p.toRealPath().startsWith(real))) {
+          return "the template folder has a link, " + folder.relativize(p);
+        }
+        if (unix && Files.isRegularFile(p, LinkOption.NOFOLLOW_LINKS)
+            && ((Number) Files.getAttribute(p, "unix:nlink", LinkOption.NOFOLLOW_LINKS)).intValue() > 1) {
+          return "the template folder has a file with another name too, " + folder.relativize(p);
+        }
+      }
+    }
+    return null;
+  }
+
+  /** Whether the script's properties are expanded as Ant expands them by default (and nothing else runs when they are) */
+  private boolean onlyAntsPropertyEvaluation() throws ReflectiveOperationException {
+    PropertyHelper ph = PropertyHelper.getPropertyHelper(antProject);
+    if (ph.getClass() != PropertyHelper.class) {
+      return false;
+    }
+    Project plain = new Project();
+    plain.init();
+    Set<Object> ants = new HashSet<>();
+    for (List<?> l : delegates(PropertyHelper.getPropertyHelper(plain)).values()) {
+      ants.addAll(l);
+    }
+    for (List<?> l : delegates(ph).values()) {
+      for (Object d : l) {
+        // Ant's own <local> properties: running a target sets them up
+        if (!ants.contains(d) && d.getClass() != LocalProperties.class) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Map<?, List<?>> delegates(PropertyHelper ph) throws ReflectiveOperationException {
+    return (Map<?, List<?>>) field(PropertyHelper.class, "delegates", ph);
+  }
+
+  private String whyElementMaySeeOutput(UnknownElement e, Path tmpl) {
+    Set<String> allowed = BLIND_ELEMENTS.get(e.getTag());
+    RuntimeConfigurable w = e.getWrapper();
+    if (e.getClass() != UnknownElement.class || w == null || w.getClass() != RuntimeConfigurable.class || e.getRealThing() != null
+        || e.getProject() != antProject) {
+      return "<" + e.getQName() + "> of its own kind";
+    }
+    if (allowed == null || !e.getNamespace().isEmpty() || w.getPolyType() != null) {
+      return "<" + e.getQName() + (w.getPolyType() != null ? " ant-type=\"" + w.getPolyType() + "\"" : "") + ">";
+    }
+    if (w.getText() != null && EVALUATED_PROPERTY.matcher(w.getText()).find()) {
+      return "<" + e.getTag() + ">" + w.getText();
+    }
+    for (Map.Entry<String, Object> a : w.getAttributeMap().entrySet()) {
+      // what else is there is evaluated when the task is set up
+      if (a.getValue() == null || a.getValue().getClass() != String.class) {
+        return "<" + e.getTag() + " " + a.getKey() + "> of its own kind";
+      }
+      String n = a.getKey().toLowerCase();
+      String raw = String.valueOf(a.getValue());
+      if (!allowed.contains(n) || EVALUATED_PROPERTY.matcher(raw).find()) {
+        return "<" + e.getTag() + " " + a.getKey() + "=\"" + raw + "\">";
+      }
+      String v = antProject.replaceProperties(raw);
+      if (PATH_ATTRIBUTES.contains(n) || PATTERN_ATTRIBUTES.contains(n)) {
+        // a property that isn't set yet may be by the time it runs
+        boolean inside = !v.contains("${");
+        if (inside && PATH_ATTRIBUTES.contains(n)) {
+          inside = antProject.resolveFile(v).toPath().toAbsolutePath().normalize().startsWith(tmpl);
+        } else if (inside) {
+          for (String pt : v.split("[,\\s]+")) {
+            inside = inside && !pt.startsWith("/") && !pt.startsWith("\\") && !pt.contains(":") && !pt.contains("..");
+          }
+        }
+        if (!inside) {
+          return "<" + e.getTag() + " " + a.getKey() + "=\"" + v + "\">";
+        }
+      }
+    }
+    // Ant sets up what is nested from the wrappers' own children
+    List<UnknownElement> children = e.getChildren() == null ? new ArrayList<>() : e.getChildren();
+    List<RuntimeConfigurable> wrappers = Collections.list(w.getChildren());
+    if (wrappers.size() != children.size()) {
+      return "<" + e.getTag() + "> of its own kind";
+    }
+    for (int i = 0; i < children.size(); i++) {
+      UnknownElement c = children.get(i);
+      if (c.getWrapper() != wrappers.get(i)) {
+        return "<" + c.getTag() + "> of its own kind";
+      }
+      String why = whyElementMaySeeOutput(c, tmpl);
+      if (why != null) {
+        return why;
+      }
+    }
+    return null;
+  }
+
     
   public JsonArray getPreProcess() {
     return preProcess;

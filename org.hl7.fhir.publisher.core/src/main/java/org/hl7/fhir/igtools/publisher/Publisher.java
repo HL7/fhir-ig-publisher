@@ -196,6 +196,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     String rootDir = settings.getConfigFile();
     FileChangeMonitor monitor = null;
     WatchSession session = null;
+    JekyllDriver jekyllDriver = null;
     List<FileChangeMonitor.MonitoredPath> watched = null;
     Path watchRoot = null;
     // in watch mode, what a module's pre-processing wrote in input, in any build so far
@@ -224,6 +225,8 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         session = new WatchSession(watchRoot, paths);
         session.setLog(this::log);
         PackageListFetcher.rememberFetches();
+        jekyllDriver = JekyllDriver.forCommand(settings.jekyllCommand);
+        generator.setWatchTools(jekyllDriver, new FullIgZip());
       }
       loader.setWatchSession(session);
 
@@ -280,6 +283,10 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       } while (session != null && waitForChanges(monitor, session, buildOutputs(watchRoot), moduleWrites(watchRoot, moduleOutputs)));
     } finally {
       discardPageRebuild();
+      if (jekyllDriver != null) {
+        jekyllDriver.stop();
+      }
+      generator.setWatchTools(null, null);
       if (monitor != null) {
         // its thread would keep the JVM running
         try {
@@ -358,8 +365,9 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       TimeTracker.Session tts = pf.tt.start("generate");
       state.restore();
       log("Generating Outputs in " + pf.outputDir);
-      state.prepareTemp(generator.regeneratePages(pages));
-      generator.finishGenerate(state);
+      List<String> written = generator.regeneratePages(pages);
+      state.prepareTemp(written);
+      generator.finishGenerate(state, written);
       finishIg(state.getUncsList(), buildTracker, tts, true);
     } catch (Exception | Error e) {
       // (such as a page written twice: but running out of memory isn't something a complete build would help with)

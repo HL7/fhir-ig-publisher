@@ -103,8 +103,15 @@ public class PageRebuild {
   private Map<Path, Stamp> outputAfterJekyll;
   private Path stashFolder;
   private final List<Path> stashed = new ArrayList<>();
+  // the package step's files kept as the last html check left them while Jekyll runs (see
+  // keepCheckedPackageOutputs()), and where
+  private final List<Path> checkedKept = new ArrayList<>();
+  private Path checkedFolder;
   private boolean captured;
   private boolean complete;
+  // what the html checks found, and what the AI step worked out, in the last build or rebuild (for the next rebuild)
+  private HtmlCheckRecords htmlRecords;
+  private final AIProcessor.Cache aiCache = new AIProcessor.Cache();
   /** the languages that the pages are also written in, from their translations if they have one */
   private List<String> pageLanguages = Collections.emptyList();
   /** the folders in the input folder that the template reads before Jekyll, and how */
@@ -117,6 +124,18 @@ public class PageRebuild {
 
   public PublisherFields getPf() {
     return pf;
+  }
+
+  HtmlCheckRecords getHtmlRecords() {
+    return htmlRecords;
+  }
+
+  void setHtmlRecords(HtmlCheckRecords htmlRecords) {
+    this.htmlRecords = htmlRecords;
+  }
+
+  public AIProcessor.Cache getAiCache() {
+    return aiCache;
   }
 
   /**
@@ -555,6 +574,110 @@ public class PageRebuild {
       Files.createDirectories(dst.getParent());
       Files.copy(stashFolder.resolve(p), dst, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
     }
+  }
+
+  /**
+   * Before Jekyll runs in a rebuild: moves aside the package step's files that are as the last html check left them
+   * (Jekyll deletes them, and restorePackageOutputs() puts back copies of what the package step wrote), so that they
+   * can be put back instead (see putBackCheckedPackageOutputs()), and what the check found in them reused (a move
+   * keeps the modified time, which the check's records go by)
+   */
+  public void keepCheckedPackageOutputs() throws IOException {
+    dropCheckedPackageOutputs();
+    if (htmlRecords == null) {
+      return;
+    }
+    Path out = Paths.get(pf.outputDir);
+    for (Path p : stashed) {
+      Path f = out.resolve(p).toAbsolutePath();
+      HtmlCheckRecords.FileRecord r = htmlRecords.files.get(f.toString());
+      if (r != null && r.sameStamp() && Files.isRegularFile(f)) {
+        if (checkedFolder == null) {
+          // next to the output folder, so that the files are moved, not copied
+          checkedFolder = Files.createTempDirectory(out.toAbsolutePath().getParent(), ".package-checked-");
+        }
+        Path to = checkedFolder.resolve(p);
+        Files.createDirectories(to.getParent());
+        Files.move(f, to);
+        checkedKept.add(p);
+      }
+    }
+  }
+
+  /**
+   * After restorePackageOutputs(), when the html check is to go by what it found last time: puts the files that
+   * keepCheckedPackageOutputs() moved aside back over the copies. Returns them (as getPackageOutputs() does)
+   */
+  public List<String> putBackCheckedPackageOutputs() throws IOException {
+    List<String> res = new ArrayList<>();
+    Path out = Paths.get(pf.outputDir);
+    for (Path p : new ArrayList<>(checkedKept)) {
+      Files.move(checkedFolder.resolve(p), out.resolve(p), StandardCopyOption.REPLACE_EXISTING);
+      checkedKept.remove(p);
+      res.add(out.resolve(p).toAbsolutePath().toString());
+    }
+    return res;
+  }
+
+  /**
+   * Deletes what keepCheckedPackageOutputs() moved aside and wasn't put back: where the copies of what the package
+   * step wrote are, they stay; where nothing is (the rebuild stopped before they were put back), the files go back as
+   * they were. Never throws: it runs in a finally, and must not hide why that ran
+   */
+  public void dropCheckedPackageOutputs() {
+    if (checkedFolder == null) {
+      return;
+    }
+    Path out = Paths.get(pf.outputDir);
+    for (Path p : checkedKept) {
+      try {
+        if (!Files.exists(out.resolve(p))) {
+          Files.createDirectories(out.resolve(p).getParent());
+          Files.move(checkedFolder.resolve(p), out.resolve(p));
+        }
+      } catch (IOException e) {
+        log("Unable to put back " + out.resolve(p) + ": " + e.getMessage());
+      }
+    }
+    checkedKept.clear();
+    delete(checkedFolder);
+    if (Files.exists(checkedFolder)) {
+      // (it's next to the output folder, not in the system temp folder)
+      log("Unable to delete " + checkedFolder);
+    }
+    checkedFolder = null;
+  }
+
+  private void log(String msg) {
+    if (pf.logger != null) {
+      pf.logger.logMessage(msg);
+    } else {
+      System.out.println(msg);
+    }
+  }
+
+  /** The files in the output folder that restorePackageOutputs() puts back */
+  public List<String> getPackageOutputs() {
+    List<String> res = new ArrayList<>();
+    Path out = Paths.get(pf.outputDir);
+    for (Path p : stashed) {
+      res.add(out.resolve(p).toAbsolutePath().toString());
+    }
+    return res;
+  }
+
+  /**
+   * Puts back this file in the output folder (an absolute path), if the package step wrote it; returns whether it
+   * did
+   */
+  public boolean restorePackageOutput(String file) throws IOException {
+    Path out = Paths.get(pf.outputDir).toAbsolutePath();
+    Path p = Paths.get(file).toAbsolutePath();
+    if (!p.startsWith(out) || !stashed.contains(out.relativize(p))) {
+      return false;
+    }
+    Files.copy(stashFolder.resolve(out.relativize(p)), p, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+    return true;
   }
 
   /** Deletes the copies of the package files */

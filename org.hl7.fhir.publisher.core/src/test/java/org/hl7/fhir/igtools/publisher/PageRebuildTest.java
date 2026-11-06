@@ -271,6 +271,97 @@ class PageRebuildTest {
     assertFalse(Files.exists(stash));
   }
 
+  private String abs(String path) {
+    return dir.resolve(path).toAbsolutePath().toString();
+  }
+
+  /** what the html check records of a file it checked, as it finishes */
+  private HtmlCheckRecords.FileRecord checked(String path) throws IOException {
+    HTMLInspector inspector = new HTMLInspector(null, "root", new ArrayList<>(), new ArrayList<>(), null, "http://example.org/ig",
+        "example.ig", "0.1.0", null, new ArrayList<>(), null, false, null, new ArrayList<>(), false, new ArrayList<>(), null);
+    HtmlCheckRecords.FileRecord res = new HtmlCheckRecords.FileRecord(inspector.new LoadedFile(abs(path), path, 0, 0, null, false, true),
+        new ArrayList<>(), new ArrayList<>());
+    res.stamp();
+    return res;
+  }
+
+  /** a build in which the package step wrote two pages, which the html check then changed, and a package */
+  private HtmlCheckRecords builtAndChecked() throws IOException {
+    state.finished();
+    state.afterJekyll();
+    write("output/cmp/a.html", "<p>a</p>");
+    write("output/cmp/b.html", "<p>b</p>");
+    write("output/package.tgz", "tgz");
+    state.afterPackage();
+    write("output/cmp/a.html", "<p id=\"l1\">a</p>");
+    write("output/cmp/b.html", "<p id=\"l1\">b</p>");
+    HtmlCheckRecords records = new HtmlCheckRecords("signature");
+    records.files.put(abs("output/cmp/a.html"), checked("output/cmp/a.html"));
+    records.files.put(abs("output/cmp/b.html"), checked("output/cmp/b.html"));
+    state.setHtmlRecords(records);
+    return records;
+  }
+
+  private void jekyllRuns() throws IOException {
+    for (String f : Arrays.asList("output/cmp/a.html", "output/cmp/b.html", "output/package.tgz")) {
+      Files.deleteIfExists(dir.resolve(f));
+    }
+  }
+
+  private List<String> leftOver() throws IOException {
+    List<String> res = new ArrayList<>();
+    try (java.util.stream.Stream<Path> s = Files.list(dir)) {
+      s.filter(p -> p.getFileName().toString().startsWith(".package-checked-")).forEach(p -> res.add(p.toString()));
+    }
+    return res;
+  }
+
+  /**
+   * the package step's files that are as the last html check left them go back as it left them, not as the package step
+   * wrote them, so that what the check found in them can be reused; the others go back as the package step wrote them
+   */
+  @Test
+  void thePackageOutputsGoBackAsTheHtmlCheckLeftThem() throws IOException {
+    HtmlCheckRecords records = builtAndChecked();
+    // changed since the check
+    write("output/cmp/b.html", "<p id=\"l2\">bb</p>");
+
+    state.keepCheckedPackageOutputs();
+    jekyllRuns();
+    state.restorePackageOutputs();
+    assertEquals(Collections.singletonList(abs("output/cmp/a.html")), state.putBackCheckedPackageOutputs());
+    assertEquals("<p id=\"l1\">a</p>", read("output/cmp/a.html"));
+    assertTrue(records.files.get(abs("output/cmp/a.html")).sameStamp());
+    assertEquals("<p>b</p>", read("output/cmp/b.html"));
+    assertEquals("tgz", read("output/package.tgz"));
+    state.dropCheckedPackageOutputs();
+    assertEquals("<p id=\"l1\">a</p>", read("output/cmp/a.html"));
+    assertEquals(Collections.emptyList(), leftOver());
+  }
+
+  /**
+   * if the rebuild stops before they're put back, the files the html check left are where they were; if it put back
+   * the copies of what the package step wrote instead, those stay
+   */
+  @Test
+  void thePackageOutputsKeptAsideArentLost() throws IOException {
+    builtAndChecked();
+    state.keepCheckedPackageOutputs();
+    jekyllRuns();
+    state.dropCheckedPackageOutputs();
+    assertEquals("<p id=\"l1\">a</p>", read("output/cmp/a.html"));
+    assertEquals("<p id=\"l1\">b</p>", read("output/cmp/b.html"));
+    assertEquals(Collections.emptyList(), leftOver());
+
+    state.keepCheckedPackageOutputs();
+    jekyllRuns();
+    state.restorePackageOutputs();
+    state.dropCheckedPackageOutputs();
+    assertEquals("<p>a</p>", read("output/cmp/a.html"));
+    assertEquals("<p>b</p>", read("output/cmp/b.html"));
+    assertEquals(Collections.emptyList(), leftOver());
+  }
+
   @Test
   void aPackageStepThatDeletesOutputIsNotReplayed() throws IOException {
     state.finished();

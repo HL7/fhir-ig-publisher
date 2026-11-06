@@ -641,22 +641,8 @@ class ConformanceStatementHandler {
     // This is documented in the FHIR Implementation Guide on conformance statements
     // https://build.fhir.org/ig/FHIR/ig-guidance/conformance-statements.html
 
-    String langName = langForSource(source);
-    rc = new RenderingContext(context, rendererFactory, new MarkDownProcessor(MarkDownProcessor.Dialect.COMMON_MARK),
-        null, "http://hl7.org/fhir", "", new Locale(langName), RenderingContext.ResourceRendererMode.END_USER, RenderingContext.GenerationRules.VALID_RESOURCE);
-    rr = new ActorDefinitionRenderer(rc);
+    useLanguageOf(source);
 
-    termShallNot = rc.formatPhrase(RenderingContext.CONF_SHALLNOT); 
-    termShall = rc.formatPhrase(RenderingContext.CONF_SHALL); 
-    termShouldNot = rc.formatPhrase(RenderingContext.CONF_SHOULDNOT); 
-    termShould = rc.formatPhrase(RenderingContext.CONF_SHOULD); 
-    termMay = rc.formatPhrase(RenderingContext.CONF_MAY); 
-    termShallNotPlural = rc.formatPhrase(RenderingContext.CONF_SHALLNOT_PLURAL); 
-    termShallPlural = rc.formatPhrase(RenderingContext.CONF_SHALL_PLURAL); 
-    termShouldNotPlural = rc.formatPhrase(RenderingContext.CONF_SHOULDNOT_PLURAL); 
-    termShouldPlural = rc.formatPhrase(RenderingContext.CONF_SHOULD_PLURAL); 
-    termMayPlural = rc.formatPhrase(RenderingContext.CONF_MAY_PLURAL); 
-    
     List<XhtmlNodeHolder> divs = new ArrayList<>();
     Set<XhtmlNode> noClauseMarkers = Collections.newSetFromMap(new IdentityHashMap<>());
     findNodesWithoutClauseMarkers(x, noClauseMarkers);
@@ -671,6 +657,41 @@ class ConformanceStatementHandler {
       // We have called out clauses on this page, so show *all* non-flagged conformance statements, not just the first one
       messages.addAll(unwarnedMessages);
     }
+  }
+
+  /**
+   * Sets up the rendering for the language of the page source is in, as reading its clauses does: what is rendered
+   * at the end (e.g. the Requirements resource made from the narrative) uses the language of the last page read
+   */
+  public void useLanguageOf(LoadedFile source) {
+    String langName = langForSource(source);
+    rc = new RenderingContext(context, rendererFactory, new MarkDownProcessor(MarkDownProcessor.Dialect.COMMON_MARK),
+        null, "http://hl7.org/fhir", "", new Locale(langName), RenderingContext.ResourceRendererMode.END_USER, RenderingContext.GenerationRules.VALID_RESOURCE);
+    rr = new ActorDefinitionRenderer(rc);
+
+    termShallNot = rc.formatPhrase(RenderingContext.CONF_SHALLNOT); 
+    termShall = rc.formatPhrase(RenderingContext.CONF_SHALL); 
+    termShouldNot = rc.formatPhrase(RenderingContext.CONF_SHOULDNOT); 
+    termShould = rc.formatPhrase(RenderingContext.CONF_SHOULD); 
+    termMay = rc.formatPhrase(RenderingContext.CONF_MAY); 
+    termShallNotPlural = rc.formatPhrase(RenderingContext.CONF_SHALLNOT_PLURAL); 
+    termShallPlural = rc.formatPhrase(RenderingContext.CONF_SHALL_PLURAL); 
+    termShouldNotPlural = rc.formatPhrase(RenderingContext.CONF_SHOULDNOT_PLURAL); 
+    termShouldPlural = rc.formatPhrase(RenderingContext.CONF_SHOULD_PLURAL);
+    termMayPlural = rc.formatPhrase(RenderingContext.CONF_MAY_PLURAL);
+  }
+
+  /**
+   * A summary of what reading clauses has collected so far: if reading a page's clauses changes it, the page has
+   * clauses (watch mode doesn't reuse the html checks of pages with clauses, see HtmlCheckRecords)
+   */
+  public String stateSignature() {
+    int clauses = 0;
+    for (Map<String, ConformanceClause> m : languageClauses.values()) {
+      clauses += m.size();
+    }
+    return usedActors.size() + "|" + usedCategories.size() + "|" + hasConditionalTrue + "|" + hasConditionalFalse + "|"
+        + foundExpectations.size() + "|" + langCounts + "|" + confHomes.size() + "|" + languageClauses.size() + "|" + clauses;
   }
 
   private String langForSource(LoadedFile source) {
