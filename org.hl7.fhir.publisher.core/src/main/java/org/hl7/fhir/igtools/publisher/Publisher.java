@@ -1135,6 +1135,22 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         System.out.println("  "+s);
       }
       HierarchicalTableGenerator.uuid = buildTracker.getStringProperty("status", "uuid");
+      addCopiedFiles();
+    }
+  }
+
+  /**
+   * In a differential build, the files that are only copied to the temp folder (pages, includes, images) are copied
+   * again, in file order as in a complete build: the template's scripts copy its own files there on every build, and
+   * an IG file that overrides one of them (an include, say) has to be written after it, or the template's version is used
+   */
+  private void addCopiedFiles() {
+    Set<FetchedFile> changed = new HashSet<>(pf.changeList);
+    pf.changeList.clear();
+    for (FetchedFile f : pf.fileList) {
+      if (changed.contains(f) || (f.getResources().isEmpty() && f.getProcessMode() != FetchedFile.PROCESS_RESOURCE)) {
+        pf.changeList.add(f);
+      }
     }
   }
 

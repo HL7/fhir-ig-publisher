@@ -44,10 +44,12 @@ class PublisherRapidoWatchTest {
 
     HierarchicalTableGenerator.uuid = "a-new-session"; // as resetForRebuild leaves it
 
-    // the patient changes: the observation that refers to it is built again, the other patient isn't
+    // the patient changes: the observation that refers to it is built again, the other patient isn't. The page is
+    // only copied to the temp folder, which is done again in every build (after the template's files, as it may
+    // override one of them)
     List<FetchedFile> changes = build(new IniFile(dir.resolve(".build-tracker.ini").toString()), 3);
 
-    assertEquals(List.of("Patient-a.json", "Observation-o.json"), names(changes));
+    assertEquals(List.of("Patient-a.json", "Observation-o.json", "page.md"), names(changes));
     assertEquals("the-last-build", HierarchicalTableGenerator.uuid);
   }
 
@@ -78,6 +80,7 @@ class PublisherRapidoWatchTest {
     FetchedFile other = file("Patient-b.json", 5, resource("Patient", "b"));
     FetchedFile observation = file("Observation-o.json", 7, resource("Observation", "o", primitive("Patient/a")));
     FetchedFile page = file("page.md", 9);
+    page.setProcessMode(FetchedFile.PROCESS_NONE);
 
     Publisher publisher = new Publisher();
     publisher.getSettings().setRapidoMode(true);
