@@ -1,0 +1,17 @@
+{
+  "resourceType": "StructureDefinition",
+  "id": "AdditionalRecord",
+  "url": "http://hl7.org/fhir/5.0/StructureDefinition/AdditionalRecord",
+  "name": "AdditionalRecord",
+  "status": "draft",
+  "kind": "resource",
+  "abstract": false,
+  "type": "AdditionalRecord",
+  "derivation": "specialization",
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/tools/StructureDefinition/additional-resource",
+      "valueBoolean": true
+    }
+  ]
+}

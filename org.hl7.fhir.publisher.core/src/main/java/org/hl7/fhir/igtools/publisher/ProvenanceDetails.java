@@ -1,7 +1,7 @@
 package org.hl7.fhir.igtools.publisher;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -34,7 +34,7 @@ public class ProvenanceDetails {
   private Coding action;
   private BaseDateTimeType date;
   private String comment;
-  private Map<Coding, Reference> actors = new HashMap<>();
+  private Map<Coding, Reference> actors = new LinkedHashMap<>();
   private List<ProvenanceDetailsTarget> targets;
   
   

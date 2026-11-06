@@ -1,0 +1,17 @@
+{
+  "resourceType": "StructureDefinition",
+  "id": "PatientProfile",
+  "url": "http://example.org/fhir/StructureDefinition/PatientProfile",
+  "name": "PatientProfile",
+  "status": "draft",
+  "kind": "resource",
+  "abstract": false,
+  "type": "PatientProfile",
+  "derivation": "constraint",
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/tools/StructureDefinition/additional-resource",
+      "valueBoolean": true
+    }
+  ]
+}

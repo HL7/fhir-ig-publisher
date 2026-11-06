@@ -214,7 +214,10 @@ public class FeedBuilder {
       if (forPackage && new File(Utilities.path(pub.folder, "package.tgz")).exists()) {
         // open the package, check the details and get the description
         try {
-          NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(Utilities.path(pub.folder, "package.tgz")));
+          NpmPackage npm;
+          try (FileInputStream in = new FileInputStream(Utilities.path(pub.folder, "package.tgz"))) {
+            npm = NpmPackage.fromPackage(in);
+          }
           if (!(npm.name()+"#"+npm.version()).equals(pub.title(forPackage)))
             System.out.println("id mismatch in "+Utilities.path(pub.folder, "package.tgz")+" - expected "+pub.title(forPackage)+" but found "+npm.name()+"#"+npm.version());
           desc = npm.description();
@@ -229,7 +232,10 @@ public class FeedBuilder {
       if (forPackage) {
         for (String s : pub.subPackages) {
           // open the package, check the details and get the description
-          NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(Utilities.path(pub.folder, s+".tgz")), Utilities.path(pub.folder, s+".tgz"));
+          NpmPackage npm;
+          try (FileInputStream in = new FileInputStream(Utilities.path(pub.folder, s+".tgz"))) {
+            npm = NpmPackage.fromPackage(in, Utilities.path(pub.folder, s+".tgz"));
+          }
           if (!npm.name().equals(s))
             System.out.println("id mismatch in "+Utilities.path(pub.folder, s+".tgz")+" - expected "+s+" but found "+npm.name());
           if (!npm.version().equals(pub.version))
