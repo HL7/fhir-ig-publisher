@@ -1,9 +1,11 @@
 package org.hl7.fhir.igtools.publisher;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -49,6 +51,26 @@ class PublisherRapidoWatchTest {
     assertEquals("the-last-build", HierarchicalTableGenerator.uuid);
   }
 
+  @Test
+  void withoutARecordOfWhatTheLastBuildWroteTheBuildIsComplete() throws Exception {
+    IniFile buildTracker = new IniFile(dir.resolve(".build-tracker.ini").toString());
+    buildTracker.setBooleanProperty("status", "started", true, null);
+    buildTracker.setBooleanProperty("status", "complete", true, null);
+    buildTracker.setStringProperty("status", "uuid", "the-last-build", null);
+    for (String[] tracked : new String[][] {{"ig.json", "1"}, {"Patient-a.json", Long.toString(37 * 2 + 1)},
+      {"Patient-b.json", Long.toString(37 * 5 + 1)}, {"Observation-o.json", Long.toString((37 * 7 + 1) * 37 + 37 * 2 + 1)},
+      {"page.md", Long.toString(37 * 9 + 1)}}) {
+      buildTracker.setStringProperty("tracked", tracked[0], tracked[1], null);
+    }
+    buildTracker.save();
+
+    // the patient changes, but what the unchanged files wrote in the temp folder isn't known (an older publisher built it)
+    List<FetchedFile> changes = build(buildTracker, 3);
+
+    assertEquals(List.of("ig.json", "Patient-a.json", "Patient-b.json", "Observation-o.json", "page.md"), names(changes));
+    assertTrue(Files.isDirectory(dir.resolve("temp")), "the temp folder is cleared for the complete build");
+  }
+
   /** checkDependencies on new files, as a watch rebuild loads them, with the given hash for Patient/a */
   private List<FetchedFile> build(IniFile buildTracker, long patientHash) throws Exception {
     FetchedFile ig = file("ig.json", 1);
@@ -67,6 +89,10 @@ class PublisherRapidoWatchTest {
     pf.template = mock(Template.class);
     pf.fileList.addAll(List.of(ig, patient, other, observation, page));
     publisher.setPf(pf);
+    // as build() does, for a complete build to clear the temp folder
+    Field loader = Publisher.class.getDeclaredField("loader");
+    loader.setAccessible(true);
+    ((PublisherIGLoader) loader.get(publisher)).setPf(pf);
 
     publisher.checkDependencies(ig, buildTracker);
     return pf.changeList;
