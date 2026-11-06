@@ -1340,6 +1340,10 @@ public class RapidoTracker {
     if (pf.errors.size() < rec.errorsBefore || f.getErrors().size() < rec.fileErrorsBefore || pf.expansions.size() < rec.expansionsBefore) {
       return;
     }
+    // a phase that failed with an exception (a file that couldn't be written, say) is done again in the next build
+    if (threw(pf.errors.subList(rec.errorsBefore, pf.errors.size())) || threw(f.getErrors().subList(rec.fileErrorsBefore, f.getErrors().size()))) {
+      return;
+    }
     if (!addMessages(j.forceArray("errors"), pf.errors.subList(rec.errorsBefore, pf.errors.size()))
         || !addMessages(j.forceArray("fileErrors"), f.getErrors().subList(rec.fileErrorsBefore, f.getErrors().size()))) {
       return;
@@ -1350,7 +1354,7 @@ public class RapidoTracker {
     JsonObject re = j.forceObject("resErrors");
     for (int i = 0; i < rec.resErrorsBefore.length; i++) {
       List<ValidationMessage> errs = f.getResources().get(i).getErrors();
-      if (errs.size() < rec.resErrorsBefore[i]) {
+      if (errs.size() < rec.resErrorsBefore[i] || threw(errs.subList(rec.resErrorsBefore[i], errs.size()))) {
         return;
       }
       if (errs.size() > rec.resErrorsBefore[i] && !addMessages(re.forceArray(Integer.toString(i)), errs.subList(rec.resErrorsBefore[i], errs.size()))) {
@@ -1366,6 +1370,15 @@ public class RapidoTracker {
       }
     }
     newFile(f).set(rec.phase, j);
+  }
+
+  private static boolean threw(List<ValidationMessage> list) {
+    for (ValidationMessage vm : list) {
+      if (vm.getSource() == ValidationMessage.Source.Publisher && vm.getType() == ValidationMessage.IssueType.EXCEPTION) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private boolean addMessages(JsonArray a, List<ValidationMessage> list) {
