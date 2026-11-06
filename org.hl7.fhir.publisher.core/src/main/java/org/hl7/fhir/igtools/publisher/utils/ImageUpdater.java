@@ -49,7 +49,9 @@ public class ImageUpdater {
       }
       if (f.getName().equals(filename)) {
         System.out.println("  Overwrite "+f.getAbsolutePath()+" with "+source);
-        IOUtils.copy(new FileInputStream(source), new FileOutputStream(f));
+        try (FileInputStream in = new FileInputStream(source); FileOutputStream out2 = new FileOutputStream(f)) {
+          IOUtils.copy(in, out2);
+        }
       }
     }
   }

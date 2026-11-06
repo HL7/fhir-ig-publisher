@@ -247,6 +247,16 @@ public class PublisherIGLoader extends PublisherBase {
     }
   }
 
+  // null if they can't be read: watch mode then reports the changes in input by their events
+  private Map<Path, String> inputStates(Path input) {
+    try {
+      return FileChangeMonitor.fileStates(input);
+    } catch (IOException e) {
+      log("Unable to read the files in " + input + ", so watch mode may take what the module writes for edits: " + e.getMessage());
+      return null;
+    }
+  }
+
   private IniFile checkNewIg() throws IOException {
     if (settings.getConfigFile() == null)
       return null;
@@ -285,9 +295,17 @@ public class PublisherIGLoader extends PublisherBase {
     pf.module = loadModule(ini.getStringProperty("IG", "module"));
     if (pf.module.useRoutine("preProcess")) {
       log("== Ask "+ pf.module.name()+" to pre-process the IG ============================");
+      Path input = Paths.get(Utilities.path(pf.rootDir, "input"));
+      Map<Path, String> inputBefore = settings.isWatchMode() ? inputStates(input) : null;
       if (!pf.module.preProcess(pf.rootDir)) {
         throw new Exception("Process terminating due to Module failure");
       } else {
+        Map<Path, String> inputAfter = inputBefore == null ? null : inputStates(input);
+        if (inputAfter != null) {
+          // so that watch mode doesn't take what it wrote for an edit
+          pf.inputBeforeModule = inputBefore;
+          pf.moduleWrites = FileChangeMonitor.changedFiles(inputBefore, inputAfter);
+        }
         log("== Done ====================================================================");
       }
     }
@@ -311,6 +329,10 @@ public class PublisherIGLoader extends PublisherBase {
     }
     pf.templateManager.loadTemplateOverrides(ini, pf.rootDir);
     pf.template = pf.templateManager.loadTemplate(templateName, pf.rootDir, pf.packageId(), settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD, pf.logOptions.contains("template"), settings.isRapidoMode());
+    if (settings.isRapidoMode() && pf.template.isDevMode()) {
+      // the temp folder is cleared on every run for a template in development, so every rapido build is a complete one (see Publisher.checkDependencies)
+      log("Rapido Mode: the template is in development mode (a local folder), so -rapido has no effect: every build is a complete build");
+    }
     if (pf.template.hasExtraTemplates()) {
       processExtraTemplates(pf.template.getExtraTemplates());
     }
@@ -632,7 +654,10 @@ public class PublisherIGLoader extends PublisherBase {
         case "additional-resource": {
           pf.additionalResourceFiles.add(p.getValue());
           try {
-            StructureDefinition sd = (StructureDefinition) new XmlParser(ModelContext.fullCoreContext()).parse(new FileInputStream(Utilities.path(pf.rootDir, p.getValue())));
+            StructureDefinition sd;
+            try (FileInputStream in = new FileInputStream(Utilities.path(pf.rootDir, p.getValue()))) {
+              sd = (StructureDefinition) new XmlParser(ModelContext.fullCoreContext()).parse(in);
+            }
             if (sd.hasExtension(ExtensionDefinitions.EXT_ADDITIONAL_RESOURCE)) {
               sd.getExtensionByUrl(ExtensionDefinitions.EXT_ADDITIONAL_RESOURCE).setValue(new BooleanType(true));
             } else {
@@ -1054,11 +1079,11 @@ public class PublisherIGLoader extends PublisherBase {
         pf.context.setCanRunWithoutTerminology(true);
         pf.txLog = null;
       } else {
-        log("Connect to Terminology Server at "+ settings.getTxServer());
-        pf.context.connectToTSServer(new TerminologyClientFactory(pf.version), settings.getTxServer(), "fhir/publisher", pf.txLog, true);
+        log("Connect to Terminology Server at "+ settings.getTxServer()+(settings.getEcosystem() == null ? " (no ecosystem)" : " (ecosystem: "+settings.getEcosystem()+")"));
+        pf.context.connectToTSServer(new TerminologyClientFactory(pf.version), settings.getTxServer(), "fhir/publisher", pf.txLog, settings.getEcosystem());
       }
     } else {
-      pf.context.connectToTSServer(new TerminologyClientFactory(pf.version), pf.webTxServer.getAddress(), "fhir/publisher", pf.txLog, true);
+      pf.context.connectToTSServer(new TerminologyClientFactory(pf.version), pf.webTxServer.getAddress(), "fhir/publisher", pf.txLog, settings.getEcosystem());
     }
     if (expParams != null) {
       /* This call to uncheckedPath is allowed here because the path is used to
@@ -1521,20 +1546,20 @@ public class PublisherIGLoader extends PublisherBase {
         }
       } else {
         this.pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.NOTFOUND, path, "Supressed messages file is not using the new format (see https://confluence.hl7.org/display/FHIR/Implementation+Guide+Parameters)", ValidationMessage.IssueSeverity.ERROR));
-        InputStreamReader r = new InputStreamReader(new FileInputStream(messageFile));
-        StringBuilder b = new StringBuilder();
-        while (r.ready()) {
-          char c = (char) r.read();
-          if (c == '\r' || c == '\n') {
-            if (b.length() > 0)
-              this.pf.suppressedMessages.add(b.toString(), "?pub-msg-2?");
-            b = new StringBuilder();
-          } else
-            b.append(c);
+        try (InputStreamReader r = new InputStreamReader(new FileInputStream(messageFile))) {
+          StringBuilder b = new StringBuilder();
+          while (r.ready()) {
+            char c = (char) r.read();
+            if (c == '\r' || c == '\n') {
+              if (b.length() > 0)
+                this.pf.suppressedMessages.add(b.toString(), "?pub-msg-2?");
+              b = new StringBuilder();
+            } else
+              b.append(c);
+          }
+          if (b.length() > 0)
+            this.pf.suppressedMessages.add(b.toString(), "?pub-msg-3?");
         }
-        if (b.length() > 0)
-          this.pf.suppressedMessages.add(b.toString(), "?pub-msg-3?");
-        r.close();
       }
     }
   }
@@ -1564,7 +1589,9 @@ public class PublisherIGLoader extends PublisherBase {
       pi = pf.pcm.loadPackage(VersionUtilities.packageForVersion(v), v);
     } else {
       log("Load Core from provided file "+ pf.igPack);
-      pi = NpmPackage.fromPackage(new FileInputStream(pf.igPack));
+      try (FileInputStream in = new FileInputStream(pf.igPack)) {
+        pi = NpmPackage.fromPackage(in);
+      }
     }
     if (pi == null) {
       throw new Error("Unable to load core package!");
@@ -2808,7 +2835,11 @@ public class PublisherIGLoader extends PublisherBase {
     for (String dir : pf.translationSources) {
       File df = new File(Utilities.path(pf.rootDir, dir));
       if (df.exists()) {
-        for (String fn : df.list()) {
+        // sorted, so that translations come in the same order on every machine: File.list() makes no promise
+        // about the order, and the translation extensions are made in the order the units are found
+        String[] names = df.list();
+        Arrays.sort(names);
+        for (String fn : names) {
           if ((fn.startsWith(base+".") || fn.startsWith(base+"-") || fn.startsWith(base+"_")) ||
                   (fn.startsWith(tbase+".") || fn.startsWith(tbase+"-") || fn.startsWith(tbase+"_"))) {
             LanguageFileProducer lp = null;
@@ -4108,10 +4139,12 @@ public class PublisherIGLoader extends PublisherBase {
 
   private List<LanguageFileProducer.TranslationUnit> loadTranslations(File f, String ext) throws FileNotFoundException, IOException, ParserConfigurationException, SAXException {
     try {
-      switch (ext) {
-        case "po": return new PoGetTextProducer().loadSource(new FileInputStream(f));
-        case "xliff": return new XLIFFProducer().loadSource(new FileInputStream(f));
-        case "json": return new JsonLangFileProducer().loadSource(new FileInputStream(f));
+      try (FileInputStream in = new FileInputStream(f)) {
+        switch (ext) {
+          case "po": return new PoGetTextProducer().loadSource(in);
+          case "xliff": return new XLIFFProducer().loadSource(in);
+          case "json": return new JsonLangFileProducer().loadSource(in);
+        }
       }
     } catch (Exception e) {
       throw new FHIRException("Error parsing "+f.getAbsolutePath()+": "+e.getMessage(), e);
@@ -4120,7 +4153,7 @@ public class PublisherIGLoader extends PublisherBase {
   }
 
 
-  private void loadPrePages() throws Exception {
+  void loadPrePages() throws Exception {
     if (pf.prePagesDirs.isEmpty())
       return;
 
@@ -4153,12 +4186,11 @@ public class PublisherIGLoader extends PublisherBase {
       }
       addFile(dir, false);
     }
+    // the fetched paths are canonical, and basePath may not be (a symlink, or an 8.3 short name on Windows)
+    String canonicalBasePath = new File(basePath).getCanonicalPath();
     for (String link : dir.getFiles()) {
       FetchedFile f = this.pf.fetcher.fetch(link);
-      if (basePath.startsWith("/var") && f.getPath().startsWith("/private/var")) {
-        f.setPath(f.getPath().substring(8));
-      }
-      f.setRelativePath(f.getPath().substring(basePath.length()+1));
+      f.setRelativePath(f.getPath().substring(canonicalBasePath.length()+1));
       if (f.isFolder())
         loadPrePages(f, basePath);
       else
@@ -4468,7 +4500,7 @@ public class PublisherIGLoader extends PublisherBase {
           r.setElement(e).setId(id).setTitle(e.getChildValue("name"));
           r.setResource(res);
         }
-        if (new AdjunctFileLoader(pf.binaryPaths, pf.cql).replaceAttachments1(file, r, metadataResourceNames())) {
+        if (new AdjunctFileLoader(pf.binaryPaths, pf.cql, isDebugLogging()).replaceAttachments1(file, r, metadataResourceNames())) {
           altered = true;
         }
         if (isNewML()) {
@@ -4835,7 +4867,7 @@ public class PublisherIGLoader extends PublisherBase {
             bc.setStatus(Enumerations.PublicationStatus.DRAFT);
           }
         }
-        if (new AdjunctFileLoader(this.pf.binaryPaths, this.pf.cql).replaceAttachments2(f, r)) {
+        if (new AdjunctFileLoader(this.pf.binaryPaths, this.pf.cql, isDebugLogging()).replaceAttachments2(f, r)) {
           altered = true;
         }
         if (this.pf.oidRoot != null && !hasOid(bc.getIdentifierList())) {

@@ -197,7 +197,9 @@ public class TemplateReleaser {
       if (bak.exists())
         bak.delete();
       xml.renameTo(bak);
-      saveXml(new FileOutputStream(xml)); 
+      try (FileOutputStream out = new FileOutputStream(xml)) {
+        saveXml(out);
+      }
 
       System.out.println("Updating Indexes");
       tidyDirectory(source, new File(dest), new File(dest), false);
@@ -213,7 +215,10 @@ public class TemplateReleaser {
         File npmf = new File(Utilities.path(f, "package.tgz"));
         File ndxf = new File(Utilities.path(f, "index.html"));
         if (npmf.exists() && ndxf.exists()) {
-          NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(npmf));
+          NpmPackage npm;
+          try (FileInputStream in = new FileInputStream(npmf)) {
+            npm = NpmPackage.fromPackage(in);
+          }
           String index = FileUtilities.fileToString(Utilities.path(source, "index.template"));
           index = index.replace("{pid}", npm.name());
           if (ver) {
@@ -247,7 +252,10 @@ public class TemplateReleaser {
       if (!f.exists()) {
         return npm.name()+"#"+npm.version()+ " --> "+base+"#"+baseVer+" (broken)";
       } else {
-        NpmPackage bnpm = NpmPackage.fromPackage(new FileInputStream(npmf));
+        NpmPackage bnpm;
+        try (FileInputStream in = new FileInputStream(npmf)) {
+          bnpm = NpmPackage.fromPackage(in);
+        }
         return npm.name()+"#"+npm.version()+ " --> "+buildDep(dest, bnpm);       
       }
     }
@@ -289,7 +297,10 @@ public class TemplateReleaser {
     if (!f.exists()) {
       return cver + " / ?";
     } else {
-      NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(f));
+      NpmPackage npm;
+      try (FileInputStream in = new FileInputStream(f)) {
+        npm = NpmPackage.fromPackage(in);
+      }
       return cver +" / "+npm.getNpm().forceObject("dependencies").asString(base);
     }
   }
@@ -327,7 +338,7 @@ public class TemplateReleaser {
   }
 
   private void updateVersions(String source, VersionDecision vd, List<VersionDecision> versionsList) throws FileNotFoundException, IOException {
-    JsonObject npm = JsonParser.parseObject(new FileInputStream(Utilities.path(source, vd.getId(), "package", "package.json")));
+    JsonObject npm = JsonParser.parseObject(new File(Utilities.path(source, vd.getId(), "package", "package.json")));
     npm.remove("version");
     npm.add("version", vd.getNewVersion());
     if (npm.has("dependencies")) {
@@ -346,7 +357,7 @@ public class TemplateReleaser {
   }
 
   private void resetVersions(String source, VersionDecision vd, List<VersionDecision> versionsList) throws FileNotFoundException, IOException {
-    JsonObject npm = JsonParser.parseObject(new FileInputStream(Utilities.path(source, vd.getId(), "package", "package.json")));
+    JsonObject npm = JsonParser.parseObject(new File(Utilities.path(source, vd.getId(), "package", "package.json")));
     if (npm.has("dependencies")) {
       JsonObject d = npm.getJsonObject("dependencies");
       List<String> deps = new ArrayList<>();
@@ -579,7 +590,10 @@ public class TemplateReleaser {
     File p = new File(Utilities.path(source, folder, "output", "package.tgz"));
     check(p.exists(), "Source Package "+p.getAbsolutePath()+" not found");
     check(!p.isDirectory(), "Source Package "+p.getAbsolutePath()+" is a directory");
-    NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(p));
+    NpmPackage npm;
+    try (FileInputStream in = new FileInputStream(p)) {
+      npm = NpmPackage.fromPackage(in);
+    }
     String pid = npm.name();
     String version = npm.version();
     check(pid != null, "Source Package "+p.getAbsolutePath()+" Package id not found");
@@ -672,10 +686,11 @@ public class TemplateReleaser {
   }
 
   private Document loadXml(File file) throws Exception {
-    InputStream src = new FileInputStream(file);
     DocumentBuilderFactory dbf = XMLUtil.newXXEProtectedDocumentBuilderFactory();
     DocumentBuilder db = dbf.newDocumentBuilder();
-    return db.parse(src);
+    try (InputStream src = new FileInputStream(file)) {
+      return db.parse(src);
+    }
   }
 
   private void checkNote(String note) {

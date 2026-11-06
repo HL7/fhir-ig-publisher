@@ -19,7 +19,9 @@ public class PackagePacker {
     System.out.println("Build Package");
     NpmPackage npm = NpmPackage.fromFolder(path);
     npm.loadAllFiles();
-    npm.save(new FileOutputStream("/Users/grahamegrieve/web/hl7.org/fhir/extensions/5.1.0-snapshot1/package.tgz"));
+    try (FileOutputStream out = new FileOutputStream("/Users/grahamegrieve/web/hl7.org/fhir/extensions/5.1.0-snapshot1/package.tgz")) {
+      npm.save(out);
+    }
     
   }
 }

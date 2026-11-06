@@ -171,7 +171,9 @@ public class PublicationChecker {
     if (check(messages, exists("output", "package.tgz"), "No output package found - can't check publication details"+mkWarning())) {
       NpmPackage npm = null;
       try {
-        npm = NpmPackage.fromPackage(new FileInputStream(Utilities.path(folder, "output", "package.tgz")));
+        try (FileInputStream in = new FileInputStream(Utilities.path(folder, "output", "package.tgz"))) {
+          npm = NpmPackage.fromPackage(in);
+        }
       } catch (Exception e) {
         check(messages, false, "Error reading package: "+e.getMessage()+mkError());
       }
