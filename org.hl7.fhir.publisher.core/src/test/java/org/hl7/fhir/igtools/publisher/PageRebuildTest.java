@@ -242,6 +242,33 @@ class PageRebuildTest {
   }
 
   @Test
+  void prepareTempLeavesRapidosStateAlone() throws IOException {
+    write("temp/_rapido/state.json", "{}");
+    state.beforeJekyll();
+    // saved again at the end of the build, and created by the first one
+    write("temp/_rapido/state.json", "{\"files\":{}}");
+    Files.setLastModifiedTime(dir.resolve("temp/_rapido/state.json"), FileTime.fromMillis(System.currentTimeMillis() + 5000));
+    write("temp/_rapido/claimed.txt", "x");
+    state.prepareTemp(Collections.emptyList());
+    assertEquals("{\"files\":{}}", read("temp/_rapido/state.json"));
+    assertEquals("x", read("temp/_rapido/claimed.txt"));
+  }
+
+  @Test
+  void prepareTempLeavesTheWatchStagingFolderAlone() throws IOException {
+    // in watch mode the build writes its output in the temp folder, and the sync moves files out of it
+    pf.outputDir = dir.resolve("temp/.watch-output").toString();
+    write("temp/.watch-output/package-combined.tgz", "pkg");
+    write("temp/.watch-output/en/index.html", "<html/>");
+    state.beforeJekyll();
+    Files.delete(dir.resolve("temp/.watch-output/package-combined.tgz"));
+    write("temp/.watch-output/en/other.html", "<html/>");
+    state.prepareTemp(Collections.emptyList());
+    assertEquals("<html/>", read("temp/.watch-output/en/other.html"));
+    assertEquals("# Home", read("temp/index.md"));
+  }
+
+  @Test
   void prepareTempFailsForAPageThatWasntThereBefore() throws IOException {
     state.beforeJekyll();
     write("temp/other.md", "other");
