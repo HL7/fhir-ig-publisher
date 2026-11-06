@@ -29,13 +29,17 @@ public class PackageRegistryBuilder {
   public void updateForWithdrawal(String path, PackageList list, String withdrawalReason) throws JsonException, IOException {
     JsonObject j = JsonParser.parseObject(prFile());
     update(j,  Utilities.pathURL(path, "package-list.json"), list, withdrawalReason);
-    JsonParser.compose(j, new FileOutputStream(prFile()), true);
+    try (FileOutputStream out = new FileOutputStream(prFile())) {
+      JsonParser.compose(j, out, true);
+    }
   }
 
   public void update(String path, PackageList list) throws JsonException, IOException {
     JsonObject j = JsonParser.parseObject(prFile());
     update(j, Utilities.pathURL(path, "package-list.json"), list, null);
-    JsonParser.compose(j, new FileOutputStream(prFile()), true);
+    try (FileOutputStream out = new FileOutputStream(prFile())) {
+      JsonParser.compose(j, out, true);
+    }
   }
   
   private void update(JsonObject json, String path, PackageList pl, String withdrawalReason) {
@@ -105,7 +109,9 @@ public class PackageRegistryBuilder {
     for (String path : Utilities.sorted(packages.keySet())) {
       update(j, path,  packages.get(path), null);
     }
-    JsonParser.compose(j, new FileOutputStream(prFile()), true);
+    try (FileOutputStream out = new FileOutputStream(prFile())) {
+      JsonParser.compose(j, out, true);
+    }
     System.out.println("Done. Built "+prFile().getAbsolutePath());
   }
 

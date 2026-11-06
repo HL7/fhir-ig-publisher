@@ -50,6 +50,7 @@ import lombok.Setter;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.PublisherBase.FragmentUseRecord;
+import org.hl7.fhir.igtools.renderers.IPViewRenderer;
 import org.hl7.fhir.igtools.publisher.PublisherUtils.LinkedSpecification;
 import org.hl7.fhir.igtools.publisher.SpecMapManager.SpecialPackageType;
 import org.hl7.fhir.igtools.publisher.modules.IPublisherModule;
@@ -249,7 +250,6 @@ public class HTMLInspector {
 
   private boolean strict;
   @Getter private String rootFolder;
-  private String altRootFolder;
   private List<SpecMapManager> specs;
   private List<LinkedSpecification> linkSpecs;
   private Map<String, LoadedFile> cache = new HashMap<String, LoadedFile>();
@@ -296,6 +296,8 @@ public class HTMLInspector {
   private Map<String, FragmentUseRecord> fragmentUses = new HashMap<>();
   private List<RelatedIG> relatedIGs;
   private List<ExternalReference> externalReferences = new ArrayList<>();
+  // the same entries, by url, so that adding one doesn't look at all the others
+  private Map<String, List<ExternalReference>> externalReferencesByUrl = new HashMap<>();
   private Map<String, XhtmlNode> imageRefs = new HashMap<>();
   private Map<String, String> copyrights = new HashMap<>();
   // the text of the last parent of a text node with a copyright mark, while the tree hasn't changed since: when a
@@ -306,6 +308,11 @@ public class HTMLInspector {
   private int copyrightParentTreeChanges;
   // the number of changes checkLinks() has made to the text of the tree
   private int linkCheckTreeChanges;
+  // once a page has this many uses of the marks, the rest aren't recorded: the page gets one entry saying so instead
+  private static final int MAX_COPYRIGHT_USES_PER_PAGE = 20;
+  // the uses of the marks found on the current page so far, and whether all the ones recorded were in renderings
+  private int copyrightUses;
+  private boolean copyrightUsesAllRenderings;
   private boolean noCIBuildIssues;
   private String packageId;
   private String version;
@@ -335,10 +342,6 @@ public class HTMLInspector {
     requirePublishBox = Utilities.startsWithInList(packageId, "hl7.");
     this.context = context;
     this.csHandler = new ConformanceStatementHandler(this, context, log, langList, forHL7, rendererFactory);
-  }
-
-  public void setAltRootFolder(String altRootFolder) throws IOException {
-    this.altRootFolder = Utilities.path(rootFolder, altRootFolder.replace("/", File.separator));
   }
 
   public List<ValidationMessage> check(String statusMessageDef, Map<String, String> statusMessagesLang) throws IOException {
@@ -462,6 +465,8 @@ public class HTMLInspector {
         }
         copyrightParent = null;
         copyrightParentText = null;
+        copyrightUses = 0;
+        copyrightUsesAllRenderings = true;
         boolean changed = checkLinks(lf, s, "", x, null, messages, false, dat, null) != NodeChangeType.NONE || bh.ok() || headingsShifted; // returns true if changed
         // after all the checks, so the panel's own markup is never checked
         if (accessibilityPanel && addAccessibilityPanel(lf, x)) {
@@ -661,9 +666,9 @@ public class HTMLInspector {
 
   public void saveFile(LoadedFile lf, XhtmlNode x) throws IOException {
     new File(lf.getFilename()).delete();
-    FileOutputStream f = new FileOutputStream(lf.getFilename());
-    new XhtmlComposer(XhtmlComposer.HTML).composeDocument(f, x);
-    f.close();
+    try (FileOutputStream f = new FileOutputStream(lf.getFilename())) {
+      new XhtmlComposer(XhtmlComposer.HTML).composeDocument(f, x);
+    }
   }
 
   private void checkGoneFiles() {
@@ -1626,7 +1631,7 @@ public class HTMLInspector {
     if (x.getNodeType() == NodeType.Text) {
       String tx = x.allText().toUpperCase();
       if (tx.contains("©") || tx.contains("®") || tx.contains("(R)") || tx.contains("(TM)") || tx.contains("(C)") ) {
-        copyrights.put(parent == null ? tx : copyrightParentText(parent), FileUtilities.getRelativePath(rootFolder, lf.filename));
+        noteCopyrightUse(parent == null ? tx : null, parent, FileUtilities.getRelativePath(rootFolder, lf.filename));
       }
     }
     if ("title".equals(x.getName()) && Utilities.noString(x.allText())) {
@@ -1678,6 +1683,25 @@ public class HTMLInspector {
       return NodeChangeType.CHILD;
     else
       return NodeChangeType.NONE;
+  }
+
+  /**
+   * Records a use of one of the copyright / trademark marks for the IP review. Past MAX_COPYRIGHT_USES_PER_PAGE on
+   * one page, the rest aren't recorded (and their text isn't worked out): the page gets one entry saying that the scan
+   * stopped, so it can be looked at directly. No such entry is added if all the uses recorded were in renderings of
+   * resources, since those aren't listed anyway (and a code system with displays like "Right (R)" has a lot of them)
+   */
+  private void noteCopyrightUse(String text, XhtmlNode parent, String src) {
+    copyrightUses++;
+    if (copyrightUses <= MAX_COPYRIGHT_USES_PER_PAGE) {
+      String s = text != null ? text : copyrightParentText(parent);
+      copyrights.put(s, src);
+      if (!IPViewRenderer.isRendering(s)) {
+        copyrightUsesAllRenderings = false;
+      }
+    } else if (copyrightUses == MAX_COPYRIGHT_USES_PER_PAGE + 1 && !copyrightUsesAllRenderings) {
+      copyrights.put("More than "+MAX_COPYRIGHT_USES_PER_PAGE+" uses of \u00A9, \u00AE, (R), (TM) or (C) on "+src+": stopped looking for them there - check the page directly", src);
+    }
   }
 
   private String copyrightParentText(XhtmlNode parent) {
@@ -1738,6 +1762,13 @@ public class HTMLInspector {
   private boolean checkResolveLink(String filename, Location loc, String path, String ref, String text, List<ValidationMessage> messages, String uuid, XhtmlNode x, XhtmlNode parent) throws IOException {
     links++;
     String fn = makeLocal(filename);
+    if (!Utilities.isAbsoluteUrl(ref)) {
+      int q = ref.indexOf('?');
+      int h = ref.indexOf('#');
+      if (q >= 0 && (h < 0 || q < h)) {
+        ref = ref.substring(0, q) + (h >= 0 ? ref.substring(h) : "");
+      }
+    }
     String rref;
     try {
       rref = Utilities.URLDecode(ref);
@@ -1822,14 +1853,7 @@ public class HTMLInspector {
     }
     if (specs != null){
       for (SpecMapManager spec : specs) {
-        if (spec.getBase() != null && (spec.getBase().equals(rref) || (spec.getBase()).equals(rref+"/") || (spec.getBase()+"/").equals(rref)|| spec.hasTarget(rref) ||
-                Utilities.existsInList(rref, Utilities.pathURL(spec.getBase(), "definitions.json.zip"),
-                        Utilities.pathURL(spec.getBase(), "full-ig.zip"), Utilities.pathURL(spec.getBase(), "definitions.xml.zip"),
-                        Utilities.pathURL(spec.getBase(), "package.tgz"), Utilities.pathURL(spec.getBase(), "history.html")))) {
-          return true;
-        }
-        if (spec.getBase2() != null && (spec.getBase2().equals(rref) || (spec.getBase2()).equals(rref+"/") ||
-                Utilities.existsInList(rref, Utilities.pathURL(spec.getBase2(), "definitions.json.zip"), Utilities.pathURL(spec.getBase2(), "definitions.xml.zip"), Utilities.pathURL(spec.getBase2(), "package.tgz"), Utilities.pathURL(spec.getBase2(), "full-ig.zip")))) {
+        if (spec.isSpecLink(rref)) {
           return true;
         }
       }
@@ -1937,9 +1961,7 @@ public class HTMLInspector {
       } else if (page.contains("#")) {
         name = page.substring(page.indexOf("#")+1);
         try {
-          if (altRootFolder != null && filename.startsWith(altRootFolder))
-            page = Utilities.path(altRootFolder, page.substring(0, page.indexOf("#")).replace("/", File.separator));
-          else if (subFolder == null) {
+          if (subFolder == null) {
             page = Utilities.path(rootFolder, page.substring(0, page.indexOf("#")).replace("/", File.separator));
           } else {
             page = Utilities.path(rootFolder, subFolder, page.substring(0, page.indexOf("#")).replace("/", File.separator));
@@ -1960,7 +1982,7 @@ public class HTMLInspector {
       } else {
         try {
           String folder = FileUtilities.getDirectoryForFile(filename);
-          String f = folder == null ? (altRootFolder != null && filename.startsWith(altRootFolder) ? altRootFolder : rootFolder) : folder;
+          String f = folder == null ? rootFolder : folder;
           page = PathBuilder.getPathBuilder().withRequiredTarget(rootFolder).buildPath(f, page.replace("/", File.separator));
         } catch (java.nio.file.InvalidPathException e) {
           page = null;
@@ -1974,14 +1996,17 @@ public class HTMLInspector {
           else if (f.isLangRedirect) {
             String fn = filename.replace(rootFolder, rootFolder+"/"+csHandler.getPrimaryLang());
             return checkTarget(fn, ref, rref, tgtList, bh, x, parent);
+          } else if (f.targets.contains(name)) {
+            return true;
           } else {
+            // only needed for the message about the link that can't be resolved
             tgtList.append(" (valid targets: "+(f.targets.size() > 40 ? Integer.toString(f.targets.size())+" targets"  :  f.targets.toString())+")");
             for (String s : f.targets) {
               if (s.equalsIgnoreCase(name)) {
                 tgtList.append(" - case is wrong ('"+s+"')");
               }
             }
-            return f.targets.contains(name);
+            return false;
           }
         }
       } else {
@@ -2000,12 +2025,15 @@ public class HTMLInspector {
             ref.contains("snomed.org") || ref.contains("iana.org") || ref.contains("ietf.org") || ref.contains("w3.org") || ref.endsWith(".gov") || ref.contains(".gov/")) {
       return;
     }
-    for (ExternalReference exr : externalReferences) {
-      if (exr.getType() == type && exr.getUrl().equals(ref) && x.allText().equals(exr.getXhtml().allText())) {
+    List<ExternalReference> sameUrl = externalReferencesByUrl.computeIfAbsent(ref, k -> new ArrayList<>());
+    for (ExternalReference exr : sameUrl) {
+      if (exr.getType() == type && x.allText().equals(exr.getXhtml().allText())) {
         return;
       }
     }
-    externalReferences.add(new ExternalReference(type, ref, x, stripLeadSlash(source.replace(rootFolder, ""))));
+    ExternalReference exr = new ExternalReference(type, ref, x, stripLeadSlash(source.replace(rootFolder, "")));
+    externalReferences.add(exr);
+    sameUrl.add(exr);
   }
 
   private String stripLeadSlash(String s) {

@@ -29,7 +29,10 @@ public class PackageChecker {
       } else {
         if (f.getName().endsWith(".tgz")) {
           System.out.println("Package "+f.getAbsolutePath());
-          NpmPackage pck = NpmPackage.fromPackage(new FileInputStream(f));
+          NpmPackage pck;
+          try (FileInputStream in = new FileInputStream(f)) {
+            pck = NpmPackage.fromPackage(in);
+          }
           boolean save = false;
           JsonObject json = JsonParser.parseObject(pck.load("package", "package.json"));
           JsonArray vl = json.getJsonArray("fhir-version-list");
@@ -40,7 +43,9 @@ public class PackageChecker {
           }
           if (save) {
             f.renameTo(new File(FileUtilities.changeFileExt(f.getAbsolutePath(), ".tgz-old")));
-            pck.save(new FileOutputStream(f));
+            try (FileOutputStream out = new FileOutputStream(f)) {
+              pck.save(out);
+            }
           }
         }
       }

@@ -453,7 +453,9 @@ public class IGReleaseRedirectionBuilder {
     File f = new File(Utilities.path(folder, "package.tgz"));
     if (!f.exists())
       return null;
-    pkg = NpmPackage.fromPackage(new FileInputStream(f));
+    try (FileInputStream in = new FileInputStream(f)) {
+      pkg = NpmPackage.fromPackage(in);
+    }
     JsonObject json = null;
     try {
       json = JsonParser.parseObject(pkg.load("other", "spec.internals"));

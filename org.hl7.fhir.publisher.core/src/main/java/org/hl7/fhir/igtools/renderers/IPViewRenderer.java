@@ -114,7 +114,10 @@ public class IPViewRenderer {
   }
 
 
-  private boolean isRendering(String s) {
+  /**
+   * @return true if the text is a rendering of a resource (xml, json or turtle) - uses in those aren't listed
+   */
+  public static boolean isRendering(String s) {
     if (s.contains("xmlns=\"http://hl7.org/fhir\"")) {
       return true;
     }

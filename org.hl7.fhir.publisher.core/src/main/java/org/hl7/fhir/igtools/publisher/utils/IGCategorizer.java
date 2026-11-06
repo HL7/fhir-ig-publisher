@@ -225,7 +225,7 @@ public class IGCategorizer {
     for (JsonObject ig : iglist.getJsonObjects("guides")) {
         processIG(ig);
     }  
-    JsonParser.compose(iglist, new FileOutputStream(path));
+    JsonParser.compose(iglist, new File(path));
   }
 
   private void processIG(JsonObject ig) {

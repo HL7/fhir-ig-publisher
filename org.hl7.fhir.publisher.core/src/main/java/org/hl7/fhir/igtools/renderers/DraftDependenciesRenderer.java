@@ -45,8 +45,9 @@ public class DraftDependenciesRenderer implements IElementVisitor {
   private List<DraftReference> draftRefs = new ArrayList<>();
   private String thisPackage;
   // every primitive in every resource is checked, and the same few urls turn up over and over again, so remember
-  // what each one resolved to (including nothing) rather than asking the context again
-  private Map<String, Resource> resolved = new HashMap<>();
+  // what each one resolved to (including nothing) rather than asking the context again. Only canonical resources
+  // can be draft dependencies, so a url that resolves to anything else isn't remembered
+  private Map<String, CanonicalResource> resolved = new HashMap<>();
 
   public DraftDependenciesRenderer(IWorkerContext context, String thisPackage) {
     super();
@@ -90,7 +91,7 @@ public class DraftDependenciesRenderer implements IElementVisitor {
       url = url.substring(0, url.indexOf("#"));
     }
     if (Utilities.isAbsoluteUrl(url)) {
-      CanonicalResource tgt = (CanonicalResource) fetch(url, ElementModelUtilities.getVersionResolutionRules(urlE));
+      CanonicalResource tgt = fetch(url, ElementModelUtilities.getVersionResolutionRules(urlE));
       if (tgt != null && tgt.hasSourcePackage() && !thisPackage.equals(tgt.getSourcePackage().getVID())) {
         if (tgt.getStatus() == PublicationStatus.DRAFT || tgt.getExperimental()) {
           DraftReference dr = new DraftReference(resource, url, tgt);
@@ -111,7 +112,7 @@ public class DraftDependenciesRenderer implements IElementVisitor {
       url = url.substring(0, url.indexOf("#"));
     }
     if (Utilities.isAbsoluteUrl(url)) {
-      CanonicalResource tgt = (CanonicalResource) fetch(url, ExtensionUtilities.getVersionResolutionRules(urlE));
+      CanonicalResource tgt = fetch(url, ExtensionUtilities.getVersionResolutionRules(urlE));
       if (tgt != null && tgt.hasSourcePackage() && !thisPackage.equals(tgt.getSourcePackage().getVID())) {
         if (tgt.getStatus() == PublicationStatus.DRAFT || tgt.getExperimental()) {
           DraftReference dr = new DraftReference(resource, url, tgt);
@@ -123,14 +124,26 @@ public class DraftDependenciesRenderer implements IElementVisitor {
     }
   }
 
-  private Resource fetch(String url, VersionResolutionRules rules) {
+  /**
+   * @return the canonical resource the url resolves to, or null if it doesn't resolve to one. A url that resolves to
+   * some other kind of resource (e.g. an absolute reference to a Patient) returns null, and isn't cached
+   */
+  private CanonicalResource fetch(String url, VersionResolutionRules rules) {
     String key = url + "|" + rules;
     if (resolved.containsKey(key)) {
       return resolved.get(key);
     }
     Resource res = context.fetchResource(Resource.class, url, rules);
-    resolved.put(key, res);
-    return res;
+    if (res == null) {
+      resolved.put(key, null);
+      return null;
+    } else if (res instanceof CanonicalResource) {
+      CanonicalResource cr = (CanonicalResource) res;
+      resolved.put(key, cr);
+      return cr;
+    } else {
+      return null;
+    }
   }
 
   private boolean alreadyExists(DraftReference dr) {

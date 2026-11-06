@@ -78,8 +78,6 @@ import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 
-import static org.hl7.fhir.services.elementmodel.ElementVisitor.ElementVisitorInstruction.VISIT_CHILDREN;
-
 public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   private static final int EXAMPLE_UPPER_LIMIT = 50;
@@ -1063,7 +1061,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (strength == null) {
       tr.td();
     } else {
-      tr.td().ah(Utilities.pathURL(corePath, "terminologies.html#" + tx.getStrengthElement())).style("opacity: "+opacityStr(strengthInh)).tx(gen.getTranslated(tx.getStrengthElement()));
+      tr.td().ah(Utilities.pathURL(corePath, "terminologies.html#" + tx.getStrengthElement())).unchangedStyle(strengthInh).tx(gen.getTranslated(tx.getStrengthElement()));
     }
     XhtmlNode td = tr.td();
     if (tx.hasDescription()) {
@@ -1081,16 +1079,16 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (vs == null) {
       String name = getSpecialValueSetName(uri);
       if (name != null) {
-        td.ah(getSpecialValueSetUrl(uri)).style("opacity: "+opacityStr(inherited)).tx(name);
+        td.ah(getSpecialValueSetUrl(uri)).unchangedStyle(inherited).tx(name);
       } else {
         BindingResolution br = igp.resolveActualUrl(uri);
         if (br.url == null) {
           td.markdown(br.display, "binding");
         } else if (Utilities.isAbsoluteUrlLinkable(br.url)) {
-          td.ah(br.url).style("opacity: "+opacityStr(inherited)).tx(br.display);
+          td.ah(br.url).unchangedStyle(inherited).tx(br.display);
           td.button("btn-copy", "copy", gen.formatPhrase(RenderingI18nContext.SDR_CLICK_COPY)).setAttribute("data-clipboard-text", tx.getValueSet());
         } else {
-          td.ah(prefix + br.url).style("opacity: "+opacityStr(inherited)).tx(br.display);
+          td.ah(prefix + br.url).unchangedStyle(inherited).tx(br.display);
           td.button("btn-copy", "copy", gen.formatPhrase(RenderingI18nContext.SDR_CLICK_COPY)).setAttribute("data-clipboard-text", tx.getValueSet());
         }
         showVersion(tr.td(), uri, resolutionMethod,null);
@@ -1099,9 +1097,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     } else {
       String p = vs.getWebPath();
       if (p == null) {
-        td.ah("??").style("opacity: "+opacityStr(inherited)).tx(gen.getTranslated(vs.getTitleElement(), vs.getNameElement()) + " (" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_MISSING_LINK)) + ")");
+        td.ah("??").unchangedStyle(inherited).tx(gen.getTranslated(vs.getTitleElement(), vs.getNameElement()) + " (" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_MISSING_LINK)) + ")");
       } else {
-        td.ah(p).style("opacity: "+opacityStr(inherited)).tx(gen.getTranslated(vs.getTitleElement(), vs.getNameElement()));
+        td.ah(p).unchangedStyle(inherited).tx(gen.getTranslated(vs.getTitleElement(), vs.getNameElement()));
       }
       td.button("btn-copy", "copy", gen.formatPhrase(RenderingI18nContext.SDR_CLICK_COPY)).setAttribute("data-clipboard-text", tx.getValueSet());
       if (vs.hasUserData(UserDataNames.render_external_link)) {
@@ -1222,10 +1220,6 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     boolean fromPackages = vs == null ? false : vs.hasSourcePackage();
     boolean fromThisPackage = vs == null ? false : !Utilities.isAbsoluteUrlLinkable(vs.getWebPath());
     ResourceRenderer.renderVersionReference(gen, vs, statedVersion, resolutionMethod, actualVersion, fromPackages, td, fromThisPackage, gen.formatPhrase(RenderingI18nContext.GENERAL_VALUESET), RenderingI18nContext.VS_VERSION_NOTHING_TEXT);
-  }
-
-  private String opacityStr(boolean inherited) {
-    return inherited ? HierarchicalTableGenerator.STANDARD_OPACITY : "1.0";
   }
 
   private String getSpecialValueSetName(String uri) {
@@ -2785,7 +2779,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   private boolean usesExtension(Element focus) {
     for (Element child : focus.getChildList()) {
-      if (child.getName().equals("extension") && refersToThisSD(child.getChildValue("url")))
+      if (Utilities.existsInList(child.getName(), "extension", "modifierExtension") && refersToThisSD(child.getChildValue("url")))
         return true;
       if (usesExtension(child))
         return true;
@@ -2795,7 +2789,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   /**
    * The urls (without any version) that usesSD() compares with the url of this SD: the meta.profile values, and
-   * the url of every extension anywhere in the resource
+   * the url of every extension and modifierExtension anywhere in the resource
    */
   private void listUsedUrls(Element resource, Set<String> urls) {
     if (resource.hasChild("meta")) {
@@ -2809,7 +2803,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   private void listExtensionUrls(Element focus, Set<String> urls) {
     for (Element child : focus.getChildList()) {
-      if (child.getName().equals("extension")) {
+      if (Utilities.existsInList(child.getName(), "extension", "modifierExtension")) {
         addUsedUrl(urls, child.getChildValue("url"));
       }
       listExtensionUrls(child, urls);
@@ -2906,7 +2900,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     XhtmlNode x = null;
     try {
       genElement(gen, model.getRows(), pe.buildPEDefinition(sd));
-      x = gen.generate(model, destDir, 0, otherFilesRun);
+      x = gen.generate(model, destDir, false, otherFilesRun);
     } catch (Exception e) {
       x = new XhtmlNode(NodeType.Element, "div").tx("Error: "+e.getMessage());
     }
@@ -2957,7 +2951,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (sdr.hasNonBaseConstraints(element.definition().getConstraintList()) || sdr.hasNonBaseConditions(element.definition().getConditionList())) {
       Piece p = gc.addText(org.hl7.fhir.r5.renderers.StructureDefinitionRenderer.CONSTRAINT_CHAR);
       p.setHint((this.gen.formatPhrase(RenderingI18nContext.STRUC_DEF_AFFECT_CONSTRAINTS)+sdr.listConstraintsAndConditions(element.definition())+")"));
-      p.addStyle(org.hl7.fhir.r5.renderers.StructureDefinitionRenderer.CONSTRAINT_STYLE);
+      p.addNamedStyle("xhtConstraintStyle", org.hl7.fhir.r5.renderers.StructureDefinitionRenderer.CONSTRAINT_STYLE);
       p.setReference(Utilities.pathURL(VersionUtilities.getSpecUrl(context.getFHIRVersion()), "conformance-rules.html#constraints"));
     }
     if (element != null && element.definition().hasExtension(ExtensionDefinitions.EXT_STANDARDS_STATUS)) {

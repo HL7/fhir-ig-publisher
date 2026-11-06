@@ -98,7 +98,10 @@ public class OldIGAIGenerator {
   }
 
   private NpmPackage loadResources(File dir, List<LoadedResource> resources) throws IOException {
-    NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(Utilities.path(dir, "package.tgz")));
+    NpmPackage npm;
+    try (FileInputStream in = new FileInputStream(Utilities.path(dir, "package.tgz"))) {
+      npm = NpmPackage.fromPackage(in);
+    }
     if (npm.isCore() || !npm.hasFile("other", "spec.internals")) {
       return null;
     }

@@ -2,6 +2,7 @@ package org.hl7.fhir.igtools.publisher;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -17,6 +18,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.lang3.StringUtils;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_50_N;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.HTMLInspector.LoadedFile;
 import org.hl7.fhir.igtools.publisher.HTMLInspector.XhtmlNodeHolder;
@@ -224,15 +226,9 @@ class ConformanceStatementHandler {
         oldReq.put(comp.getKey(), comp);
       }
       req.setStatementList(new ArrayList<>());
-      if (req.getActorList().size()!=this.usedActors.size())
+      if (!actorsMatch(req, usedActors.values()))
         mismatch = true;
-      else {
-        for (ActorDefinition actor: usedActors.values()) {
-          if(!req.hasActor(actor.getUrl()))
-            mismatch = true;
-        }
-      }
-      
+
     } else {
       req = new Requirements();
       req.setId("fromNarrative");
@@ -376,10 +372,45 @@ class ConformanceStatementHandler {
       if (!oldReq.isEmpty())
         messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Requirements/fromNarrative", "There are differences between the requirements found in the narrative and what's found the provided Requirements resource.  A new version has been generated in the root.  It should be used to replace the one in the input folder.",
             IssueSeverity.WARNING));
-        
+
       try (FileOutputStream fs = new FileOutputStream(fname)) {
-        new org.hl7.fhir.model.core.formats.JsonParser(context.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(fs, req);
+        composeRequirements(fs, req, context);
       }
+    }
+  }
+
+  /**
+   * True if the Requirements lists exactly these actors, each with its id as key. A file written by an older
+   * publisher carries the key in the tools extension requirements-actorkey, which is not converted when the
+   * file is loaded as R5, so its actors have no key and the actor list has to be regenerated
+   */
+  static boolean actorsMatch(Requirements req, Collection<ActorDefinition> actors) {
+    if (req.getActorList().size() != actors.size())
+      return false;
+    for (ActorDefinition actor : actors) {
+      boolean found = false;
+      for (Requirements.RequirementsActorComponent actorRef : req.getActorList()) {
+        if (actor.getUrl().equals(actorRef.getReference()) && actor.getId().equals(actorRef.getKey()))
+          found = true;
+      }
+      if (!found)
+        return false;
+    }
+    return true;
+  }
+
+  /**
+   * Writes the generated Requirements resource in the format the publisher expects when it is copied
+   * into the input folder. In an R4/R4B/R5 IG Requirements is a special type that is authored (and
+   * loaded, see PublisherIGLoader.parseContent) as R5, so it has to be written as R5: otherwise
+   * actor is written in the R6 shape (reference + key) and the next build can't parse it.
+   */
+  static void composeRequirements(OutputStream stream, Requirements req, IWorkerContext context) throws IOException {
+    if (SpecialTypeHandler.handlesType(req.fhirType(), context.getFHIRVersion())) {
+      new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(org.hl7.fhir.r5.formats.IParser.OutputStyle.PRETTY)
+        .compose(stream, VersionConvertorFactory_50_N.convertResource(req));
+    } else {
+      new org.hl7.fhir.model.core.formats.JsonParser(context.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(stream, req);
     }
   }
   
@@ -586,16 +617,29 @@ class ConformanceStatementHandler {
   }
   
   public void readConformanceClauses(LoadedFile source, XhtmlNode x, BooleanHolder hasClauses, BooleanHolder hasWarning, List<ValidationMessage> messages) {
-    // there's two kinds of conformance clauses:
+    // there are two forms of conformance clause:
     // from XML
-    //  <span class="fhir-conformance" id="id">clause</span> - in paragraph clause id is optional but recommended
-    //  <div class=="fhir-conformance" id="id" summary="summary">multi-paragraphs</div> - summary is mandatory
+    //  <span class="fhir-conformance" id="id">clause</span> - inline; id is optional, summary defaults to the text
+    //  <div class="fhir-conformance" id="id" summary="summary">block content</div> - id is optional, summary is mandatory
     // and from markdown
-    //  §id:clause$. in-paragraph clause. Id must be a token if present. it's optional but recommended
-    //  §§id:summary. both id and summary are mandatory
+    //  §id:clause§ or §clause§ - inline; clause may include inline formatting
+    //  §§id:summary^title - opening paragraph; id and summary are mandatory, title is the first block paragraph
+    //  §§ - closing paragraph after the block content
     //
-    // the first pass is finding and fixing the markdown clauses, and then we process them at the end
-    // spans
+    // id should be a FHIR id and may have metadata suffixes in either XML or markdown:
+    //  id? - conditional
+    //  id^actor1,actor2 - actors
+    //  id^^category1,category2 - categories without actors
+    //  id?^actor1,actor2^category1,category2 - combined; e.g. §id?^actor1^category1:clause§
+    // actors reference ActorDefinition ids from the IG or its dependencies; categories use requirements-category-vs
+    //
+    // conformance statement table (one per language):
+    //  <table class="fhir-conformance-list"/> in XML, or a markdown paragraph containing only §§§
+    //
+    // the first pass converts markdown markers to XML elements, then we process the clauses and table placeholders
+
+    // This is documented in the FHIR Implementation Guide on conformance statements
+    // https://build.fhir.org/ig/FHIR/ig-guidance/conformance-statements.html
 
     String langName = langForSource(source);
     rc = new RenderingContext(context, rendererFactory, new MarkDownProcessor(MarkDownProcessor.Dialect.COMMON_MARK),
@@ -887,10 +931,14 @@ class ConformanceStatementHandler {
         x.getChildNodes().clear();
         hasClauses.set(true);
       }
-    } else if (text != null && "!§§".equals(text)) {
+    } else if (text != null && (x.getNodeType() == NodeType.Element || x.getNodeType() == NodeType.Text) && "!§§".equals(text)) {
       // special placeholder for documentation
-      x.getChildNodes().clear();
-      x.tx("§§");
+      if (x.getNodeType() == NodeType.Text) {
+        x.setContent("§§");
+      } else {
+        x.getChildNodes().clear();
+        x.tx("§§");
+      }
       hasClauses.set(true);
     } else {
       do {
@@ -899,7 +947,7 @@ class ConformanceStatementHandler {
         tryAgain = false;
         for (int i = 0; i < x.getChildNodes().size(); i++) {
           XhtmlNode c = x.getChildNodes().get(i);
-          if (c.getNodeType() == NodeType.Text && c.getContent().contains("§")) {
+          if (c.getNodeType() == NodeType.Text && c.getContent().contains("§") && !"!§§".equals(c.getContent())) {
             int offset = c.getContent().indexOf("§");
             if (start == -1) {
               start = i;
@@ -926,7 +974,7 @@ class ConformanceStatementHandler {
             String cnt = c.getContent();
             int si = cnt.indexOf("§")+1;
             int ei = cnt.substring(si).indexOf("§") + si;
-            span.addText((si > 0 && ei >= si) ? cnt.substring(si, ei) : cnt);
+            addConformanceClauseText(span, (si > 0 && ei >= si) ? cnt.substring(si, ei) : cnt);
             x.getChildNodes().add(start + 1, span);
             String ss = cnt.substring(0, si-1);
             String es = cnt.substring(ei + 1);
@@ -934,7 +982,7 @@ class ConformanceStatementHandler {
             if (!Utilities.noString(es)) {
               XhtmlNode t = new XhtmlNode(NodeType.Text);
               t.setContent(es);
-              x.getChildNodes().add(start + 2, span);
+              x.getChildNodes().add(start + 2, t);
             }
           } else {
             XhtmlNode sc = x.getChildNodes().get(start);
@@ -944,14 +992,7 @@ class ConformanceStatementHandler {
             int si = sc.getContent().indexOf("§");
             int ei = ec.getContent().indexOf("§");
             String cnt = sc.getContent().substring(si + 1);
-            if (cnt.contains(":")) {
-              String token = cnt.substring(0, cnt.indexOf(":"));
-              if (token.matches("^[a-zA-Z0-9._\\-\\^\\,\\?]+$")) {
-                span.setAttribute("id", token);
-                cnt = cnt.substring(cnt.indexOf(":")+1);
-              }
-            }
-            span.addText(cnt);
+            addConformanceClauseText(span, cnt);
             for (int i = start + 1; i < end; i++) {
               span.add(x.getChildNodes().get(start + 1));
               x.getChildNodes().remove(start + 1);
@@ -981,6 +1022,17 @@ class ConformanceStatementHandler {
         x.getChildNodes().subList(start + 1, end).clear();
       }
     }
+  }
+
+  private void addConformanceClauseText(XhtmlNode span, String text) {
+    if (text.contains(":")) {
+      String token = text.substring(0, text.indexOf(":"));
+      if (token.matches("^[a-zA-Z0-9._\\-\\^\\,\\?]+$")) {
+        span.setAttribute("id", token);
+        text = text.substring(text.indexOf(":")+1);
+      }
+    }
+    span.addText(text);
   }
 
   public void renderConfHomes() throws IOException {

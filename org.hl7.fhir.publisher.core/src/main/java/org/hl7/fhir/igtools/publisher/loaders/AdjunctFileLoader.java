@@ -30,10 +30,12 @@ public class AdjunctFileLoader {
 
   private CqlSubSystem cql;
   private List<String> binaryPaths;
+  private boolean debugging = false;
 
-  public AdjunctFileLoader(List<String> binaryPaths, CqlSubSystem cql) {
+  public AdjunctFileLoader(List<String> binaryPaths, CqlSubSystem cql, boolean debugging) {
     this.binaryPaths = binaryPaths;
     this.cql = cql;
+    this.debugging = debugging;
   }
 
   private class ElementWithPath {
@@ -86,12 +88,17 @@ public class AdjunctFileLoader {
         try {
           f.addAdditionalPath(fn);
           a = loadFile(fn);
+          if (a == null) {
+            f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, att.getPath(), notFoundMessage(fn), IssueSeverity.ERROR));
+            continue;
+          }
           res = true;
+          String contentType = att.getAttachment().hasContentType() ? att.getAttachment().getContentType() : a.getContentType();
           att.getAttachment().setId(null);
           att.getAttachment().setData(a.getData());
-          att.getAttachment().setContentType(a.getContentType());
+          att.getAttachment().setContentType(contentType);
           // Library - post processing needed
-          if (r.getResource() instanceof Library && ("text/cql".equals(a.getContentType()) || "application/xml".equals(a.getContentType()))) {
+          if (r.getResource() instanceof Library && (matchesMediaType(contentType, "text/cql") || matchesMediaType(contentType, "application/xml"))) {
             // we just injected CQL or a CQL ModelInfo into a library
             try {
               performLibraryCQLProcessing(f, (Library) r.getResource(), a);
@@ -105,6 +112,15 @@ public class AdjunctFileLoader {
       }
     }
     return res;    
+  }
+
+  static boolean matchesMediaType(String contentType, String expected) {
+    if (contentType == null) {
+      return false;
+    }
+    int parameterSeparator = contentType.indexOf(';');
+    String mediaType = parameterSeparator < 0 ? contentType : contentType.substring(0, parameterSeparator);
+    return expected.equalsIgnoreCase(mediaType.trim());
   }
   
   /**
@@ -155,6 +171,9 @@ public class AdjunctFileLoader {
           res = true;
           addAttachment(f, att, fn, a);
         } catch (Exception ex) {
+          if (debugging) {
+            ex.printStackTrace();
+          }
           f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, att.getElement().line(), att.getElement().col(), att.getPath(), "Error Loading "+fn+": " +ex.getMessage(), IssueSeverity.ERROR));
         }
       }
@@ -170,11 +189,15 @@ public class AdjunctFileLoader {
       try {
         Attachment a = loadFile(fn);
         if (a == null) {
-          f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, e.line(), e.col(), "Binary", "Unable to find Adjunct Binary "+fn, IssueSeverity.ERROR));
+          f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, e.line(), e.col(), "Binary", notFoundMessage(fn), IssueSeverity.ERROR));
         } else {
           res = true;
-          if (a.hasContentType()) {
-            e.setChildValue("contentType", a.getContentType());
+          String contentType = e.getChildValue("contentType");
+          if (contentType == null) {
+            contentType = a.getContentType();
+          }
+          if (contentType != null) {
+            e.setChildValue("contentType", contentType);
           } else {
             f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, e.line(), e.col(), "Binary", "Unknown file type "+fn, IssueSeverity.ERROR));
           }
@@ -189,16 +212,34 @@ public class AdjunctFileLoader {
 
   public void addAttachment(FetchedFile f, ElementWithPath att, String fn, Attachment a) {
     if (a == null) {
-      f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, att.getElement().line(), att.getElement().col(), att.getPath(), "Unable to find Adjunct Binary "+fn, IssueSeverity.ERROR));
+      f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, att.getElement().line(), att.getElement().col(), att.getPath(), notFoundMessage(fn), IssueSeverity.ERROR));
     } else {
-      att.getElement().getChildren().clear();
-      if (a.hasContentType()) {
-        att.getElement().setChildValue("contentType", a.getContentType());
+      String contentType = att.getElement().getChildValue("contentType");
+      if (contentType == null) {
+        contentType = a.getContentType();
+      }
+      att.getElement().getChildList().clear();
+      if (contentType != null) {
+        att.getElement().setChildValue("contentType", contentType);
       } else {
         f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, att.getElement().line(), att.getElement().col(), att.getPath(), "Unknown file type "+fn, IssueSeverity.ERROR));
       }
       att.getElement().setProperty("data", new Base64BinaryType(a.getData()));
     }
+  }
+
+  private String notFoundMessage(String fn) {
+    if (binaryPaths.isEmpty()) {
+      return "Unable to find Adjunct Binary "+fn+": no path-binary parameters are defined in the IG";
+    }
+    StringBuilder b = new StringBuilder();
+    for (String dir : binaryPaths) {
+      if (b.length() > 0) {
+        b.append(", ");
+      }
+      b.append(dir);
+    }
+    return "Unable to find Adjunct Binary "+fn+" in any path-binary folder ("+b.toString()+")";
   }
 
   private Attachment loadFile(String fn) throws FileNotFoundException, IOException {
@@ -249,14 +290,17 @@ public class AdjunctFileLoader {
   }
 
   private String checkReplaceable(Element att) {
-    if (att.getChildren().size() != 1) {
-      return null;
+    String value = null;
+    boolean contentTypeFound = false;
+    for (Element child : att.getChildList()) {
+      if ("id".equals(child.getName()) && value == null) {
+        value = child.primitiveValue();
+      } else if ("contentType".equals(child.getName()) && !contentTypeFound) {
+        contentTypeFound = true;
+      } else {
+        return null;
+      }
     }
-    Element id = att.getChildList().get(0);
-    if (!id.getName().equals("id")) {
-      return null;
-    }
-    String value = id.primitiveValue();
     if (value == null || !value.startsWith("ig-loader-")) {
       return null;
     }
@@ -264,7 +308,7 @@ public class AdjunctFileLoader {
   }
 
   private String checkReplaceable(Attachment att) {
-    if (att.hasData() || att.hasUrl() || att.hasContentType() || att.hasSize()) {
+    if (att.hasData() || att.hasUrl() || att.hasSize()) {
       return null;
     }
     if (!att.hasId()) {

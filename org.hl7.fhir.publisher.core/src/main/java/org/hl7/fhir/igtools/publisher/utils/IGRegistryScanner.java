@@ -1,5 +1,6 @@
 package org.hl7.fhir.igtools.publisher.utils;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -23,9 +24,11 @@ public class IGRegistryScanner {
   }
 
   private void execute() throws FileNotFoundException, IOException {
-    JsonObject reg = JsonParser.parseObject(new FileInputStream(filename));
+    JsonObject reg = JsonParser.parseObject(new File(filename));
     if (checkReg(reg)) {
-      JsonParser.compose(reg, new FileOutputStream(filename), true);
+      try (FileOutputStream out = new FileOutputStream(filename)) {
+        JsonParser.compose(reg, out, true);
+      }
     }
   }
 

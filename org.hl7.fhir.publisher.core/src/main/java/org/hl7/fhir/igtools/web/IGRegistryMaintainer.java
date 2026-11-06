@@ -251,7 +251,9 @@ public class IGRegistryMaintainer {
           a.add(makeEdition(p));
         }
       }
-      JsonParser.compose(json, new FileOutputStream(path), true);
+      try (FileOutputStream out = new FileOutputStream(path)) {
+        JsonParser.compose(json, out, true);
+      }
     }
     for (ImplementationGuideEntry ig : igs) {
       System.out.println(ig.packageId+" ("+ig.canonical+"): "+ig.title+" @ "+ig.cibuild);

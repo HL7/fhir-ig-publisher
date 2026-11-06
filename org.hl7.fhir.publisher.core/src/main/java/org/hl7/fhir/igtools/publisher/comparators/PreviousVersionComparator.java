@@ -165,7 +165,9 @@ public class PreviousVersionComparator {
   private IniFile makeIni(String rootDir, String v) throws IOException {
     File ini = new File(Utilities.path(rootDir, "url-map-v-"+v+".ini"));
     if (ini.exists()) {
-      return new IniFile(new FileInputStream(ini));
+      try (FileInputStream in = new FileInputStream(ini)) {
+        return new IniFile(in);
+      }
     } else {
       return null;
     }
@@ -212,7 +214,7 @@ public class PreviousVersionComparator {
           NpmPackage core = pcm.loadPackage(VersionUtilities.packageForVersion(current.fhirVersion()), VersionUtilities.getCurrentVersion(current.fhirVersion()));
           vi.context = new SimpleWorkerContext.SimpleWorkerContextBuilder(ModelContext.fullCoreContext()).withTerminologyCachePath(Utilities.path(context.getTxCache().getFolder(), vi.version)).fromPackage(core,
                   new PublisherLoader(core, SpecMapManager.fromPackage(core), core.getWebLocation(), null, false, ModelContext.fullCoreContext()).makeLoader(), true);
-          vi.context.connectToTSServer(context.getTxClientManager().getFactory(), context.getTxClientManager().getMasterClient(), false);
+          vi.context.connectToTSServer(context.getTxClientManager().getFactory(), context.getTxClientManager().getMasterClient(), null);
           vi.context.setAllowLoadingDuplicates(true);
           vi.context.setExpansionParameters(context.getExpansionParameters());
           vi.context.setUcumService(context.getUcumService());

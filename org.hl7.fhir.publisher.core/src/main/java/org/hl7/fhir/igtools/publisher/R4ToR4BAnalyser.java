@@ -451,7 +451,10 @@ public class R4ToR4BAnalyser {
   
 
   private void genSameVersionPackage(String pid, String source, String dest, boolean r4, String ver, String pver) throws FHIRException, IOException {
-    NpmPackage src = NpmPackage.fromPackage(new FileInputStream(source));
+    NpmPackage src;
+    try (FileInputStream in = new FileInputStream(source)) {
+      src = NpmPackage.fromPackage(in);
+    }
     JsonObject npm = src.getNpm();
     npm.remove("name");
     npm.add("name", pid+"."+pver);
@@ -469,7 +472,7 @@ public class R4ToR4BAnalyser {
   // we use R4B here, whether it's r4 or r4b - if the content is in the differences, we won't get to the this point
   private void processFileSame(NPMPackageGenerator gen, String folder, String filename, byte[] content, Map<String, ResPointer> exemptions, String ver, String pver) {
     try {
-      if (Utilities.existsInList(folder, "package", "example")) {
+      if (Utilities.existsInList(folder, "package", "examples", "example")) {
         if (!Utilities.existsInList(filename, "package.json", ".index.json", ".index.db")) {
           org.hl7.fhir.r4b.model.Resource res = new org.hl7.fhir.r4b.formats.JsonParser().parse(content);
           boolean exempt = (exemptions.containsKey(res.fhirType()+"/"+res.getIdBase()) ||
@@ -512,7 +515,10 @@ public class R4ToR4BAnalyser {
   }
 
   private void genOtherVersionPackage(String pid, String source, String dest, String core, String ver, String pver, String nver, String pathS, String pathT) throws FHIRException, IOException {
-    NpmPackage src = NpmPackage.fromPackage(new FileInputStream(source));
+    NpmPackage src;
+    try (FileInputStream in = new FileInputStream(source)) {
+      src = NpmPackage.fromPackage(in);
+    }
     JsonObject npm = src.getNpm();
     npm.remove("name");
     npm.add("name", pid+"."+pver);
@@ -537,7 +543,7 @@ public class R4ToR4BAnalyser {
 
   // we use R4B here, whether it's r4 or r4b - if the content is in the differences, we won't get to them at this point
   private void processFileOther(NPMPackageGenerator gen, String folder, String filename, byte[] content, String ver, String pver, String nver, Map<String, ResPointer> exemptions, String pathS, String pathT) throws IOException {
-    if (Utilities.existsInList(folder, "package", "example")) {
+    if (Utilities.existsInList(folder, "package", "examples", "example")) {
       if (!Utilities.existsInList(filename, "package.json", ".index.json", ".index.db")) {
         org.hl7.fhir.r4b.model.Resource res = new org.hl7.fhir.r4b.formats.JsonParser().parse(content);
         if (VersionUtilities.isR4Ver(context.getFHIRVersion()) && "Basic".equals(res.fhirType())) {
@@ -724,7 +730,10 @@ public class R4ToR4BAnalyser {
 
   private void processPackage(String filename) throws FileNotFoundException, IOException {
     System.out.println("Analysing "+filename);
-    NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(filename));
+    NpmPackage npm;
+    try (FileInputStream in = new FileInputStream(filename)) {
+      npm = NpmPackage.fromPackage(in);
+    }
     String version = npm.fhirVersion();
     String pid = VersionUtilities.packageForVersion(version);
     String specPath = VersionUtilities.getSpecUrl(version);
