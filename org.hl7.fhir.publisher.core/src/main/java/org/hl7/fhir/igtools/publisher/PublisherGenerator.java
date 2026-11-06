@@ -236,6 +236,11 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
   private Path checkedStash;
   private final List<String> stashed = new ArrayList<>();
 
+  /** Watch mode: whether Jekyll is kept running for this build's site, and writes only what changed next time */
+  public boolean keepsJekyllRunning() {
+    return jekyllDriver != null && jekyllDriver.isRunningFor(new File(pf.tempDir).getAbsolutePath(), new File(pf.outputDir).getAbsolutePath());
+  }
+
   public void setWatchTools(JekyllDriver jekyllDriver, FullIgZip fullIgZip) {
     this.jekyllDriver = jekyllDriver;
     this.fullIgZip = fullIgZip;

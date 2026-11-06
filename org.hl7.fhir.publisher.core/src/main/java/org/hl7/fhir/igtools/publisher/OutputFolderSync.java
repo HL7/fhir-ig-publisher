@@ -33,7 +33,8 @@ import java.util.TreeSet;
  * deleted before anything is moved in, so a name that only changed case (one file on Windows and macOS) ends up
  * with the new case. A read-only file is made writable and tried again.
  *
- * <p>Files that are moved are no longer in the staging folder afterwards.
+ * <p>Files that are moved are no longer in the staging folder afterwards, unless the sync is asked to keep them (then
+ * they are copied).
  */
 public class OutputFolderSync {
 
@@ -70,6 +71,15 @@ public class OutputFolderSync {
   }
 
   public static Result sync(Path staged, Path target) throws IOException {
+    return sync(staged, target, false);
+  }
+
+  /**
+   * As sync(staged, target), but if keep is true the new and changed files are copied rather than moved, so that the
+   * staging folder still has the whole output afterwards (a Jekyll kept running between builds only writes what
+   * changed into it: see JekyllDriver)
+   */
+  public static Result sync(Path staged, Path target, boolean keep) throws IOException {
     Result result = new Result();
     // a folder that is a link (output linked into a web server's folder, say) is synced where it points
     staged = staged.toRealPath();
@@ -147,7 +157,11 @@ public class OutputFolderSync {
         if (old != null && old.isRegularFile() && old.size() == e.getValue().size() && sameContent(from, to, ba, bb)) {
           result.unchanged++;
         } else {
-          move(from, to);
+          if (keep) {
+            copy(from, to);
+          } else {
+            move(from, to);
+          }
           result.written++;
         }
       } catch (IOException ex) {
@@ -213,6 +227,31 @@ public class OutputFolderSync {
         throw e;
       }
       rename(from, to);
+    }
+  }
+
+  /** replaces a file with a copy of another, in one rename: the copy is made next to it first */
+  static void copy(Path from, Path to) throws IOException {
+    try {
+      copyOver(from, to);
+    } catch (AccessDeniedException e) {
+      // a read-only file can't be replaced on Windows
+      if (!makeWritable(to)) {
+        throw e;
+      }
+      copyOver(from, to);
+    }
+  }
+
+  private static void copyOver(Path from, Path to) throws IOException {
+    // (a copy left by a sync that stopped is stale, and deleted by the next)
+    Path copy = to.resolveSibling(".sync-" + to.getFileName());
+    Files.copy(from, copy, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+    try {
+      Files.move(copy, to, StandardCopyOption.ATOMIC_MOVE);
+    } catch (IOException ex) {
+      Files.deleteIfExists(copy);
+      throw ex;
     }
   }
 

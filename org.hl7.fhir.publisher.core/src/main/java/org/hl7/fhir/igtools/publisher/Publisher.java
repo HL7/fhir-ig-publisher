@@ -728,7 +728,8 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     long start = System.nanoTime();
     OutputFolderSync.Result r;
     try {
-      r = OutputFolderSync.sync(Paths.get(pf.outputDir), Paths.get(pf.watchOutputDir));
+      // a Jekyll kept running writes only what changed into the staging folder, so it keeps the whole output
+      r = OutputFolderSync.sync(Paths.get(pf.outputDir), Paths.get(pf.watchOutputDir), generator.keepsJekyllRunning());
       pf.watchOutputSynced = true;
     } catch (IOException e) {
       log("Unable to update "+ pf.watchOutputDir +" (it still has the output of the last build that succeeded): "+e);
