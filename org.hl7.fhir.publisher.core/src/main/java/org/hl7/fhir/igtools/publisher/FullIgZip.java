@@ -203,7 +203,13 @@ public class FullIgZip {
       lastZip = Files.createTempFile("ig-full-zip-", ".zip");
       lastZip.toFile().deleteOnExit();
     }
-    Files.copy(zip, lastZip, StandardCopyOption.REPLACE_EXISTING);
+    try {
+      Files.copy(zip, lastZip, StandardCopyOption.REPLACE_EXISTING);
+    } catch (IOException | RuntimeException e) {
+      // a part copy must not be read again
+      forget();
+      throw e;
+    }
     last = entries;
   }
 
@@ -368,7 +374,11 @@ public class FullIgZip {
         long pos = e.dataOffset;
         long end = pos + e.csize;
         while (pos < end) {
-          pos += previous.transferTo(pos, end - pos, channel);
+          long n = previous.transferTo(pos, end - pos, channel);
+          if (n <= 0) {
+            throw new IOException("The last zip is shorter than expected");
+          }
+          pos += n;
         }
         written += e.csize;
         reused++;

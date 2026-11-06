@@ -195,6 +195,8 @@ module IgJekyllDriver
       target = destination(dest)
       IgJekyllDriver.write(target, IgJekyllDriver.source_stamp(path)) do
         FileUtils.rm_f(target)
+        # the copy gets the source's time, as in a build: Jekyll keeps the time it read first
+        @modified_time = nil
         super
       end
     end

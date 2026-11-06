@@ -82,6 +82,69 @@ class JekyllDriverTest {
     }
   }
 
+  /** a "Ruby" that answers each command with what the shell command prints */
+  private JekyllDriver fake(String reply) {
+    String sh = "while read l; do " + reply + "; done";
+    return new JekyllDriver(Arrays.asList("sh", "-c", sh), System.getenv());
+  }
+
+  @Test
+  void aReplyAfterOutputThatDidntEndItsLine() throws Exception {
+    driver = fake("printf 'Generating...@@ig-jekyll-driver@@ {\"ok\":true,\"full\":true}\\n'");
+    JekyllDriver.Result r = driver.build(dir.toString(), dir.resolve("out").toString(), 20_000, log::add);
+    assertTrue(r.isOk());
+    assertEquals(Arrays.asList("Generating..."), log);
+  }
+
+  @Test
+  void aReplyThatCantBeReadStopsIt() {
+    driver = fake("printf '@@ig-jekyll-driver@@ {\"ok\":\\n'");
+    IOException e = org.junit.jupiter.api.Assertions.assertThrows(IOException.class,
+        () -> driver.build(dir.toString(), dir.resolve("out").toString(), 20_000, log::add));
+    assertTrue(e.getMessage().startsWith("Jekyll's reply can't be read"), e.getMessage());
+    assertFalse(driver.isRunningFor(dir.toString(), dir.resolve("out").toString()));
+  }
+
+  @Test
+  void startedAgainWhenThePluginsChange() throws Exception {
+    driver = fake("printf '@@ig-jekyll-driver@@ {\"ok\":true,\"full\":true}\\n'");
+    String out = dir.resolve("out").toString();
+    write(dir, "_config.yml", "title: a\n");
+    driver.build(dir.toString(), out, 20_000, log::add);
+    driver.build(dir.toString(), out, 20_000, log::add);
+    assertEquals(Collections.emptyList(), log);
+    write(dir, "_plugins/f.rb", "# a filter\n");
+    driver.build(dir.toString(), out, 20_000, log::add);
+    assertEquals(Arrays.asList("Jekyll is started again: the site's plugins or configuration changed"), log);
+    driver.build(dir.toString(), out, 20_000, log::add);
+    assertEquals(1, log.size());
+    // the time alone isn't a change
+    Files.setLastModifiedTime(dir.resolve("_config.yml"), java.nio.file.attribute.FileTime.fromMillis(0));
+    driver.build(dir.toString(), out, 20_000, log::add);
+    assertEquals(1, log.size());
+  }
+
+  @Test
+  void aStaticFileWrittenAgainGetsItsNewTime() throws Exception {
+    assumeTrue(jekyllInstalled(), "jekyll is not installed");
+    Path src = Files.createDirectories(dir.resolve("src"));
+    Path out = dir.resolve("out");
+    write(src, "a.html", "---\ntitle: A\n---\n<h1>{{ page.title }}</h1>\n");
+    write(src, "style.css", "body { color: red; }\n");
+    Files.setLastModifiedTime(src.resolve("style.css"), java.nio.file.attribute.FileTime.fromMillis(1_600_000_000_000L));
+    driver = JekyllDriver.forCommand("jekyll");
+    assertTrue(driver.build(src.toString(), out.toString(), TIMEOUT, log::add).isOk());
+    // as jekyll build does
+    assertEquals(1_600_000_000_000L, Files.getLastModifiedTime(out.resolve("style.css")).toMillis());
+
+    write(src, "style.css", "body { color: tan; }\n");
+    Files.setLastModifiedTime(src.resolve("style.css"), java.nio.file.attribute.FileTime.fromMillis(1_700_000_000_000L));
+    JekyllDriver.Result r = update(src, out, "style.css");
+    assertEquals(Arrays.asList("style.css"), r.getWritten());
+    assertEquals(1_700_000_000_000L, Files.getLastModifiedTime(out.resolve("style.css")).toMillis());
+    sameAsBuild(src, out);
+  }
+
   @Test
   void disabledAfterItFailed() {
     JekyllDriver d = new JekyllDriver(Arrays.asList("ruby"), System.getenv());
