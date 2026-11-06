@@ -2,7 +2,6 @@ package org.hl7.fhir.igtools.publisher;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -43,33 +42,5 @@ class CliParamsTest {
   void getNamedParams_ignoresTrailingFlagWithNoValue() {
     String[] args = {"-po", "a.po", "-po"};
     assertEquals(List.of("a.po"), CliParams.getNamedParams(args, "-po"));
-  }
-
-  @Test
-  void getThreads_offByDefault() {
-    assertEquals(0, CliParams.getThreads(new String[]{"-ig", "x"}, 16));
-    assertEquals(0, new PublisherSettings().getThreads());
-  }
-
-  @Test
-  void getThreads_usesTheNumberAskedFor() {
-    assertEquals(12, CliParams.getThreads(new String[]{"-ig", "x", "-threads", "12"}, 16));
-    assertEquals(0, CliParams.getThreads(new String[]{"-threads", "0"}, 16));
-    assertEquals(4, CliParams.getThreads(new String[]{"-threads", " 4 "}, 16));
-  }
-
-  @Test
-  void getThreads_capsAtOneLessThanTheCores() {
-    assertEquals(15, CliParams.getThreads(new String[]{"-threads", "15"}, 16));
-    assertEquals(15, CliParams.getThreads(new String[]{"-threads", "64"}, 16));
-    assertEquals(0, CliParams.getThreads(new String[]{"-threads", "4"}, 1));
-  }
-
-  @Test
-  void getThreads_rejectsValuesThatAreNotACount() {
-    for (String v : new String[]{"-1", "two", "1.5", ""}) {
-      assertThrows(IllegalArgumentException.class, () -> CliParams.getThreads(new String[]{"-threads", v}, 16), v);
-    }
-    assertThrows(IllegalArgumentException.class, () -> CliParams.getThreads(new String[]{"-ig", "x", "-threads"}, 16));
   }
 }

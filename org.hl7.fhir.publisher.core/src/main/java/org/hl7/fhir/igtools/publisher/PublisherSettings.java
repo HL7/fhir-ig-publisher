@@ -37,11 +37,4 @@ public class PublisherSettings {
     @Getter private final List<String> noNarratives = new ArrayList<String>();
     @Getter private final List<String> noValidate = new ArrayList<String>();
     @Getter @Setter String jekyllCommand = "jekyll";
-    /**
-     * How many threads, beyond its own, the publisher may use for work that it can do in parallel
-     * (-threads). 0, the default, means none: the publisher does everything on one thread, so a build
-     * doesn't load more than one core unless the user asks for it. Anything that does work in parallel
-     * takes its thread count from here.
-     */
-    @Getter @Setter private int threads = 0;
 }
