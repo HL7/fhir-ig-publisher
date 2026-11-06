@@ -29,6 +29,7 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -62,6 +63,7 @@ public class TemplateManager {
   private boolean autoMode;
   private Map<String, String> templateOverrides = new LinkedHashMap<>(); // template id (name#version, or just name) -> local folder
   private boolean usedOverride;
+  private final List<String> localFolders = new ArrayList<>(); // the local folders the last template was loaded from
 
   private static final String ACCESSIBLE_MARKER = "[%accessibility-routines%]";
   private static final String JS_ROUTINE_NAME_REGEX = "[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)*";
@@ -115,6 +117,7 @@ public class TemplateManager {
   public Template loadTemplate(String template, String rootFolder, String packageId, boolean autoMode, boolean wantLog, boolean rapidoMode) throws FHIRException, IOException {
     this.autoMode = autoMode;
     this.usedOverride = false;
+    localFolders.clear();
     if (autoMode && !templateOverrides.isEmpty()) {
       // overrides would let an IG substitute arbitrary content for a trusted template id
       logger.logMessage("Template overrides in ig.ini are ignored in auto-build mode: "+String.join(", ", templateOverrides.keySet()));
@@ -132,6 +135,9 @@ public class TemplateManager {
     NpmPackage npm;
     if (!inPlace) {
       installTemplate(template, rootFolder, templateDir, scriptTemplates, new ArrayList<String>(), 0);
+    } else {
+      // the IG's own template folder is the template, as it is: a change to it needs a rebuild
+      localFolders.add(new File(templateDir).getAbsolutePath());
     }
     
     if (!autoMode) {
@@ -141,6 +147,14 @@ public class TemplateManager {
       logger.logMessage("IG template '"+templateThatCantExecute+"' is not trusted.  No scripts will be executed");
     }
     return new Template(rootFolder, canExecute, templateThatCantExecute, templateReason, wantLog, rapidoMode, usedOverride || isDevMode(template));
+  }
+
+  /**
+   * The local folders that the template loaded last, and its base templates, came from (not those from the package
+   * cache): a template that is being worked on. Watch mode watches them
+   */
+  public List<String> getLocalFolders() {
+    return Collections.unmodifiableList(localFolders);
   }
 
   private boolean isDevMode(String template) {
@@ -156,6 +170,8 @@ public class TemplateManager {
       if (!f.exists() || !f.isDirectory()) {
         throw new FHIRException("The ig.ini override for template "+template+" names the folder "+override+" which does not exist");
       }
+      // recorded first, so that a template that can't be read now is still watched: fixing it needs a rebuild
+      localFolders.add(f.getAbsolutePath());
       npm = NpmPackage.fromFolder(f.getAbsolutePath(), PackageType.IG_TEMPLATE, "output", ".git");
       usedOverride = true;
       String id = template.contains("#") ? template.substring(0, template.indexOf("#")) : template;
@@ -438,8 +454,8 @@ public class TemplateManager {
       if (template.startsWith("#")) {
         File f = new File(Utilities.path(rootFolder, template.substring(1)));
         if (f.exists() && f.isDirectory()) {
-          NpmPackage npm = NpmPackage.fromFolder(f.getAbsolutePath(), PackageType.IG_TEMPLATE, "output", ".git");
-          return npm;
+          localFolders.add(f.getAbsolutePath()); // first, as for an override
+          return NpmPackage.fromFolder(f.getAbsolutePath(), PackageType.IG_TEMPLATE, "output", ".git");
         }
       }
 
@@ -456,6 +472,7 @@ public class TemplateManager {
       }
       if (f.exists()) {
         if (f.isDirectory()) {
+          localFolders.add(f.getAbsolutePath());
           return NpmPackage.fromFolder(f.getAbsolutePath());
         } else {
           try (FileInputStream in = new FileInputStream(template)) {
