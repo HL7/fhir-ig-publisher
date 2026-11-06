@@ -458,7 +458,9 @@ public class TemplateManager {
         if (f.isDirectory()) {
           return NpmPackage.fromFolder(f.getAbsolutePath());
         } else {
-          return NpmPackage.fromPackage(new FileInputStream(template));
+          try (FileInputStream in = new FileInputStream(template)) {
+            return NpmPackage.fromPackage(in);
+          }
         }
       }
       if (template.startsWith("https://github.") || template.startsWith("http://github.")) {

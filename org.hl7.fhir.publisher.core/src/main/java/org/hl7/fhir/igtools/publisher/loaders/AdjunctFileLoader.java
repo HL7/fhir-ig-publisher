@@ -30,10 +30,12 @@ public class AdjunctFileLoader {
 
   private CqlSubSystem cql;
   private List<String> binaryPaths;
+  private boolean debugging = false;
 
-  public AdjunctFileLoader(List<String> binaryPaths, CqlSubSystem cql) {
+  public AdjunctFileLoader(List<String> binaryPaths, CqlSubSystem cql, boolean debugging) {
     this.binaryPaths = binaryPaths;
     this.cql = cql;
+    this.debugging = debugging;
   }
 
   private class ElementWithPath {
@@ -169,6 +171,9 @@ public class AdjunctFileLoader {
           res = true;
           addAttachment(f, att, fn, a);
         } catch (Exception ex) {
+          if (debugging) {
+            ex.printStackTrace();
+          }
           f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, att.getElement().line(), att.getElement().col(), att.getPath(), "Error Loading "+fn+": " +ex.getMessage(), IssueSeverity.ERROR));
         }
       }
@@ -213,7 +218,7 @@ public class AdjunctFileLoader {
       if (contentType == null) {
         contentType = a.getContentType();
       }
-      att.getElement().getChildren().clear();
+      att.getElement().getChildList().clear();
       if (contentType != null) {
         att.getElement().setChildValue("contentType", contentType);
       } else {
