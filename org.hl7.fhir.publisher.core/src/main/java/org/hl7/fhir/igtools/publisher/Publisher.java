@@ -811,8 +811,6 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     log("Finished @ "+nowString()+". Max Memory Used = "+Utilities.describeSize(pf.maxMemory)+logSummary());
   }
 
-  }
-
   /**
    * Write any terminology answers this build has picked up but not yet flushed.
    *
