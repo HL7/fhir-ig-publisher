@@ -61,6 +61,29 @@ class RapidoFileNamesTest {
     }
   }
 
+  private static String templateHash(Path t, boolean[] fshIndex) throws IOException {
+    RapidoDependencyAnalyser.Hasher h = new RapidoDependencyAnalyser.Hasher();
+    RapidoTracker.hashTree(t.toFile(), h, Set.of(), fshIndex);
+    return h.finish();
+  }
+
+  /** the template's hash reads files the JVM can't decode the names of too, so a change to one is seen */
+  @Test
+  void templateHashReadsNamesTheJvmCantDecode(@TempDir Path dir) throws Exception {
+    Path t = dir.resolve("template");
+    Files.createDirectories(t.resolve("layouts"));
+    Files.writeString(t.resolve("layouts/a.html"), "x");
+    assumeTrue(shWrite(t.resolve("layouts"), "b\\377.html", "uses fsh-index"), "can't make files with such names here");
+    boolean[] fshIndex = new boolean[1];
+    String h = templateHash(t, fshIndex);
+    assertTrue(fshIndex[0]);
+    assertEquals(h, templateHash(t, new boolean[1]));
+    assertTrue(shWrite(t.resolve("layouts"), "b\\377.html", "changed"));
+    boolean[] after = new boolean[1];
+    assertNotEquals(h, templateHash(t, after));
+    assertFalse(after[0]);
+  }
+
   /** an output the build wrote through java.io is read by the same name, or it looks overwritten in every build */
   @Test
   void aFileJavaIoWroteIsReadByItsName(@TempDir Path dir) throws Exception {
