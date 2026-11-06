@@ -75,7 +75,7 @@ public class RapidoOutputs {
       JsonArray names = new JsonArray();
       if (generated.contains(f)) {
         for (String name : f.getOutputNames()) {
-          if (name.startsWith(tempDir + File.separator)) {
+          if (name.startsWith(tempDir + File.separator) && name.length() > tempDir.length() + 1) { // not the temp folder itself
             names.add(name.substring(tempDir.length() + 1));
             written.add(name);
           }

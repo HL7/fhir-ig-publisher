@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
+import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -60,6 +61,24 @@ class RapidoOutputsTest {
     FetchedFile renamed = file("background.md", temp, "background.md");
     FetchedFile other2 = file("other.md", temp);
     assertEquals(Set.of(), new RapidoOutputs(cache, temp).update(List.of(renamed, other2), List.of(renamed)).getGone());
+  }
+
+  @Test
+  void theTempFolderItselfIsntAnOutput() throws Exception {
+    // a template folder copied to the root of the temp folder
+    String temp = dir.resolve("temp").toString();
+    String cache = dir.resolve("cache").toString();
+    Files.createDirectories(dir.resolve("cache"));
+    FetchedFile folder = new FetchedFile("config");
+    folder.getOutputNames().add(temp + File.separator);
+    FetchedFile page = file("a.md", temp, "a.md");
+    new RapidoOutputs(cache, temp).update(List.of(folder, page), List.of(folder, page));
+
+    FetchedFile folder2 = new FetchedFile("config");
+    FetchedFile page2 = file("a.md", temp, "a.md");
+    RapidoOutputs.Change change = new RapidoOutputs(cache, temp).update(List.of(folder2, page2), List.of(page2));
+    assertEquals(Set.of(), change.getKept());
+    assertEquals(Set.of(), change.getGone());
   }
 
   @Test
