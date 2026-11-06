@@ -916,8 +916,13 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     if (!pf.txUnloadEarly) {
       // default path: terminology stayed loaded through HTML inspection (so conformance
       // statement rendering works); unload it now that the inspector is complete.
-      pf.context.unload();
-      System.gc();
+      if (pageRebuild != null) {
+        // a page rebuild that follows checks the html again with it (see PageRebuild.discard())
+        pageRebuild.unloadContextWhenDiscarded();
+      } else if (replay == null) {
+        pf.context.unload();
+        System.gc();
+      }
     }
   }
 

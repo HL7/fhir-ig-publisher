@@ -79,6 +79,7 @@ public class PageRebuild {
    * The copies of the package outputs that haven't been discarded: watch mode usually ends with Ctrl-C, which doesn't
    * get to discard(), so they're deleted when the JVM exits
    */
+  private boolean unloadContext;
   private static final Set<Path> STASHES = ConcurrentHashMap.newKeySet();
   private static boolean shutdownHookAdded;
 
@@ -558,8 +559,22 @@ public class PageRebuild {
     }
   }
 
-  /** Deletes the copies of the package files */
+  /**
+   * The build left its context loaded for the html checks of a page rebuild (a complete build unloads it once its
+   * checks are done): discard() unloads it
+   */
+  public void unloadContextWhenDiscarded() {
+    unloadContext = true;
+  }
+
+  /** Deletes the copies of the package files, and unloads the context if the build left it loaded for a page rebuild */
   public void discard() {
+    if (unloadContext) {
+      unloadContext = false;
+      if (pf != null && pf.context != null) {
+        pf.context.unload();
+      }
+    }
     if (stashFolder != null) {
       if (delete(stashFolder)) {
         STASHES.remove(stashFolder);
