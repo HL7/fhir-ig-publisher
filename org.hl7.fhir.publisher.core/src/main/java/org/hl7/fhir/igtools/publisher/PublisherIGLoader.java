@@ -79,6 +79,7 @@ import org.hl7.fhir.validation.ValidatorUtils;
 import org.hl7.fhir.validation.instance.InstanceValidator;
 import org.hl7.fhir.validation.profile.ProfileValidator;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.io.FileUtils;
 import org.w3._1999.xhtml.B;
 import org.w3c.dom.Document;
 import org.xml.sax.SAXException;
@@ -1032,6 +1033,13 @@ public class PublisherIGLoader extends PublisherBase {
       pf.outputDir = staging;
       logDebugMessage(LogCategory.INIT, "Staging: "+ pf.outputDir);
       forceDir(pf.outputDir);
+      if (pf.qaDir != null) {
+        // or the sync would delete it
+        pf.qaDir = Publisher.stagedPath(pf.qaDir, pf.watchOutputDir, pf.outputDir);
+      }
+    } else if (new File(staging).exists()) {
+      // left by a watch session: it isn't part of this build
+      FileUtils.deleteDirectory(new File(staging));
     }
     FileUtilities.clearDirectory(pf.outputDir);
     if (pf.qaDir != null) {
@@ -1392,7 +1400,15 @@ public class PublisherIGLoader extends PublisherBase {
   public void clearTempFolder() throws Exception {
     logDebugMessage(LogCategory.INIT, "Temp: "+ pf.tempDir);
     if (pf.watchOutputDir != null) {
-      FileUtilities.clearDirectory(pf.tempDir, WATCH_OUTPUT_STAGING);
+      // everything but the staging folder, which already has what this build wrote to the output so far
+      File[] children = new File(pf.tempDir).listFiles();
+      if (children != null) {
+        for (File f : children) {
+          if (!f.getName().equals(WATCH_OUTPUT_STAGING)) {
+            FileUtils.forceDelete(f);
+          }
+        }
+      }
     } else {
       FileUtilities.clearDirectory(pf.tempDir);
     }
