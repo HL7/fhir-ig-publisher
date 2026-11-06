@@ -634,7 +634,7 @@ public class RapidoTracker {
   }
 
   /** see listTree() for why this goes by Paths */
-  private void hashTree(File root, Hasher h, Set<String> skip, boolean[] fshIndex) throws IOException {
+  static void hashTree(File root, Hasher h, Set<String> skip, boolean[] fshIndex) throws IOException {
     Path r = path(root);
     if (r == null) {
       h.add("unreadable").add(root.getAbsolutePath()).add(UUID.randomUUID().toString()); // assume it changed
@@ -643,7 +643,7 @@ public class RapidoTracker {
     }
   }
 
-  private void hashTree(Path dir, Hasher h, Set<String> skip, boolean[] fshIndex) throws IOException {
+  private static void hashTree(Path dir, Hasher h, Set<String> skip, boolean[] fshIndex) throws IOException {
     if (!Files.exists(dir)) {
       h.add("missing").add(dir.toAbsolutePath().toString());
       return;
