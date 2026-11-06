@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -11,9 +12,11 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.time.Duration;
 import java.util.Map;
 import java.util.Set;
 
@@ -58,6 +61,50 @@ class RapidoFileNamesTest {
       assertEquals(a.keySet(), b.keySet());
       assertEquals(1, a.keySet().stream().filter(k -> !a.get(k).equals(b.get(k))).count(), name);
       a.putAll(b);
+    }
+  }
+
+  /** runs the command with sh in dir; false if that can't be done here */
+  private static boolean sh(Path dir, String command) throws InterruptedException {
+    try {
+      return new ProcessBuilder("sh", "-c", "cd \"$1\" && " + command, "sh", dir.toString()).inheritIO().start().waitFor() == 0;
+    } catch (IOException e) {
+      return false;
+    }
+  }
+
+  /** two folders whose names decode the same are both scanned, not taken for a link to the other */
+  @Test
+  void otherFilesScanListsFoldersWhoseNamesDecodeTheSame(@TempDir Path dir) throws Exception {
+    Files.createDirectories(dir.resolve("input"));
+    assumeTrue(sh(dir.resolve("input"), "mkdir \"$(printf 'd\\377')\" \"$(printf 'd\\376')\""
+        + " && printf a > \"$(printf 'd\\377')/x.txt\" && printf b > \"$(printf 'd\\376')/x.txt\""), "can't make folders with such names here");
+    assumeTrue(dir.resolve("input").toFile().list().length == 2, "the file system changed the names");
+    Map<String, String> a = RapidoTracker.scanTree(dir.toFile(), Set.of());
+    assertEquals(2, a.size(), a.toString());
+    assertFalse(a.values().stream().anyMatch(v -> v.startsWith("(same as")), a.toString());
+    assertTrue(sh(dir.resolve("input"), "printf changed > \"$(printf 'd\\377')/x.txt\""));
+    Map<String, String> b = RapidoTracker.scanTree(dir.toFile(), Set.of());
+    assertEquals(a.keySet(), b.keySet());
+    assertNotEquals(a, b);
+  }
+
+  /** a FIFO in the template is read by nothing, so it doesn't make every build a complete one */
+  @Test
+  void aFifoInTheTemplateDoesntChangeItsHash(@TempDir Path dir) throws Exception {
+    Path t = dir.resolve("template");
+    Files.createDirectories(t);
+    Files.writeString(t.resolve("a.html"), "x");
+    assumeTrue(sh(t, "mkfifo pipe"), "can't make a FIFO here");
+    try {
+      // opening a FIFO to read waits for a writer, so a scan that does would hang
+      assertTimeoutPreemptively(Duration.ofSeconds(30), () -> {
+        assertEquals(templateHash(t, new boolean[1]), templateHash(t, new boolean[1]));
+        // and in the other-files scan
+        assertEquals(Set.of("template/a.html"), RapidoTracker.scanTree(dir.toFile(), Set.of()).keySet());
+      });
+    } finally {
+      new RandomAccessFile(t.resolve("pipe").toFile(), "rw").close(); // lets a stuck open go on
     }
   }
 
