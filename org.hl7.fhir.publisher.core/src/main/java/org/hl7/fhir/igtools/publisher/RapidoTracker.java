@@ -61,6 +61,7 @@ import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonElement;
+import org.hl7.fhir.utilities.json.model.JsonNumber;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.model.JsonPrimitive;
 import org.hl7.fhir.utilities.json.model.JsonProperty;
@@ -121,6 +122,9 @@ public class RapidoTracker {
   private Set<String> statusBefore;
   /** how many of the IG's profiles the resource being validated was known to conform to before it was validated */
   private int profilesBefore;
+  /** how many validations were reused, and how many were done, for the log */
+  private int validationsReused;
+  private int validationsDone;
   /** the date the loader puts on canonical resources that have none; it differs every build */
   private final String buildDate;
 
@@ -1007,8 +1011,15 @@ public class RapidoTracker {
       Set<String> sw = statusWarnings();
       statusBefore = sw == null ? null : new HashSet<>(sw);
       profilesBefore = r.getFoundProfiles().size();
+    } else {
+      validationsReused++;
     }
     return res;
+  }
+
+  /** e.g. "reused 12 of 15 validations", for the log */
+  public String validationSummary() {
+    return "reused "+validationsReused+" of "+(validationsReused+validationsDone)+" validations";
   }
 
   private List<ValidationMessage> savedValidation(FetchedFile f, FetchedResource r) {
@@ -1041,6 +1052,10 @@ public class RapidoTracker {
     if (sources == null) {
       return null;
     }
+    // the validator attaches the profiles it validated an element against to the element, for the qa page's signposts
+    if (!restoreSignposts(r.getElement(), rv.getJsonArray("signposts"), res)) {
+      return null;
+    }
     for (FetchedResource source : sources) {
       source.addFoundExample(r);
       r.getFoundProfiles().add(((CanonicalResource) source.getResource()).getUrl());
@@ -1052,6 +1067,7 @@ public class RapidoTracker {
 
   /** records the messages from validating a resource, before the publisher adds them to the file */
   public void recordValidation(FetchedFile f, FetchedResource r, List<ValidationMessage> errs) {
+    validationsDone++;
     Set<String> sw = statusWarnings();
     if (!keys.containsKey(f) || sw == null || statusBefore == null) {
       return; // without knowing what the validator had seen, the result can't be reused
@@ -1080,7 +1096,117 @@ public class RapidoTracker {
       }
       msgs.add(m);
     }
+    JsonArray signposts = recordSignposts(r.getElement(), errs);
+    if (signposts == null) {
+      return;
+    }
+    rv.add("signposts", signposts);
     newFile(f).forceObject("validation").set(Integer.toString(f.getResources().indexOf(r)), rv);
+  }
+
+  /**
+   * The messages the validator attached to the elements of the resource (Element.addMessage(): the profiles it
+   * validated each element against), with where each element is (the index of each child from the root) and its path.
+   * A message that is also one of the resource's messages is recorded as its index there, so that it comes back as the
+   * same object, as in a stock build. null if a message can't be saved.
+   */
+  static JsonArray recordSignposts(Element root, List<ValidationMessage> errs) {
+    JsonArray res = new JsonArray();
+    Map<ValidationMessage, Integer> index = new IdentityHashMap<>();
+    for (int i = 0; i < errs.size(); i++) {
+      index.putIfAbsent(errs.get(i), i);
+    }
+    return root == null || recordSignposts(root, "", index, res) ? res : null;
+  }
+
+  private static boolean recordSignposts(Element e, String at, Map<ValidationMessage, Integer> index, JsonArray res) {
+    if (e.hasMessages()) {
+      JsonObject o = new JsonObject();
+      o.add("at", at);
+      o.add("path", String.valueOf(e.getPath()));
+      JsonArray msgs = o.forceArray("messages");
+      for (ValidationMessage vm : e.getMessages()) {
+        Integer i = index.get(vm);
+        if (i != null) {
+          msgs.add(i);
+        } else {
+          JsonObject m = writeMessage(vm);
+          if (m == null) {
+            return false;
+          }
+          msgs.add(m);
+        }
+      }
+      res.add(o);
+    }
+    if (e.hasChildren()) {
+      int i = 0;
+      for (Element c : e.getChildList()) {
+        if (!recordSignposts(c, at.isEmpty() ? Integer.toString(i) : at+"."+i, index, res)) {
+          return false;
+        }
+        i++;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Attaches the messages recordSignposts() recorded to the elements of the resource, as validating it would have.
+   * false (and nothing attached) if an element isn't where it was, or a message can't be read.
+   *
+   * @param msgs the resource's messages, as restored
+   */
+  static boolean restoreSignposts(Element root, JsonArray signposts, List<ValidationMessage> msgs) {
+    if (signposts == null || root == null) {
+      return signposts != null && signposts.size() == 0;
+    }
+    Map<Element, List<ValidationMessage>> found = new LinkedHashMap<>();
+    for (JsonObject o : signposts.asJsonObjects()) {
+      Element e = root;
+      String at = o.asString("at");
+      if (at == null) {
+        return false;
+      }
+      if (!at.isEmpty()) {
+        for (String s : at.split("\\.")) {
+          int i;
+          try {
+            i = Integer.parseInt(s);
+          } catch (NumberFormatException ex) {
+            return false;
+          }
+          if (!e.hasChildren() || i < 0 || i >= e.getChildList().size()) {
+            return false;
+          }
+          e = e.getChildList().get(i);
+        }
+      }
+      if (!String.valueOf(e.getPath()).equals(o.asString("path")) || o.getJsonArray("messages") == null) {
+        return false;
+      }
+      List<ValidationMessage> list = new ArrayList<>();
+      for (JsonElement m : o.getJsonArray("messages").getItems()) {
+        ValidationMessage vm = null;
+        if (m instanceof JsonObject) {
+          vm = readMessage((JsonObject) m);
+        } else if (m instanceof JsonNumber) {
+          Integer i = ((JsonNumber) m).getInteger();
+          vm = i != null && i >= 0 && i < msgs.size() ? msgs.get(i) : null;
+        }
+        if (vm == null) {
+          return false;
+        }
+        list.add(vm);
+      }
+      found.put(e, list);
+    }
+    for (Map.Entry<Element, List<ValidationMessage>> e : found.entrySet()) {
+      for (ValidationMessage vm : e.getValue()) {
+        e.getKey().addMessage(vm);
+      }
+    }
+    return true;
   }
 
   /**
