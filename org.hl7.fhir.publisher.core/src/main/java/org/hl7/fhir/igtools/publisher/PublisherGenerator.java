@@ -25,7 +25,10 @@ import org.hl7.fhir.igtools.renderers.QuestionnaireResponseRenderer;
 import org.hl7.fhir.igtools.renderers.StructureDefinitionRenderer;
 import org.hl7.fhir.igtools.renderers.StructureMapRenderer;
 import org.hl7.fhir.igtools.renderers.ValueSetRenderer;
+import org.hl7.fhir.igtools.spreadsheets.ColumnWidthCache;
 import org.hl7.fhir.igtools.spreadsheets.ObservationSummarySpreadsheetGenerator;
+import org.hl7.fhir.igtools.spreadsheets.ProfileSpreadsheetGenerator;
+import org.hl7.fhir.igtools.spreadsheets.ProfileSpreadsheetPrefetcher;
 import org.hl7.fhir.igtools.web.IGReleaseVersionUpdater;
 import org.hl7.fhir.model.Base;
 import org.hl7.fhir.model.fml.StructureMap;
@@ -342,33 +345,55 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       }
 
       logMessage("Generate Spreadsheets");
-      for (FetchedFile f : pf.changeList) {
-        f.start("generate2");
-        try {
-          if (pf.rapido != null && !settings.isGenerationOff() && pf.rapido.canReplay(f, RapidoTracker.PHASE_SHEETS)) {
-            replayGeneration(f, RapidoTracker.PHASE_SHEETS);
-            // any messages from adding the rows were recorded with the rest of the phase, and have just been replayed
-            for (FetchedResource r : f.getResources()) {
-              if (r.getResource() instanceof StructureDefinition) {
-                try {
-                  addToAllProfiles(r, (StructureDefinition) r.getResource(), new ArrayList<>());
-                } catch (Exception e) {
-                  // as in generateResourceSpreadsheets, the profile gets no row (e.g. it has no snapshot); the error
-                  // was recorded with the phase, and has just been replayed
+      columnWidths = new ColumnWidthCache();
+      // the files whose spreadsheets are reused from the last build: decided before the prefetcher starts, so that it
+      // doesn't build their workbooks
+      Set<FetchedFile> replaySheets = new HashSet<>();
+      if (pf.rapido != null && !settings.isGenerationOff()) {
+        for (FetchedFile f : pf.changeList) {
+          if (pf.rapido.canReplay(f, RapidoTracker.PHASE_SHEETS)) {
+            replaySheets.add(f);
+          }
+        }
+      }
+      spreadsheetPrefetcher = startSpreadsheetPrefetcher(replaySheets);
+      try {
+        for (FetchedFile f : pf.changeList) {
+          f.start("generate2");
+          try {
+            if (replaySheets.contains(f)) {
+              replayGeneration(f, RapidoTracker.PHASE_SHEETS);
+              // any messages from adding the rows were recorded with the rest of the phase, and have just been replayed
+              for (FetchedResource r : f.getResources()) {
+                if (r.getResource() instanceof StructureDefinition) {
+                  try {
+                    addToAllProfiles(r, (StructureDefinition) r.getResource(), new ArrayList<>());
+                  } catch (Exception e) {
+                    // as in generateResourceSpreadsheets, the profile gets no row (e.g. it has no snapshot); the error
+                    // was recorded with the phase, and has just been replayed
+                  }
                 }
               }
+            } else {
+              if (pf.rapido != null) {
+                pf.rapido.startRecording(f, RapidoTracker.PHASE_SHEETS);
+              }
+              generateSpreadsheets(f, false, db);
+              if (pf.rapido != null) {
+                pf.rapido.stopRecording();
+              }
             }
-          } else {
-            if (pf.rapido != null) {
-              pf.rapido.startRecording(f, RapidoTracker.PHASE_SHEETS);
-            }
-            generateSpreadsheets(f, false, db);
-            if (pf.rapido != null) {
-              pf.rapido.stopRecording();
-            }
+          } finally {
+            f.finish("generate2");
           }
-        } finally {
-          f.finish("generate2");
+        }
+      } finally {
+        if (spreadsheetPrefetcher != null) {
+          if (spreadsheetPrefetcher.getFallbacks() > 0) {
+            log("Spreadsheets: "+spreadsheetPrefetcher.getFallbacks()+" profile workbook(s) could not be built ahead, and were built in order instead (first: "+spreadsheetPrefetcher.getFirstFailure()+")");
+          }
+          spreadsheetPrefetcher.close();
+          spreadsheetPrefetcher = null;
         }
       }
       if (pf.allProfilesCsv != null) {
@@ -383,6 +408,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         pf.otherFilesRun.add(Utilities.path(pf.tempDir, "all-profiles.xlsx"));
         pf.allProfilesXlsx.dump();
       }
+      columnWidths = null;
 
       logMessage("Generate Summaries");
 
@@ -433,7 +459,23 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
     printMemUsage();
     log("Reclaiming memory...");
-    cleanOutput(pf.tempDir);
+    if (pf.hasCheckedDependencies) {
+      // rapido: a differential build keeps what the files it didn't generate wrote in an earlier build
+      RapidoOutputs.Change change = new RapidoOutputs(pf.vsCache, pf.tempDir).update(pf.fileList, pf.changeList);
+      if (change != null) {
+        pf.otherFilesRun.addAll(change.getKept());
+        for (String gone : change.getGone()) {
+          if (!isValidFile(gone)) { // unless something else wrote it in this build
+            new File(gone).delete();
+          }
+        }
+        cleanOutput(pf.tempDir);
+      } else {
+        log("Rapido Mode: what the unchanged files wrote in the temp folder isn't known, so nothing is removed from it");
+      }
+    } else {
+      cleanOutput(pf.tempDir);
+    }
     for (FetchedFile f : pf.fileList) {
       f.trim();
     }
@@ -968,6 +1010,57 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
   }
 
+  /** shared by the profile workbooks of one Spreadsheets phase */
+  private ColumnWidthCache columnWidths;
+  /** builds the per-profile workbooks of the Spreadsheets phase ahead, on other threads */
+  private ProfileSpreadsheetPrefetcher<FetchedResource> spreadsheetPrefetcher;
+
+  private ColumnWidthCache columnWidths() {
+    if (columnWidths == null) {
+      columnWidths = new ColumnWidthCache();
+    }
+    return columnWidths;
+  }
+
+  /**
+   * The per-profile xlsx workbooks that the Spreadsheets loop below will build, in its order, are handed to a
+   * {@link ProfileSpreadsheetPrefetcher}. Each job renders a deep copy of the profile, taken here on this thread,
+   * with the displays that need the worker context rendered here too, by a generator that then lets go of the
+   * context. This only happens when the user has asked for extra threads (-threads). The loop still does
+   * everything else in the same order as before (csv, all-profiles, schematron), and builds a workbook itself
+   * whenever the prefetcher has no result for it.
+   */
+  private ProfileSpreadsheetPrefetcher<FetchedResource> startSpreadsheetPrefetcher(Set<FetchedFile> replayed) {
+    int threads = this.settings.getThreads();
+    if (threads == 0 || this.settings.isGenerationOff()) {
+      return null;
+    }
+    List<FetchedResource> candidates = new ArrayList<>();
+    for (FetchedFile f : pf.changeList) {
+      if (f.getProcessMode() != FetchedFile.PROCESS_NONE && f.getProcessMode() != FetchedFile.PROCESS_XSLT && !replayed.contains(f)) {
+        for (FetchedResource r : f.getResources()) {
+          // wantGen(r, "xlsx") without the template check, which is always true for xlsx but counts the calls;
+          // the loop still asks wantGen itself
+          if (r.getResource() instanceof StructureDefinition && ((StructureDefinition) r.getResource()).hasSnapshot()
+              && !Boolean.FALSE.equals(pf.wantGenParams.get("xlsx")) && pf.igpkp.wantGen(r, "xlsx")) {
+            candidates.add(r);
+          }
+        }
+      }
+    }
+    if (candidates.isEmpty()) {
+      return null;
+    }
+    return new ProfileSpreadsheetPrefetcher<>(candidates, threads, r -> {
+      StructureDefinition sd = (StructureDefinition) r.getResource();
+      ProfileSpreadsheetGenerator sdg = new ProfileSpreadsheetGenerator(this.pf.context, true, anyMustSupport(sd), pf.rendererFactory, columnWidths());
+      StructureDefinition copy = sd.copy(Base.COPY_ALL);
+      // the job runs on a worker thread, so it must not see the context: detach the generator from it here
+      sdg.detachFromContext(copy);
+      return ProfileSpreadsheetPrefetcher.job(sdg, copy);
+    });
+  }
+
   private void generateSpreadsheets(FetchedFile f, boolean regen, DBBuilder db) throws Exception {
     if (this.settings.isGenerationOff()) {
       return;
@@ -1333,6 +1426,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           }
           for (String fn : br.getFilenames()) {
             this.pf.otherFilesRun.add(Utilities.path(this.pf.tempDir, fn));
+            f.getOutputNames().add(Utilities.path(this.pf.tempDir, fn)); // for -rapido (see RapidoOutputs)
           }
         }
         fragment(rX.fhirType()+"-"+rX.getId()+"-html", html, f.getOutputNames(), rX, vars, null, start, "html", "Resource", lang);
@@ -1939,6 +2033,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       oa.commit();
       if (lang == null) {
         this.pf.otherFilesRun.add(Utilities.path(this.pf.tempDir, cpbs.getId()+lp+ ".openapi.json"));
+        f.getOutputNames().add(Utilities.path(this.pf.tempDir, cpbs.getId()+lp+ ".openapi.json")); // for -rapido (see RapidoOutputs)
         addFileToNpm(NPMPackageGenerator.Category.OPENAPI, cpbs.getId()+ lp+".openapi.json", FileUtilities.fileToBytes(Utilities.path(this.pf.tempDir, cpbs.getId()+lp+".openapi.json")));
       }
     }
@@ -1959,10 +2054,17 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       lapsed(null);
       String path = Utilities.path(this.pf.tempDir, sdPrefix + r.getId()+".xlsx");
       f.getOutputNames().add(path);
-      StructureDefinitionSpreadsheetGenerator sdg = new StructureDefinitionSpreadsheetGenerator(this.pf.context, true, anyMustSupport(sd), pf.rendererFactory);
-      sdg.renderStructureDefinition(sd, false);
-      try (FileOutputStream out = new FileOutputStream(path)) {
-        sdg.finish(out);
+      byte[] xlsx = spreadsheetPrefetcher == null ? null : spreadsheetPrefetcher.take(r);
+      if (xlsx != null) {
+        try (FileOutputStream out = new FileOutputStream(path)) {
+          out.write(xlsx);
+        }
+      } else {
+        StructureDefinitionSpreadsheetGenerator sdg = new ProfileSpreadsheetGenerator(this.pf.context, true, anyMustSupport(sd), pf.rendererFactory, columnWidths());
+        sdg.renderStructureDefinition(sd, false);
+        try (FileOutputStream out = new FileOutputStream(path)) {
+          sdg.finish(out);
+        }
       }
       lapsed("xslx");
       addToAllProfilesXlsx(sd);
@@ -2006,7 +2108,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
   private void addToAllProfilesXlsx(StructureDefinition sd) throws Exception {
     if (this.pf.allProfilesXlsx == null) {
-      this.pf.allProfilesXlsx = new StructureDefinitionSpreadsheetGenerator(this.pf.context, true, false, pf.rendererFactory);
+      this.pf.allProfilesXlsx = new ProfileSpreadsheetGenerator(this.pf.context, true, false, pf.rendererFactory, columnWidths());
     }
     this.pf.allProfilesXlsx.renderStructureDefinition(sd, true);
     lapsed("all-xslx");
@@ -2511,6 +2613,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         String filename = "Library-"+r.getId()+(counter == 0 ? "" : "-"+Integer.toString(counter))+"."+extension;
         FileUtilities.bytesToFile(att.getData(), Utilities.path(this.pf.tempDir, filename));
         this.pf.otherFilesRun.add(Utilities.path(this.pf.tempDir, filename));
+        f.getOutputNames().add(Utilities.path(this.pf.tempDir, filename)); // for -rapido (see RapidoOutputs)
       }
       counter++;
     }
@@ -5794,6 +5897,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       }
       gen.finish();
       this.pf.otherFilesRun.add(Utilities.path(this.pf.tempDir, id+".tgz"));
+      f.getOutputNames().add(Utilities.path(this.pf.tempDir, id+".tgz")); // for -rapido (see RapidoOutputs)
     }
 
   }

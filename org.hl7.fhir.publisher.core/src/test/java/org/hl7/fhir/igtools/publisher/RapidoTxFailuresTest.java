@@ -50,6 +50,7 @@ class RapidoTxFailuresTest {
     pf.rootDir = dir.toString();
     pf.tempDir = dir.resolve("temp").toString();
     pf.vsCache = dir.resolve("txcache").toString();
+    Files.createDirectories(dir.resolve("txcache"));
     pf.igpkp = mock(IGKnowledgeProvider.class);
     when(pf.igpkp.getCanonical()).thenReturn("http://example.org/ig");
     igf = new FetchedFile("input/ig.json");
@@ -71,6 +72,7 @@ class RapidoTxFailuresTest {
     first.setUuid("the-last-build");
     duringTheBuild.run();
     first.save();
+    new RapidoOutputs(pf.vsCache, pf.tempDir).update(pf.fileList, pf.fileList); // what it wrote in the temp folder
     RapidoTracker next = new RapidoTracker(pf);
     next.analyse(igf, null);
     return next;

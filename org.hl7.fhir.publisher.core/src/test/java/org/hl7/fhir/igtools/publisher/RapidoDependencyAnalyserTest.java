@@ -266,6 +266,30 @@ class RapidoDependencyAnalyserTest {
     assertEquals(List.of("p2"), o.validate);
   }
 
+  /** a Type/id that two files hold reaches both: a change to either one could change what the reference shows */
+  @Test
+  void aReferenceDependsOnEveryFileWithThatTypeAndId() {
+    Ig ig = new Ig();
+    ig.add("bundle", "Patient", "p1").title("In the bundle");
+    ig.add("patient", "Patient", "p1").title("On its own");
+    ig.add("obs", "Observation", "o1").str("Patient/p1");
+    ig.add("other", "Patient", "p2");
+    assertEquals(List.of("bundle", "obs"), edit(ig, i -> i.get("bundle").title("In the bundle, renamed")).validate);
+    assertEquals(List.of("patient", "obs"), edit(ig, i -> i.get("patient").title("On its own, renamed")).validate);
+  }
+
+  /** versions are ignored: a missed dependency leaves Rapido output stale, an extra one only costs a rebuild */
+  @Test
+  void aVersionedCanonicalDependsOnEveryVersionOfThatUrl() {
+    Ig ig = new Ig();
+    ig.add("lib1", "Library", "lib1").url(B+"/Library/lib").version = "1.0.0";
+    ig.add("lib2", "Library", "lib2").url(B+"/Library/lib").version = "2.0.0";
+    ig.add("group", "Group", "g1").str(B+"/Library/lib|1.0.0");
+    // (each version's url finds the other one too)
+    assertEquals(List.of("lib1", "lib2", "group"), edit(ig, i -> i.get("lib2").title("Version 2")).validate);
+    assertEquals(List.of("lib1", "lib2", "group"), edit(ig, i -> i.get("lib1").title("Version 1")).validate);
+  }
+
   @Test
   void mappingsAreNotRelativeReferences() {
     // base snapshots carry v2 mappings such as XPN/4, which look like Type/id

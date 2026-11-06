@@ -166,6 +166,10 @@ public class RapidoTracker {
     if (reason == null && pf.doTransforms) {
       reason = "running transforms";
     }
+    if (reason == null && !new RapidoOutputs(pf.vsCache, pf.tempDir).isComplete()) {
+      // a reused file's outputs are what it wrote in the temp folder in the last build (see RapidoOutputs)
+      reason = "what the last build wrote in the temp folder isn't all there";
+    }
     complete = reason != null;
     if (complete) {
       return;

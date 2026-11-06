@@ -6,6 +6,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -13,7 +14,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -206,13 +206,40 @@ public class RapidoDependencyAnalyser {
   private final String canonical;
   /** the type names a relative reference (Type/id) can start with, or null for any capitalised name */
   private final Set<String> resourceTypes;
-  private final Map<String, ResourceNode> byKey = new HashMap<>();
-  private final Map<String, List<ResourceNode>> byUrl = new HashMap<>();
+  private final Index index = new Index();
   private final Map<String, List<ResourceNode>> byId = new HashMap<>();
   private final Map<String, List<ResourceNode>> byLabel = new HashMap<>();
   private final Map<ResourceNode, String> fileOf = new HashMap<>();
   private final Map<ResourceNode, Set<ResourceNode>> direct = new HashMap<>();
   private final Set<ResourceNode> unresolved = new HashSet<>();
+
+  /**
+   * The resources of the IG by what a value can refer to them by: Type/id, url and url|version. Built once for all the
+   * files, so that looking up a value doesn't go through every resource of the IG. A key finds every resource that has
+   * it, in the order they were added (two files can hold the same Type/id, or several versions of a url)
+   */
+  static class Index {
+    private final Map<String, List<ResourceNode>> resources = new HashMap<>();
+
+    void add(String key, ResourceNode r) {
+      if (key != null) {
+        List<ResourceNode> list = resources.computeIfAbsent(key, k -> new ArrayList<>());
+        // a resource is added under each of its keys in turn, so one that is already there is the last one
+        if (list.isEmpty() || list.get(list.size()-1) != r) {
+          list.add(r);
+        }
+      }
+    }
+
+    /** the resources that the value refers to, in the order they were added */
+    List<ResourceNode> find(String value) {
+      return resources.getOrDefault(value, List.of());
+    }
+
+    boolean has(String value) {
+      return resources.containsKey(value);
+    }
+  }
 
   public RapidoDependencyAnalyser(String canonical) {
     this(canonical, null);
@@ -325,12 +352,12 @@ public class RapidoDependencyAnalyser {
 
   private void index(FileNode f, ResourceNode r) {
     fileOf.put(r, f.key);
-    byKey.put(r.getKey(), r);
+    index.add(r.getKey(), r);
     addTo(byId, r.id, r);
     if (r.url != null) {
-      addTo(byUrl, r.url, r);
+      index.add(r.url, r);
       if (r.version != null) {
-        addTo(byUrl, r.url+"|"+r.version, r);
+        index.add(r.url+"|"+r.version, r);
       }
       addTo(byLabel, r.url, r);
     }
@@ -378,7 +405,7 @@ public class RapidoDependencyAnalyser {
         List<ResourceNode> found = byLabel.get(label);
         if (found == null) {
           ok = resolveReference(label, targets) && ok;
-          if (!byUrl.containsKey(label) && !byKey.containsKey(label)) {
+          if (!index.has(label)) {
             ok = false;
           }
         } else {
@@ -452,27 +479,21 @@ public class RapidoDependencyAnalyser {
     if (base.contains("#")) {
       base = base.substring(0, base.indexOf("#"));
     }
-    addAll(targets, byUrl.get(s));
-    addAll(targets, byUrl.get(base));
+    targets.addAll(index.find(s));
+    targets.addAll(index.find(base));
     if (base.contains("|")) {
       base = base.substring(0, base.indexOf("|"));
-      addAll(targets, byUrl.get(base));
+      targets.addAll(index.find(base));
     }
     String path = base;
     if (path.contains("/_history/")) {
       path = path.substring(0, path.indexOf("/_history/"));
     }
-    ResourceNode r = byKey.get(path);
-    if (r != null) {
-      targets.add(r);
-    }
+    targets.addAll(index.find(path));
     boolean absolute = path.startsWith("http://") || path.startsWith("https://");
     String[] parts = path.split("/");
     if (absolute && parts.length >= 2) {
-      r = byKey.get(parts[parts.length-2]+"/"+parts[parts.length-1]);
-      if (r != null) {
-        targets.add(r);
-      }
+      targets.addAll(index.find(parts[parts.length-2]+"/"+parts[parts.length-1]));
     }
   }
 
@@ -532,13 +553,16 @@ public class RapidoDependencyAnalyser {
     return res;
   }
 
-  private static void addNodes(Hasher h, Collection<ResourceNode> nodes) {
-    TreeMap<String, String> sorted = new TreeMap<>();
+  private void addNodes(Hasher h, Collection<ResourceNode> nodes) {
+    // sorted, so that the hash doesn't depend on the order the nodes were found in. Two files (or one) can hold the
+    // same Type/id, and each of them counts
+    List<String[]> sorted = new ArrayList<>();
     for (ResourceNode n : nodes) {
-      sorted.put(n.getKey(), n.contentHash);
+      sorted.add(new String[] {n.getKey(), String.valueOf(fileOf.get(n)), n.contentHash});
     }
-    for (Map.Entry<String, String> e : sorted.entrySet()) {
-      h.add(e.getKey()).add(e.getValue());
+    sorted.sort(Comparator.comparing((String[] e) -> e[0]).thenComparing(e -> e[1]).thenComparing(e -> e[2]));
+    for (String[] e : sorted) {
+      h.add(e[0]).add(e[1]).add(e[2]);
     }
   }
 

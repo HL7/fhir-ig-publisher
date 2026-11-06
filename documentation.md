@@ -42,6 +42,7 @@ Command line build mode parameters
 * ```-no-narrative``` - comma list of resources (type/id) to not generate narrative for (e.g. faster run)
 * ```-validation-off``` - turn validation off completely to make for faster local run time
 * ```-no-validate``` -  comma list of resources (type/id) to not validate (e.g. faster run)
+* ```-threads``` {n} - let the publisher use up to n threads beyond its own for work that it can do in parallel, at most one less than the number of cores (default 0: everything runs on one thread). More than 0 uses spare cores, at the cost of more load on the machine
 * ```-resetTx``` - clear the local terminology cache before running
 * ```-resetTxErrors``` - remove any errors from the local cache but leave other content there
 * ```-auto-ig-build``` - used by the ci-build (see below) to switch on some ci-build integration features

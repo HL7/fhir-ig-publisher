@@ -64,6 +64,9 @@ class PublisherRapidoDevTemplateTest {
     assertTrue(first.isCompleteBuild());
     first.setUuid("the-last-build");
     first.save();
+    // and the record of what it wrote in the temp folder (nothing)
+    Files.createDirectories(Path.of(pf.vsCache));
+    Files.writeString(Path.of(pf.vsCache, ".build-outputs.json"), "{}");
 
     // the template hasn't changed: a differential build
     Publisher publisher = new Publisher();
