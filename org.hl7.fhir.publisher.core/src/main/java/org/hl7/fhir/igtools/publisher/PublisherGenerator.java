@@ -363,14 +363,15 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           try {
             if (replaySheets.contains(f)) {
               replayGeneration(f, RapidoTracker.PHASE_SHEETS);
-              // any messages from adding the rows were recorded with the rest of the phase, and have just been replayed
+              // the rows in the all-profiles spreadsheets. A phase that threw isn't replayed, so this didn't throw last
+              // time: an exception now is reported as generateResourceSpreadsheets reports it
               for (FetchedResource r : f.getResources()) {
                 if (r.getResource() instanceof StructureDefinition) {
                   try {
                     addToAllProfiles(r, (StructureDefinition) r.getResource(), new ArrayList<>());
                   } catch (Exception e) {
-                    // as in generateResourceSpreadsheets, the profile gets no row (e.g. it has no snapshot); the error
-                    // was recorded with the phase, and has just been replayed
+                    log("Exception generating resource "+f.getName()+"::"+r.fhirType()+"/"+r.getId()+": "+e.getMessage());
+                    f.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.EXCEPTION, r.fhirType(), "Error Rendering Resource: "+e.getMessage(), ValidationMessage.IssueSeverity.ERROR));
                   }
                 }
               }
@@ -2127,6 +2128,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       }
     }
     pf.otherFilesRun.addAll(j.otherFiles);
+    for (int i : j.umlGenerated) {
+      f.getResources().get(i).setUmlGenerated(true);
+    }
     pf.errors.addAll(j.errors);
     f.getErrors().addAll(j.fileErrors);
     for (Map.Entry<Integer, List<ValidationMessage>> e : j.resErrors.entrySet()) {

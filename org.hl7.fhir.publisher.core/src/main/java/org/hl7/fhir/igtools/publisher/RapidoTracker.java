@@ -1247,6 +1247,8 @@ public class RapidoTracker {
     public final List<ValidationMessage> errors = new ArrayList<>();
     public final List<ValidationMessage> fileErrors = new ArrayList<>();
     public final Map<Integer, List<ValidationMessage>> resErrors = new LinkedHashMap<>();
+    /** the resources (by index) the phase found a UML diagram for, as _data/structuredefinitions.json says */
+    public final Set<Integer> umlGenerated = new TreeSet<>();
     public final List<NpmEntry> npm = new ArrayList<>();
     public final List<ValueSet> expansions = new ArrayList<>();
     public final List<String[]> tracked = new ArrayList<>();
@@ -1278,6 +1280,7 @@ public class RapidoTracker {
     private final int errorsBefore;
     private final int fileErrorsBefore;
     private final int[] resErrorsBefore;
+    private final boolean[] umlBefore;
     private final int expansionsBefore;
 
     private Recording(FetchedFile file, String phase) {
@@ -1291,8 +1294,10 @@ public class RapidoTracker {
       errorsBefore = pf.errors.size();
       fileErrorsBefore = file.getErrors().size();
       resErrorsBefore = new int[file.getResources().size()];
+      umlBefore = new boolean[resErrorsBefore.length];
       for (int i = 0; i < resErrorsBefore.length; i++) {
         resErrorsBefore[i] = file.getResources().get(i).getErrors().size();
+        umlBefore[i] = file.getResources().get(i).isUmlGenerated();
       }
       expansionsBefore = pf.expansions.size();
       if (PHASE_HTML.equals(phase)) {
@@ -1350,6 +1355,12 @@ public class RapidoTracker {
     }
     if (f.getResources().size() != rec.resErrorsBefore.length) {
       return;
+    }
+    JsonArray uml = j.forceArray("uml");
+    for (int i = 0; i < rec.umlBefore.length; i++) {
+      if (!rec.umlBefore[i] && f.getResources().get(i).isUmlGenerated()) {
+        uml.add(Integer.toString(i));
+      }
     }
     JsonObject re = j.forceObject("resErrors");
     for (int i = 0; i < rec.resErrorsBefore.length; i++) {
@@ -1438,6 +1449,9 @@ public class RapidoTracker {
     res.outputs.addAll(j.forceArray("outputs").asStrings());
     res.allOutputs.addAll(j.forceArray("allOutputs").asStrings());
     res.otherFiles.addAll(j.forceArray("otherFiles").asStrings());
+    for (String s : j.forceArray("uml").asStrings()) {
+      res.umlGenerated.add(Integer.parseInt(s));
+    }
     readMessages(j.forceArray("errors"), res.errors);
     readMessages(j.forceArray("fileErrors"), res.fileErrors);
     JsonObject re = j.forceObject("resErrors");

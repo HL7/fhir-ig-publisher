@@ -104,18 +104,79 @@ class PublisherRapidoWatchTest {
         "page.md (always processed)"), pf.rapido.listRenderDirty());
   }
 
+  /** A file whose outputs are reused keeps them: they're not removed as written by no file, and the next build reuses them too */
+  @Test
+  void whatAReusedFileWroteIsKept() throws Exception {
+    finish(build("a"));
+
+    PublisherFields pf = build("a2");
+    RapidoOutputs.Change change = finish(pf);
+
+    assertEquals(List.of("Patient-b.json"), replayed);
+    Path page = dir.resolve("temp").resolve("Patient-b.html");
+    assertFalse(change.getGone().contains(page.toString()), change.getGone().toString());
+    assertTrue(Files.exists(page));
+
+    pf = build("a2");
+    assertFalse(pf.rapido.isCompleteBuild(), pf.rapido.getReason());
+    assertEquals(List.of("ig.json (always processed)", "page.md (always processed)"), pf.rapido.listRenderDirty());
+  }
+
+  /** Something else wrote over what the file wrote: what the file made isn't reused */
+  @Test
+  void anOutputWrittenOverIsntReused() throws Exception {
+    finish(build("a"));
+    Files.writeString(dir.resolve("temp").resolve("Patient-b.html"), "something else");
+
+    PublisherFields pf = build("a");
+
+    assertFalse(pf.rapido.canReplay(file(pf, "Patient-b.json"), RapidoTracker.PHASE_HTML));
+    assertTrue(pf.rapido.listRenderDirty().contains("Patient-b.json (an output was overwritten: Patient-b.html; render only)"),
+        pf.rapido.listRenderDirty().toString());
+  }
+
+  /** A reused profile says it has a UML diagram, as it did when it was rendered (_data/structuredefinitions.json) */
+  @Test
+  void aReusedFileStillHasItsUmlDiagram() throws Exception {
+    PublisherFields pf = build("a");
+    FetchedResource r = file(pf, "Patient-b.json").getResources().get(0);
+    when(r.isUmlGenerated()).thenReturn(false, true); // rendering it makes the diagram
+    finish(pf);
+
+    pf = build("a2");
+    FetchedFile b = file(pf, "Patient-b.json");
+    assertTrue(pf.rapido.canReplay(b, RapidoTracker.PHASE_HTML));
+    assertEquals(java.util.Set.of(0), pf.rapido.replay(b, RapidoTracker.PHASE_HTML).umlGenerated);
+  }
+
+  private static FetchedFile file(PublisherFields pf, String name) {
+    return pf.fileList.stream().filter(f -> f.getLoadPath().equals(name)).findFirst().orElseThrow();
+  }
+
+  /** the files whose html the last finish reused */
+  private final List<String> replayed = new ArrayList<>();
+
   /**
-   * What the rest of a build does for -rapido: each file's html and spreadsheet phases are recorded (each patient
-   * writes a page in the temp folder), what the files wrote in the temp folder is recorded, and the state is saved
+   * What the rest of a build does for -rapido: each file's html and spreadsheet phases are reused if they can be, and
+   * recorded if not (each patient writes a page in the temp folder), what the files wrote in the temp folder is
+   * recorded, and the state is saved
    */
-  private void finish(PublisherFields pf) throws Exception {
-    finish(pf, null);
+  private RapidoOutputs.Change finish(PublisherFields pf) throws Exception {
+    return finish(pf, null);
   }
 
   /** as finish(pf), with the html of the file named failing as generateResourceHtmlInner reports an exception */
-  private void finish(PublisherFields pf, String failing) throws Exception {
+  private RapidoOutputs.Change finish(PublisherFields pf, String failing) throws Exception {
     pf.rapido.finishValidation();
+    replayed.clear();
     for (FetchedFile f : pf.fileList) {
+      if (pf.rapido.canReplay(f, RapidoTracker.PHASE_HTML) && pf.rapido.canReplay(f, RapidoTracker.PHASE_SHEETS)) {
+        // as replayGeneration does
+        replayed.add(f.getLoadPath());
+        f.getOutputNames().addAll(pf.rapido.replay(f, RapidoTracker.PHASE_HTML).outputs);
+        f.getOutputNames().addAll(pf.rapido.replay(f, RapidoTracker.PHASE_SHEETS).outputs);
+        continue;
+      }
       pf.rapido.startRecording(f, RapidoTracker.PHASE_HTML);
       if (f.getLoadPath().startsWith("Patient-")) {
         Path page = dir.resolve("temp").resolve(f.getLoadPath().replace(".json", ".html"));
@@ -130,11 +191,12 @@ class PublisherRapidoWatchTest {
       pf.rapido.startRecording(f, RapidoTracker.PHASE_SHEETS);
       pf.rapido.stopRecording();
     }
-    new RapidoOutputs(pf.vsCache, pf.tempDir).update(pf.fileList, pf.changeList);
+    RapidoOutputs.Change change = new RapidoOutputs(pf.vsCache, pf.tempDir).update(pf.fileList, pf.changeList);
     pf.rapido.save();
     IniFile buildTracker = new IniFile(dir.resolve(".build-tracker.ini").toString());
     buildTracker.setBooleanProperty("status", "complete", true, null);
     buildTracker.save();
+    return change;
   }
 
   /** checkDependencies on new files, as a watch rebuild loads them, with the given content for Patient/a */
