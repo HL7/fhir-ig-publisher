@@ -29,8 +29,9 @@ import java.util.TreeSet;
  * <p>Each folder is listed once (on Windows the listing carries the sizes, so there is no call per file to find
  * them). A file whose size and content are the same is left alone, so its modification time doesn't change. A new
  * or changed file is moved from the staging folder, replacing the old one in one rename, so no one sees it half
- * written. Stale files are deleted before anything is moved in, so a name that only changed case (one file on
- * Windows and macOS) ends up with the new case. A read-only file is made writable and tried again.
+ * written (across file systems, a copy next to it is renamed over it), and qa.json is moved last. Stale files are
+ * deleted before anything is moved in, so a name that only changed case (one file on Windows and macOS) ends up
+ * with the new case. A read-only file is made writable and tried again.
  *
  * <p>Files that are moved are no longer in the staging folder afterwards.
  */
@@ -63,6 +64,7 @@ public class OutputFolderSync {
   }
 
   private static final int BUFFER = 64 * 1024;
+  private static final String QA_JSON = "qa.json";
 
   private OutputFolderSync() {
   }
@@ -118,7 +120,20 @@ public class OutputFolderSync {
     }
     byte[] ba = new byte[BUFFER];
     byte[] bb = new byte[BUFFER];
+    List<Map.Entry<String, BasicFileAttributes>> files = new ArrayList<>(stagedFiles.size());
+    Map.Entry<String, BasicFileAttributes> qa = null;
     for (Map.Entry<String, BasicFileAttributes> e : stagedFiles.entrySet()) {
+      if (e.getKey().equals(QA_JSON)) {
+        qa = e;
+      } else {
+        files.add(e);
+      }
+    }
+    if (qa != null) {
+      // last, so that what waits for it to change finds the pages in place
+      files.add(qa);
+    }
+    for (Map.Entry<String, BasicFileAttributes> e : files) {
       String rel = e.getKey();
       Path from = staged.resolve(rel);
       Path to = target.resolve(rel);
@@ -183,7 +198,8 @@ public class OutputFolderSync {
     }
   }
 
-  private static void move(Path from, Path to) throws IOException {
+  /** replaces a file with another, in one rename where the file system allows it */
+  static void move(Path from, Path to) throws IOException {
     try {
       rename(from, to);
     } catch (AccessDeniedException e) {
@@ -200,8 +216,17 @@ public class OutputFolderSync {
       // replaces the file in one call: a move that isn't atomic deletes it first
       Files.move(from, to, StandardCopyOption.ATOMIC_MOVE);
     } catch (AtomicMoveNotSupportedException e) {
-      // the staging folder is on another file system
-      Files.move(from, to, StandardCopyOption.REPLACE_EXISTING);
+      // the staging folder is on another file system, where a move deletes the file and then copies: copy next to
+      // it and rename that over it instead (a copy left by a sync that stopped is stale, and deleted by the next)
+      Path copy = to.resolveSibling(".sync-" + to.getFileName());
+      Files.copy(from, copy, StandardCopyOption.REPLACE_EXISTING);
+      try {
+        Files.move(copy, to, StandardCopyOption.ATOMIC_MOVE);
+      } catch (IOException ex) {
+        Files.deleteIfExists(copy);
+        throw ex;
+      }
+      Files.delete(from);
     }
   }
 

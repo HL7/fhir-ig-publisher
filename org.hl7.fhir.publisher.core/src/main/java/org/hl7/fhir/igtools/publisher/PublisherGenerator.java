@@ -4149,7 +4149,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       return true;
     }
     if (settings.isGenerationOff()) {
-      FileUtils.copyDirectory(new File(pf.tempDir), new File(pf.outputDir));
+      File out = new File(pf.outputDir).getAbsoluteFile();
+      // in watch mode the output folder is in temp: it isn't copied into itself
+      FileUtils.copyDirectory(new File(pf.tempDir), out, f -> !f.getAbsoluteFile().equals(out));
       return true;
     }
     return runJekyll();

@@ -32,6 +32,7 @@ import java.io.OutputStream;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
@@ -246,6 +247,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
             log("");
             log("Stack Dump (for debugging):");
             e.printStackTrace();
+            recordWatchFailure(e);
             try {
               session.buildFailed();
             } catch (IOException e2) {
@@ -621,10 +623,6 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       } catch (Exception ex) {
         ex.printStackTrace();
       }
-      if (pf.watchOutputDir != null) {
-        log("The build failed, so the pages in "+ pf.watchOutputDir +" are still those of the last build that succeeded");
-        recordFailureInOutput();
-      }
       throw e;
     } finally {
       // Generation asks the terminology server plenty of its own (expansions for rendering),
@@ -666,7 +664,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     try {
       r = OutputFolderSync.sync(Paths.get(pf.outputDir), Paths.get(pf.watchOutputDir));
     } catch (IOException e) {
-      log("Unable to update "+ pf.watchOutputDir +" (it still has the output of the last build that succeeded): "+e.getMessage());
+      log("Unable to update "+ pf.watchOutputDir +" (it still has the output of the last build that succeeded): "+e);
       return;
     }
     for (String s : r.getFailures()) {
@@ -678,19 +676,35 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   }
 
   /**
-   * in watch mode, a failed build isn't synced, but tools that read qa.json in the output folder should see that it failed
+   * in watch mode, a failed build isn't synced, but what reads qa.json in the output folder should see that it failed
    */
-  private void recordFailureInOutput() {
-    if (settings.getDestDir() != null) {
+  private void recordWatchFailure(Throwable e) {
+    if (pf == null || pf.watchOutputDir == null || settings.getDestDir() != null) {
       return;
     }
+    log("The build failed, so the pages in "+ pf.watchOutputDir +" are still those of the last build that succeeded");
+    if (!new File(pf.outputDir, "qa.json").exists()) {
+      // an Error, or a failure before the IG was loaded
+      recordOutcome(e instanceof Exception ? (Exception) e : new Exception(e.toString(), e), null);
+    }
     try {
-      File qa = new File(Utilities.path(pf.outputDir, "qa.json"));
-      if (qa.exists()) {
-        FileUtilities.copyFile(qa, new File(Utilities.path(pf.watchOutputDir, "qa.json")));
-      }
-    } catch (IOException e) {
-      log("Unable to record the failure in "+ pf.watchOutputDir +"/qa.json: "+e.getMessage());
+      recordFailure(Paths.get(pf.outputDir), Paths.get(pf.watchOutputDir));
+    } catch (IOException ex) {
+      log("Unable to record the failure in "+ pf.watchOutputDir +"/qa.json: "+ex);
+    }
+  }
+
+  /**
+   * puts the failed build's qa.json in the output folder, or, if it didn't write one, removes the last one there (as
+   * when the output folder was emptied for each build)
+   */
+  static void recordFailure(Path staging, Path output) throws IOException {
+    Path staged = staging.resolve("qa.json");
+    Path qa = output.resolve("qa.json");
+    if (Files.exists(staged)) {
+      OutputFolderSync.move(staged, qa);
+    } else {
+      Files.deleteIfExists(qa);
     }
   }
 

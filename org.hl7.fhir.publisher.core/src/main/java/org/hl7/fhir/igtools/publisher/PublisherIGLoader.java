@@ -1076,22 +1076,7 @@ public class PublisherIGLoader extends PublisherBase {
 
     logDebugMessage(LogCategory.INIT, "Output: "+ pf.outputDir);
     forceDir(pf.outputDir);
-    String staging = Utilities.path(pf.tempDir, WATCH_OUTPUT_STAGING);
-    if (settings.isWatchMode() && !nested(staging, pf.outputDir)) {
-      // the output folder isn't emptied: the build writes to a staging folder, and when it succeeds what
-      // changed is moved into the output folder, so the pages there can be browsed while a rebuild runs
-      pf.watchOutputDir = pf.outputDir;
-      pf.outputDir = staging;
-      logDebugMessage(LogCategory.INIT, "Staging: "+ pf.outputDir);
-      forceDir(pf.outputDir);
-      if (pf.qaDir != null) {
-        // or the sync would delete it
-        pf.qaDir = Publisher.stagedPath(pf.qaDir, pf.watchOutputDir, pf.outputDir);
-      }
-    } else if (new File(staging).exists()) {
-      // left by a watch session: it isn't part of this build
-      FileUtils.deleteDirectory(new File(staging));
-    }
+    setUpWatchOutput();
     FileUtilities.clearDirectory(pf.outputDir);
     if (pf.qaDir != null) {
       logDebugMessage(LogCategory.INIT, "QA Dir: "+ pf.qaDir);
@@ -1439,6 +1424,36 @@ public class PublisherIGLoader extends PublisherBase {
     DataSetInformation dsi = new DataSetInformation(org.hl7.fhir.utilities.json.parser.JsonParser.parseObjectFromFile(t));
     dsi.load(pf.rootDir);
     return dsi;
+  }
+
+  /**
+   * In watch mode the output folder isn't emptied: the build writes to a staging folder in temp, and when it succeeds
+   * what changed is moved into the output folder, so the pages there can be browsed while a rebuild runs
+   */
+  void setUpWatchOutput() throws Exception {
+    String staging = Utilities.path(pf.tempDir, WATCH_OUTPUT_STAGING);
+    if (settings.isWatchMode() && !nested(staging, pf.outputDir)) {
+      pf.watchOutputDir = pf.outputDir;
+      pf.outputDir = staging;
+      logDebugMessage(LogCategory.INIT, "Staging: "+ pf.outputDir);
+      forceDir(pf.outputDir);
+      if (pf.qaDir != null) {
+        // or the sync would delete it
+        pf.qaDir = Publisher.stagedPath(pf.qaDir, pf.watchOutputDir, pf.outputDir);
+      }
+      return;
+    }
+    if (settings.isWatchMode()) {
+      log("The output folder "+ pf.outputDir +" is, or is inside, the temp folder's "+ WATCH_OUTPUT_STAGING +", so it is emptied on each rebuild");
+    }
+    if (new File(staging).exists()) {
+      // left by a watch session: it isn't part of this build
+      try {
+        FileUtils.deleteDirectory(new File(staging));
+      } catch (IOException e) {
+        log("Unable to delete "+ staging +", left by a watch session (it isn't used by this build): "+e.getMessage());
+      }
+    }
   }
 
   /** whether one folder is the other or inside it */

@@ -2,6 +2,7 @@ package org.hl7.fhir.igtools.publisher;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -10,8 +11,10 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.attribute.FileTime;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -305,5 +308,71 @@ class OutputFolderSyncTest {
 
     assertFalse(Files.exists(staged.resolve("new.html")));
     assertTrue(Files.exists(staged.resolve("same.html")));
+  }
+
+  @Test
+  void aStagingFolderItCantReadFailsTheSyncBeforeAnythingIsDeleted() throws IOException {
+    Path staged = staged();
+    Path target = target();
+    write(staged, "index.html", "new");
+    write(staged, "sub/page.html", "new");
+    write(target, "index.html", "old");
+    write(target, "sub/page.html", "old");
+    File sub = staged.resolve("sub").toFile();
+    assumeTrue(sub.setReadable(false, false) && !Files.isReadable(staged.resolve("sub")));
+    try {
+      assertThrows(IOException.class, () -> OutputFolderSync.sync(staged, target));
+    } finally {
+      sub.setReadable(true, false);
+    }
+    assertEquals("old", read(target, "index.html"));
+    assertEquals("old", read(target, "sub/page.html"));
+  }
+
+  @Test
+  void aLinkInTheOutputFolderIsDeletedButNotWhatItPointsTo() throws IOException {
+    Path staged = staged();
+    Path target = target();
+    write(staged, "index.html", "new");
+    write(dir, "elsewhere/keep.html", "keep");
+    Files.createDirectories(target);
+    try {
+      Files.createSymbolicLink(target.resolve("linked"), dir.resolve("elsewhere"));
+    } catch (UnsupportedOperationException | IOException e) {
+      assumeTrue(false, "can't make a link here");
+    }
+
+    OutputFolderSync.Result r = OutputFolderSync.sync(staged, target);
+
+    assertEquals(Set.of("index.html"), contents(target));
+    assertEquals("keep", read(dir, "elsewhere/keep.html"));
+    assertTrue(r.getFailures().isEmpty(), r.getFailures().toString());
+  }
+
+  @Test
+  void acrossFileSystemsAChangedFileIsReplacedByARename() throws IOException {
+    Path shm = Paths.get("/dev/shm");
+    assumeTrue(Files.isDirectory(shm) && Files.isWritable(shm));
+    Path staged = Files.createTempDirectory(shm, "sync-test");
+    try {
+      assumeTrue(!Files.getFileStore(staged).equals(Files.getFileStore(dir)), "the same file system");
+      Path target = target();
+      write(staged, "page.html", "new");
+      write(staged, "new.html", "new");
+      write(target, "page.html", "old");
+
+      OutputFolderSync.Result r = OutputFolderSync.sync(staged, target);
+
+      assertEquals(Set.of("new.html", "page.html"), contents(target));
+      assertEquals("new", read(target, "page.html"));
+      assertEquals(2, r.getWritten());
+      assertFalse(Files.exists(staged.resolve("page.html")));
+    } finally {
+      try (Stream<Path> s = Files.walk(staged)) {
+        for (Path p : s.sorted(Comparator.reverseOrder()).collect(Collectors.toList())) {
+          Files.deleteIfExists(p);
+        }
+      }
+    }
   }
 }

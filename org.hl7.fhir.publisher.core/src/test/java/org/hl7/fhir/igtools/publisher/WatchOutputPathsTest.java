@@ -84,4 +84,72 @@ class WatchOutputPathsTest {
     loader.setPf(pf);
     loader.clearTempFolder();
   }
+
+  @Test
+  void inWatchModeTheBuildWritesToTheStagingFolder() throws Exception {
+    PublisherFields pf = watchSetUp(true, p("output"), p("output", "qa"));
+    assertEquals(p("output"), pf.watchOutputDir);
+    assertEquals(p("temp", ".watch-output"), pf.outputDir);
+    assertEquals(p("temp", ".watch-output", "qa"), pf.qaDir);
+    assertTrue(new File(pf.outputDir).isDirectory());
+  }
+
+  @Test
+  void anOutputFolderThatHoldsTheStagingFolderIsNotSynced() throws Exception {
+    // the sync would delete everything in it that the build didn't write
+    for (String output : new String[] {p(), p("temp"), p("temp", ".watch-output", "out")}) {
+      PublisherFields pf = watchSetUp(true, output, null);
+      assertEquals(null, pf.watchOutputDir, output);
+      assertEquals(output, pf.outputDir);
+    }
+  }
+
+  @Test
+  void withoutWatchModeAStagingFolderLeftByAWatchSessionIsDeleted() throws Exception {
+    Files.createDirectories(dir.resolve("temp").resolve(".watch-output"));
+    Files.writeString(dir.resolve("temp").resolve(".watch-output").resolve("index.html"), "staged");
+    PublisherFields pf = watchSetUp(false, p("output"), null);
+    assertEquals(null, pf.watchOutputDir);
+    assertEquals(p("output"), pf.outputDir);
+    assertFalse(Files.exists(dir.resolve("temp").resolve(".watch-output")));
+  }
+
+  @Test
+  void aFailedBuildPutsItsQaJsonInTheOutputFolder() throws Exception {
+    Path staging = Files.createDirectories(dir.resolve("staging"));
+    Path output = Files.createDirectories(dir.resolve("output"));
+    Files.writeString(staging.resolve("qa.json"), "failed");
+    Files.writeString(output.resolve("qa.json"), "succeeded");
+    Files.writeString(output.resolve("index.html"), "last good");
+
+    Publisher.recordFailure(staging, output);
+
+    assertEquals("failed", Files.readString(output.resolve("qa.json")));
+    assertEquals("last good", Files.readString(output.resolve("index.html")));
+  }
+
+  @Test
+  void aFailedBuildWithoutAQaJsonRemovesTheLastOne() throws Exception {
+    Path staging = Files.createDirectories(dir.resolve("staging"));
+    Path output = Files.createDirectories(dir.resolve("output"));
+    Files.writeString(output.resolve("qa.json"), "succeeded");
+
+    Publisher.recordFailure(staging, output);
+
+    assertFalse(Files.exists(output.resolve("qa.json")));
+  }
+
+  private PublisherFields watchSetUp(boolean watch, String output, String qa) throws Exception {
+    PublisherFields pf = new PublisherFields();
+    pf.logger = mock(ILoggingService.class);
+    pf.tempDir = p("temp");
+    pf.outputDir = output;
+    pf.qaDir = qa;
+    PublisherSettings settings = new PublisherSettings();
+    settings.setWatchMode(watch);
+    PublisherIGLoader loader = new PublisherIGLoader(settings);
+    loader.setPf(pf);
+    loader.setUpWatchOutput();
+    return pf;
+  }
 }
