@@ -702,15 +702,35 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
    * html checks, the final zip. A page-only rebuild (replay != null) has put the temp folder back as it was when Jekyll
    * ran (apart from the changed pages), and puts back what the package step wrote instead of running it again
    */
+  interface PageRebuildStep {
+    void run() throws IOException;
+  }
+
+  /**
+   * Watch mode: keeps what a page rebuild after this build needs. If that fails, the build goes on: only a page rebuild
+   * can't follow it
+   */
+  void keepForPageRebuild(PageRebuildStep step) {
+    if (pageRebuild == null) {
+      return;
+    }
+    try {
+      step.run();
+    } catch (IOException | RuntimeException e) {
+      log("Unable to keep the state for a page rebuild: " + e);
+      pageRebuild.notReusable("its state couldn't be kept (" + e + ")");
+      pageRebuild.discard();
+      pageRebuild = null;
+    }
+  }
+
   public void finishGenerate(PageRebuild replay) throws Exception {
     if (replay == null) {
       fixSearchForm();
       if (!settings.isGenerationOff()) {
         templateBeforeJekyll();
       }
-      if (pageRebuild != null) {
-        pageRebuild.beforeJekyll();
-      }
+      keepForPageRebuild(() -> pageRebuild.beforeJekyll());
     }
 
     boolean jekyllOk = runTool();
@@ -721,13 +741,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         replay.checkOnCheckMessages(pf.template.onCheckEvent(pf.context, pf.publishedIg));
       }
       replay.restorePackageOutputs();
-    } else if (!jekyllOk && pageRebuild != null) {
-      pageRebuild.notReusable("Jekyll failed");
     }
     if (jekyllOk && replay == null) {
-      if (pageRebuild != null) {
-        pageRebuild.afterJekyll();
-      }
+      keepForPageRebuild(() -> pageRebuild.afterJekyll());
       if (!settings.isGenerationOff()) {
         templateOnCheck();
       }
@@ -806,9 +822,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         FileUtilities.bytesToFile(org.hl7.fhir.utilities.json.parser.JsonParser.composeBytes(json), Utilities.path(pf.outputDir, "sub-package-list.json"));
         generateZips(df);
       }
-      if (pageRebuild != null) {
-        pageRebuild.afterPackage();
-      }
+      keepForPageRebuild(() -> pageRebuild.afterPackage());
     }
 
     log("Checking Output HTML");
@@ -4656,6 +4670,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           log("Jekyll timeout exceeded: " + Long.toString(pf.jekyllTimeout /1000) + " seconds");
         }
         log("Jekyll claimed to succeed, but returned an error. Proceeding anyway");
+        if (pageRebuild != null) {
+          pageRebuild.notReusable("Jekyll returned an error");
+        }
       } else {
         log("Jekyll has failed. Complete output from running Jekyll: " + pumpHandler.getBufferString());
         if (watchdog.killedProcess()) {

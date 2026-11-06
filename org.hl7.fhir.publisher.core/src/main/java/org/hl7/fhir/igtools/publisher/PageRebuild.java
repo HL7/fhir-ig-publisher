@@ -2,6 +2,7 @@ package org.hl7.fhir.igtools.publisher;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -560,8 +561,9 @@ public class PageRebuild {
   /** Deletes the copies of the package files */
   public void discard() {
     if (stashFolder != null) {
-      delete(stashFolder);
-      STASHES.remove(stashFolder);
+      if (delete(stashFolder)) {
+        STASHES.remove(stashFolder);
+      }
       stashFolder = null;
     }
   }
@@ -574,12 +576,18 @@ public class PageRebuild {
     }
   }
 
-  private static void delete(Path folder) {
+  /** True if the folder is gone. It's in the system temp folder: if it can't be deleted, that's only reported */
+  private static boolean delete(Path folder) {
     try (Stream<Path> s = Files.walk(folder)) {
       s.sorted(Comparator.reverseOrder()).forEach(p -> p.toFile().delete());
-    } catch (IOException e) {
-      // nothing: it's in the system temp folder
+    } catch (IOException | UncheckedIOException e) {
+      // reported below
     }
+    if (Files.exists(folder)) {
+      System.out.println("Unable to delete the temporary folder " + folder);
+      return false;
+    }
+    return true;
   }
 
   // --- utilities -----------------------------------------------------------------------------------------------------

@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -20,6 +21,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.io.FileUtils;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
@@ -296,6 +298,24 @@ class PageRebuildTest {
     assertTrue(Files.isDirectory(stash));
     state.discard();
     assertFalse(Files.exists(stash));
+  }
+
+  @Test
+  void aStashThatCantBeDeletedIsOnlyReported() throws IOException {
+    state.finished();
+    state.afterJekyll();
+    write("output/package.tgz", "tgz");
+    state.afterPackage();
+    Path locked = state.getStashFolder().resolve("locked");
+    Files.createDirectories(locked.resolve("sub"));
+    assumeTrue(locked.toFile().setReadable(false) && !Files.isReadable(locked), "needs a folder that can't be read");
+    try {
+      state.discard();
+      assertNull(state.getStashFolder());
+    } finally {
+      locked.toFile().setReadable(true);
+      FileUtils.deleteDirectory(locked.getParent().toFile());
+    }
   }
 
   @Test

@@ -375,7 +375,12 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       state.discard();
       return false;
     } finally {
-      saveTerminologyCache();
+      try {
+        saveTerminologyCache();
+      } catch (RuntimeException e) {
+        // not a reason to build again
+        log("Unable to save the terminology cache: " + e);
+      }
     }
     pageRebuild = state;
     return true;
