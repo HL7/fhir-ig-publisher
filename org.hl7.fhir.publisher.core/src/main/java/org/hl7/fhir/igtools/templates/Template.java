@@ -355,6 +355,555 @@ public class Template {
     return !(v == null || v.isJsonNull() || Utilities.noString(v.asString()));
   }
 
+  // what ends a folder name in a path (not a wildcard, or a property that names a folder: those may stand for any folder)
+  private static final String FOLDER_END = "(?![^/\"'\\s<>;,)&])";
+  // a reference to the input folder (or fsh-generated, which pages come from too), and the folder in it, if one is
+  // named: ${folder.input}, ${ig.root}/input...
+  private static final String INPUT_REF = "(\\$\\{(?:folder\\.input|dir\\.input%s)\\}|\\$\\{(?:ig\\.root|basedir%s)\\}/(?:input|fsh-generated)(?![\\w.-]))(/([^/\"'*&;,()\\s<>$?\\[{]+)" + FOLDER_END + ")?";
+  private static final java.util.regex.Pattern PROPERTY = java.util.regex.Pattern.compile(
+      "<property\\s[^>]*?name=\"([^\"]+)\"[^>]*>");
+  // a file set or the like that starts from the IG's root folder
+  private static final String ROOT_DIR =
+      "<(?!project[\\s>])([\\w.:-]+)\\s[^>]*?(?<=\\s)(?:base)?dir=\"(?:\\$\\{(?:ig\\.root|basedir%s)\\})?(?:/?\\.)?/?\"[^>]*>";
+  // a property set to the folder that holds a file or folder
+  private static final java.util.regex.Pattern DIRNAME = java.util.regex.Pattern.compile(
+      "<dirname\\s[^>]*?(?<=\\s)property=\"([^\"]+)\"");
+  // a property defined as the IG's folder (${ig.root}, ${basedir} or .), by group 1 the property it's defined from; or
+  // as a folder above (..), which is the IG's folder outside a target, where paths start from the ant file's folder
+  private static final java.util.regex.Pattern ROOT_VALUE = java.util.regex.Pattern.compile(
+      "\\s(?:value|location)=\"(?:\\$\\{([^}]+)\\}|\\.\\.?(?:/\\.\\.?)*)/?\"");
+  // a path that goes up out of a folder (by group 1, the property it starts from, if it does): all but the IG's
+  // folder are in the IG's folder
+  private static final java.util.regex.Pattern PARENT = java.util.regex.Pattern.compile(
+      "(?:\\$\\{([^}]+)\\}|(?<![\\w.$}/-])(?!\\.\\.(?![^/\"'\\s<>]))[\\w.-]+)((?:/[^/\"'\\s<>]*)*?)/\\.\\.(?![^/\"'\\s<>])");
+  // a folder in the input folder named by its path from the IG's folder (input/pagecontent)
+  private static final java.util.regex.Pattern INPUT_PATH = java.util.regex.Pattern.compile(
+      "(?<![\\w.-])(?:input|fsh-generated)/([^/\"'*&;,()\\s<>$?\\[{]+)" + FOLDER_END);
+  // the input folder by its path from the IG's folder, followed by something that isn't a folder name ("input",
+  // input/** or input/${x})
+  private static final java.util.regex.Pattern INPUT_WHOLE = java.util.regex.Pattern.compile(
+      "(?<![\\w.-])(?:input|fsh-generated)(?:/?[\"']|/)");
+  // a property defined as the input folder by its path from the IG's folder
+  private static final java.util.regex.Pattern INPUT_VALUE = java.util.regex.Pattern.compile(
+      "\\s(?:value|location)=\"(?:\\./)?(?:input|fsh-generated)/?\"");
+  // the folders that only pages come from: a script that names one may read them
+  private static final String[] PAGE_FOLDER_NAMES = {"pagecontent", "intro-notes"};
+
+  /** Whether a folder name in a path is . or .., which stand for the input folder, or the folder it is in */
+  private static boolean isDots(String folder) {
+    return folder.equals(".") || folder.equals("..");
+  }
+
+  /** Whether the rest of the path from i in src goes through . or .. (input/includes/../images) */
+  private static boolean dotsAfter(String src, int i) {
+    int end = i;
+    while (end < src.length() && "\"'<> \t\r\n;,".indexOf(src.charAt(end)) < 0) {
+      end++;
+    }
+    String rest = src.substring(i, end) + "/";
+    return rest.contains("/./") || rest.contains("/../");
+  }
+
+  /**
+   * Why a watch mode rebuild can't skip running this template's scripts again after only the content of some pages
+   * changed (see PageRebuild), or null if it can: it can if the template runs nothing just before Jekyll, and its
+   * onLoad and onGenerate scripts don't read the whole input folder. (The folders in it that they read are in
+   * pageFolderBlockers(). The check script runs again after Jekyll: see PageRebuild.checkOnCheckMessages())
+   */
+  public String pageOnlyRebuildBlocker() throws IOException {
+    if (targetOnJekyll != null) {
+      return "the template runs a script before Jekyll";
+    }
+    boolean targets = targetOnGenerate != null || targetOnLoad != null;
+    if (!targets && script == null) {
+      return null;
+    }
+    Map<java.nio.file.Path, String> files = scriptFiles(!targets);
+    if (files == null) {
+      return targets ? "the template's scripts can't be read" : null;
+    }
+    Map<String, String> scripts = scripts(files);
+    String unread = unreadAntFile(files);
+    if (unread != null) {
+      return unread;
+    }
+    String all = String.join("\n", scripts.values());
+    for (Map.Entry<String, String> e : scripts.entrySet()) {
+      String blocker = scriptPageUse(e.getKey(), e.getValue(), all);
+      if (blocker != null) {
+        return blocker;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * The folders in the input folder that the template's onLoad and onGenerate scripts read (by name, e.g. "includes"), each with
+   * how ("the template's script ant.xml reads (${dir.input}/includes)"): a page-only rebuild can't take a change to a
+   * file in one of them, because the scripts aren't run again
+   */
+  public Map<String, String> pageFolderBlockers() throws IOException {
+    Map<String, String> res = new HashMap<>();
+    boolean targets = targetOnGenerate != null || targetOnLoad != null;
+    Map<java.nio.file.Path, String> files = (!targets && script == null) || targetOnJekyll != null ? null : scriptFiles(!targets);
+    Map<String, String> scripts = files == null ? null : scripts(files);
+    if (scripts != null) {
+      String all = String.join("\n", scripts.values());
+      for (Map.Entry<String, String> e : scripts.entrySet()) {
+        for (Map.Entry<String, String> u : scriptFolderUse(e.getKey(), e.getValue(), all).entrySet()) {
+          res.putIfAbsent(u.getKey(), u.getValue());
+        }
+      }
+    }
+    return res;
+  }
+
+  /**
+   * The template's scripts (not the jars in the scripts folder) by their path from the template's folder
+   * (scripts/ant.xml), or null if they can't be read
+   */
+  private Map<String, String> scripts(Map<java.nio.file.Path, String> files) throws IOException {
+    Map<String, String> res = new java.util.TreeMap<>();
+    for (Map.Entry<java.nio.file.Path, String> e : files.entrySet()) {
+      // ant takes \ as a separator too
+      res.put(scriptName(e.getKey()), e.getValue().replace('\\', '/'));
+    }
+    return res;
+  }
+
+  /** A template script's path from the template's folder */
+  private String scriptName(java.nio.file.Path f) throws IOException {
+    java.nio.file.Path tdir = new File(templateDir).getCanonicalFile().toPath();
+    return (f.startsWith(tdir) ? tdir.relativize(f) : f).toString().replace(File.separatorChar, '/');
+  }
+
+  /**
+   * The template's scripts (its folder of scripts, and the ant file it runs, wherever it is), by where they are, or null
+   * if there are none
+   */
+  private Map<java.nio.file.Path, String> scriptFiles(boolean outsideTargets) throws IOException {
+    Set<java.nio.file.Path> propertyFiles = new HashSet<>();
+    Map<java.nio.file.Path, String> res = scriptFiles(propertyFiles);
+    if (res == null || !outsideTargets) {
+      return res;
+    }
+    // the tasks outside the targets, which ant runs when it loads the ant files (with the template), in the ant files
+    java.nio.file.Path main = new File(Utilities.path(templateDir, script)).getCanonicalFile().toPath();
+    Map<java.nio.file.Path, String> top = new java.util.TreeMap<>();
+    for (Map.Entry<java.nio.file.Path, String> e : res.entrySet()) {
+      if (e.getKey().getFileName().toString().endsWith(".xml") || e.getKey().equals(main)) {
+        top.put(e.getKey(), TARGET.matcher(COMMENT.matcher(e.getValue()).replaceAll(" ")).replaceAll(" "));
+      } else if (propertyFiles.contains(e.getKey())) {
+        // (the properties that the tasks may use)
+        top.put(e.getKey(), e.getValue());
+      }
+    }
+    return top.isEmpty() ? null : top;
+  }
+
+  private static final java.util.regex.Pattern COMMENT = java.util.regex.Pattern.compile("<!--.*?-->", java.util.regex.Pattern.DOTALL);
+  private static final java.util.regex.Pattern TARGET = java.util.regex.Pattern.compile(
+      "<target\\b[^>]*?/>|<target\\b.*?</target>", java.util.regex.Pattern.DOTALL);
+
+  private Map<java.nio.file.Path, String> scriptFiles(Set<java.nio.file.Path> propertyFiles) throws IOException {
+    java.nio.file.Path dir = new File(Utilities.path(templateDir, "scripts")).getCanonicalFile().toPath();
+    Map<java.nio.file.Path, String> res = new java.util.TreeMap<>();
+    if (java.nio.file.Files.isDirectory(dir)) {
+      try (java.util.stream.Stream<java.nio.file.Path> files = java.nio.file.Files.walk(dir)) {
+        for (java.nio.file.Path f : (Iterable<java.nio.file.Path>) files::iterator) {
+          if (java.nio.file.Files.isRegularFile(f) && !f.getFileName().toString().endsWith(".jar")) {
+            res.put(f.toFile().getCanonicalFile().toPath(), FileUtilities.fileToString(f.toFile()));
+          }
+        }
+      } catch (java.io.UncheckedIOException e) {
+        throw e.getCause();
+      }
+    }
+    if (script != null) {
+      File f = new File(Utilities.path(templateDir, script)).getCanonicalFile();
+      if (f.isFile()) {
+        res.putIfAbsent(f.toPath(), FileUtilities.fileToString(f));
+      }
+    }
+    // and the property files they load that are in the template (with each property as an ant file defines it, so that
+    // the properties are seen); those that aren't there yet are written by the scripts while the build runs
+    String all = String.join("\n", res.values()).replace('\\', '/');
+    java.nio.file.Path tdir = new File(templateDir).getCanonicalFile().toPath();
+    java.util.regex.Matcher m = PROPERTY_FILE.matcher(all);
+    Set<java.nio.file.Path> loaded = new HashSet<>();
+    while (m.find()) {
+      java.nio.file.Path f = m.group(1).equalsIgnoreCase("file") || m.group(1).equalsIgnoreCase("srcfile") ? propertyFile(m.group(2), all) : null;
+      if (f != null && f.startsWith(tdir) && java.nio.file.Files.isRegularFile(f) && loaded.add(f)) {
+        // (one in the scripts folder is read already, as text)
+        String src = FileUtilities.fileToString(f.toFile());
+        StringBuilder b = new StringBuilder(res.getOrDefault(f, src));
+        for (String line : src.split("\\R")) {
+          java.util.regex.Matcher kv = PROPERTY_LINE.matcher(line);
+          if (kv.matches()) {
+            b.append("\n<property name=\"").append(kv.group(1)).append("\" value=\"").append(kv.group(2).trim()).append("\"/>");
+          }
+        }
+        res.put(f, b.toString());
+        propertyFiles.add(f);
+      }
+    }
+    return res.isEmpty() ? null : res;
+  }
+
+  // a property file that a script loads (by group 1, how it names it, and group 2, the name)
+  private static final java.util.regex.Pattern PROPERTY_FILE = java.util.regex.Pattern.compile(
+      "<(?:property|loadproperties|xmlproperty)\\s[^>]*?(?<=\\s)(file|srcfile|url|resource)=\"([^\"]*)\"",
+      java.util.regex.Pattern.CASE_INSENSITIVE);
+  // a property in a property file
+  private static final java.util.regex.Pattern PROPERTY_LINE = java.util.regex.Pattern.compile("\\s*([^#!\\s=:][^=:\\s]*)\\s*[=:](.*)");
+
+  /**
+   * Where a property file that a script loads is (with the properties the scripts define, all, and those the publisher
+   * sets for the template's folders), or null if that can't be told
+   */
+  private java.nio.file.Path propertyFile(String f, String all) throws IOException {
+    for (int i = 0; i < 10 && f.contains("${"); i++) {
+      java.util.regex.Matcher r = java.util.regex.Pattern.compile("\\$\\{([^}]+)\\}").matcher(f);
+      if (!r.find()) {
+        break;
+      }
+      String v = r.group(1).equals("ig.template") ? templateDir.replace('\\', '/')
+          : r.group(1).equals("ig.scripts") ? Utilities.path(templateDir, "scripts").replace('\\', '/')
+          : r.group(1).equals("ig.root") || r.group(1).equals("basedir") ? root.replace('\\', '/') : null;
+      if (v == null) {
+        java.util.regex.Matcher p = java.util.regex.Pattern.compile("<property\\s[^>]*?name=\"" + java.util.regex.Pattern.quote(r.group(1))
+            + "\"[^>]*?\\s(?:value|location)=\"([^\"]*)\"").matcher(all);
+        if (!p.find()) {
+          return null;
+        }
+        v = p.group(1);
+      }
+      f = f.substring(0, r.start()) + v + f.substring(r.end());
+    }
+    if (f.contains("${")) {
+      return null;
+    }
+    File res = new File(f);
+    return (res.isAbsolute() ? res : new File(root, f)).getCanonicalFile().toPath();
+  }
+
+  // an ant file that a script imports
+  private static final java.util.regex.Pattern ANT_FILE = java.util.regex.Pattern.compile(
+      "<(?:import|include)\\s[^>]*?(?<=\\s)file=\"([^\"]*)\"");
+  // another build or a program that a script runs (ant, subant, exec, apply, or a task it defines), or an ant file it
+  // imports from the class path: they aren't read. (Not java: the base templates run plantuml with it, on the folder
+  // their scripts name, so it would stop every page rebuild. One that is given the IG's folder itself is caught in
+  // scriptPageUse)
+  private static final java.util.regex.Pattern SUB_BUILD = java.util.regex.Pattern.compile(
+      "<(?:ant|subant|exec|apply|taskdef|typedef)[\\s/>]|<(?:import|include)\\s[^>]*?(?<=\\s)resource=\"");
+  // a style sheet or script that an ant file uses: it must be one of the template's scripts, which are read
+  private static final java.util.regex.Pattern USED_FILE = java.util.regex.Pattern.compile(
+      "<(?:xslt|style)\\s[^>]*?(?<=\\s)style=\"([^\"]*)\"|<script(?:def)?\\s[^>]*?(?<=\\s)src=\"([^\"]*)\"");
+
+  // code in an ant file (by group 1 the task, group 2 its attributes, group 3 the code)
+  private static final java.util.regex.Pattern INLINE_CODE = java.util.regex.Pattern.compile(
+      "<(script|scriptdef|groovy|groovyc|jython|beanshell)\\b([^>]*?)(?<!/)>(.*?)</\\1>", java.util.regex.Pattern.DOTALL);
+  private static final java.util.regex.Pattern LANGUAGE = java.util.regex.Pattern.compile("(?<=\\s)language=\"([^\"]*)\"");
+  // a string in javascript
+  // (written so that a long string doesn't take a long chain of calls to match)
+  private static final java.util.regex.Pattern JS_STRING = java.util.regex.Pattern.compile(
+      "\"([^\"\\\\\\n]*+(?:\\\\.[^\"\\\\\\n]*+)*+)\"|'([^'\\\\\\n]*+(?:\\\\.[^'\\\\\\n]*+)*+)'");
+  // what javascript needs to read files, or run what isn't read: without them it can only work with properties (as
+  // the base templates do) and run the targets in the scripts
+  private static final java.util.regex.Pattern JS_FILE_USE = java.util.regex.Pattern.compile(
+      "\\b(?:new|java|javax|Packages|importClass|importPackage|JavaImporter|load|loadWithNewGlobal|require|eval|Function|"
+      + "Java|getBaseDir|createTask|createDataType|getReference|getReferences|getClass|forName|Runtime|readFully|(?i:\\w*file\\w*|\\w*path\\w*|\\w*dir\\w*))\\b");
+
+  /**
+   * Why the template's code (in javascript, the language that ant runs it in, or another, for tasks other than
+   * script) can't be told not to read pages, if it can't: only javascript that uses no files, and doesn't name the
+   * input folder or the IG's, can be
+   */
+  static String scriptCode(String name, String language, String code, String all) {
+    String lang = language.toLowerCase();
+    if (!(lang.equals("javascript") || lang.equals("ecmascript") || lang.equals("js"))) {
+      return "the template's script " + name + " runs code (" + (language.isEmpty() ? "in a language it doesn't name" : language) + "), which isn't checked";
+    }
+    Set<String> roots = rootAliases(all);
+    java.util.regex.Pattern input = inputRef(all);
+    // the code as ant sees it (a scriptdef's attributes and elements aren't code)
+    String js = code.replace("<![CDATA[", " ").replace("]]>", " ").replaceAll("<(?:attribute|element)\\s[^>]*>|</element>", " ");
+    if (!code.contains("<![CDATA[")) {
+      js = js.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&apos;", "'").replace("&amp;", "&");
+    }
+    StringBuilder rest = new StringBuilder();
+    java.util.regex.Matcher m = JS_STRING.matcher(js);
+    int last = 0;
+    while (m.find()) {
+      String str = m.group(1) != null ? m.group(1) : m.group(2);
+      java.util.regex.Matcher i = input.matcher("${" + str + "}");
+      if (str.equals("ig.root") || str.equals("basedir") || roots.contains(str) || (i.matches() && i.group(3) == null)) {
+        return "the template's script " + name + " runs code that uses the property " + str + ", which isn't checked";
+      }
+      rest.append(js, last, m.start()).append("\"\"");
+      last = m.end();
+    }
+    rest.append(js.substring(last));
+    java.util.regex.Matcher f = JS_FILE_USE.matcher(rest);
+    if (f.find()) {
+      return "the template's script " + name + " runs code that may read files (" + f.group() + "), which isn't checked";
+    }
+    return null;
+  }
+
+  /**
+   * An ant file that a script runs or imports, or a style sheet or script it uses, that isn't one of the template's
+   * scripts, if there is one
+   */
+  private String unreadAntFile(Map<java.nio.file.Path, String> files) throws IOException {
+    String all = String.join("\n", files.values()).replace('\\', '/');
+    java.nio.file.Path main = script == null ? null : new File(Utilities.path(templateDir, script)).getCanonicalFile().toPath();
+    for (Map.Entry<java.nio.file.Path, String> e : files.entrySet()) {
+      java.util.regex.Matcher m = ANT_FILE.matcher(e.getValue());
+      while (m.find()) {
+        String f = m.group(1);
+        if (f.contains("$") || !files.containsKey(e.getKey().getParent().resolve(f).toFile().getCanonicalFile().toPath())) {
+          return "the template's script " + scriptName(e.getKey()) + " runs " + f + ", which isn't read";
+        }
+      }
+      java.util.regex.Matcher pf = PROPERTY_FILE.matcher(e.getValue());
+      java.nio.file.Path tdir = new File(templateDir).getCanonicalFile().toPath();
+      while (pf.find()) {
+        java.nio.file.Path f = pf.group(1).equalsIgnoreCase("file") || pf.group(1).equalsIgnoreCase("srcfile")
+            ? propertyFile(pf.group(2), all) : null;
+        // one in the template is read, or the scripts write it
+        if (f == null || !f.startsWith(tdir) || (java.nio.file.Files.exists(f) && !files.containsKey(f))) {
+          return "the template's script " + scriptName(e.getKey()) + " loads properties from " + pf.group(2) + ", which isn't read";
+        }
+      }
+      java.util.regex.Matcher b = SUB_BUILD.matcher(e.getValue());
+      if (b.find()) {
+        return "the template's script " + scriptName(e.getKey()) + " runs another build or a program (" + b.group().trim() + "), which isn't read";
+      }
+      String code = e.getKey().getFileName().toString().endsWith(".js") ? scriptCode(scriptName(e.getKey()), "javascript", e.getValue(), all) : null;
+      if (code != null) {
+        return code;
+      }
+      // an ant file (not a style sheet, which may write html with scripts in it)
+      if (e.getKey().getFileName().toString().endsWith(".xml") || e.getKey().equals(main)) {
+        java.util.regex.Matcher c = INLINE_CODE.matcher(e.getValue());
+        while (c.find()) {
+          java.util.regex.Matcher l = LANGUAGE.matcher(c.group(2));
+          code = scriptCode(scriptName(e.getKey()), c.group(1).startsWith("script") ? (l.find() ? l.group(1) : "") : c.group(1), c.group(3), all);
+          if (code != null) {
+            return code;
+          }
+        }
+        java.util.regex.Matcher u = USED_FILE.matcher(e.getValue());
+        while (u.find()) {
+          String f = u.group(1) != null ? u.group(1) : u.group(2);
+          if (!f.contains("${") && !new File(f).isAbsolute() && !new File(Utilities.path(root, f)).exists()) {
+            // a path without properties is in the IG's folder (the ant project's basedir): if there's no such file,
+            // the task reads nothing (fhir2.base.template has style="{$ig.scripts}/..." with failonerror="false")
+            continue;
+          }
+          String rest = f.startsWith("${ig.scripts}/") ? f.substring("${ig.scripts}/".length()) : null;
+          if (rest == null || rest.contains("$")
+              || !files.containsKey(new File(Utilities.path(templateDir, "scripts", rest)).getCanonicalFile().toPath())) {
+            return "the template's script " + scriptName(e.getKey()) + " uses " + f + ", which isn't read";
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * The folders in the input folder that a template script (an ant file) reads, each with how: those it names after
+   * the input folder (directly, or through a property defined as it), and the page folders it names anywhere
+   */
+  static Map<String, String> scriptFolderUse(String name, String src) {
+    return scriptFolderUse(name, src, src);
+  }
+
+  /** scriptFolderUse, with the properties defined in all the template's scripts (all): ant properties are global */
+  static Map<String, String> scriptFolderUse(String name, String src, String all) {
+    Map<String, String> res = new java.util.LinkedHashMap<>();
+    java.util.regex.Matcher m = inputRef(all).matcher(src);
+    while (m.find()) {
+      if (m.group(3) != null && !isDots(m.group(3))) {
+        res.putIfAbsent(m.group(3), "the template's script " + name + " reads (" + m.group() + ")");
+      }
+    }
+    java.util.regex.Matcher r = INPUT_PATH.matcher(src);
+    while (r.find()) {
+      if (!isDots(r.group(1))) {
+        res.putIfAbsent(r.group(1), "the template's script " + name + " reads (" + r.group() + ")");
+      }
+    }
+    for (String f : PAGE_FOLDER_NAMES) {
+      if (src.contains(f)) {
+        res.putIfAbsent(f, "the template's script " + name + " names");
+      }
+    }
+    return res;
+  }
+
+  /**
+   * How a template script (an ant file) can read any file in the input folder, or null if it can't: it uses the input
+   * folder (directly, or through a property defined as it) other than to define a property, or selects everything
+   * under the IG's folder
+   */
+  static String scriptPageUse(String name, String src) {
+    return scriptPageUse(name, src, src);
+  }
+
+  /** scriptPageUse, with the properties defined in all the template's scripts (all): ant properties are global */
+  static String scriptPageUse(String name, String src, String all) {
+    java.util.regex.Pattern inputRef = inputRef(all);
+    java.util.regex.Matcher m = inputRef.matcher(src);
+    while (m.find()) {
+      if (m.group(3) != null && (isDots(m.group(3)) || dotsAfter(src, m.end()))) {
+        return "the template's script " + name + " reads " + m.group();
+      }
+      if (m.group(3) == null && !inPropertyDefinition(src, m.start())) {
+        return "the template's script " + name + " reads " + m.group();
+      }
+    }
+    // a property defined as a folder in the input folder, and a path through it that goes up out of the folder
+    java.util.regex.Matcher d = PROPERTY.matcher(all);
+    while (d.find()) {
+      if (inputRef.matcher(d.group()).find() || INPUT_PATH.matcher(d.group()).find()) {
+        java.util.regex.Matcher u = java.util.regex.Pattern.compile("\\$\\{" + java.util.regex.Pattern.quote(d.group(1)) + "\\}").matcher(src);
+        while (u.find()) {
+          if (dotsAfter(src, u.end())) {
+            return "the template's script " + name + " reads " + u.group() + " (" + d.group() + ") and goes out of the folder";
+          }
+        }
+      }
+    }
+    java.util.regex.Matcher w = INPUT_WHOLE.matcher(src);
+    while (w.find()) {
+      java.util.regex.Matcher p = INPUT_PATH.matcher(src).region(w.start(), src.length());
+      boolean named = w.group().endsWith("/") && p.lookingAt();
+      // input/.. is the IG's folder, even as a property
+      boolean dots = named && (isDots(p.group(1)) || dotsAfter(src, p.end()));
+      if (dots || (!named && !inPropertyDefinition(src, w.start()))) {
+        int end = w.end();
+        while (end < src.length() && "\"'<> \t\r\n".indexOf(src.charAt(end)) < 0) {
+          end++;
+        }
+        return "the template's script " + name + " reads " + src.substring(w.start(), end);
+      }
+    }
+    Set<String> roots = rootAliases(all);
+    java.util.regex.Matcher o = PARENT.matcher(src);
+    while (o.find()) {
+      // straight up out of the IG's folder (${ig.root}/../schemas) is outside it
+      boolean outside = o.group(1) != null && o.group(2).isEmpty()
+          && (o.group(1).equals("ig.root") || o.group(1).equals("basedir") || roots.contains(o.group(1)));
+      if (!outside) {
+        return "the template's script " + name + " reads " + o.group() + ", which may be the IG's folder";
+      }
+    }
+    java.util.regex.Matcher r = java.util.regex.Pattern.compile(String.format(ROOT_DIR, alternatives(roots))).matcher(src);
+    while (r.find()) {
+      // what it selects: the includes attribute, or what's in the element
+      String selection = r.group();
+      if (!r.group().endsWith("/>")) {
+        int end = src.indexOf("</" + r.group(1) + ">", r.end());
+        selection = end < 0 ? src.substring(r.start()) : src.substring(r.start(), end);
+      }
+      if (!INCLUDES.matcher(selection).find() || INCLUDES_FILE.matcher(selection).find() || selection.contains("**")
+          || WILD_FIRST.matcher(selection).find()) {
+        return "the template's script " + name + " reads everything under the IG's folder";
+      }
+    }
+    java.util.regex.Matcher j = JAVA.matcher(src);
+    while (j.find()) {
+      int end = j.group().endsWith("/>") ? j.end() : src.indexOf("</java>", j.end());
+      String task = end < 0 ? src.substring(j.start()) : src.substring(j.start(), end);
+      if (java.util.regex.Pattern.compile(String.format(ROOT_ARG, alternatives(roots))).matcher(task).find()) {
+        return "the template's script " + name + " gives the IG's folder to a program (<java>), which isn't read";
+      }
+    }
+    return null;
+  }
+
+  // what a selection under the IG's folder includes: an includes attribute or include element (a list in another file,
+  // includesfile, may name anything)
+  private static final java.util.regex.Pattern INCLUDES = java.util.regex.Pattern.compile(
+      "(?<=\\s)includes=\"|<include[\\s/>]");
+  private static final java.util.regex.Pattern INCLUDES_FILE = java.util.regex.Pattern.compile(
+      "(?<=\\s)includesfile=\"|<includesfile[\\s/>]");
+  // a program that a script runs with java, and the IG's folder itself (not a folder in it) given to it
+  private static final java.util.regex.Pattern JAVA = java.util.regex.Pattern.compile("<java[\\s/>][^>]*>");
+  private static final String ROOT_ARG =
+      "\\$\\{(?:ig\\.root|basedir%s)\\}/?(?![^\"'\\s&;<>])|(?<=\\s)\\w+=\"\\./?\"";
+
+  // a pattern in an include whose first folder is a wildcard (*/includes/menu.xml), so it may be the input folder
+  private static final java.util.regex.Pattern WILD_FIRST = java.util.regex.Pattern.compile(
+      "(?<=\\s)(?:name|includes)=\"(?:[^\"]*[,\\s])?[^\"/,\\s]*[*?]");
+
+  private static boolean inPropertyDefinition(String src, int i) {
+    int tag = src.lastIndexOf('<', i);
+    return tag >= 0 && src.startsWith("<property", tag) && src.indexOf('>', tag) > i;
+  }
+
+  /**
+   * The pattern for a reference to the input folder in src, including through the properties src defines as the input
+   * folder (e.g. &lt;property name="in" value="${folder.input}"/&gt; makes ${in} one)
+   */
+  private static java.util.regex.Pattern inputRef(String src) {
+    Set<String> roots = rootAliases(src);
+    Set<String> aliases = new HashSet<>();
+    boolean more = true;
+    while (more) {
+      more = false;
+      java.util.regex.Pattern ref = inputRef(aliases, roots);
+      java.util.regex.Matcher p = PROPERTY.matcher(src);
+      while (p.find()) {
+        java.util.regex.Matcher m = ref.matcher(p.group());
+        if ((m.find() && m.group(3) == null || INPUT_VALUE.matcher(p.group()).find()) && !aliases.contains(p.group(1))) {
+          aliases.add(p.group(1));
+          more = true;
+        }
+      }
+    }
+    return inputRef(aliases, roots);
+  }
+
+  private static java.util.regex.Pattern inputRef(Set<String> aliases, Set<String> roots) {
+    return java.util.regex.Pattern.compile(String.format(INPUT_REF, alternatives(aliases), alternatives(roots)));
+  }
+
+  /** The properties src defines as the IG's folder (e.g. &lt;property name="root" value="${ig.root}"/&gt;) */
+  private static Set<String> rootAliases(String src) {
+    Set<String> aliases = new HashSet<>();
+    // a folder that holds another may be the IG's folder
+    java.util.regex.Matcher d = DIRNAME.matcher(src);
+    while (d.find()) {
+      aliases.add(d.group(1));
+    }
+    boolean more = true;
+    while (more) {
+      more = false;
+      java.util.regex.Matcher p = PROPERTY.matcher(src);
+      while (p.find()) {
+        java.util.regex.Matcher v = ROOT_VALUE.matcher(p.group());
+        if (v.find() && (v.group(1) == null || v.group(1).equals("ig.root") || v.group(1).equals("basedir") || aliases.contains(v.group(1)))
+            && aliases.add(p.group(1))) {
+          more = true;
+        }
+      }
+    }
+    return aliases;
+  }
+
+  private static String alternatives(Set<String> names) {
+    StringBuilder alt = new StringBuilder();
+    for (String a : names) {
+      alt.append('|').append(java.util.regex.Pattern.quote(a));
+    }
+    return alt.toString();
+  }
+
+  /** Whether the template runs a script while the IG is generated, before Jekyll */
   public boolean hasPreProcess() {
     return preProcess != null;
   }

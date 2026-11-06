@@ -320,6 +320,8 @@ public class HTMLInspector {
   private ConformanceStatementHandler csHandler;
   private Set<String> comparisonFiles = new HashSet<>();
   @Getter @Setter private ImplementationGuide ig;
+  private List<String> langList;
+  private RendererFactory rendererFactory;
 
   public HTMLInspector(IWorkerContext context, String rootFolder, List<SpecMapManager> specs, List<LinkedSpecification> linkSpecs, ILoggingService log,
                        String canonical, String packageId, String version, Map<String, List<String>> trackedFragments, List<FetchedFile> sources, IPublisherModule module, boolean isCIBuild,
@@ -341,7 +343,32 @@ public class HTMLInspector {
     this.version = version;
     requirePublishBox = Utilities.startsWithInList(packageId, "hl7.");
     this.context = context;
+    this.langList = langList;
+    this.rendererFactory = rendererFactory;
     this.csHandler = new ConformanceStatementHandler(this, context, log, langList, forHL7, rendererFactory);
+  }
+
+  /**
+   * A new inspector with the same set up as this one, and what was given to it before it checked anything (the links to
+   * check, the manual pages, the exceptions and comparison files so far), but nothing it found when checking: watch mode
+   * uses it to check the output again after a page-only change (see PageRebuild)
+   */
+  public HTMLInspector copyForRecheck() throws IOException {
+    HTMLInspector res = new HTMLInspector(context, rootFolder, specs, linkSpecs, log, canonical, packageId, version, trackedFragments, sources,
+        module, isCIBuild, fragmentUses, relatedIGs, noCIBuildIssues, langList, rendererFactory);
+    res.strict = strict;
+    res.otherlinks.addAll(otherlinks);
+    res.manual = new ArrayList<>(manual);
+    res.igs = igs;
+    res.pcm = pcm;
+    res.exemptHtmlPatterns = exemptHtmlPatterns;
+    res.pageHeadingLevel = pageHeadingLevel;
+    res.accessibilityChecks = accessibilityChecks;
+    res.accessibilityPanel = accessibilityPanel;
+    res.exceptions.addAll(exceptions);
+    res.comparisonFiles.addAll(comparisonFiles);
+    res.ig = ig;
+    return res;
   }
 
   public List<ValidationMessage> check(String statusMessageDef, Map<String, String> statusMessagesLang) throws IOException {
