@@ -5,6 +5,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -20,6 +25,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.io.FileUtils;
+import org.hl7.fhir.standalone.context.SimpleWorkerContext;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
@@ -387,6 +394,37 @@ class PageRebuildTest {
     assertEquals("<p>a</p>", read("output/cmp/a.html"));
     assertEquals("<p>b</p>", read("output/cmp/b.html"));
     assertEquals(Collections.emptyList(), leftOver());
+  }
+
+  @Test
+  void theContextIsUnloadedWhenTheStateIsDiscarded() {
+    pf.context = mock(SimpleWorkerContext.class);
+    state.discard();
+    verify(pf.context, never()).unload();
+    // what the build does when a page rebuild can follow it
+    state.unloadContextWhenDiscarded();
+    verify(pf.context, never()).unload();
+    state.discard();
+    state.discard();
+    verify(pf.context, times(1)).unload();
+  }
+
+  @Test
+  void aStashThatCantBeDeletedIsOnlyReported() throws IOException {
+    state.finished();
+    state.afterJekyll();
+    write("output/package.tgz", "tgz");
+    state.afterPackage();
+    Path locked = state.getStashFolder().resolve("locked");
+    Files.createDirectories(locked.resolve("sub"));
+    assumeTrue(locked.toFile().setReadable(false) && !Files.isReadable(locked), "needs a folder that can't be read");
+    try {
+      state.discard();
+      assertNull(state.getStashFolder());
+    } finally {
+      locked.toFile().setReadable(true);
+      FileUtils.deleteDirectory(locked.getParent().toFile());
+    }
   }
 
   @Test

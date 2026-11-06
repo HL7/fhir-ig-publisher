@@ -332,6 +332,24 @@ class RegeneratePagesTest {
     }
   }
 
+  @Test
+  void aStateThatCantBeKeptOnlyStopsAPageRebuild() throws Exception {
+    PageRebuild state = checked();
+    try {
+      gen.keepForPageRebuild(() -> {
+        throw new IOException("No space left on device");
+      });
+      assertTrue(state.getNotReusable() != null);
+      assertTrue(log.stream().anyMatch(m -> m.startsWith("Unable to keep the state for a page rebuild") && m.contains("No space left on device")), log.toString());
+      // and the later steps aren't done
+      gen.keepForPageRebuild(() -> {
+        throw new AssertionError("not expected");
+      });
+    } finally {
+      state.discard();
+    }
+  }
+
   /** a template whose onGenerate script reads the menu in the includes folder */
   private Template template() throws IOException {
     write("template/config.json", "{\"script\": \"scripts/ant.xml\", \"targets\": {\"onGenerate\": \"onGenerate\"}}");

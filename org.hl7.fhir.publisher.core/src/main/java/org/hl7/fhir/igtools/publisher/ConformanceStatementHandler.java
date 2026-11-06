@@ -23,6 +23,7 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.HTMLInspector.LoadedFile;
 import org.hl7.fhir.igtools.publisher.HTMLInspector.XhtmlNodeHolder;
 import org.hl7.fhir.model.core.*;
+import org.hl7.fhir.model.Base;
 import org.hl7.fhir.model.utilities.formats.OutputStyle;
 import org.hl7.fhir.services.context.IWorkerContext;
 import org.hl7.fhir.model.extensions.ExtensionUtilities;
@@ -221,6 +222,8 @@ class ConformanceStatementHandler {
     Map<String, Requirements.RequirementsStatementComponent> oldReq = new HashMap<>();
     boolean mismatch = false;
     if (req != null) {
+      // a copy: the IG's own resource is left as it was loaded, for when the pages are checked again (watch mode)
+      req = req.copy(Base.COPY_ALL);
       req.setText(null);
       for (Requirements.RequirementsStatementComponent comp: req.getStatementList()) {
         oldReq.put(comp.getKey(), comp);

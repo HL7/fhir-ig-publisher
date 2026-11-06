@@ -727,6 +727,28 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
    * html checks, the final zip. A page-only rebuild (replay != null) has put the temp folder back as it was when Jekyll
    * ran (apart from the changed pages), and puts back what the package step wrote instead of running it again
    */
+  interface PageRebuildStep {
+    void run() throws IOException;
+  }
+
+  /**
+   * Watch mode: keeps what a page rebuild after this build needs. If that fails, the build goes on: only a page rebuild
+   * can't follow it
+   */
+  void keepForPageRebuild(PageRebuildStep step) {
+    if (pageRebuild == null) {
+      return;
+    }
+    try {
+      step.run();
+    } catch (IOException | RuntimeException e) {
+      log("Unable to keep the state for a page rebuild: " + e);
+      pageRebuild.notReusable("its state couldn't be kept (" + e + ")");
+      pageRebuild.discard();
+      pageRebuild = null;
+    }
+  }
+
   public void finishGenerate(PageRebuild replay) throws Exception {
     finishGenerate(replay, null);
   }
@@ -742,9 +764,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       if (!settings.isGenerationOff()) {
         templateBeforeJekyll();
       }
-      if (pageRebuild != null) {
-        pageRebuild.beforeJekyll();
-      }
+      keepForPageRebuild(() -> pageRebuild.beforeJekyll());
     }
 
     boolean jekyllOk;
@@ -775,8 +795,6 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           fresh.removeAll(checked);
           freshFrom.append(" (").append(checked.size()).append(" of them as the html check left them)");
         }
-      } else if (!jekyllOk && pageRebuild != null) {
-        pageRebuild.notReusable("Jekyll failed");
       }
     } finally {
       dropCheckedStash();
@@ -785,9 +803,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       }
     }
     if (jekyllOk && replay == null) {
-      if (pageRebuild != null) {
-        pageRebuild.afterJekyll();
-      }
+      keepForPageRebuild(() -> pageRebuild.afterJekyll());
       if (!settings.isGenerationOff()) {
         templateOnCheck();
       }
@@ -866,9 +882,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         FileUtilities.bytesToFile(org.hl7.fhir.utilities.json.parser.JsonParser.composeBytes(json), Utilities.path(pf.outputDir, "sub-package-list.json"));
         generateZips(df);
       }
-      if (pageRebuild != null) {
-        pageRebuild.afterPackage();
-      }
+      keepForPageRebuild(() -> pageRebuild.afterPackage());
     }
 
     log("Checking Output HTML");
@@ -989,8 +1003,13 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     if (!pf.txUnloadEarly) {
       // default path: terminology stayed loaded through HTML inspection (so conformance
       // statement rendering works); unload it now that the inspector is complete.
-      pf.context.unload();
-      System.gc();
+      if (pageRebuild != null) {
+        // a page rebuild that follows checks the html again with it (see PageRebuild.discard())
+        pageRebuild.unloadContextWhenDiscarded();
+      } else if (replay == null) {
+        pf.context.unload();
+        System.gc();
+      }
     }
   }
 
@@ -4944,6 +4963,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           log("Jekyll timeout exceeded: " + Long.toString(pf.jekyllTimeout /1000) + " seconds");
         }
         log("Jekyll claimed to succeed, but returned an error. Proceeding anyway");
+        if (pageRebuild != null) {
+          pageRebuild.notReusable("Jekyll returned an error");
+        }
       } else {
         log("Jekyll has failed. Complete output from running Jekyll: " + pumpHandler.getBufferString());
         if (watchdog.killedProcess()) {

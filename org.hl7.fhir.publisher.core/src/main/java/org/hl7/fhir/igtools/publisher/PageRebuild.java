@@ -2,6 +2,7 @@ package org.hl7.fhir.igtools.publisher;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -78,6 +79,7 @@ public class PageRebuild {
    * The copies of the package outputs that haven't been discarded: watch mode usually ends with Ctrl-C, which doesn't
    * get to discard(), so they're deleted when the JVM exits
    */
+  private boolean unloadContext;
   private static final Set<Path> STASHES = ConcurrentHashMap.newKeySet();
   private static boolean shutdownHookAdded;
 
@@ -680,11 +682,26 @@ public class PageRebuild {
     return true;
   }
 
-  /** Deletes the copies of the package files */
+  /**
+   * The build left its context loaded for the html checks of a page rebuild (a complete build unloads it once its
+   * checks are done): discard() unloads it
+   */
+  public void unloadContextWhenDiscarded() {
+    unloadContext = true;
+  }
+
+  /** Deletes the copies of the package files, and unloads the context if the build left it loaded for a page rebuild */
   public void discard() {
+    if (unloadContext) {
+      unloadContext = false;
+      if (pf != null && pf.context != null) {
+        pf.context.unload();
+      }
+    }
     if (stashFolder != null) {
-      delete(stashFolder);
-      STASHES.remove(stashFolder);
+      if (delete(stashFolder)) {
+        STASHES.remove(stashFolder);
+      }
       stashFolder = null;
     }
   }
@@ -697,12 +714,18 @@ public class PageRebuild {
     }
   }
 
-  private static void delete(Path folder) {
+  /** True if the folder is gone. It's in the system temp folder: if it can't be deleted, that's only reported */
+  private static boolean delete(Path folder) {
     try (Stream<Path> s = Files.walk(folder)) {
       s.sorted(Comparator.reverseOrder()).forEach(p -> p.toFile().delete());
-    } catch (IOException e) {
-      // nothing: it's in the system temp folder
+    } catch (IOException | UncheckedIOException e) {
+      // reported below
     }
+    if (Files.exists(folder)) {
+      System.out.println("Unable to delete the temporary folder " + folder);
+      return false;
+    }
+    return true;
   }
 
   // --- utilities -----------------------------------------------------------------------------------------------------
