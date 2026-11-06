@@ -160,22 +160,28 @@ public class CrossVersionOIDScanner {
         processR5Source(f);
       } else if (f.getName().endsWith(".json")) {
         try {
-          Resource r = new JsonParser(ModelContext.fullCoreContext()).parse(new FileInputStream(f));
+          Resource r;
+          try (FileInputStream in = new FileInputStream(f)) {
+            r = new JsonParser(ModelContext.fullCoreContext()).parse(in);
+          }
           if (updateOids(r)) {
-            OutputStream s = new FileOutputStream(f);
-            new JsonParser(ModelContext.fullCoreContext()).setOutputStyle(OutputStyle.PRETTY).compose(s, r);
-            s.close();
+            try (OutputStream s = new FileOutputStream(f)) {
+              new JsonParser(ModelContext.fullCoreContext()).setOutputStyle(OutputStyle.PRETTY).compose(s, r);
+            }
           }         
         } catch (Exception e) {
           System.out.println("Fail "+f+": " +e.getMessage());
         }        
       } else if (f.getName().endsWith(".xml")) {
         try {
-          Resource r = new XmlParser(ModelContext.fullCoreContext()).parse(new FileInputStream(f));
+          Resource r;
+          try (FileInputStream in = new FileInputStream(f)) {
+            r = new XmlParser(ModelContext.fullCoreContext()).parse(in);
+          }
           if (updateOids(r)) {
-            OutputStream s = new FileOutputStream(f);
-            new XmlParser(ModelContext.fullCoreContext()).setOutputStyle(OutputStyle.PRETTY).compose(s, r);
-            s.close();
+            try (OutputStream s = new FileOutputStream(f)) {
+              new XmlParser(ModelContext.fullCoreContext()).setOutputStyle(OutputStyle.PRETTY).compose(s, r);
+            }
           }         
         } catch (Exception e) {
           System.out.println("Fail "+f+": " +e.getMessage());

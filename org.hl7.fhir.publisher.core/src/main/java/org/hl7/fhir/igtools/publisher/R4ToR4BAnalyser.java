@@ -451,7 +451,10 @@ public class R4ToR4BAnalyser {
   
 
   private void genSameVersionPackage(String pid, String source, String dest, boolean r4, String ver, String pver) throws FHIRException, IOException {
-    NpmPackage src = NpmPackage.fromPackage(new FileInputStream(source));
+    NpmPackage src;
+    try (FileInputStream in = new FileInputStream(source)) {
+      src = NpmPackage.fromPackage(in);
+    }
     JsonObject npm = src.getNpm();
     npm.remove("name");
     npm.add("name", pid+"."+pver);
@@ -512,7 +515,10 @@ public class R4ToR4BAnalyser {
   }
 
   private void genOtherVersionPackage(String pid, String source, String dest, String core, String ver, String pver, String nver, String pathS, String pathT) throws FHIRException, IOException {
-    NpmPackage src = NpmPackage.fromPackage(new FileInputStream(source));
+    NpmPackage src;
+    try (FileInputStream in = new FileInputStream(source)) {
+      src = NpmPackage.fromPackage(in);
+    }
     JsonObject npm = src.getNpm();
     npm.remove("name");
     npm.add("name", pid+"."+pver);
@@ -724,7 +730,10 @@ public class R4ToR4BAnalyser {
 
   private void processPackage(String filename) throws FileNotFoundException, IOException {
     System.out.println("Analysing "+filename);
-    NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(filename));
+    NpmPackage npm;
+    try (FileInputStream in = new FileInputStream(filename)) {
+      npm = NpmPackage.fromPackage(in);
+    }
     String version = npm.fhirVersion();
     String pid = VersionUtilities.packageForVersion(version);
     String specPath = VersionUtilities.getSpecUrl(version);

@@ -51,8 +51,10 @@ public class CodeSystemConvertor {
     if (nname.equals(name))
       nname = FileUtilities.changeFileExt(name, "-cs.xml");
     if (new File(nname).exists()) {
-      FileInputStream input = new FileInputStream(nname);
-      CodeSystem cs = (CodeSystem) p.parse(input);
+      CodeSystem cs;
+      try (FileInputStream input = new FileInputStream(nname)) {
+        cs = (CodeSystem) p.parse(input);
+      }
       CodeSystemUtilities.makeShareable(cs, true);
       if (!cs.hasTitle())
         cs.setTitle(Utilities.capitalize(Utilities.unCamelCase(cs.getName())));

@@ -657,9 +657,9 @@ public class HTMLInspector {
 
   public void saveFile(LoadedFile lf, XhtmlNode x) throws IOException {
     new File(lf.getFilename()).delete();
-    FileOutputStream f = new FileOutputStream(lf.getFilename());
-    new XhtmlComposer(XhtmlComposer.HTML).composeDocument(f, x);
-    f.close();
+    try (FileOutputStream f = new FileOutputStream(lf.getFilename())) {
+      new XhtmlComposer(XhtmlComposer.HTML).composeDocument(f, x);
+    }
   }
 
   private void checkGoneFiles() {
@@ -1671,6 +1671,13 @@ public class HTMLInspector {
   private boolean checkResolveLink(String filename, Location loc, String path, String ref, String text, List<ValidationMessage> messages, String uuid, XhtmlNode x, XhtmlNode parent) throws IOException {
     links++;
     String fn = makeLocal(filename);
+    if (!Utilities.isAbsoluteUrl(ref)) {
+      int q = ref.indexOf('?');
+      int h = ref.indexOf('#');
+      if (q >= 0 && (h < 0 || q < h)) {
+        ref = ref.substring(0, q) + (h >= 0 ? ref.substring(h) : "");
+      }
+    }
     String rref;
     try {
       rref = Utilities.URLDecode(ref);

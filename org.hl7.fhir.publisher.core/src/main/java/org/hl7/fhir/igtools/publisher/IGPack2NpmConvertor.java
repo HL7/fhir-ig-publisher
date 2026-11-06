@@ -178,7 +178,10 @@ public class IGPack2NpmConvertor {
   private void processValidatorPack(File f) throws IOException {
     System.out.println("Processing "+f.getAbsolutePath());
     try {
-      Map<String, byte[]> files = loadZip(new FileInputStream(f));
+      Map<String, byte[]> files;
+      try (FileInputStream in = new FileInputStream(f)) {
+        files = loadZip(in);
+      }
       String version = determineVersion(files);
       if (Utilities.existsInList(version, "n/a", "3.1.0", "1.8.0")) {
         System.out.println("  version not supported");

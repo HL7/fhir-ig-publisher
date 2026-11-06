@@ -166,7 +166,9 @@ public class PreviousVersionComparator {
   private IniFile makeIni(String rootDir, String v) throws IOException {
     File ini = new File(Utilities.path(rootDir, "url-map-v-"+v+".ini"));
     if (ini.exists()) {
-      return new IniFile(new FileInputStream(ini));
+      try (FileInputStream in = new FileInputStream(ini)) {
+        return new IniFile(in);
+      }
     } else {
       return null;
     }

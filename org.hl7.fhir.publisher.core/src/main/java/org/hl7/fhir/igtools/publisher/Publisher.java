@@ -468,8 +468,12 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       FileUtilities.stringToFile(makeTemplateQAPage(), Utilities.path(pf.outputDir, "qa.html"));
 
       if (settings.getMode() != PublisherUtils.IGBuildMode.AUTOBUILD) {
-        pf.pcm.addPackageToCache(pf.templateInfo.asString("name"), pf.templateInfo.asString("version"), new FileInputStream(pf.npm.filename()), Utilities.path(pf.outputDir, "package.tgz"));
-        pf.pcm.addPackageToCache(pf.templateInfo.asString("name"), "dev", new FileInputStream(pf.npm.filename()), Utilities.path(pf.outputDir, "package.tgz"));
+        try (FileInputStream in = new FileInputStream(pf.npm.filename())) {
+          pf.pcm.addPackageToCache(pf.templateInfo.asString("name"), pf.templateInfo.asString("version"), in, Utilities.path(pf.outputDir, "package.tgz"));
+        }
+        try (FileInputStream in = new FileInputStream(pf.npm.filename())) {
+          pf.pcm.addPackageToCache(pf.templateInfo.asString("name"), "dev", in, Utilities.path(pf.outputDir, "package.tgz"));
+        }
       }
     } catch (Exception e) {
       e.printStackTrace();
@@ -1283,11 +1287,11 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       CompressionUtilities.zipSlipProtect(n, Path.of(dir));
       FileUtilities.createDirectory(dir);
 
-      FileOutputStream output = new FileOutputStream(filename);
-      int len = 0;
-      while ((len = zip.read(buffer)) > 0)
-        output.write(buffer, 0, len);
-      output.close();
+      try (FileOutputStream output = new FileOutputStream(filename)) {
+        int len = 0;
+        while ((len = zip.read(buffer)) > 0)
+          output.write(buffer, 0, len);
+      }
     }
     zip.close();
   }
@@ -1339,9 +1343,9 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     URL url = URI.create(address).toURL();
     URLConnection c = url.openConnection();
     InputStream s = c.getInputStream();
-    FileOutputStream f = new FileOutputStream(filename);
-    transfer(s, f, 1024);
-    f.close();   
+    try (FileOutputStream f = new FileOutputStream(filename)) {
+      transfer(s, f, 1024);
+    }
   }
 
   public static void transfer(InputStream in, OutputStream out, int buffer) throws IOException {
