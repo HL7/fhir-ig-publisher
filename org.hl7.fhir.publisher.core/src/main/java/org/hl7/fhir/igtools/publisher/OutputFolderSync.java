@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.AccessDeniedException;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -166,12 +167,22 @@ public class OutputFolderSync {
 
   private static void move(Path from, Path to) throws IOException {
     try {
-      Files.move(from, to, StandardCopyOption.REPLACE_EXISTING);
+      rename(from, to);
     } catch (AccessDeniedException e) {
       // a read-only file can't be replaced on Windows
       if (!makeWritable(to)) {
         throw e;
       }
+      rename(from, to);
+    }
+  }
+
+  private static void rename(Path from, Path to) throws IOException {
+    try {
+      // replaces the file in one call: a move that isn't atomic deletes it first
+      Files.move(from, to, StandardCopyOption.ATOMIC_MOVE);
+    } catch (AtomicMoveNotSupportedException e) {
+      // the staging folder is on another file system
       Files.move(from, to, StandardCopyOption.REPLACE_EXISTING);
     }
   }
