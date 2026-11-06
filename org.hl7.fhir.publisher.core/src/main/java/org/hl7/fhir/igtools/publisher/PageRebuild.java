@@ -79,11 +79,12 @@ public class PageRebuild {
    * The copies of the package outputs that haven't been discarded: watch mode usually ends with Ctrl-C, which doesn't
    * get to discard(), so they're deleted when the JVM exits
    */
-  private boolean unloadContext;
   private static final Set<Path> STASHES = ConcurrentHashMap.newKeySet();
   private static boolean shutdownHookAdded;
 
   private PublisherFields pf;
+  /** see unloadContextWhenDiscarded() */
+  private boolean unloadContext;
   private String notReusable;
 
   private final List<ValidationMessage> errors = new ArrayList<>();
@@ -161,6 +162,11 @@ public class PageRebuild {
     if (notReusable == null) {
       notReusable = reason;
     }
+  }
+
+  /** False if the build has already found why its state can't be reused */
+  public boolean mayBeReusable() {
+    return notReusable == null;
   }
 
   public String getNotReusable() {
