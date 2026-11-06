@@ -117,9 +117,7 @@ public class PublisherBase implements ILoggingService {
 //      s = "";
 //    }
     Runtime runtime = Runtime.getRuntime();
-    long totalMemory = runtime.totalMemory();
-    long freeMemory = runtime.freeMemory();
-    long usedMemory = totalMemory - freeMemory;
+    long usedMemory = usedMemory(runtime.totalMemory(), runtime.freeMemory());
     if (pf != null && usedMemory > pf.maxMemory) {
       pf.maxMemory = usedMemory;
     }
@@ -135,6 +133,15 @@ public class PublisherBase implements ILoggingService {
       System.out.println("Terminating Process now");
       System.exit(1);
     }
+  }
+
+  /**
+   * totalMemory and freeMemory are two separate reads, so if another thread makes the heap grow in
+   * between, freeMemory can exceed the totalMemory read before it. That isn't a real figure, and
+   * Utilities.describeSize throws on a negative one, so it counts as 0.
+   */
+  static long usedMemory(long totalMemory, long freeMemory) {
+    return Math.max(0, totalMemory - freeMemory);
   }
 
   @Override
