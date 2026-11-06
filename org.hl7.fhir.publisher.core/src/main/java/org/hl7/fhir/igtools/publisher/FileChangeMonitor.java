@@ -52,6 +52,10 @@ public class FileChangeMonitor implements Closeable {
       this.recursive = recursive;
     }
 
+    public Path getPath() {
+      return path;
+    }
+
     public static MonitoredPath recursive(Path path) {
       return new MonitoredPath(path, true);
     }

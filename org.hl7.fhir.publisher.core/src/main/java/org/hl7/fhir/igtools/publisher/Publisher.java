@@ -61,6 +61,7 @@ import org.hl7.fhir.igtools.renderers.*;
 import org.hl7.fhir.igtools.renderers.ValidationPresenter.IGLanguageInformation;
 import org.hl7.fhir.igtools.ui.IGPublisherUI;
 import org.hl7.fhir.igtools.web.*;
+import org.hl7.fhir.services.comparison.ResourceComparer;
 import org.hl7.fhir.services.context.*;
 import org.hl7.fhir.services.elementmodel.Element;
 import org.hl7.fhir.services.elementmodel.ElementVisitor;
@@ -193,60 +194,83 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 
     String rootDir = settings.getConfigFile();
     FileChangeMonitor monitor = null;
+    WatchSession session = null;
+    List<FileChangeMonitor.MonitoredPath> watched = null;
     Path watchRoot = null;
-    if (settings.isWatchMode()) {
-      watchRoot = watchRoot(rootDir);
-      Path igIni = new File(rootDir).isFile() ? Paths.get(rootDir).toAbsolutePath().normalize() : watchRoot.resolve("ig.ini");
-      monitor = new FileChangeMonitor(Arrays.asList(
-              FileChangeMonitor.MonitoredPath.file(igIni),
-              FileChangeMonitor.MonitoredPath.file(watchRoot.resolve("sushi-config.yaml")),
-              FileChangeMonitor.MonitoredPath.file(watchRoot.resolve("publication-request.json")),
-              FileChangeMonitor.MonitoredPath.file(watchRoot.resolve("sushi-ignoreWarnings.txt")),
-              FileChangeMonitor.MonitoredPath.recursive(watchRoot.resolve("input")),
-              FileChangeMonitor.MonitoredPath.recursive(watchRoot.resolve("fsh-generated"))
-      ));
-    }
-
     // in watch mode, what a module's pre-processing wrote in input, in any build so far
     Set<Path> moduleOutputs = new HashSet<>();
+    // settings that a build adds to: each build starts again from what the command line said
+    List<String> cliNoNarratives = new ArrayList<>(settings.getNoNarratives());
+    List<String> cliNoValidate = new ArrayList<>(settings.getNoValidate());
     try {
+      if (settings.isWatchMode()) {
+        watchRoot = watchRoot(rootDir);
+        Path igIni = new File(rootDir).isFile() ? Paths.get(rootDir).toAbsolutePath().normalize() : watchRoot.resolve("ig.ini");
+        watched = new ArrayList<>(Arrays.asList(
+                FileChangeMonitor.MonitoredPath.file(igIni),
+                FileChangeMonitor.MonitoredPath.file(watchRoot.resolve("sushi-config.yaml")),
+                FileChangeMonitor.MonitoredPath.file(watchRoot.resolve("publication-request.json")),
+                FileChangeMonitor.MonitoredPath.file(watchRoot.resolve("sushi-ignoreWarnings.txt")),
+                FileChangeMonitor.MonitoredPath.file(watchRoot.resolve("fsh.ini")), // which SUSHI to run
+                FileChangeMonitor.MonitoredPath.recursive(watchRoot.resolve("input")),
+                FileChangeMonitor.MonitoredPath.recursive(watchRoot.resolve("fsh")), // SUSHI's older layout
+                FileChangeMonitor.MonitoredPath.recursive(watchRoot.resolve("fsh-generated"))));
+        monitor = new FileChangeMonitor(watched);
+        List<Path> paths = new ArrayList<>();
+        for (FileChangeMonitor.MonitoredPath p : watched) {
+          paths.add(p.getPath());
+        }
+        session = new WatchSession(watchRoot, paths);
+        session.setLog(this::log);
+        PackageListFetcher.rememberFetches();
+      }
+      loader.setWatchSession(session);
+
+      boolean first = true;
       do {
-        pf = new PublisherFields();
-        loader.setPf(pf);
-        processor.setPf(pf);
-        generator.setPf(pf);
-        pf.resolver = this;
-        setLogger(this);
-
-        pf.tt = new TimeTracker();
-        loader.initialize();
-        if (pf.validator != null) {
-          pf.validator.setTracker(this);
-        }
-
-        if (pf.isBuildingTemplate) {
-          packageTemplate();
+        if (session == null) {
+          build(rootDir);
         } else {
-          log("Load IG");
+          session.startBuild();
           try {
-            createIg();
-          } catch (Exception e) {
-            recordOutcome(e, null);
-            throw e;
+            if (!first) {
+              resetForRebuild(cliNoNarratives, cliNoValidate);
+            }
+            build(rootDir);
+          } catch (Exception | Error e) {
+            if (BuildFailures.isFatal(e)) {
+              throw e;
+            }
+            // keep watching: the next save may fix it
+            log("Publishing Content Failed: " + e.getMessage());
+            log("");
+            log("Stack Dump (for debugging):");
+            e.printStackTrace();
+            try {
+              session.buildFailed();
+            } catch (IOException e2) {
+              log("Unable to read the watched files after the failure (saving a file without changing it won't build again): " + e2.getMessage());
+            }
           }
         }
-        if (pf.templateLoaded && new File(rootDir).exists()) {
-          FileUtilities.clearDirectory(Utilities.path(rootDir, "template"));
-        }
-        if (pf.folderToDelete != null) {
-          try {
-            FileUtilities.clearDirectory(pf.folderToDelete);
-            new File(pf.folderToDelete).delete();
-          } catch (Throwable e) {
-            // nothing
+        first = false;
+        if (session != null) {
+          if (pf.moduleWrites != null) {
+            // what the module wrote in input is the build's, not a change
+            moduleOutputs.addAll(pf.moduleWrites);
+            session.buildWrote(moduleOutputs);
+          }
+          List<Path> added = session.takeNotMonitored();
+          if (!added.isEmpty()) {
+            // the build loaded its template from a local folder
+            for (Path p : added) {
+              watched.add(FileChangeMonitor.MonitoredPath.recursive(p));
+            }
+            monitor.close();
+            monitor = new FileChangeMonitor(watched);
           }
         }
-      } while (monitor != null && thereIsAFileChange(monitor, buildOutputs(watchRoot), moduleWrites(watchRoot, moduleOutputs)));
+      } while (session != null && waitForChanges(monitor, session, buildOutputs(watchRoot), moduleWrites(watchRoot, moduleOutputs)));
     } finally {
       if (monitor != null) {
         // its thread would keep the JVM running
@@ -255,6 +279,61 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         } catch (IOException e) {
           System.out.println("Unable to close the file monitor: " + e.getMessage());
         }
+      }
+      if (session != null) {
+        PackageListFetcher.forgetFetches();
+      }
+    }
+  }
+
+  /**
+   * Puts back the state that a build changes outside PublisherFields to what a fresh start has, so that a rebuild
+   * in watch mode doesn't see what the previous build did
+   */
+  void resetForRebuild(List<String> cliNoNarratives, List<String> cliNoValidate) {
+    settings.getNoNarratives().clear();
+    settings.getNoNarratives().addAll(cliNoNarratives);
+    settings.getNoValidate().clear();
+    settings.getNoValidate().addAll(cliNoValidate);
+    HierarchicalTableGenerator.ACTIVE_TABLES = false;
+    HierarchicalTableGenerator.uuid = UUIDUtilities.makeUuidLC();
+    ResourceComparer.resetCounter(); // comparison page ids
+  }
+
+  private void build(String rootDir) throws Exception {
+    pf = new PublisherFields();
+    loader.setPf(pf);
+    processor.setPf(pf);
+    generator.setPf(pf);
+    pf.resolver = this;
+    setLogger(this);
+
+    pf.tt = new TimeTracker();
+    loader.initialize();
+    if (pf.validator != null) {
+      pf.validator.setTracker(this);
+    }
+
+    if (pf.isBuildingTemplate) {
+      packageTemplate();
+    } else {
+      log("Load IG");
+      try {
+        createIg();
+      } catch (Exception e) {
+        recordOutcome(e, null);
+        throw e;
+      }
+    }
+    if (pf.templateLoaded && new File(rootDir).exists()) {
+      FileUtilities.clearDirectory(Utilities.path(rootDir, "template"));
+    }
+    if (pf.folderToDelete != null) {
+      try {
+        FileUtilities.clearDirectory(pf.folderToDelete);
+        new File(pf.folderToDelete).delete();
+      } catch (Throwable e) {
+        // nothing
       }
     }
   }
@@ -293,20 +372,47 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         List.of(watchRoot.resolve("input").resolve("fsh")));
   }
 
-  private boolean thereIsAFileChange(FileChangeMonitor monitor, List<Path> buildOutputs, FileChangeMonitor.FolderWrites moduleWrites) throws InterruptedException {
+  /**
+   * Waits until the content of a watched file is different from what the last build started with. Files that were
+   * saved without being changed, and files the build itself wrote, don't count
+   */
+  private boolean waitForChanges(FileChangeMonitor monitor, WatchSession session, List<Path> buildOutputs,
+      FileChangeMonitor.FolderWrites moduleWrites) throws InterruptedException, IOException {
+    // monitoring is started before looking for changes made while the build ran, so that nothing is missed in between
     monitor.startMonitoring(buildOutputs, moduleWrites);
-    System.out.println("Watching for changes (Cascais:Rapido mode)");
-    while (true) {
-      if (monitor.hasChanges()) {
-        monitor.printChanges();
-        monitor.clearChanges();
-        monitor.stopMonitoring();
-        return true;
-      } else if (!monitor.isWatching()) {
-        throw new IllegalStateException("No longer watching for changes (see the error above): run the IG Publisher again");
-      } else {
-        Thread.sleep(100);
+    try {
+      SourceSnapshot.Changes changes = session.changesSinceBuildStart();
+      if (changes.isEmpty()) {
+        System.out.println("Watching for changes (Cascais:Rapido mode)");
       }
+      while (changes.isEmpty()) {
+        if (monitor.hasChanges()) {
+          // wait until the files have been quiet for a moment (an editor or a git checkout often writes several),
+          // but not for ever, in case something keeps writing
+          long giveUp = System.currentTimeMillis() + 5000;
+          do {
+            monitor.clearChanges();
+            Thread.sleep(250);
+          } while (monitor.hasChanges() && System.currentTimeMillis() < giveUp);
+          changes = session.changesSinceBuildStart();
+          if (changes.isEmpty() && session.savedSinceFailure()) {
+            System.out.println("=== File saved after the build failed: building again ===");
+            return true;
+          }
+        } else if (!monitor.isWatching()) {
+          throw new IllegalStateException("No longer watching for changes (see the error above): run the IG Publisher again");
+        } else {
+          Thread.sleep(100);
+        }
+      }
+      System.out.println("=== File Changes Detected ===");
+      System.out.print(changes);
+      return true;
+    } finally {
+      // not watched while building: the files the build writes would be reported for nothing (and on macOS, the
+      // folders would be scanned again and again while the build runs). What changes while the build runs is
+      // found by changesSinceBuildStart() once it has finished
+      monitor.stopMonitoring();
     }
   }
 
@@ -971,10 +1077,11 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     buildTracker.setBooleanProperty("status", "started", true, null);
 
     // first, we load all the direct dependency lists
+    DependencyElementVisitor.Index index = new DependencyElementVisitor.Index(pf.fileList);
     for (FetchedFile f : pf.fileList) {
       if (igf != f) {
         if (f.getDependencies() == null) {
-          loadDependencyList(f, igf);
+          loadDependencyList(f, igf, index);
         }
       }
     }
@@ -1019,26 +1126,49 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       pf.changeList.clear();
       pf.changeList.addAll(pf.fileList);
       buildTracker.setStringProperty("status", "uuid", HierarchicalTableGenerator.uuid, null);
+    } else if (!new RapidoOutputs(pf.vsCache, pf.tempDir).isComplete()) {
+      // a differential build needs what the last build wrote in the temp folder, and the record of it (see RapidoOutputs)
+      log("Rapido Mode: Complete Build (what the last build wrote in the temp folder isn't all there)");
+      pf.changeList.clear();
+      pf.changeList.addAll(pf.fileList);
+      loader.clearTempFolder();
+      buildTracker.setStringProperty("status", "uuid", HierarchicalTableGenerator.uuid, null);
     } else {
       log("Rapido Mode: Differential Build ("+pf.changeList.size()+" files)");
       for (String s : Utilities.sorted(changed)) {
         System.out.println("  "+s);
       }
       HierarchicalTableGenerator.uuid = buildTracker.getStringProperty("status", "uuid");
+      addCopiedFiles();
     }
   }
 
-  private void loadDependencyList(FetchedFile f, FetchedFile igf) {
+  /**
+   * In a differential build, the files that are only copied to the temp folder (pages, includes, images) are copied
+   * again, in file order as in a complete build: the template's scripts copy its own files there on every build, and
+   * an IG file that overrides one of them (an include, say) has to be written after it, or the template's version is used
+   */
+  private void addCopiedFiles() {
+    Set<FetchedFile> changed = new HashSet<>(pf.changeList);
+    pf.changeList.clear();
+    for (FetchedFile f : pf.fileList) {
+      if (changed.contains(f) || (f.getResources().isEmpty() && f.getProcessMode() != FetchedFile.PROCESS_RESOURCE)) {
+        pf.changeList.add(f);
+      }
+    }
+  }
+
+  private void loadDependencyList(FetchedFile f, FetchedFile igf, DependencyElementVisitor.Index index) {
     f.setDependencies(new ArrayList<FetchedFile>());
     f.getDependencies().add(igf); // everything is dependent on the IG
 
     for (FetchedResource r : f.getResources()) {
-      loadDepedencies(f, r, f.getDependencies());
+      loadDepedencies(f, r, f.getDependencies(), index);
     }
   }
 
-  private void loadDepedencies(FetchedFile f, FetchedResource r, List<FetchedFile> dependencies) {
-    ElementVisitor.IElementVisitor depVisitor = new DependencyElementVisitor(pf.fileList, dependencies, f);
+  private void loadDepedencies(FetchedFile f, FetchedResource r, List<FetchedFile> dependencies, DependencyElementVisitor.Index index) {
+    ElementVisitor.IElementVisitor depVisitor = new DependencyElementVisitor(index, dependencies, f);
     new ElementVisitor(depVisitor).visit(r, r.getElement());
   }
 

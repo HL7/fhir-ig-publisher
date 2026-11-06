@@ -349,7 +349,7 @@ public class DependentIGFinder {
     try {
       String canonical = guide.asString("canonical");
       final String secureCanonical = ManagedWebAccess.makeSecureRef(canonical);
-      PackageList pl = PackageList.fromUrl(Utilities.pathURL(secureCanonical, "package-list.json"));
+      PackageList pl = PackageListFetcher.fromUrl(Utilities.pathURL(secureCanonical, "package-list.json"));
 
       DepInfo dep = new DepInfo(pid, Utilities.path(canonical, "history.html"));
       deplist.add(dep);

@@ -1300,6 +1300,7 @@ public class PublisherProcessor extends PublisherBase  {
                       }
                       rr.setMultiLangMode(langs.size() > 1).renderResource(rw);
                       this.pf.otherFilesRun.addAll(lrc.getFiles());
+                      f.getOutputNames().addAll(lrc.getFiles()); // for -rapido (see RapidoOutputs)
                     } else if (r.fhirType().equals("Bundle")) {
                       lrc.setAddName(true);
                       for (org.hl7.fhir.services.elementmodel.Element e : r.getElement().getChildrenByName("entry")) {
