@@ -49,6 +49,28 @@ class RapidoOutputsTest {
     assertEquals(Set.of(p(temp, "en/a.md")), change.getGone());
   }
 
+  /**
+   * A Rapido build takes every file through generation (reusing what it can), so the files generated are all of
+   * them: what an earlier build wrote that no file writes now is still gone, in the folders of the temp folder too
+   */
+  @Test
+  void aBuildOfEveryFileRemovesWhatNoFileWritesNow() throws Exception {
+    String temp = dir.resolve("temp").toString();
+    String cache = dir.resolve("cache").toString();
+    Files.createDirectories(dir.resolve("cache"));
+    FetchedFile patient = file("Patient-p.json", temp, "Patient-p.html", "en/Patient-p.html");
+    FetchedFile other = file("Patient-o.json", temp, "Patient-o.html");
+    new RapidoOutputs(cache, temp).update(List.of(patient, other), List.of(patient, other));
+
+    // the patient's id changed
+    FetchedFile patient2 = file("Patient-p.json", temp, "Patient-q.html", "en/Patient-q.html");
+    FetchedFile other2 = file("Patient-o.json", temp, "Patient-o.html");
+    RapidoOutputs.Change change = new RapidoOutputs(cache, temp).update(List.of(patient2, other2), List.of(patient2, other2));
+
+    assertEquals(Set.of(), change.getKept());
+    assertEquals(Set.of(p(temp, "Patient-p.html"), p(temp, "en/Patient-p.html")), change.getGone());
+  }
+
   @Test
   void aFileRenamedInCaseOnlyIsStillWritten() throws Exception {
     // on macOS and Windows, removing the old name would remove the file just written

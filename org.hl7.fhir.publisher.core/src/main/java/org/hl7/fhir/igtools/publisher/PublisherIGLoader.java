@@ -3,6 +3,7 @@ package org.hl7.fhir.igtools.publisher;
 import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_10_50;
 import org.hl7.fhir.convertors.factory.*;
 import org.hl7.fhir.convertors.txClient.TerminologyClientFactory;
+import org.hl7.fhir.services.client.ITerminologyClientFactoryN;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.openehr.ArchetypeImporter;
 import org.hl7.fhir.igtools.openehr.CKMClient;
@@ -363,7 +364,7 @@ public class PublisherIGLoader extends PublisherBase {
     }
     pf.templateManager.loadTemplateOverrides(ini, pf.rootDir);
     try {
-      pf.template = pf.templateManager.loadTemplate(templateName, pf.rootDir, pf.packageId(), settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD, pf.logOptions.contains("template"), settings.isRapidoMode());
+      pf.template = pf.templateManager.loadTemplate(templateName, pf.rootDir, pf.packageId(), settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD, pf.logOptions.contains("template"), false); // Rapido has to produce every fragment that a full build does
     } catch (Throwable e) {
       if (watchSession != null) {
         // a template that is being worked on, and can't be loaded now: fixing it needs a rebuild
@@ -379,10 +380,6 @@ public class PublisherIGLoader extends PublisherBase {
       // a template that is being worked on: a change to it needs a rebuild
       watchSession.watchTemplateFolders(pf.templateManager.getLocalFolders());
       pf.template.setOutputListener(watchSession.templateOutputs());
-    }
-    if (settings.isRapidoMode() && pf.template.isDevMode()) {
-      // the temp folder is cleared on every run for a template in development, so every rapido build is a complete one (see Publisher.checkDependencies)
-      log("Rapido Mode: the template is in development mode (a local folder), so -rapido has no effect: every build is a complete build");
     }
     if (pf.template.hasExtraTemplates()) {
       processExtraTemplates(pf.template.getExtraTemplates());
@@ -998,7 +995,9 @@ public class PublisherIGLoader extends PublisherBase {
       pf.jekyllTimeout = ini.getLongProperty("IG", "jekyll-timeout") * 1000;
     }
 
-    if (pf.template.isDevMode()) {
+    if (pf.template.isDevMode() && !settings.isRapidoMode()) {
+      // (Rapido hashes the template, and clears the temp folder itself when it changes: clearing it here would throw
+      // away what Rapido reuses, in every build with a local template)
       FileUtilities.clearDirectory(pf.tempDir);
     } else {
       File fTempDir = new File(pf.tempDir);
@@ -1131,10 +1130,10 @@ public class PublisherIGLoader extends PublisherBase {
         pf.txLog = null;
       } else {
         log("Connect to Terminology Server at "+ settings.getTxServer()+(settings.getEcosystem() == null ? " (no ecosystem)" : " (ecosystem: "+settings.getEcosystem()+")"));
-        pf.context.connectToTSServer(new TerminologyClientFactory(pf.version), settings.getTxServer(), "fhir/publisher", pf.txLog, settings.getEcosystem());
+        pf.context.connectToTSServer(txClientFactory(), settings.getTxServer(), "fhir/publisher", pf.txLog, settings.getEcosystem());
       }
     } else {
-      pf.context.connectToTSServer(new TerminologyClientFactory(pf.version), pf.webTxServer.getAddress(), "fhir/publisher", pf.txLog, settings.getEcosystem());
+      pf.context.connectToTSServer(txClientFactory(), pf.webTxServer.getAddress(), "fhir/publisher", pf.txLog, settings.getEcosystem());
     }
     if (expParams != null) {
       /* This call to uncheckedPath is allowed here because the path is used to
@@ -1665,6 +1664,16 @@ public class PublisherIGLoader extends PublisherBase {
       }
     }
     return sp;
+  }
+
+  private ITerminologyClientFactoryN txClientFactory() {
+    ITerminologyClientFactoryN res = new TerminologyClientFactory(pf.version);
+    if (settings.isRapidoMode()) {
+      // a call that got no answer from the server means the next build can't reuse this one
+      pf.txFailures = new RapidoTracker.TxFailures(res);
+      res = pf.txFailures;
+    }
+    return res;
   }
 
   private Parameters makeExpProfile() {

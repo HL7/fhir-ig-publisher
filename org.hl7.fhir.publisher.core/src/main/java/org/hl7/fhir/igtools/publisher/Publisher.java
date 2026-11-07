@@ -64,7 +64,6 @@ import org.hl7.fhir.igtools.web.*;
 import org.hl7.fhir.services.comparison.ResourceComparer;
 import org.hl7.fhir.services.context.*;
 import org.hl7.fhir.services.elementmodel.Element;
-import org.hl7.fhir.services.elementmodel.ElementVisitor;
 import org.hl7.fhir.model.utilities.formats.FhirFormat;
 import org.hl7.fhir.model.extensions.*;
 import org.hl7.fhir.model.core.*;
@@ -73,7 +72,6 @@ import org.hl7.fhir.model.core.Enumerations.CodeSystemContentMode;
 import org.hl7.fhir.model.core.ImplementationGuide.ImplementationGuideDefinitionResourceComponent;
 import org.hl7.fhir.model.core.ImplementationGuide.ImplementationGuideGlobalComponent;
 import org.hl7.fhir.model.core.Parameters.ParametersParameterComponent;
-import org.hl7.fhir.model.core.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.services.renderers.utils.RenderingContext;
 import org.hl7.fhir.services.renderers.utils.RenderingContext.IResourceLinkResolver;
 import org.hl7.fhir.services.renderers.utils.Resolver.IReferenceResolver;
@@ -611,6 +609,9 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       log("Generating QA");
       log("Validation output in "+val.generate(pf.sourceIg.getName(), pf.errors, pf.fileList, Utilities.path(settings.getDestDir() != null ? settings.getDestDir() : pf.outputDir, "qa.html"), pf.suppressedMessages, pinSummary()));
       recordOutcome(null, val);
+      if (pf.rapido != null) {
+        pf.rapido.save();
+      }
       buildTracker.setBooleanProperty("status", "complete", true, null);
       buildTracker.save();
       log("Finished @ "+nowString()+". Max Memory Used = "+Utilities.describeSize(pf.maxMemory)+logSummary());
@@ -1067,145 +1068,27 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     }
     pf.hasCheckedDependencies = true;
 
+    String failure = null;
     if (buildTracker.getBooleanProperty("status", "started") && !buildTracker.getBooleanProperty("status", "complete")) {
-      log("Rapido Mode: Complete Build after failure");
-      pf.changeList.addAll(pf.fileList);
-      loader.clearTempFolder();
-      return;
+      failure = "after failure";
     }
     buildTracker.setBooleanProperty("status", "complete", false, null);
     buildTracker.setBooleanProperty("status", "started", true, null);
-
-    // first, we load all the direct dependency lists
-    DependencyElementVisitor.Index index = new DependencyElementVisitor.Index(pf.fileList);
-    for (FetchedFile f : pf.fileList) {
-      if (igf != f) {
-        if (f.getDependencies() == null) {
-          loadDependencyList(f, igf, index);
-        }
-      }
-    }
-
-    for (FetchedFile f : pf.fileList) {
-      f.calculateHash();
-    }
-
-    Set<String> changed = new HashSet<>();
-    for (FetchedFile f : pf.fileList) {
-      String hNow = Long.toString(f.getHash());
-      String hThen = buildTracker.getStringProperty("source", f.getLoadPath());
-      if (!hNow.equals(hThen)) {
-       changed.add(f.getLoadPath());
-       buildTracker.setStringProperty("source", f.getLoadPath(), hNow, null);
-      }
-    }
-    for (FetchedFile f : pf.fileList) {
-      String hNow = Long.toString(f.getCalcHash());
-      String hThen = buildTracker.getStringProperty("tracked", f.getLoadPath());
-      if (!hNow.equals(hThen)) {
-        pf.changeList.add(f);
-        buildTracker.setStringProperty("tracked", f.getLoadPath(), hNow, null);
-      }
-    }
     buildTracker.save();
 
-
-    if (pf.changeList.isEmpty()) {
-      log("Rapido Mode: Complete Build (no changes)");
-      pf.changeList.addAll(pf.fileList);
+    pf.rapido = new RapidoTracker(pf);
+    pf.rapido.analyse(igf, failure);
+    if (pf.rapido.isCompleteBuild()) {
+      log("Rapido Mode: Complete Build ("+pf.rapido.getReason()+")");
       loader.clearTempFolder();
-      buildTracker.setStringProperty("status", "uuid", HierarchicalTableGenerator.uuid, null);
-    } else if (pf.changeList.size() == pf.fileList.size()) {
-      log("Rapido Mode: Complete Build (all files)");
-      loader.clearTempFolder();
-      buildTracker.setStringProperty("status", "uuid", HierarchicalTableGenerator.uuid, null);
-    } else if (pf.template.isDevMode()) {
-      // the temp folder has already been cleared for a template in development (see PublisherIGLoader), so a
-      // differential build would leave out the pages of the files that haven't changed
-      log("Rapido Mode: Complete Build (template in development mode)");
-      pf.changeList.clear();
-      pf.changeList.addAll(pf.fileList);
-      buildTracker.setStringProperty("status", "uuid", HierarchicalTableGenerator.uuid, null);
-    } else if (!new RapidoOutputs(pf.vsCache, pf.tempDir).isComplete()) {
-      // a differential build needs what the last build wrote in the temp folder, and the record of it (see RapidoOutputs)
-      log("Rapido Mode: Complete Build (what the last build wrote in the temp folder isn't all there)");
-      pf.changeList.clear();
-      pf.changeList.addAll(pf.fileList);
-      loader.clearTempFolder();
-      buildTracker.setStringProperty("status", "uuid", HierarchicalTableGenerator.uuid, null);
+      pf.rapido.setUuid(HierarchicalTableGenerator.uuid);
     } else {
-      log("Rapido Mode: Differential Build ("+pf.changeList.size()+" files)");
-      for (String s : Utilities.sorted(changed)) {
+      log("Rapido Mode: Differential Build ("+pf.rapido.countRenderDirty()+" of "+pf.fileList.size()+" files to render, "+pf.rapido.countValidationDirty()+" to validate)");
+      for (String s : pf.rapido.listRenderDirty()) {
         System.out.println("  "+s);
       }
-      HierarchicalTableGenerator.uuid = buildTracker.getStringProperty("status", "uuid");
-      addCopiedFiles();
+      HierarchicalTableGenerator.uuid = pf.rapido.getUuid();
     }
-  }
-
-  /**
-   * In a differential build, the files that are only copied to the temp folder (pages, includes, images) are copied
-   * again, in file order as in a complete build: the template's scripts copy its own files there on every build, and
-   * an IG file that overrides one of them (an include, say) has to be written after it, or the template's version is used
-   */
-  private void addCopiedFiles() {
-    Set<FetchedFile> changed = new HashSet<>(pf.changeList);
-    pf.changeList.clear();
-    for (FetchedFile f : pf.fileList) {
-      if (changed.contains(f) || (f.getResources().isEmpty() && f.getProcessMode() != FetchedFile.PROCESS_RESOURCE)) {
-        pf.changeList.add(f);
-      }
-    }
-  }
-
-  private void loadDependencyList(FetchedFile f, FetchedFile igf, DependencyElementVisitor.Index index) {
-    f.setDependencies(new ArrayList<FetchedFile>());
-    f.getDependencies().add(igf); // everything is dependent on the IG
-
-    for (FetchedResource r : f.getResources()) {
-      loadDepedencies(f, r, f.getDependencies(), index);
-    }
-  }
-
-  private void loadDepedencies(FetchedFile f, FetchedResource r, List<FetchedFile> dependencies, DependencyElementVisitor.Index index) {
-    ElementVisitor.IElementVisitor depVisitor = new DependencyElementVisitor(index, dependencies, f);
-    new ElementVisitor(depVisitor).visit(r, r.getElement());
-  }
-
-  private void loadValueSetDependencies(FetchedFile f, FetchedResource r) {
-    ValueSet vs = (ValueSet) r.getResource();
-    for (ConceptSetComponent cc : vs.getCompose().getIncludeList()) {
-      for (UriType vsi : cc.getValueSetList()) {
-        FetchedFile fi = getFileForUri(vsi.getValue());
-        if (fi != null)
-          f.getDependencies().add(fi);
-      }
-    }
-    for (ConceptSetComponent cc : vs.getCompose().getExcludeList()) {
-      for (UriType vsi : cc.getValueSetList()) {
-        FetchedFile fi = getFileForUri(vsi.getValue());
-        if (fi != null)
-          f.getDependencies().add(fi);
-      }
-    }
-    for (ConceptSetComponent vsc : vs.getCompose().getIncludeList()) {
-      FetchedFile fi = getFileForUri(vsc.getSystem());
-      if (fi != null)
-        f.getDependencies().add(fi);
-    }
-    for (ConceptSetComponent vsc : vs.getCompose().getExcludeList()) {
-      FetchedFile fi = getFileForUri(vsc.getSystem());
-      if (fi != null)
-        f.getDependencies().add(fi);
-    }
-  }
-
-
-  private void loadProfileDependencies(FetchedFile f, FetchedResource r) {
-    StructureDefinition sd = (StructureDefinition) r.getResource();
-    FetchedFile fi = getFileForUri(sd.getBaseDefinition());
-    if (fi != null)
-      f.getDependencies().add(fi);
   }
 
   private boolean bool(JsonObject obj, String name) throws Exception {
