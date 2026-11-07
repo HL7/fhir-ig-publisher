@@ -225,13 +225,16 @@ class PageRebuildTest {
     state.beforeJekyll();
     // what Jekyll and the rest of the build leave in the temp folder
     write("temp/full-ig.zip", "zip");
+    write("temp/_site-extra/a/b", "extra");
     write("temp/.jekyll-cache/a/b", "cache");
     // the changed page, written again
     write("temp/index.md", "# Home, edited");
     Files.setLastModifiedTime(dir.resolve("temp/index.md"), FileTime.fromMillis(System.currentTimeMillis() + 5000));
     state.prepareTemp(Collections.singletonList(dir.resolve("temp/index.md").toString()));
     assertFalse(Files.exists(dir.resolve("temp/full-ig.zip")));
-    assertFalse(Files.exists(dir.resolve("temp/.jekyll-cache")));
+    assertFalse(Files.exists(dir.resolve("temp/_site-extra")));
+    // Jekyll's cache is Jekyll's to check
+    assertEquals("cache", read("temp/.jekyll-cache/a/b"));
     assertEquals("# Home, edited", read("temp/index.md"));
     assertEquals("<x/>", read("temp/_includes/x.xml"));
   }
@@ -259,6 +262,19 @@ class PageRebuildTest {
     state.prepareTemp(Collections.emptyList());
     assertEquals("{\"files\":{}}", read("temp/_rapido/state.json"));
     assertEquals("x", read("temp/_rapido/claimed.txt"));
+  }
+
+  @Test
+  void prepareTempLeavesJekyllsCacheAlone() throws IOException {
+    // left by the last watch session: Jekyll rewrites part of it when it runs, and adds to it
+    write("temp/.jekyll-cache/Jekyll/Cache/Jekyll--Cache/b7/config", "old");
+    state.beforeJekyll();
+    write("temp/.jekyll-cache/Jekyll/Cache/Jekyll--Cache/b7/config", "new config");
+    Files.setLastModifiedTime(dir.resolve("temp/.jekyll-cache/Jekyll/Cache/Jekyll--Cache/b7/config"), FileTime.fromMillis(System.currentTimeMillis() + 5000));
+    write("temp/.jekyll-cache/Jekyll/Cache/Jekyll--Converters--Markdown/1a/page", "<p>x</p>");
+    state.prepareTemp(Collections.emptyList());
+    assertEquals("new config", read("temp/.jekyll-cache/Jekyll/Cache/Jekyll--Cache/b7/config"));
+    assertEquals("<p>x</p>", read("temp/.jekyll-cache/Jekyll/Cache/Jekyll--Converters--Markdown/1a/page"));
   }
 
   @Test
