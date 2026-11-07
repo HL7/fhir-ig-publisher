@@ -52,7 +52,11 @@ module IgJekyllDriver
   LIQUID_MARKUP = %r{\{\{.*?\}\}|\{%.*?%\}}m.freeze
   QUOTED = %r{"[^"{}%]*"|'[^'{}%]*'}.freeze
   RISKY_MARKUP = %r{(?<![\w.])(?<!\w-)site(?!\w|-\w)(?!\s*\.\s*data(?!\w|-\w))(?!\s*=(?!=))|\A\{%-?\s*(?:increment|decrement)\b}.freeze
-  QUICK_CHECK = %r{\bsite\b|increment|decrement}.freeze
+  # RISKY_MARKUP's two parts anywhere in a text: they find all that RISKY_MARKUP finds in the text's markup (taking out
+  # a quoted string leaves quotes next to what was next to it), so only the few texts they find in need their markup
+  # looked at. (Apart, the regex engine finds each one by its fixed text, which is much quicker)
+  SITE_ANYWHERE = %r{(?<![\w.])(?<!\w-)site(?!\w|-\w)(?!\s*\.\s*data(?!\w|-\w))(?!\s*=(?!=))}.freeze
+  COUNTER_ANYWHERE = %r{\{%-?\s*(?:increment|decrement)\b}.freeze
 
   class << self
     # page source path => the files it read while it was rendered (includes)
@@ -80,7 +84,7 @@ module IgJekyllDriver
 
     def scan(name, content)
       s = content.to_s
-      return unless QUICK_CHECK.match?(s)
+      return unless (s.include?("site") && SITE_ANYWHERE.match?(s)) || (s.include?("crement") && COUNTER_ANYWHERE.match?(s))
 
       s.scan(LIQUID_MARKUP) do |m|
         if risky?(m)
