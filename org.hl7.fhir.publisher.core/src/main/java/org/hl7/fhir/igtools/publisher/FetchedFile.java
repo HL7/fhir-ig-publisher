@@ -29,8 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import lombok.Getter;
-import lombok.Setter;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 
@@ -91,10 +89,8 @@ public class FetchedFile {
   private byte[] source;
   private long size;
   private long hash;
-  @Getter @Setter private long calcHash;
   private long time;
   private String contentType;
-  private List<FetchedFile> dependencies;
   private List<FetchedResource> resources = new ArrayList<FetchedResource>();
   private List<ValidationMessage> errors = new ArrayList<ValidationMessage>();
   private FetchedResource bundle;
@@ -191,12 +187,6 @@ public class FetchedFile {
     this.contentType = contentType;
   }
  
-  public List<FetchedFile> getDependencies() {
-    return dependencies;
-  }
-  public void setDependencies(List<FetchedFile> dependencies) {
-    this.dependencies = dependencies;
-  }
   public long getHash() {
     return hash;
   }
@@ -207,6 +197,9 @@ public class FetchedFile {
     if (source == null)
       throw new Error("Source has been dropped");
     return source;
+  }
+  public boolean hasSource() {
+    return source != null;
   }
   public void setSource(byte[] source) {
     this.source = source;
@@ -404,44 +397,6 @@ public class FetchedFile {
     } else {
       return false;
     }
-  }
-
-
-  public void calculateHash() {
-    if (calcHash == 0) {
-      long result = hash;
-      if (dependencies != null) {
-        for (FetchedFile f : dependencies) {
-          result = 37 * result + f.calculateHash(addToSet( null, this));
-        }
-      }
-      calcHash = result;
-    }
-  }
-
-  private long calculateHash(Set<FetchedFile> trail) {
-    if (trail.contains(this)) {
-      return 0;
-    }
-    if (calcHash == 0) {
-      long result = hash;
-      if (dependencies != null) {
-        for (FetchedFile f : dependencies) {
-          result = 37 * result + f.calculateHash(addToSet(trail, this));
-        }
-      }
-      calcHash = result;
-    }
-    return calcHash;
-  }
-
-  private Set<FetchedFile> addToSet(Set<FetchedFile> trail, FetchedFile focus) {
-    Set<FetchedFile> result = new HashSet<>();
-    if (trail != null) {
-      result.addAll(trail);
-    }
-    result.add(focus);
-    return result;
   }
 
 }

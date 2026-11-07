@@ -1,0 +1,29 @@
+{
+  "resourceType": "StructureDefinition",
+  "id": "qa-humanname",
+  "url": "http://example.org/fhir/rapido-qa/StructureDefinition/qa-humanname",
+  "version": "0.1.0",
+  "name": "QAHumanName",
+  "title": "QAHumanName",
+  "status": "active",
+  "description": "A data type profile that an example uses.",
+  "fhirVersion": "5.0.0",
+  "kind": "complex-type",
+  "abstract": false,
+  "type": "HumanName",
+  "baseDefinition": "http://hl7.org/fhir/StructureDefinition/HumanName",
+  "derivation": "constraint",
+  "differential": {
+    "element": [
+      {
+        "id": "HumanName",
+        "path": "HumanName"
+      },
+      {
+        "id": "HumanName.family",
+        "path": "HumanName.family",
+        "min": 1
+      }
+    ]
+  }
+}
