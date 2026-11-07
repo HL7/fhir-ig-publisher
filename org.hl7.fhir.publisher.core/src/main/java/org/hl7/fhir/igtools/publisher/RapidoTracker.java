@@ -1183,7 +1183,11 @@ public class RapidoTracker {
       return signposts != null && signposts.size() == 0;
     }
     Map<Element, List<ValidationMessage>> found = new LinkedHashMap<>();
-    for (JsonObject o : signposts.asJsonObjects()) {
+    for (JsonElement je : signposts.getItems()) {
+      if (!(je instanceof JsonObject)) {
+        return false;
+      }
+      JsonObject o = (JsonObject) je;
       Element e = root;
       String at = o.asString("at");
       if (at == null) {

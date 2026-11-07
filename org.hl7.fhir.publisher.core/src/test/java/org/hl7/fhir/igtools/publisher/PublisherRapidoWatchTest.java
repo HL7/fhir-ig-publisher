@@ -5,7 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Field;
@@ -17,6 +20,7 @@ import java.util.HashSet;
 import java.util.List;
 
 import org.hl7.fhir.igtools.templates.Template;
+import org.hl7.fhir.model.core.StructureDefinition;
 import org.hl7.fhir.services.elementmodel.Element;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.NamedItemList;
@@ -179,18 +183,40 @@ class PublisherRapidoWatchTest {
   @Test
   void aValidationWhoseSignpostsCantComeBackIsDoneAgain() throws Exception {
     PublisherFields pf = build("a");
-    validateB(pf);
+    FetchedFile profile = profile(pf);
+    validateB(pf, PROFILE);
+    pf.fileList.remove(profile);
     finish(pf);
 
     pf = build("a2");
+    profile = profile(pf);
     validator(pf);
     FetchedResource b = withRealElement(file(pf, "Patient-b.json"));
     b.getElement().getChildList().clear();
     assertNull(pf.rapido.reuseValidation(file(pf, "Patient-b.json"), b));
+    // and nothing it would have done is done, as validating it again does that
+    assertTrue(b.getFoundProfiles().isEmpty());
+    verify(profile.getResources().get(0), never()).addFoundExample(any());
+  }
+
+  private static final String PROFILE = "http://example.org/ig/StructureDefinition/p";
+
+  /** a profile in the IG, which Patient/b is found to conform to when it's validated */
+  private FetchedFile profile(PublisherFields pf) {
+    FetchedResource r = mock(FetchedResource.class);
+    when(r.getResource()).thenReturn(new StructureDefinition().setUrl(PROFILE));
+    FetchedFile f = file("StructureDefinition-p.json", "p", r);
+    pf.fileList.add(f);
+    return f;
   }
 
   /** validates Patient/b as the processor does: its name element gets a signpost, which is also reported */
   private ValidationMessage validateB(PublisherFields pf) throws Exception {
+    return validateB(pf, null);
+  }
+
+  /** ... and is found to conform to the profile, if one is given */
+  private ValidationMessage validateB(PublisherFields pf, String profile) throws Exception {
     validator(pf);
     FetchedFile f = file(pf, "Patient-b.json");
     FetchedResource b = withRealElement(f);
@@ -199,6 +225,9 @@ class PublisherRapidoWatchTest {
         "Validate resource against profile http://x/p", IssueSeverity.INFORMATION);
     sp.setSignpost(true);
     b.getElement().getChildList().get(0).addMessage(sp);
+    if (profile != null) {
+      b.getFoundProfiles().add(profile);
+    }
     pf.rapido.recordValidation(f, b, new ArrayList<>(List.of(sp)));
     return sp;
   }

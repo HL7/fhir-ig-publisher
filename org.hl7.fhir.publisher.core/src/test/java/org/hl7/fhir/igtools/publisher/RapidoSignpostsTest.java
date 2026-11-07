@@ -97,8 +97,20 @@ class RapidoSignpostsTest {
     Element c = el("Patient", "Patient", el("id", "Patient.id"), el("name", "Patient.name[0]", el("given", "Patient.name[0].given[0]")));
     assertFalse(RapidoTracker.restoreSignposts(c, rec, restored));
     assertFalse(c.getChildList().get(1).getChildList().get(0).hasMessages());
+    // one comes back and a later one can't: nothing is attached, as the resource is validated again
+    Element e = patient();
+    ValidationMessage onRoot = signpost("Patient", "http://x/p2");
+    e.addMessage(onRoot);
+    e.getChildList().get(1).getChildList().get(0).addMessage(onFamily);
+    JsonArray both = RapidoTracker.recordSignposts(e, List.of(onRoot, onFamily));
+    assertFalse(RapidoTracker.restoreSignposts(b, both, List.of(signpost("Patient", "http://x/p2"), signpost("Patient.name[0].family", "http://x/p1"))));
+    assertFalse(b.hasMessages());
     // the messages aren't the same
     assertFalse(RapidoTracker.restoreSignposts(patient(), rec, List.of()));
+    // a damaged record
+    JsonArray damaged = new JsonArray();
+    damaged.add("x");
+    assertFalse(RapidoTracker.restoreSignposts(patient(), damaged, restored));
     // a record from before signposts were kept
     assertFalse(RapidoTracker.restoreSignposts(patient(), null, restored));
     // nothing to attach
