@@ -266,7 +266,7 @@ class PageRebuildTest {
 
   @Test
   void prepareTempLeavesJekyllsCacheAlone() throws IOException {
-    // left by the last watch session: Jekyll rewrites part of it when it runs, and adds to it
+    // left by the last run of Jekyll: it writes it again when its configuration changed since, and adds to it
     write("temp/.jekyll-cache/Jekyll/Cache/Jekyll--Cache/b7/config", "old");
     state.beforeJekyll();
     write("temp/.jekyll-cache/Jekyll/Cache/Jekyll--Cache/b7/config", "new config");

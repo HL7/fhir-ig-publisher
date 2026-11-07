@@ -754,8 +754,9 @@ public class PageRebuild {
     Set<Path> skip = new HashSet<>();
     skip.add(temp.resolve(RAPIDO_STATE).toAbsolutePath().normalize());
     skip.add(Paths.get(pf.outputDir).toAbsolutePath().normalize());
-    // Jekyll's cache (the temp folder is its source): Jekyll checks what it finds there itself, and rewrites some of it
-    // each time it runs, so it is neither what Jekyll saw nor something to remove
+    // Jekyll's cache (the temp folder is its source): Jekyll checks what it finds there itself, and writes it all again
+    // when its configuration changed since the last run (e.g. a build without -watch, which writes to another folder),
+    // so it is neither what Jekyll saw nor something to remove
     skip.add(temp.resolve(JEKYLL_CACHE).toAbsolutePath().normalize());
     return list(temp, folders, skip);
   }
