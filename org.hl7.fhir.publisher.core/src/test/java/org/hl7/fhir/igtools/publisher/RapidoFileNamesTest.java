@@ -108,6 +108,24 @@ class RapidoFileNamesTest {
     }
   }
 
+  /** nor does one whose name decodes to the name of a file next to it */
+  @Test
+  void aFifoNamedLikeAFileIsntRead(@TempDir Path dir) throws Exception {
+    Path t = dir.resolve("template");
+    Files.createDirectories(t);
+    // a\377 decodes to "a" and U+FFFD under UTF-8, and to "a?" under POSIX
+    assumeTrue(sh(t, "mkfifo p && mv p \"$(printf 'a\\377')\" && printf x > \"$(printf 'a\\357\\277\\275')\" && printf y > 'a?'"), "can't make such names here");
+    assumeTrue(t.toFile().list().length == 3, "the file system changed the names");
+    try {
+      assertTimeoutPreemptively(Duration.ofSeconds(30), () -> {
+        assertEquals(templateHash(t, new boolean[1]), templateHash(t, new boolean[1]));
+        assertEquals(2, RapidoTracker.scanTree(dir.toFile(), Set.of()).size());
+      });
+    } finally {
+      sh(t, "exec 3<>\"$(printf 'a\\377')\""); // lets a stuck open go on
+    }
+  }
+
   private static String templateHash(Path t, boolean[] fshIndex) throws IOException {
     RapidoDependencyAnalyser.Hasher h = new RapidoDependencyAnalyser.Hasher();
     RapidoTracker.hashTree(t.toFile(), h, Set.of(), fshIndex);

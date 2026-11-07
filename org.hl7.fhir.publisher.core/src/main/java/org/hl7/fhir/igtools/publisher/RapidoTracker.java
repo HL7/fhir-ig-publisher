@@ -553,10 +553,19 @@ public class RapidoTracker {
 
   /**
    * whether p is a file to read: on Windows, a file that is a reparse point but not a link (a OneDrive file that is only
-   * online, say) isn't a regular file for java.nio, but is one for java.io and the build. A FIFO or socket is neither
+   * online, say) isn't a regular file for java.nio, but is one for java.io and the build. A FIFO or socket is neither.
+   * java.io is asked only when it names the same file: for a name the JVM can't decode, it names another one
    */
   private static boolean isFile(Path p) {
-    return Files.isRegularFile(p) || (!Files.isDirectory(p) && p.toFile().isFile());
+    if (Files.isRegularFile(p)) {
+      return true;
+    }
+    File f = p.toFile();
+    try {
+      return f.toPath().equals(p) && !Files.isDirectory(p) && f.isFile();
+    } catch (InvalidPathException e) {
+      return false;
+    }
   }
 
   private static String canonical(String s) {
