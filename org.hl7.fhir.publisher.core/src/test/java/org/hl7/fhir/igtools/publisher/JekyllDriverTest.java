@@ -24,6 +24,8 @@ import java.util.stream.Stream;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
@@ -113,6 +115,7 @@ class JekyllDriverTest {
   }
 
   @Test
+  @DisabledOnOs(value = OS.WINDOWS, disabledReason = "the driver isn't used on Windows (see forCommand()), and MSYS's sleep isn't seen there as a process named sleep")
   void stoppingItStopsWhatItStarted() throws Exception {
     // a process that the process started outlives it unless it's stopped too (on Windows, Git's sh.exe is a launcher
     // that starts the real shell); while it runs, it keeps the site's folder in use, and Windows can't delete it
