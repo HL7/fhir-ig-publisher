@@ -136,6 +136,8 @@ public class RapidoTracker {
   private final String buildDate;
   /** the IG's own file */
   private FetchedFile igFile;
+  /** the state the last build saved, or null */
+  private JsonObject lastState;
   /**
    * "Type/id" of the resources loaded from the IG's files: the loader copies the name and description of their
    * definition.resource entries to them (see igSourceForHash)
@@ -174,9 +176,10 @@ public class RapidoTracker {
     }
     fileSetHash = fs.finish();
 
+    JsonObject old = loadState();
+    lastState = old;
     String noAnalysis = analyseDependencies();
 
-    JsonObject old = loadState();
     reason = failure;
     if (reason == null) {
       reason = noAnalysis;
@@ -374,10 +377,24 @@ public class RapidoTracker {
       h.add(o.getRelativePath()).add(Integer.toString(o.getProcessMode())).add(o.getXslt());
     }
     FileNode fn = new FileNode(keys.get(f), h.finish());
-    for (FetchedResource r : f.getResources()) {
-      fn.addResource(resourceNode(f, r));
+    for (int i = 0; i < f.getResources().size(); i++) {
+      ResourceNode n = resourceNode(f, f.getResources().get(i));
+      // the profiles it was found to conform to when it was last validated: not known until it's validated again, and
+      // their example lists show it
+      for (String url : lastFoundProfiles(f, i)) {
+        n.addReference(url);
+      }
+      fn.addResource(n);
     }
     return fn;
+  }
+
+  /** the profileUsages the last build recorded for the file's resource at index i (see recordValidation) */
+  private List<String> lastFoundProfiles(FetchedFile f, int i) {
+    JsonObject of = lastState == null || !lastState.hasObject("files") ? null : lastState.getJsonObject("files").getJsonObject(keys.get(f));
+    JsonObject v = of == null || !of.hasObject("validation") ? null : of.getJsonObject("validation");
+    JsonObject rv = v == null || !v.hasObject(Integer.toString(i)) ? null : v.getJsonObject(Integer.toString(i));
+    return rv == null || !rv.hasArray("profileUsages") ? Collections.emptyList() : rv.getJsonArray("profileUsages").asStrings();
   }
 
   /**
@@ -583,18 +600,20 @@ public class RapidoTracker {
     // a template script that gets the IG gets it as [target]-ig-working.json/xml, written by the build from the IG (see
     // Template.scriptOutputs()); what it gives back, [target]-ig-updated.json/xml, is what the build goes on with, so
     // it counts as the IG does
-    Set<String> igCopies = new TreeSet<>();
+    Set<String> igCopies = new HashSet<>();
+    Map<String, File> igUpdated = new TreeMap<>();
     File[] tf = new File(Utilities.path(pf.rootDir, "template")).listFiles();
     for (File f : tf == null ? new File[0] : tf) {
-      if (f.isFile() && IG_COPY.matcher(f.getName()).matches()) {
+      if (f.isFile() && IG_WORKING.matcher(f.getName()).matches()) {
         igCopies.add(canonical(f.getAbsolutePath()));
+      } else if (f.isFile() && IG_UPDATED.matcher(f.getName()).matches()) {
+        igCopies.add(canonical(f.getAbsolutePath()));
+        igUpdated.put(f.getName(), f);
       }
     }
     hashTree(new File(Utilities.path(pf.rootDir, "template")), tmpl, igCopies, templateUsesFshIndex);
-    for (String f : igCopies) {
-      if (IG_UPDATED.matcher(new File(f).getName()).matches()) {
-        tmpl.add(f).add(igSourceForHash(read(new File(f)), loaded));
-      }
+    for (File f : igUpdated.values()) {
+      tmpl.add(f.getAbsolutePath()).add(igSourceForHash(read(f), loaded));
     }
     global.put("template", tmpl.finish());
     if (!templateUsesFshIndex[0]) {
@@ -606,7 +625,8 @@ public class RapidoTracker {
     global.put("other-files", hashOtherFiles(otherFiles));
   }
 
-  private static final Pattern IG_COPY = Pattern.compile(".+-ig-(working|updated)\\..+", Pattern.CASE_INSENSITIVE);
+  /** what the build writes for a script, and what the base template's scripts make of it ([target]-ig-working.1.xml...) */
+  private static final Pattern IG_WORKING = Pattern.compile(".+-ig-working(\\.[0-9]+)?\\.(json|xml)", Pattern.CASE_INSENSITIVE);
   private static final Pattern IG_UPDATED = Pattern.compile(".+-ig-updated\\.(json|xml)", Pattern.CASE_INSENSITIVE);
 
   /**

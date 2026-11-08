@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.File;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -17,6 +18,7 @@ import org.hl7.fhir.igtools.templates.Template;
 import org.hl7.fhir.services.elementmodel.Element;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.NamedItemList;
+import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.logging.ILoggingService;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
@@ -163,18 +165,61 @@ class PublisherRapidoWatchTest {
     ig.aDescription = "The first patient, edited";
     PublisherFields pf = build("a", ig);
 
+    // the profile that Patient/a states lists it among its examples
+    List<String> dirty = List.of("Observation-o.json (something it depends on changed)",
+        "Patient-a.json (the content loaded from it changed: Patient/a)", "StructureDefinition-p.json (something that refers to it changed; render only)",
+        "ig.json (always processed)", "page.md (always processed)");
     assertFalse(pf.rapido.isCompleteBuild(), pf.rapido.getReason());
-    assertEquals(List.of("Observation-o.json (something it depends on changed)",
-        "Patient-a.json (the content loaded from it changed: Patient/a)", "ig.json (always processed)",
-        "page.md (always processed)"), pf.rapido.listRenderDirty());
+    assertEquals(dirty, pf.rapido.listRenderDirty());
+    finish(pf);
+
+    // the description alone
+    ig.aDescription = "The first patient, edited again";
+    pf = build("a", ig);
+    assertFalse(pf.rapido.isCompleteBuild(), pf.rapido.getReason());
+    assertEquals(dirty, pf.rapido.listRenderDirty());
     finish(pf);
 
     // the name the IG gives the file, which a profile's list of examples shows, counts too
     ig.aFileTitle = "Patient A's file";
     pf = build("a", ig);
     assertFalse(pf.rapido.isCompleteBuild(), pf.rapido.getReason());
-    assertTrue(pf.rapido.listRenderDirty().contains("Patient-a.json (the content loaded from it changed: Patient/a)"),
-        pf.rapido.listRenderDirty().toString());
+    assertEquals(dirty, pf.rapido.listRenderDirty());
+  }
+
+  /**
+   * A profile that validation found an example to conform to lists it too, though nothing in the example refers to it:
+   * what the last build found counts as a reference
+   */
+  @Test
+  void aProfileAnExampleWasFoundToConformToIsRenderedAgain() throws Exception {
+    finish(build("a", new Ig()));
+    // as recordValidation records it for Patient/b
+    File state = dir.resolve("temp").resolve("_rapido").resolve("state.json").toFile();
+    JsonObject json = RapidoTracker.readState(state);
+    JsonObject rv = json.getJsonObject("files").getJsonObject("Patient-b.json").forceObject("validation").forceObject("0");
+    rv.forceArray("profileUsages").add(P_URL);
+    RapidoTracker.writeState(json, state);
+
+    Ig ig = new Ig();
+    ig.bName = "Patient B, renamed";
+    PublisherFields pf = build("a", ig);
+    assertFalse(pf.rapido.isCompleteBuild(), pf.rapido.getReason());
+    assertEquals(List.of("Patient-b.json (the content loaded from it changed: Patient/b)",
+        "StructureDefinition-p.json (something that refers to it changed; render only)", "ig.json (always processed)",
+        "page.md (always processed)"), pf.rapido.listRenderDirty());
+  }
+
+  /** Without an ig.ini, the loader doesn't copy the entries' names and descriptions to the resources: they count */
+  @Test
+  void withoutAnIgIniAnIgEntrysNameIsACompleteBuild() throws Exception {
+    Ig ig = new Ig();
+    ig.igMode = false;
+    finish(build("a", ig));
+    ig.aName = "Patient A, renamed";
+    PublisherFields pf = build("a", ig);
+    assertTrue(pf.rapido.isCompleteBuild());
+    assertEquals("changed: ig", pf.rapido.getReason());
   }
 
   /** Anything else in the IG still makes the build a complete one */
@@ -226,10 +271,43 @@ class PublisherRapidoWatchTest {
     pf = build("a", ig, changed);
     assertTrue(pf.rapido.isCompleteBuild());
     assertEquals("changed: template", pf.rapido.getReason());
+    finish(pf);
+
+    // a file of the template's own whose name only looks like one counts as it is
+    Files.writeString(dir.resolve("template").resolve("notes-ig-working.txt"), "one");
+    finish(build("a", ig, changed));
+    Files.writeString(dir.resolve("template").resolve("notes-ig-working.txt"), "two");
+    pf = build("a", ig, changed);
+    assertTrue(pf.rapido.isCompleteBuild());
+    assertEquals("changed: template", pf.rapido.getReason());
   }
 
-  /** The IG of a build: Patient/a's entry has the name and description given, and an entry for a resource not loaded */
+  /** what a template script gives back counts through a link too */
+  @Test
+  void theIgATemplateScriptGivesBackThroughALinkCounts() throws Exception {
+    Ig ig = new Ig();
+    Path template = Files.createDirectories(dir.resolve("template"));
+    Files.writeString(template.resolve("given.json"), ig.json());
+    Files.createSymbolicLink(template.resolve("onLoad-ig-updated.json"), template.resolve("given.json"));
+    finish(build("a", ig));
+
+    Ig changed = new Ig();
+    changed.status = "active";
+    Files.writeString(template.resolve("given.json"), changed.json());
+    PublisherFields pf = build("a", ig);
+    assertTrue(pf.rapido.isCompleteBuild());
+    assertEquals("changed: template", pf.rapido.getReason());
+  }
+
+  private static final String P_URL = "http://example.org/ig/StructureDefinition/p";
+
+  /**
+   * The IG of a build: Patient/a's entry has the name and description given, Patient/a states profile p, and an entry
+   * for a resource not loaded
+   */
   private static class Ig {
+    boolean igMode = true;
+    String bName = "Patient B";
     String aName = "Patient A";
     String aDescription = "The first patient";
     String aFileTitle = null;
@@ -244,7 +322,8 @@ class PublisherRapidoWatchTest {
           + "{\"reference\":{\"reference\":\"Patient/a\"},\"name\":\""+aName+"\","
           + (aNameExtension ? "\"_name\":{\"extension\":[{\"url\":\"http://example.org/x\",\"valueString\":\"x\"}]}," : "")
           + "\"description\":\""+aDescription+"\"},"
-          + "{\"reference\":{\"reference\":\"Patient/b\"},\"name\":\"Patient B\"},"
+          + "{\"reference\":{\"reference\":\"Patient/b\"},\"name\":\""+bName+"\"},"
+          + "{\"reference\":{\"reference\":\"StructureDefinition/p\"},\"name\":\"Profile P\"},"
           + "{\"reference\":{\"reference\":\"Observation/o\"},\"name\":\"Observation\"},"
           + "{\"reference\":{\"reference\":\"Patient/missing\"},\"name\":\""+missingName+"\"}]}}";
     }
@@ -261,7 +340,8 @@ class PublisherRapidoWatchTest {
       }
       return PublisherRapidoWatchTest.resource("ImplementationGuide", "ig", primitive("status", status), node("definition",
           node("resource", node("reference", primitive("reference", "Patient/a")), name, primitive("description", aDescription)),
-          node("resource", node("reference", primitive("reference", "Patient/b")), primitive("name", "Patient B")),
+          node("resource", node("reference", primitive("reference", "Patient/b")), primitive("name", bName)),
+          node("resource", node("reference", primitive("reference", "StructureDefinition/p")), primitive("name", "Profile P")),
           node("resource", node("reference", primitive("reference", "Observation/o")), primitive("name", "Observation")),
           node("resource", node("reference", primitive("reference", "Patient/missing")), primitive("name", missingName))));
     }
@@ -337,6 +417,7 @@ class PublisherRapidoWatchTest {
       // as the loader copies them from the IG
       when(a.getResourceName()).thenReturn(igContent.aName);
       when(a.getResourceDescription()).thenReturn(igContent.aDescription);
+      when(a.getProfiles(false)).thenReturn(List.of(P_URL));
       if (igContent.inTemplate) {
         Path template = Files.createDirectories(dir.resolve("template"));
         Files.writeString(template.resolve("onLoad-ig-working.json"), igContent.json());
@@ -347,7 +428,11 @@ class PublisherRapidoWatchTest {
     if (igContent != null && igContent.aFileTitle != null) {
       patient.setTitle(igContent.aFileTitle);
     }
-    FetchedFile other = file("Patient-b.json", "b", resource("Patient", "b"));
+    FetchedResource b = resource("Patient", "b");
+    if (igContent != null) {
+      when(b.getResourceName()).thenReturn(igContent.bName);
+    }
+    FetchedFile other = file("Patient-b.json", "b", b);
     FetchedFile observation = file("Observation-o.json", "o", resource("Observation", "o", primitive("Patient/a")));
     FetchedFile page = file("page.md", "# page");
     page.setProcessMode(FetchedFile.PROCESS_NONE);
@@ -363,8 +448,15 @@ class PublisherRapidoWatchTest {
     pf.igpkp = mock(IGKnowledgeProvider.class);
     when(pf.igpkp.getCanonical()).thenReturn("http://example.org/ig");
     pf.template = mock(Template.class);
-    pf.igMode = igContent != null;
+    pf.igMode = igContent != null && igContent.igMode;
     pf.fileList.addAll(List.of(ig, patient, other, observation, page));
+    if (igContent != null) {
+      FetchedResource p = resource("StructureDefinition", "p");
+      Element url = primitive("url", P_URL);
+      when(p.getElement().hasChildren()).thenReturn(true);
+      when(p.getElement().getChildrenByName("url")).thenReturn(List.of(url));
+      pf.fileList.add(pf.fileList.size() - 1, file("StructureDefinition-p.json", "p", p));
+    }
     pf.changeList.addAll(pf.fileList); // as the loader leaves it
     publisher.setPf(pf);
     // as build() does, for a complete build to clear the temp folder
