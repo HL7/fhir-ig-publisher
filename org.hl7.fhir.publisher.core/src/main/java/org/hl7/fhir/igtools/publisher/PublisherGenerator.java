@@ -4684,7 +4684,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       if (update) {
         List<String> changed = new ArrayList<>();
         for (String f : changedTempFiles) {
-          changed.add(Paths.get(temp).relativize(Paths.get(f).toAbsolutePath()).toString());
+          changed.add(JekyllDriver.sitePath(Paths.get(temp).relativize(Paths.get(f).toAbsolutePath())));
         }
         log("Run jekyll: render the pages that depend on " + changed.size() + " changed " + (changed.size() == 1 ? "file" : "files")
             + " (Jekyll kept running, in folder " + pf.tempDir + ")");
@@ -4820,7 +4820,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     Map<String, String> byRelative = new HashMap<>();
     for (String f : files) {
       if (replay == null || !replay.restorePackageOutput(f)) {
-        byRelative.put(Paths.get(out).relativize(Paths.get(f).toAbsolutePath()).toString(), f);
+        byRelative.put(JekyllDriver.sitePath(Paths.get(out).relativize(Paths.get(f).toAbsolutePath())), f);
       }
     }
     if (byRelative.isEmpty()) {

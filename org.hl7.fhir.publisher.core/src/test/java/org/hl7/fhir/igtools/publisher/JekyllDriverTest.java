@@ -14,8 +14,10 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
@@ -103,6 +105,28 @@ class JekyllDriverTest {
         () -> driver.build(dir.toString(), dir.resolve("out").toString(), 20_000, log::add));
     assertTrue(e.getMessage().startsWith("Jekyll's reply can't be read"), e.getMessage());
     assertFalse(driver.isRunningFor(dir.toString(), dir.resolve("out").toString()));
+  }
+
+  @Test
+  void stoppingItStopsWhatItStarted() throws Exception {
+    // a process that the process started outlives it unless it's stopped too (on Windows, Git's sh.exe is a launcher
+    // that starts the real shell); while it runs, it keeps the site's folder in use, and Windows can't delete it
+    Set<Long> before = descendants();
+    driver = fake("sleep 600 & printf '@@ig-jekyll-driver@@ {\"ok\":true,\"full\":true}\\n'");
+    assertTrue(driver.build(dir.toString(), dir.resolve("out").toString(), 20_000, log::add).isOk());
+    List<ProcessHandle> started = new ArrayList<>();
+    ProcessHandle.current().descendants().filter(h -> !before.contains(h.pid())).forEach(started::add);
+    assertTrue(started.size() >= 2, started.toString());
+    driver.stop();
+    for (ProcessHandle h : started) {
+      assertFalse(h.isAlive(), h + " " + h.info());
+    }
+  }
+
+  private static Set<Long> descendants() {
+    Set<Long> res = new HashSet<>();
+    ProcessHandle.current().descendants().forEach(h -> res.add(h.pid()));
+    return res;
   }
 
   @Test

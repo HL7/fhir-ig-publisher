@@ -23,8 +23,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
@@ -304,7 +306,12 @@ public class JekyllDriver {
     return r;
   }
 
-  /** The stamps of the files under this folder, by path relative to it */
+  /** A path relative to the site's source or destination, as Jekyll names it (with '/' on every system) */
+  static String sitePath(Path relative) {
+    return relative.toString().replace(File.separatorChar, '/');
+  }
+
+  /** The stamps of the files under this folder, by path relative to it (see sitePath()) */
   static Map<String, String> stampTree(String folder) throws IOException {
     Map<String, String> res = new HashMap<>();
     Path root = Paths.get(folder);
@@ -314,7 +321,7 @@ public class JekyllDriver {
     Files.walkFileTree(root, new SimpleFileVisitor<Path>() {
       @Override
       public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-        res.put(root.relativize(file).toString(), stamp(file));
+        res.put(sitePath(root.relativize(file)), stamp(file));
         return FileVisitResult.CONTINUE;
       }
     });
@@ -478,6 +485,7 @@ public class JekyllDriver {
       Runtime.getRuntime().addShutdownHook(new Thread(() -> {
         Process running = process;
         if (running != null) {
+          running.descendants().forEach(ProcessHandle::destroyForcibly);
           running.destroyForcibly();
         }
       }, "jekyll-driver-stop"));
@@ -503,27 +511,52 @@ public class JekyllDriver {
     this.destination = destination;
   }
 
-  /** Stops the Jekyll process, if it's running */
+  /**
+   * Stops the Jekyll process, if it's running, and what it started: a process it started would outlive it (e.g. the
+   * real shell that Git's sh.exe launcher starts on Windows), and keep the site's folder in use. Returns once they have
+   * all stopped, or can't be made to
+   */
   public synchronized void stop() {
     if (process != null) {
+      // (taken first: once the process has stopped, what it started is no longer known as its descendants)
+      List<ProcessHandle> all = new ArrayList<>();
+      all.add(process.toHandle());
+      process.descendants().forEach(all::add);
       try {
         stdin.close();
       } catch (IOException e) {
         // it's being stopped anyway
       }
-      process.destroy();
+      for (ProcessHandle h : all) {
+        h.destroy();
+      }
       try {
-        if (!process.waitFor(5, TimeUnit.SECONDS)) {
-          process.destroyForcibly();
+        for (ProcessHandle h : all) {
+          if (!waitFor(h)) {
+            h.destroyForcibly();
+            waitFor(h);
+          }
         }
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
-        process.destroyForcibly();
+        all.forEach(ProcessHandle::destroyForcibly);
       }
       process = null;
       source = null;
       destination = null;
     }
     stamps = null;
+  }
+
+  /** Whether the process has stopped within a few seconds */
+  private static boolean waitFor(ProcessHandle h) throws InterruptedException {
+    try {
+      h.onExit().get(5, TimeUnit.SECONDS);
+      return true;
+    } catch (TimeoutException e) {
+      return false;
+    } catch (ExecutionException e) {
+      return !h.isAlive();
+    }
   }
 }
