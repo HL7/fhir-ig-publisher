@@ -1,6 +1,7 @@
 package org.hl7.fhir.igtools.publisher;
 
 import java.io.BufferedWriter;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -35,7 +36,14 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
+
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
 
 import org.hl7.fhir.igtools.publisher.RapidoDependencyAnalyser.FileNode;
 import org.hl7.fhir.igtools.publisher.RapidoDependencyAnalyser.FileResult;
@@ -68,6 +76,9 @@ import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
+import org.hl7.fhir.utilities.xml.XMLUtil;
+import org.w3c.dom.Document;
+import org.w3c.dom.Node;
 
 /**
  * The state that Rapido keeps between builds, and the decisions made from it.
@@ -123,6 +134,13 @@ public class RapidoTracker {
   private int profilesBefore;
   /** the date the loader puts on canonical resources that have none; it differs every build */
   private final String buildDate;
+  /** the IG's own file */
+  private FetchedFile igFile;
+  /**
+   * "Type/id" of the resources loaded from the IG's files: the loader copies the name and description of their
+   * definition.resource entries to them (see igSourceForHash)
+   */
+  private final Set<String> loaded = new HashSet<>();
 
   public RapidoTracker(PublisherFields pf) throws IOException {
     this.pf = pf;
@@ -148,6 +166,7 @@ public class RapidoTracker {
       }
       keys.put(f, key);
     }
+    igFile = igf;
     computeGlobal(igf);
     Hasher fs = new Hasher();
     for (String k : new TreeSet<>(keys.values())) {
@@ -356,7 +375,7 @@ public class RapidoTracker {
     }
     FileNode fn = new FileNode(keys.get(f), h.finish());
     for (FetchedResource r : f.getResources()) {
-      fn.addResource(resourceNode(r));
+      fn.addResource(resourceNode(f, r));
     }
     return fn;
   }
@@ -384,11 +403,22 @@ public class RapidoTracker {
   }
 
   ResourceNode resourceNode(FetchedResource r) {
+    return resourceNode(null, r);
+  }
+
+  ResourceNode resourceNode(FetchedFile f, FetchedResource r) {
     ResourceNode n = new ResourceNode(r.fhirType(), r.getId());
     Element e = r.getElement();
     Hasher h = new Hasher();
     h.add(r.fhirType()).add(r.getId()).add(r.getTitle()).add(r.getResourceName()).add(r.getResourceDescription())
       .add(Boolean.toString(r.isExample())).add(r.getExampleUri()).add(r.getPath()).add(r.getLocalRef());
+    if (f != null) {
+      // the loader gives the file its entry's name, and the profile's example list shows it
+      h.add("file title").add(f.getTitle());
+    }
+    // the IG's entries' names and descriptions are in the hashes of the resources they're copied to (see
+    // igSourceForHash). Left in the IG's hash, they'd change the render hash of every resource the IG lists
+    Set<Element> skip = f != null && f == igFile && e != null ? igEntryText(e) : Collections.emptySet();
     for (String s : r.getProfiles(false)) {
       h.add("profile").add(s);
       n.addReference(s);
@@ -415,13 +445,51 @@ public class RapidoTracker {
           // stamped by the loader because the source has no date: the same input every build, so hash it as such
           h.add("(build date)");
         } else {
-          scan(c, h, n);
+          scan(c, h, n, skip);
         }
       }
       h.add(")");
     }
     n.setContentHash(h.finish());
     return n;
+  }
+
+  /**
+   * The name and description elements of the IG's definition.resource entries for the loaded resources: what the
+   * loader copies to them. Only the values: a name or description with extensions counts as it is
+   */
+  private Set<Element> igEntryText(Element ig) {
+    Set<Element> res = Collections.newSetFromMap(new IdentityHashMap<>());
+    for (Element def : children(ig, "definition")) {
+      for (Element rg : children(def, "resource")) {
+        boolean isLoaded = false;
+        for (Element ref : children(rg, "reference")) {
+          for (Element s : children(ref, "reference")) {
+            isLoaded = isLoaded || loaded.contains(s.getValue());
+          }
+        }
+        if (isLoaded) {
+          for (Element c : rg.getChildList()) {
+            if (("name".equals(c.getName()) || "description".equals(c.getName())) && !c.hasChildren()) {
+              res.add(c);
+            }
+          }
+        }
+      }
+    }
+    return res;
+  }
+
+  private static List<Element> children(Element e, String name) {
+    List<Element> res = new ArrayList<>();
+    if (e.getChildList() != null) {
+      for (Element c : e.getChildList()) {
+        if (name.equals(c.getName())) {
+          res.add(c);
+        }
+      }
+    }
+    return res;
   }
 
   // a canonical resource's url, version, name and title are single primitives; other resources can repeat them (Device.name)
@@ -433,7 +501,10 @@ public class RapidoTracker {
     return l.size() == 1 && l.get(0).isPrimitive() ? l.get(0).getValue() : null;
   }
 
-  private void scan(Element e, Hasher h, ResourceNode n) {
+  private void scan(Element e, Hasher h, ResourceNode n, Set<Element> skip) {
+    if (skip.contains(e)) {
+      h = new Hasher(); // still read for references, but not hashed
+    }
     h.add("(").add(e.getName()).add(e.fhirType());
     if (e.isXhtml()) {
       String x = e.getXhtml() == null ? e.getValue() : new XhtmlComposer(XhtmlComposer.XML).compose(e.getXhtml());
@@ -448,7 +519,7 @@ public class RapidoTracker {
     }
     if (e.hasChildren()) {
       for (Element c : e.getChildList()) {
-        scan(c, h, n);
+        scan(c, h, n, skip);
       }
     }
     h.add(")");
@@ -470,7 +541,15 @@ public class RapidoTracker {
       jar.add(Long.toString(System.nanoTime())); // can't tell what the publisher is, so assume it changed
     }
     global.put("publisher", jar.finish());
-    global.put("ig", new Hasher().add(igf.getPath()).add(igf.getSource()).finish());
+    if (pf.igMode) {
+      // only an IG loaded from an ig.ini has its entries' names and descriptions copied to the resources
+      for (FetchedFile f : pf.fileList) {
+        for (FetchedResource r : f.getResources()) {
+          loaded.add(r.fhirType()+"/"+r.getId());
+        }
+      }
+    }
+    global.put("ig", new Hasher().add(igf.getPath()).add(igSourceForHash(igf.getSource(), loaded)).finish());
     // the loader stamps the build date on canonicals that have none, and pages show it ("Draft as of ..."); FHIRPath
     // today() and now() see it too. A page replayed on a later day would show the day it was first rendered
     global.put("date", buildDay(pf.getExecTime()));
@@ -501,7 +580,22 @@ public class RapidoTracker {
     }
     Hasher tmpl = new Hasher();
     boolean[] templateUsesFshIndex = new boolean[1];
-    hashTree(new File(Utilities.path(pf.rootDir, "template")), tmpl, Collections.emptySet(), templateUsesFshIndex);
+    // a template script that gets the IG gets it as [target]-ig-working.json/xml, written by the build from the IG (see
+    // Template.scriptOutputs()); what it gives back, [target]-ig-updated.json/xml, is what the build goes on with, so
+    // it counts as the IG does
+    Set<String> igCopies = new TreeSet<>();
+    File[] tf = new File(Utilities.path(pf.rootDir, "template")).listFiles();
+    for (File f : tf == null ? new File[0] : tf) {
+      if (f.isFile() && IG_COPY.matcher(f.getName()).matches()) {
+        igCopies.add(canonical(f.getAbsolutePath()));
+      }
+    }
+    hashTree(new File(Utilities.path(pf.rootDir, "template")), tmpl, igCopies, templateUsesFshIndex);
+    for (String f : igCopies) {
+      if (IG_UPDATED.matcher(new File(f).getName()).matches()) {
+        tmpl.add(f).add(igSourceForHash(read(new File(f)), loaded));
+      }
+    }
     global.put("template", tmpl.finish());
     if (!templateUsesFshIndex[0]) {
       // written by sushi on every run, and not read by the publisher or the template
@@ -510,6 +604,99 @@ public class RapidoTracker {
     }
     otherFiles.putAll(scanOtherFiles());
     global.put("other-files", hashOtherFiles(otherFiles));
+  }
+
+  private static final Pattern IG_COPY = Pattern.compile(".+-ig-(working|updated)\\..+", Pattern.CASE_INSENSITIVE);
+  private static final Pattern IG_UPDATED = Pattern.compile(".+-ig-updated\\.(json|xml)", Pattern.CASE_INSENSITIVE);
+
+  /**
+   * The IG's source, as it goes into the global hash. The loader copies the name and description of each
+   * definition.resource entry to the resource it loads for it (FetchedResource.getResourceName() and
+   * getResourceDescription()), and those are in that resource's own hash, so a change to them makes that resource, and
+   * what depends on it, dirty. They're left out here, so that a change to them alone isn't a complete build: SUSHI
+   * copies an instance's Title and Description, and an extension's title, into its entry. Everything else in the IG
+   * (and the entries for anything that wasn't loaded, and a name or description with extensions) still counts; an IG
+   * that can't be read counts as it is.
+   *
+   * @param loaded "type/id" of the resources loaded from the IG's files
+   */
+  static byte[] igSourceForHash(byte[] source, Set<String> loaded) {
+    if (source == null || loaded.isEmpty()) {
+      return source;
+    }
+    int i = 0;
+    while (i < source.length && (Character.isWhitespace(source[i]) || (source[i] & 0xFF) == 0xEF || (source[i] & 0xFF) == 0xBB || (source[i] & 0xFF) == 0xBF)) {
+      i++; // whitespace and a byte order mark
+    }
+    try {
+      if (i < source.length && source[i] == '<') {
+        return igXmlForHash(source, loaded);
+      }
+      JsonObject ig = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(source);
+      if (ig == null || !"ImplementationGuide".equals(ig.asString("resourceType")) || !ig.hasObject("definition")) {
+        return source;
+      }
+      for (JsonObject rg : ig.getJsonObject("definition").forceArray("resource").asJsonObjects()) {
+        JsonObject ref = rg.getJsonObject("reference");
+        if (ref != null && loaded.contains(ref.asString("reference"))) {
+          for (String name : new String[] {"name", "description"}) {
+            if (!rg.has("_"+name)) { // one with extensions stays
+              rg.remove(name);
+            }
+          }
+        }
+      }
+      return org.hl7.fhir.utilities.json.parser.JsonParser.compose(ig, false).getBytes(StandardCharsets.UTF_8);
+    } catch (Exception e) {
+      return source;
+    }
+  }
+
+  private static byte[] igXmlForHash(byte[] source, Set<String> loaded) throws Exception {
+    DocumentBuilderFactory factory = XMLUtil.newXXEProtectedDocumentBuilderFactory();
+    factory.setNamespaceAware(true);
+    javax.xml.parsers.DocumentBuilder builder = factory.newDocumentBuilder();
+    builder.setErrorHandler(new org.xml.sax.helpers.DefaultHandler()); // an IG that can't be read counts as it is, quietly
+    Document doc = builder.parse(new ByteArrayInputStream(source));
+    org.w3c.dom.Element root = doc.getDocumentElement();
+    if (!"ImplementationGuide".equals(root.getLocalName())) {
+      return source;
+    }
+    for (org.w3c.dom.Element def : xmlChildren(root, "definition")) {
+      for (org.w3c.dom.Element rg : xmlChildren(def, "resource")) {
+        boolean isLoaded = false;
+        for (org.w3c.dom.Element ref : xmlChildren(rg, "reference")) {
+          for (org.w3c.dom.Element r : xmlChildren(ref, "reference")) {
+            isLoaded = isLoaded || loaded.contains(r.getAttribute("value"));
+          }
+        }
+        if (isLoaded) {
+          for (String name : new String[] {"name", "description"}) {
+            for (org.w3c.dom.Element c : xmlChildren(rg, name)) {
+              if (xmlChildren(c, null).isEmpty()) { // one with extensions stays
+                rg.removeChild(c);
+              }
+            }
+          }
+        }
+      }
+    }
+    Transformer t = XMLUtil.newXXEProtectedTransformerFactory().newTransformer();
+    t.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
+    ByteArrayOutputStream res = new ByteArrayOutputStream();
+    t.transform(new DOMSource(doc), new StreamResult(res));
+    return res.toByteArray();
+  }
+
+  /** the child elements with the name (any, if null) */
+  private static List<org.w3c.dom.Element> xmlChildren(org.w3c.dom.Element e, String name) {
+    List<org.w3c.dom.Element> res = new ArrayList<>();
+    for (Node n = e.getFirstChild(); n != null; n = n.getNextSibling()) {
+      if (n instanceof org.w3c.dom.Element && (name == null || name.equals(n.getLocalName()))) {
+        res.add((org.w3c.dom.Element) n);
+      }
+    }
+    return res;
   }
 
   /**

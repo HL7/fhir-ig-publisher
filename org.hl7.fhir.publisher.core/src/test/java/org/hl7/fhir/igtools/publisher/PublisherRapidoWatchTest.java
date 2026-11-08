@@ -149,6 +149,124 @@ class PublisherRapidoWatchTest {
     assertEquals(java.util.Set.of(0), pf.rapido.replay(b, RapidoTracker.PHASE_HTML).umlGenerated);
   }
 
+  /**
+   * SUSHI copies an instance's Title and Description into its IG entry. The loader copies the entry's name and
+   * description to the resource, whose own hash has them, so an edit to them alone renders that resource and what
+   * depends on it again (and, as always, the IG, the pages and the summaries that list the entries), not everything
+   */
+  @Test
+  void anIgEntrysNameAndDescriptionAloneAreNotACompleteBuild() throws Exception {
+    finish(build("a", new Ig()));
+
+    Ig ig = new Ig();
+    ig.aName = "Patient A, renamed";
+    ig.aDescription = "The first patient, edited";
+    PublisherFields pf = build("a", ig);
+
+    assertFalse(pf.rapido.isCompleteBuild(), pf.rapido.getReason());
+    assertEquals(List.of("Observation-o.json (something it depends on changed)",
+        "Patient-a.json (the content loaded from it changed: Patient/a)", "ig.json (always processed)",
+        "page.md (always processed)"), pf.rapido.listRenderDirty());
+    finish(pf);
+
+    // the name the IG gives the file, which a profile's list of examples shows, counts too
+    ig.aFileTitle = "Patient A's file";
+    pf = build("a", ig);
+    assertFalse(pf.rapido.isCompleteBuild(), pf.rapido.getReason());
+    assertTrue(pf.rapido.listRenderDirty().contains("Patient-a.json (the content loaded from it changed: Patient/a)"),
+        pf.rapido.listRenderDirty().toString());
+  }
+
+  /** Anything else in the IG still makes the build a complete one */
+  @Test
+  void anyOtherIgChangeIsACompleteBuild() throws Exception {
+    finish(build("a", new Ig()));
+    Ig ig = new Ig();
+    ig.status = "active";
+    PublisherFields pf = build("a", ig);
+    assertTrue(pf.rapido.isCompleteBuild());
+    assertEquals("changed: ig", pf.rapido.getReason());
+
+    // the entry of a resource that isn't loaded: nothing else has its name
+    finish(build("a", new Ig()));
+    ig = new Ig();
+    ig.missingName = "Not loaded, renamed";
+    pf = build("a", ig);
+    assertTrue(pf.rapido.isCompleteBuild());
+    assertEquals("changed: ig", pf.rapido.getReason());
+
+    // a name with extensions (a translation, say) counts as it is
+    finish(build("a", new Ig()));
+    ig = new Ig();
+    ig.aNameExtension = true;
+    pf = build("a", ig);
+    assertTrue(pf.rapido.isCompleteBuild());
+    assertEquals("changed: ig", pf.rapido.getReason());
+  }
+
+  /**
+   * A template script gets the IG as [target]-ig-working.json, written by the build, and gives it back as
+   * [target]-ig-updated.json: the entries' names and descriptions are left out of that one too, the rest counts
+   */
+  @Test
+  void theIgATemplateScriptGivesBackCountsAsTheIgDoes() throws Exception {
+    Ig ig = new Ig();
+    ig.inTemplate = true;
+    finish(build("a", ig));
+
+    ig.aName = "Patient A, renamed";
+    PublisherFields pf = build("a", ig);
+    assertFalse(pf.rapido.isCompleteBuild(), pf.rapido.getReason());
+    finish(pf);
+
+    Ig changed = new Ig();
+    changed.inTemplate = true;
+    changed.aName = ig.aName;
+    changed.status = "active";
+    pf = build("a", ig, changed);
+    assertTrue(pf.rapido.isCompleteBuild());
+    assertEquals("changed: template", pf.rapido.getReason());
+  }
+
+  /** The IG of a build: Patient/a's entry has the name and description given, and an entry for a resource not loaded */
+  private static class Ig {
+    String aName = "Patient A";
+    String aDescription = "The first patient";
+    String aFileTitle = null;
+    boolean aNameExtension = false;
+    String missingName = "Not loaded";
+    String status = "draft";
+    /** also as a template script's onLoad-ig-working.json and onLoad-ig-updated.json */
+    boolean inTemplate = false;
+
+    String json() {
+      return "{\"resourceType\":\"ImplementationGuide\",\"id\":\"ig\",\"status\":\""+status+"\",\"definition\":{\"resource\":["
+          + "{\"reference\":{\"reference\":\"Patient/a\"},\"name\":\""+aName+"\","
+          + (aNameExtension ? "\"_name\":{\"extension\":[{\"url\":\"http://example.org/x\",\"valueString\":\"x\"}]}," : "")
+          + "\"description\":\""+aDescription+"\"},"
+          + "{\"reference\":{\"reference\":\"Patient/b\"},\"name\":\"Patient B\"},"
+          + "{\"reference\":{\"reference\":\"Observation/o\"},\"name\":\"Observation\"},"
+          + "{\"reference\":{\"reference\":\"Patient/missing\"},\"name\":\""+missingName+"\"}]}}";
+    }
+
+    /** the IG as the loader reads it */
+    FetchedResource igResource() {
+      Element name = primitive("name", aName);
+      if (aNameExtension) {
+        Element ext = node("extension", primitive("url", "http://example.org/x"), primitive("valueString", "x"));
+        when(name.hasChildren()).thenReturn(true);
+        NamedItemList<Element> l = new NamedItemList<>();
+        l.add(ext);
+        when(name.getChildList()).thenReturn(l);
+      }
+      return PublisherRapidoWatchTest.resource("ImplementationGuide", "ig", primitive("status", status), node("definition",
+          node("resource", node("reference", primitive("reference", "Patient/a")), name, primitive("description", aDescription)),
+          node("resource", node("reference", primitive("reference", "Patient/b")), primitive("name", "Patient B")),
+          node("resource", node("reference", primitive("reference", "Observation/o")), primitive("name", "Observation")),
+          node("resource", node("reference", primitive("reference", "Patient/missing")), primitive("name", missingName))));
+    }
+  }
+
   private static FetchedFile file(PublisherFields pf, String name) {
     return pf.fileList.stream().filter(f -> f.getLoadPath().equals(name)).findFirst().orElseThrow();
   }
@@ -201,8 +319,34 @@ class PublisherRapidoWatchTest {
 
   /** checkDependencies on new files, as a watch rebuild loads them, with the given content for Patient/a */
   private PublisherFields build(String patientContent) throws Exception {
-    FetchedFile ig = file("ig.json", "{}");
-    FetchedFile patient = file("Patient-a.json", patientContent, resource("Patient", "a", primitive(patientContent)));
+    return build(patientContent, null, null);
+  }
+
+  private PublisherFields build(String patientContent, Ig igContent) throws Exception {
+    return build(patientContent, igContent, igContent);
+  }
+
+  /**
+   * as build(patientContent), with an IG (as ig.ini gives it) that lists the files; updated is what a template script
+   * gives back
+   */
+  private PublisherFields build(String patientContent, Ig igContent, Ig updated) throws Exception {
+    FetchedFile ig = igContent == null ? file("ig.json", "{}") : file("ig.json", igContent.json(), igContent.igResource());
+    FetchedResource a = resource("Patient", "a", primitive(patientContent));
+    if (igContent != null) {
+      // as the loader copies them from the IG
+      when(a.getResourceName()).thenReturn(igContent.aName);
+      when(a.getResourceDescription()).thenReturn(igContent.aDescription);
+      if (igContent.inTemplate) {
+        Path template = Files.createDirectories(dir.resolve("template"));
+        Files.writeString(template.resolve("onLoad-ig-working.json"), igContent.json());
+        Files.writeString(template.resolve("onLoad-ig-updated.json"), updated.json());
+      }
+    }
+    FetchedFile patient = file("Patient-a.json", patientContent, a);
+    if (igContent != null && igContent.aFileTitle != null) {
+      patient.setTitle(igContent.aFileTitle);
+    }
     FetchedFile other = file("Patient-b.json", "b", resource("Patient", "b"));
     FetchedFile observation = file("Observation-o.json", "o", resource("Observation", "o", primitive("Patient/a")));
     FetchedFile page = file("page.md", "# page");
@@ -219,6 +363,7 @@ class PublisherRapidoWatchTest {
     pf.igpkp = mock(IGKnowledgeProvider.class);
     when(pf.igpkp.getCanonical()).thenReturn("http://example.org/ig");
     pf.template = mock(Template.class);
+    pf.igMode = igContent != null;
     pf.fileList.addAll(List.of(ig, patient, other, observation, page));
     pf.changeList.addAll(pf.fileList); // as the loader leaves it
     publisher.setPf(pf);
@@ -255,13 +400,29 @@ class PublisherRapidoWatchTest {
   }
 
   private static Element primitive(String value) {
+    return primitive("value", value);
+  }
+
+  private static Element primitive(String name, String value) {
     Element element = mock(Element.class);
     when(element.isPrimitive()).thenReturn(true);
-    when(element.getName()).thenReturn("value");
+    when(element.getName()).thenReturn(name);
     when(element.fhirType()).thenReturn("string");
     when(element.hasValue()).thenReturn(true);
     when(element.getValue()).thenReturn(value);
     when(element.primitiveValue()).thenReturn(value);
+    when(element.getComments()).thenReturn(new ArrayList<>());
+    return element;
+  }
+
+  private static Element node(String name, Element... children) {
+    Element element = mock(Element.class);
+    NamedItemList<Element> list = new NamedItemList<>();
+    list.addAll(List.of(children));
+    when(element.getName()).thenReturn(name);
+    when(element.fhirType()).thenReturn("BackboneElement");
+    when(element.hasChildren()).thenReturn(true);
+    when(element.getChildList()).thenReturn(list);
     when(element.getComments()).thenReturn(new ArrayList<>());
     return element;
   }
