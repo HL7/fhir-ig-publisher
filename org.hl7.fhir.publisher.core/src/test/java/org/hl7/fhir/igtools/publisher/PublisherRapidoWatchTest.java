@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 
 import org.hl7.fhir.igtools.templates.Template;
@@ -26,6 +27,8 @@ import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator;
+import org.hl7.fhir.validation.BaseValidator;
+import org.hl7.fhir.validation.instance.InstanceValidator;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -292,6 +295,69 @@ class PublisherRapidoWatchTest {
     pf = build("a", new Ig());
     validateB(pf, false);
     assertEquals(pDirty, pf.rapido.listRenderDirty());
+  }
+
+  /**
+   * With a validator: a record whose messages can be saved is reused by the next build, one with a message that can't
+   * be isn't, though what it was found to conform to is kept
+   */
+  @Test
+  void aRecordWithAMessageThatCantBeSavedIsntReused() throws Exception {
+    finish(build("a", new Ig()));
+    ValidationMessage saved = new ValidationMessage(Source.InstanceValidator, IssueType.INVALID, "Patient", "saved", IssueSeverity.ERROR);
+    PublisherFields pf = withValidator(build("a", new Ig()));
+    assertEquals(null, validateB(pf, List.of(saved)));
+    finish(pf);
+    assertTrue(recordOfB().has("statusBefore"));
+
+    pf = withValidator(build("a", new Ig()));
+    List<ValidationMessage> reused = validateB(pf, List.of());
+    assertEquals(1, reused.size());
+    assertEquals("saved", reused.get(0).getMessage());
+    finish(pf);
+
+    ValidationMessage unsaved = new ValidationMessage(Source.InstanceValidator, IssueType.INVALID, "Patient", "unsaved", IssueSeverity.ERROR);
+    List<ValidationMessage> slices = new ArrayList<>();
+    slices.add(null);
+    unsaved.setSliceInfo(slices);
+    Ig renamed = new Ig();
+    renamed.bName = "Patient B, renamed";
+    pf = withValidator(build("a", renamed));
+    assertEquals(null, validateB(pf, List.of(unsaved)));
+    finish(pf);
+    assertFalse(recordOfB().has("statusBefore"));
+    assertEquals("Patient/b", recordOfB().asString("key"));
+
+    pf = withValidator(build("a", renamed));
+    assertEquals(null, validateB(pf, List.of()));
+  }
+
+  /** a validator whose record of the definitions it has mentioned can be read */
+  private static PublisherFields withValidator(PublisherFields pf) throws Exception {
+    pf.validator = mock(InstanceValidator.class);
+    Field fld = BaseValidator.class.getDeclaredField("statusWarnings");
+    fld.setAccessible(true);
+    fld.set(pf.validator, new HashSet<String>());
+    return pf;
+  }
+
+  /**
+   * as the publisher validates Patient/b: the messages from the last build if they're reused, else null, when
+   * validating it gives errs
+   */
+  private static List<ValidationMessage> validateB(PublisherFields pf, List<ValidationMessage> errs) {
+    FetchedFile f = pf.fileList.stream().filter(x -> x.getLoadPath().equals("Patient-b.json")).findFirst().get();
+    FetchedResource b = f.getResources().get(0);
+    when(b.getFoundProfiles()).thenReturn(new ArrayList<>());
+    List<ValidationMessage> reused = pf.rapido.reuseValidation(f, b);
+    if (reused == null) {
+      pf.rapido.recordValidation(f, b, new ArrayList<>(errs));
+    }
+    return reused;
+  }
+
+  private JsonObject recordOfB() throws Exception {
+    return RapidoTracker.readState(state()).getJsonObject("files").getJsonObject("Patient-b.json").getJsonObject("validation").getJsonObject("0");
   }
 
   /** as validating Patient/b does, finding it conforms to profile p or not */
