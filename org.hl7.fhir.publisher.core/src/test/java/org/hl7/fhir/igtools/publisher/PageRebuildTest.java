@@ -208,7 +208,7 @@ class PageRebuildTest {
     page.setProcessMode(FetchedFile.PROCESS_XSLT);
     assertNull(state.pagesFor(changes(() -> write("input/pagecontent/index.md", "# 1")), new ArrayList<>()));
     page.setProcessMode(FetchedFile.PROCESS_NONE);
-    page.addOutput("_includes/index.md", FetchedFile.PROCESS_XSLT, null);
+    page.addOutput("_includes" + java.io.File.separator + "index.md", FetchedFile.PROCESS_XSLT, null);
     assertNull(state.pagesFor(changes(() -> write("input/pagecontent/index.md", "# 2")), new ArrayList<>()));
 
     state.discard();
@@ -580,7 +580,7 @@ class PageRebuildTest {
     write("input/" + loadPath, content);
     FetchedFile f = new FetchedFile("input/" + loadPath, loadPath);
     f.setPath(dir.resolve("input/" + loadPath).toFile().getCanonicalPath());
-    f.setRelativePath("_includes/" + new java.io.File(loadPath).getName());
+    f.setRelativePath("_includes" + java.io.File.separator + new java.io.File(loadPath).getName());
     f.setProcessMode(FetchedFile.PROCESS_NONE);
     pf.altMap.put("pre-page/" + f.getPath(), f);
     pf.fileList.add(f);

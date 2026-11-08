@@ -884,9 +884,9 @@ public class HTMLInspector {
     return null;
   }
 
-  /** A path in the output, relative to it (for the log) */
+  /** A path in the output, relative to it, with '/' as in its URL (for the log, which is then the same on every system) */
   private String relative(String path) {
-    return path.startsWith(rootFolder + File.separator) ? path.substring(rootFolder.length() + 1) : path;
+    return path.startsWith(rootFolder + File.separator) ? path.substring(rootFolder.length() + 1).replace(File.separatorChar, '/') : path;
   }
 
   /** Checks a file, recording what it finds */

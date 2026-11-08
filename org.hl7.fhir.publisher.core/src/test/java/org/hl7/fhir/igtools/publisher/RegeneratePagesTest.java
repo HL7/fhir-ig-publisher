@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -82,7 +83,8 @@ class RegeneratePagesTest {
     gen.setPf(pf);
     page = new FetchedFile("input/pagecontent/index.md", "pagecontent/index.md");
     page.setPath(dir.resolve("input/pagecontent/index.md").toString());
-    page.setRelativePath("_includes/index.md");
+    // as the loader names it (see PublisherIGLoader.loadPage()), with the system's separator
+    page.setRelativePath("_includes" + File.separator + "index.md");
     page.setProcessMode(FetchedFile.PROCESS_NONE);
     // what the build recorded when it wrote the page (uz has no translation, so it's the English page)
     for (String s : outputs()) {
