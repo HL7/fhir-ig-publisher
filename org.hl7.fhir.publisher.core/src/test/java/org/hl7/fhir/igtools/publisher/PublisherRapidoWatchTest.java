@@ -219,7 +219,20 @@ class PublisherRapidoWatchTest {
         pf.rapido.listRenderDirty().toString());
   }
 
-  /** a record at the index that's of another resource (the file's resources were reordered) isn't the resource's */
+  /** after the file's resources are reordered, the record of the resource is still its own */
+  @Test
+  void whatWasFoundIsTheResourcesOwnAfterAReorder() throws Exception {
+    Ig ig = new Ig();
+    ig.twoInB = true;
+    finish(build("a", ig));
+    foundLastTime("0", "Patient/b2");
+    ig.b2Name = "Patient B2, renamed";
+    PublisherFields pf = build("a", ig);
+    assertTrue(pf.rapido.listRenderDirty().contains("StructureDefinition-p.json (something that refers to it changed; render only)"),
+        pf.rapido.listRenderDirty().toString());
+  }
+
+  /** a record at the index that's of another resource isn't the resource's */
   @Test
   void whatWasFoundForAnotherResourceIsntTheResourcesOwn() throws Exception {
     Ig ig = new Ig();
@@ -247,42 +260,60 @@ class PublisherRapidoWatchTest {
 
   /**
    * A profile an example is newly found to conform to has no edge to it from the last build, but lists it now: it's
-   * rendered again once validation finds it. One it was found to conform to last time isn't
+   * rendered again once validation finds it. One it was found to conform to last time isn't, unless it no longer is
    */
   @Test
   void aProfileAnExampleIsNewlyFoundToConformToIsRenderedAgain() throws Exception {
+    List<String> pDirty = List.of("StructureDefinition-p.json (the examples found to conform to it changed; render only)",
+        "ig.json (always processed)", "page.md (always processed)");
+    List<String> none = List.of("ig.json (always processed)", "page.md (always processed)");
     finish(build("a", new Ig()));
     PublisherFields pf = build("a", new Ig());
-    assertEquals(List.of("ig.json (always processed)", "page.md (always processed)"), pf.rapido.listRenderDirty());
-    validateB(pf);
-    assertEquals(List.of("StructureDefinition-p.json (an example was newly found to conform to it; render only)",
-        "ig.json (always processed)", "page.md (always processed)"), pf.rapido.listRenderDirty());
+    assertEquals(none, pf.rapido.listRenderDirty());
+    validateB(pf, true);
+    assertEquals(pDirty, pf.rapido.listRenderDirty());
     finish(pf);
+    // what it was found to conform to is kept, though without a validator the rest can't be
+    JsonObject rv = RapidoTracker.readState(state()).getJsonObject("files").getJsonObject("Patient-b.json").getJsonObject("validation").getJsonObject("0");
+    assertEquals("Patient/b", rv.asString("key"));
+    assertEquals(List.of(P_URL), rv.getJsonArray("profileUsages").asStrings());
+    assertFalse(rv.has("statusBefore"));
 
     // the build after the one that has the edge
-    foundLastTime("0", "Patient/b");
     finish(build("a", new Ig()));
     foundLastTime("0", "Patient/b");
     pf = build("a", new Ig());
-    assertEquals(List.of("ig.json (always processed)", "page.md (always processed)"), pf.rapido.listRenderDirty());
-    validateB(pf);
-    assertEquals(List.of("ig.json (always processed)", "page.md (always processed)"), pf.rapido.listRenderDirty());
+    assertEquals(none, pf.rapido.listRenderDirty());
+    validateB(pf, true);
+    assertEquals(none, pf.rapido.listRenderDirty());
+    finish(pf);
+
+    // no longer found to conform to it
+    pf = build("a", new Ig());
+    validateB(pf, false);
+    assertEquals(pDirty, pf.rapido.listRenderDirty());
   }
 
-  /** as validating Patient/b does, finding it conforms to profile p */
-  private static void validateB(PublisherFields pf) {
+  /** as validating Patient/b does, finding it conforms to profile p or not */
+  private static void validateB(PublisherFields pf, boolean conforms) {
     FetchedFile f = pf.fileList.stream().filter(x -> x.getLoadPath().equals("Patient-b.json")).findFirst().get();
     FetchedResource b = f.getResources().get(0);
     List<String> found = new ArrayList<>();
     when(b.getFoundProfiles()).thenReturn(found);
     pf.rapido.reuseValidation(f, b);
-    found.add(P_URL);
+    if (conforms) {
+      found.add(P_URL);
+    }
     pf.rapido.recordValidation(f, b, new ArrayList<>());
+  }
+
+  private File state() {
+    return dir.resolve("temp").resolve("_rapido").resolve("state.json").toFile();
   }
 
   /** the last build's state, as recordValidation records that the resource (key) at index of Patient-b.json conforms to p */
   private void foundLastTime(String index, String key) throws Exception {
-    File state = dir.resolve("temp").resolve("_rapido").resolve("state.json").toFile();
+    File state = state();
     JsonObject json = RapidoTracker.readState(state);
     JsonObject v = json.getJsonObject("files").getJsonObject("Patient-b.json").forceObject("validation");
     v.remove(index);

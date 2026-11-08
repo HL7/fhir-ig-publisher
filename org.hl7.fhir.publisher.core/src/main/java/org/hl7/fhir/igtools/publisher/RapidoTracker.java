@@ -390,15 +390,24 @@ public class RapidoTracker {
   }
 
   /**
-   * the profileUsages the last build recorded for the file's resource r at index i (see recordValidation). Empty if
-   * there's no record of r: then it's validated again, and recordValidation makes the profiles it's found to conform
-   * to dirty
+   * the profileUsages the last build recorded for the file's resource r, at index i unless the resources were
+   * reordered (see recordValidation). Empty if there's no record of r: then it's validated again, and recordValidation
+   * makes the profiles it's found to conform to dirty
    */
   private List<String> lastFoundProfiles(FetchedFile f, int i, FetchedResource r) {
     JsonObject of = lastState == null || !lastState.hasObject("files") ? null : lastState.getJsonObject("files").getJsonObject(keys.get(f));
     JsonObject v = of == null || !of.hasObject("validation") ? null : of.getJsonObject("validation");
     JsonObject rv = v == null || !v.hasObject(Integer.toString(i)) ? null : v.getJsonObject(Integer.toString(i));
-    if (rv == null || !(r.fhirType()+"/"+r.getId()).equals(rv.asString("key")) || !rv.hasArray("profileUsages")) {
+    String key = r.fhirType()+"/"+r.getId();
+    if ((rv == null || !key.equals(rv.asString("key"))) && v != null) {
+      rv = null; // the file's resources were reordered
+      for (String n : v.getNames()) {
+        if (v.hasObject(n) && key.equals(v.getJsonObject(n).asString("key"))) {
+          rv = v.getJsonObject(n);
+        }
+      }
+    }
+    if (rv == null || !rv.hasArray("profileUsages")) {
       return Collections.emptyList();
     }
     return rv.getJsonArray("profileUsages").asStrings();
@@ -1289,34 +1298,44 @@ public class RapidoTracker {
   /** records the messages from validating a resource, before the publisher adds them to the file */
   public void recordValidation(FetchedFile f, FetchedResource r, List<ValidationMessage> errs) {
     List<String> found = r.getFoundProfiles().subList(Math.min(profilesBefore, r.getFoundProfiles().size()), r.getFoundProfiles().size());
-    if (keys.containsKey(f) && !renderClean.isEmpty()) {
-      // a profile it wasn't found to conform to last time has no edge to it, but its example lists show it now
+    if (!keys.containsKey(f)) {
+      return;
+    }
+    if (!renderClean.isEmpty()) {
+      // the profiles' example lists show it, but the edges to them are the ones it was found to conform to last time
       List<String> last = lastFoundProfiles(f, f.getResources().indexOf(r), r);
       for (String url : found) {
         if (!last.contains(url)) {
           renderProfileAgain(url);
         }
       }
+      for (String url : last) {
+        if (!found.contains(url)) {
+          renderProfileAgain(url);
+        }
+      }
     }
-    Set<String> sw = statusWarnings();
-    if (!keys.containsKey(f) || sw == null || statusBefore == null) {
-      return; // without knowing what the validator had seen, the result can't be reused
-    }
+    // what it was found to conform to is kept for the next build's edges (lastFoundProfiles) even when the rest can't
+    // be: without statusBefore, savedValidation doesn't reuse it
     JsonObject rv = new JsonObject();
     rv.add("key", r.fhirType()+"/"+r.getId());
-    rv.add("statusBefore", statusHash(statusBefore));
+    JsonArray usages = rv.forceArray("profileUsages");
+    for (String url : found) {
+      usages.add(url);
+    }
+    newFile(f).forceObject("validation").set(Integer.toString(f.getResources().indexOf(r)), rv);
+    Set<String> sw = statusWarnings();
+    if (sw == null || statusBefore == null) {
+      return; // without knowing what the validator had seen, the result can't be reused
+    }
+    if (profileSources(pf.fileList, usages) == null) {
+      return;
+    }
     JsonArray added = rv.forceArray("statusAdded");
     for (String s : new TreeSet<>(sw)) {
       if (!statusBefore.contains(s)) {
         added.add(s);
       }
-    }
-    JsonArray usages = rv.forceArray("profileUsages");
-    for (String url : found) {
-      usages.add(url);
-    }
-    if (profileSources(pf.fileList, usages) == null) {
-      return;
     }
     JsonArray msgs = rv.forceArray("messages");
     for (ValidationMessage vm : errs) {
@@ -1326,7 +1345,7 @@ public class RapidoTracker {
       }
       msgs.add(m);
     }
-    newFile(f).forceObject("validation").set(Integer.toString(f.getResources().indexOf(r)), rv);
+    rv.add("statusBefore", statusHash(statusBefore));
   }
 
   /**
@@ -1361,7 +1380,7 @@ public class RapidoTracker {
     for (FetchedFile f : pf.fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.getResource() instanceof StructureDefinition && url.equals(((StructureDefinition) r.getResource()).getUrl()) && renderClean.remove(f)) {
-          why.put(f, "an example was newly found to conform to it");
+          why.put(f, "the examples found to conform to it changed");
         }
       }
     }
