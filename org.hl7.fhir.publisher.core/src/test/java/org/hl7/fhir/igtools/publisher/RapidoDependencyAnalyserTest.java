@@ -446,7 +446,9 @@ class RapidoDependencyAnalyserTest {
 
   @Test
   void igThatCantBeReadCountsAsItIs() {
-    for (String s : new String[] {"<ImplementationGuide", "{\"resourceType\":", "<Patient xmlns=\"http://hl7.org/fhir\"><id value=\"x\"/></Patient>", "{\"resourceType\":\"Patient\"}"}) {
+    for (String s : new String[] {"<ImplementationGuide", "{\"resourceType\":", "<Patient xmlns=\"http://hl7.org/fhir\"><id value=\"x\"/></Patient>", "{\"resourceType\":\"Patient\"}",
+        // an entry that isn't in an array
+        "{\"resourceType\":\"ImplementationGuide\",\"definition\":{\"resource\":{\"reference\":{\"reference\":\"Patient/ex1\"},\"name\":\"x\"}}}"}) {
       byte[] b = s.getBytes(java.nio.charset.StandardCharsets.UTF_8);
       assertTrue(java.util.Arrays.equals(b, RapidoTracker.igSourceForHash(b, Set.of("Patient/ex1"))), s);
     }

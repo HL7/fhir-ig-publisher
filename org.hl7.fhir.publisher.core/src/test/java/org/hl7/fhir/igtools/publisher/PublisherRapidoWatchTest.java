@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.hl7.fhir.igtools.templates.Template;
+import org.hl7.fhir.model.core.StructureDefinition;
 import org.hl7.fhir.services.elementmodel.Element;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.NamedItemList;
@@ -194,12 +195,7 @@ class PublisherRapidoWatchTest {
   @Test
   void aProfileAnExampleWasFoundToConformToIsRenderedAgain() throws Exception {
     finish(build("a", new Ig()));
-    // as recordValidation records it for Patient/b
-    File state = dir.resolve("temp").resolve("_rapido").resolve("state.json").toFile();
-    JsonObject json = RapidoTracker.readState(state);
-    JsonObject rv = json.getJsonObject("files").getJsonObject("Patient-b.json").forceObject("validation").forceObject("0");
-    rv.forceArray("profileUsages").add(P_URL);
-    RapidoTracker.writeState(json, state);
+    foundLastTime("0", "Patient/b");
 
     Ig ig = new Ig();
     ig.bName = "Patient B, renamed";
@@ -208,6 +204,92 @@ class PublisherRapidoWatchTest {
     assertEquals(List.of("Patient-b.json (the content loaded from it changed: Patient/b)",
         "StructureDefinition-p.json (something that refers to it changed; render only)", "ig.json (always processed)",
         "page.md (always processed)"), pf.rapido.listRenderDirty());
+  }
+
+  /** what the last build found for the second resource in a file is its own, and a record of another resource isn't */
+  @Test
+  void whatWasFoundIsTheResourcesOwn() throws Exception {
+    Ig ig = new Ig();
+    ig.twoInB = true;
+    finish(build("a", ig));
+    foundLastTime("1", "Patient/b2");
+    ig.b2Name = "Patient B2, renamed";
+    PublisherFields pf = build("a", ig);
+    assertTrue(pf.rapido.listRenderDirty().contains("StructureDefinition-p.json (something that refers to it changed; render only)"),
+        pf.rapido.listRenderDirty().toString());
+  }
+
+  /** a record at the index that's of another resource (the file's resources were reordered) isn't the resource's */
+  @Test
+  void whatWasFoundForAnotherResourceIsntTheResourcesOwn() throws Exception {
+    Ig ig = new Ig();
+    ig.twoInB = true;
+    finish(build("a", ig));
+    foundLastTime("1", "Patient/other");
+    ig.b2Name = "Patient B2, renamed";
+    PublisherFields pf = build("a", ig);
+    assertEquals(List.of("Patient-b.json (the content loaded from it changed: Patient/b2)", "ig.json (always processed)",
+        "page.md (always processed)"), pf.rapido.listRenderDirty());
+  }
+
+  /** an example the IG entry says is of a profile (exampleCanonical) is listed by it */
+  @Test
+  void aProfileTheIgSaysAnExampleIsOfIsRenderedAgain() throws Exception {
+    Ig ig = new Ig();
+    ig.bExampleOfP = true;
+    finish(build("a", ig));
+    ig.bName = "Patient B, renamed";
+    PublisherFields pf = build("a", ig);
+    assertEquals(List.of("Patient-b.json (the content loaded from it changed: Patient/b)",
+        "StructureDefinition-p.json (something that refers to it changed; render only)", "ig.json (always processed)",
+        "page.md (always processed)"), pf.rapido.listRenderDirty());
+  }
+
+  /**
+   * A profile an example is newly found to conform to has no edge to it from the last build, but lists it now: it's
+   * rendered again once validation finds it. One it was found to conform to last time isn't
+   */
+  @Test
+  void aProfileAnExampleIsNewlyFoundToConformToIsRenderedAgain() throws Exception {
+    finish(build("a", new Ig()));
+    PublisherFields pf = build("a", new Ig());
+    assertEquals(List.of("ig.json (always processed)", "page.md (always processed)"), pf.rapido.listRenderDirty());
+    validateB(pf);
+    assertEquals(List.of("StructureDefinition-p.json (an example was newly found to conform to it; render only)",
+        "ig.json (always processed)", "page.md (always processed)"), pf.rapido.listRenderDirty());
+    finish(pf);
+
+    // the build after the one that has the edge
+    foundLastTime("0", "Patient/b");
+    finish(build("a", new Ig()));
+    foundLastTime("0", "Patient/b");
+    pf = build("a", new Ig());
+    assertEquals(List.of("ig.json (always processed)", "page.md (always processed)"), pf.rapido.listRenderDirty());
+    validateB(pf);
+    assertEquals(List.of("ig.json (always processed)", "page.md (always processed)"), pf.rapido.listRenderDirty());
+  }
+
+  /** as validating Patient/b does, finding it conforms to profile p */
+  private static void validateB(PublisherFields pf) {
+    FetchedFile f = pf.fileList.stream().filter(x -> x.getLoadPath().equals("Patient-b.json")).findFirst().get();
+    FetchedResource b = f.getResources().get(0);
+    List<String> found = new ArrayList<>();
+    when(b.getFoundProfiles()).thenReturn(found);
+    pf.rapido.reuseValidation(f, b);
+    found.add(P_URL);
+    pf.rapido.recordValidation(f, b, new ArrayList<>());
+  }
+
+  /** the last build's state, as recordValidation records that the resource (key) at index of Patient-b.json conforms to p */
+  private void foundLastTime(String index, String key) throws Exception {
+    File state = dir.resolve("temp").resolve("_rapido").resolve("state.json").toFile();
+    JsonObject json = RapidoTracker.readState(state);
+    JsonObject v = json.getJsonObject("files").getJsonObject("Patient-b.json").forceObject("validation");
+    v.remove(index);
+    JsonObject rv = v.forceObject(index);
+    rv.add("key", key);
+    rv.forceArray("profileUsages").add(P_URL);
+    RapidoTracker.writeState(json, state);
   }
 
   /** Without an ig.ini, the loader doesn't copy the entries' names and descriptions to the resources: they count */
@@ -308,6 +390,11 @@ class PublisherRapidoWatchTest {
   private static class Ig {
     boolean igMode = true;
     String bName = "Patient B";
+    /** Patient/b's IG entry says it's an example of p */
+    boolean bExampleOfP = false;
+    /** Patient-b.json holds Patient/b2 too */
+    boolean twoInB = false;
+    String b2Name = "Patient B2";
     String aName = "Patient A";
     String aDescription = "The first patient";
     String aFileTitle = null;
@@ -429,10 +516,15 @@ class PublisherRapidoWatchTest {
       patient.setTitle(igContent.aFileTitle);
     }
     FetchedResource b = resource("Patient", "b");
+    FetchedResource b2 = resource("Patient", "b2");
     if (igContent != null) {
       when(b.getResourceName()).thenReturn(igContent.bName);
+      when(b2.getResourceName()).thenReturn(igContent.b2Name);
+      if (igContent.bExampleOfP) {
+        when(b.getExampleUri()).thenReturn(P_URL);
+      }
     }
-    FetchedFile other = file("Patient-b.json", "b", b);
+    FetchedFile other = igContent != null && igContent.twoInB ? file("Patient-b.json", "b", b, b2) : file("Patient-b.json", "b", b);
     FetchedFile observation = file("Observation-o.json", "o", resource("Observation", "o", primitive("Patient/a")));
     FetchedFile page = file("page.md", "# page");
     page.setProcessMode(FetchedFile.PROCESS_NONE);
@@ -455,6 +547,9 @@ class PublisherRapidoWatchTest {
       Element url = primitive("url", P_URL);
       when(p.getElement().hasChildren()).thenReturn(true);
       when(p.getElement().getChildrenByName("url")).thenReturn(List.of(url));
+      StructureDefinition sd = new StructureDefinition();
+      sd.setUrl(P_URL);
+      when(p.getResource()).thenReturn(sd);
       pf.fileList.add(pf.fileList.size() - 1, file("StructureDefinition-p.json", "p", p));
     }
     pf.changeList.addAll(pf.fileList); // as the loader leaves it

@@ -381,7 +381,7 @@ public class RapidoTracker {
       ResourceNode n = resourceNode(f, f.getResources().get(i));
       // the profiles it was found to conform to when it was last validated: not known until it's validated again, and
       // their example lists show it
-      for (String url : lastFoundProfiles(f, i)) {
+      for (String url : lastFoundProfiles(f, i, f.getResources().get(i))) {
         n.addReference(url);
       }
       fn.addResource(n);
@@ -389,12 +389,19 @@ public class RapidoTracker {
     return fn;
   }
 
-  /** the profileUsages the last build recorded for the file's resource at index i (see recordValidation) */
-  private List<String> lastFoundProfiles(FetchedFile f, int i) {
+  /**
+   * the profileUsages the last build recorded for the file's resource r at index i (see recordValidation). Empty if
+   * there's no record of r: then it's validated again, and recordValidation makes the profiles it's found to conform
+   * to dirty
+   */
+  private List<String> lastFoundProfiles(FetchedFile f, int i, FetchedResource r) {
     JsonObject of = lastState == null || !lastState.hasObject("files") ? null : lastState.getJsonObject("files").getJsonObject(keys.get(f));
     JsonObject v = of == null || !of.hasObject("validation") ? null : of.getJsonObject("validation");
     JsonObject rv = v == null || !v.hasObject(Integer.toString(i)) ? null : v.getJsonObject(Integer.toString(i));
-    return rv == null || !rv.hasArray("profileUsages") ? Collections.emptyList() : rv.getJsonArray("profileUsages").asStrings();
+    if (rv == null || !(r.fhirType()+"/"+r.getId()).equals(rv.asString("key")) || !rv.hasArray("profileUsages")) {
+      return Collections.emptyList();
+    }
+    return rv.getJsonArray("profileUsages").asStrings();
   }
 
   /**
@@ -653,7 +660,8 @@ public class RapidoTracker {
         return igXmlForHash(source, loaded);
       }
       JsonObject ig = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(source);
-      if (ig == null || !"ImplementationGuide".equals(ig.asString("resourceType")) || !ig.hasObject("definition")) {
+      if (ig == null || !"ImplementationGuide".equals(ig.asString("resourceType")) || !ig.hasObject("definition")
+          || !ig.getJsonObject("definition").hasArray("resource")) {
         return source;
       }
       for (JsonObject rg : ig.getJsonObject("definition").forceArray("resource").asJsonObjects()) {
@@ -1280,6 +1288,16 @@ public class RapidoTracker {
 
   /** records the messages from validating a resource, before the publisher adds them to the file */
   public void recordValidation(FetchedFile f, FetchedResource r, List<ValidationMessage> errs) {
+    List<String> found = r.getFoundProfiles().subList(Math.min(profilesBefore, r.getFoundProfiles().size()), r.getFoundProfiles().size());
+    if (keys.containsKey(f) && !renderClean.isEmpty()) {
+      // a profile it wasn't found to conform to last time has no edge to it, but its example lists show it now
+      List<String> last = lastFoundProfiles(f, f.getResources().indexOf(r), r);
+      for (String url : found) {
+        if (!last.contains(url)) {
+          renderProfileAgain(url);
+        }
+      }
+    }
     Set<String> sw = statusWarnings();
     if (!keys.containsKey(f) || sw == null || statusBefore == null) {
       return; // without knowing what the validator had seen, the result can't be reused
@@ -1294,7 +1312,7 @@ public class RapidoTracker {
       }
     }
     JsonArray usages = rv.forceArray("profileUsages");
-    for (String url : r.getFoundProfiles().subList(Math.min(profilesBefore, r.getFoundProfiles().size()), r.getFoundProfiles().size())) {
+    for (String url : found) {
       usages.add(url);
     }
     if (profileSources(pf.fileList, usages) == null) {
@@ -1336,6 +1354,17 @@ public class RapidoTracker {
       res.add(source);
     }
     return res;
+  }
+
+  /** the file of the IG's profile with the url is rendered again */
+  private void renderProfileAgain(String url) {
+    for (FetchedFile f : pf.fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.getResource() instanceof StructureDefinition && url.equals(((StructureDefinition) r.getResource()).getUrl()) && renderClean.remove(f)) {
+          why.put(f, "an example was newly found to conform to it");
+        }
+      }
+    }
   }
 
   /** a file with no resources to validate still needs a record, so the next build knows it can be reused */
