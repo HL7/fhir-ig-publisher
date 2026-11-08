@@ -530,16 +530,15 @@ public class JekyllDriver {
       for (ProcessHandle h : all) {
         h.destroy();
       }
-      try {
-        for (ProcessHandle h : all) {
-          if (!waitFor(h)) {
-            h.destroyForcibly();
-            waitFor(h);
-          }
-        }
-      } catch (InterruptedException e) {
+      // (stopped all the same when the thread was interrupted, as when a build is: that's when they are left running)
+      boolean interrupted = Thread.interrupted();
+      List<ProcessHandle> left = waitFor(all);
+      if (!left.isEmpty()) {
+        left.forEach(ProcessHandle::destroyForcibly);
+        waitFor(left);
+      }
+      if (interrupted) {
         Thread.currentThread().interrupt();
-        all.forEach(ProcessHandle::destroyForcibly);
       }
       process = null;
       source = null;
@@ -548,15 +547,28 @@ public class JekyllDriver {
     stamps = null;
   }
 
-  /** Whether the process has stopped within a few seconds */
-  private static boolean waitFor(ProcessHandle h) throws InterruptedException {
-    try {
-      h.onExit().get(5, TimeUnit.SECONDS);
-      return true;
-    } catch (TimeoutException e) {
-      return false;
-    } catch (ExecutionException e) {
-      return !h.isAlive();
+  /**
+   * Waits a few seconds in all for these processes to stop (whatever their number: e.g. an orphan that nothing reaps
+   * never does); returns the ones still running. An interrupt ends the wait, and is kept
+   */
+  private static List<ProcessHandle> waitFor(List<ProcessHandle> handles) {
+    long end = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+    List<ProcessHandle> res = new ArrayList<>();
+    for (ProcessHandle h : handles) {
+      try {
+        long wait = end - System.nanoTime();
+        if (wait > 0 && !Thread.currentThread().isInterrupted()) {
+          h.onExit().get(wait, TimeUnit.NANOSECONDS);
+        }
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      } catch (TimeoutException | ExecutionException e) {
+        // still running, unless it's gone
+      }
+      if (h.isAlive()) {
+        res.add(h);
+      }
     }
+    return res;
   }
 }

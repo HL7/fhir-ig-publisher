@@ -114,13 +114,46 @@ class JekyllDriverTest {
     Set<Long> before = descendants();
     driver = fake("sleep 600 & printf '@@ig-jekyll-driver@@ {\"ok\":true,\"full\":true}\\n'");
     assertTrue(driver.build(dir.toString(), dir.resolve("out").toString(), 20_000, log::add).isOk());
+    // the sleep may start after the reply (where a fork is emulated, as with Git's sh on Windows)
     List<ProcessHandle> started = new ArrayList<>();
-    ProcessHandle.current().descendants().filter(h -> !before.contains(h.pid())).forEach(started::add);
-    assertTrue(started.size() >= 2, started.toString());
+    long end = System.currentTimeMillis() + 20_000;
+    while (started.stream().noneMatch(JekyllDriverTest::isSleep) && System.currentTimeMillis() < end) {
+      Thread.sleep(50);
+      started.clear();
+      ProcessHandle.current().descendants().filter(h -> !before.contains(h.pid())).forEach(started::add);
+    }
+    assertTrue(started.stream().anyMatch(JekyllDriverTest::isSleep), started.toString());
     driver.stop();
     for (ProcessHandle h : started) {
       assertFalse(h.isAlive(), h + " " + h.info());
     }
+  }
+
+  @Test
+  void stoppedWhenTheThreadIsInterrupted() throws Exception {
+    // as when a build is interrupted: what was started has stopped all the same, and the thread is still interrupted
+    Set<Long> before = descendants();
+    driver = fake("printf '@@ig-jekyll-driver@@ {\"ok\":true,\"full\":true}\\n'");
+    assertTrue(driver.build(dir.toString(), dir.resolve("out").toString(), 20_000, log::add).isOk());
+    List<ProcessHandle> started = new ArrayList<>();
+    ProcessHandle.current().descendants().filter(h -> !before.contains(h.pid())).forEach(started::add);
+    assertFalse(started.isEmpty());
+    Thread.currentThread().interrupt();
+    try {
+      driver.stop();
+      assertTrue(Thread.currentThread().isInterrupted());
+    } finally {
+      Thread.interrupted();
+    }
+    for (ProcessHandle h : started) {
+      assertFalse(h.isAlive(), h + " " + h.info());
+    }
+  }
+
+  private static boolean isSleep(ProcessHandle h) {
+    String cmd = h.info().command().orElse("").replace('\\', '/');
+    String name = cmd.substring(cmd.lastIndexOf('/') + 1);
+    return name.equals("sleep") || name.equals("sleep.exe");
   }
 
   private static Set<Long> descendants() {
