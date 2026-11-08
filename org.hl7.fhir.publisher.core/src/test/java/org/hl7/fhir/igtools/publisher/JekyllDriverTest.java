@@ -84,10 +84,15 @@ class JekyllDriverTest {
     }
   }
 
-  /** a "Ruby" that answers each command with what the shell command prints */
-  private JekyllDriver fake(String reply) {
-    String sh = "while read l; do " + reply + "; done";
-    return new JekyllDriver(Arrays.asList("sh", "-c", sh), System.getenv());
+  /**
+   * a "Ruby" that answers each command with what the shell command prints (from a file: on Windows, the quotes in an
+   * argument don't survive the command line)
+   */
+  private JekyllDriver fake(String reply) throws IOException {
+    Path script = dir.resolve("fake-jekyll.sh");
+    Files.write(script, ("while read l; do " + reply + "; done\n").getBytes(StandardCharsets.UTF_8));
+    // (with / for the Windows shells, which take C:/x/y as a path)
+    return new JekyllDriver(Arrays.asList("sh", script.toString().replace(File.separatorChar, '/')), System.getenv());
   }
 
   @Test
@@ -99,7 +104,7 @@ class JekyllDriverTest {
   }
 
   @Test
-  void aReplyThatCantBeReadStopsIt() {
+  void aReplyThatCantBeReadStopsIt() throws IOException {
     driver = fake("printf '@@ig-jekyll-driver@@ {\"ok\":\\n'");
     IOException e = org.junit.jupiter.api.Assertions.assertThrows(IOException.class,
         () -> driver.build(dir.toString(), dir.resolve("out").toString(), 20_000, log::add));
