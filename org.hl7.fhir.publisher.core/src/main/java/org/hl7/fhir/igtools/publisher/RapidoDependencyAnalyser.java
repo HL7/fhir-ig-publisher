@@ -8,8 +8,11 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Deque;
+import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +39,17 @@ import java.util.regex.Pattern;
  *   <li>the render hash adds the resources that refer to the file's resources (directly, or through a profile they are
  *   derived from), because pages list their usages, examples, derived profiles and so on.</li>
  * </ul>
+ * Some edges are weak: what's at the other end only needs to exist, with the same identity (key, file, url, version,
+ * name, title, web path, and for a StructureDefinition its type, kind, derivation and base). The hash then holds that
+ * identity rather than the target's content, and doesn't go on through the target's own dependencies:
+ * <ul>
+ *   <li>a Reference.reference ({@link ResourceNode#addInstanceReference}) is weak for validation, which only checks that
+ *   the target exists with the right type. Rendering may show the target's content, so it's a full edge there</li>
+ *   <li>ElementDefinition.type.targetProfile and narrative ({@link ResourceNode#addLink}) are weak for both: the
+ *   validator checks that a target profile exists with the right type and base, and pages only link to it</li>
+ * </ul>
+ * A resource whose content, or anything it depends on through full edges, has a resolve() or conformsTo( reads the
+ * targets of its references, so its validation hash follows every edge.
  * A reference that looks like it is meant to point into the IG, but doesn't resolve, makes the file depend on the
  * inventory of the whole IG (every id, url, name and title), so that the file is rebuilt whenever anything it might
  * have meant appears or changes.
@@ -53,6 +67,9 @@ public class RapidoDependencyAnalyser {
     private String contentHash = "";
     private final Set<String> strings = new LinkedHashSet<>();
     private final Set<String> references = new LinkedHashSet<>();
+    private final Set<String> instanceReferences = new LinkedHashSet<>();
+    private final Set<String> links = new LinkedHashSet<>();
+    private final List<String> identity = new ArrayList<>();
 
     public ResourceNode(String type, String id) {
       this.type = type;
@@ -119,6 +136,31 @@ public class RapidoDependencyAnalyser {
       if (s != null && !s.isEmpty()) {
         references.add(s);
       }
+      return this;
+    }
+
+    /** a Reference.reference: validating the resource only needs the target to exist with the right type, rendering
+     * it may show the target's content */
+    public ResourceNode addInstanceReference(String s) {
+      if (s != null && !s.isEmpty()) {
+        instanceReferences.add(s);
+      }
+      return this;
+    }
+
+    /** a value that only links to its target (ElementDefinition.type.targetProfile, narrative): validating and
+     * rendering the resource only need the target's identity */
+    public ResourceNode addLink(String s) {
+      if (s != null && !s.isEmpty()) {
+        links.add(s);
+      }
+      return this;
+    }
+
+    /** something about the resource that a weak edge to it depends on, besides its key, url, version, name and title
+     * (its web path, a StructureDefinition's type, ...) */
+    public ResourceNode addIdentity(String s) {
+      identity.add(s);
       return this;
     }
   }
@@ -210,8 +252,38 @@ public class RapidoDependencyAnalyser {
   private final Map<String, List<ResourceNode>> byId = new HashMap<>();
   private final Map<String, List<ResourceNode>> byLabel = new HashMap<>();
   private final Map<ResourceNode, String> fileOf = new HashMap<>();
-  private final Map<ResourceNode, Set<ResourceNode>> direct = new HashMap<>();
+  private final Map<ResourceNode, Map<ResourceNode, Edge>> direct = new HashMap<>();
   private final Set<ResourceNode> unresolved = new HashSet<>();
+  /** the resources whose content has a resolve() or conformsTo(, which read the content of the resources they refer to */
+  private final Set<ResourceNode> readsTargets = new HashSet<>();
+
+  /** what one resource needs of another. Declared from the strongest down: when a resource refers to another in several
+   * ways, the strongest counts */
+  enum Edge {
+    /** the content, and what it depends on */
+    FULL,
+    /** a Reference.reference: the identity for validation, the content for rendering */
+    REFERENCE,
+    /** the identity, for validation and rendering */
+    LINK;
+
+    static Edge strongest(Edge a, Edge b) {
+      return a == null || b.ordinal() < a.ordinal() ? b : a;
+    }
+  }
+
+  /** which edges a hash follows through to the target's content and dependencies; the others give the target's identity */
+  private enum Mode {
+    ALL(EnumSet.allOf(Edge.class)),
+    VALIDATION(EnumSet.of(Edge.FULL)),
+    RENDER(EnumSet.of(Edge.FULL, Edge.REFERENCE));
+
+    final Set<Edge> follows;
+
+    Mode(Set<Edge> follows) {
+      this.follows = follows;
+    }
+  }
 
   /**
    * The resources of the IG by what a value can refer to them by: Type/id, url and url|version. Built once for all the
@@ -274,13 +346,22 @@ public class RapidoDependencyAnalyser {
     }
     for (FileNode f : files) {
       for (ResourceNode r : f.resources) {
-        Set<ResourceNode> targets = new LinkedHashSet<>();
+        Map<ResourceNode, Edge> targets = new LinkedHashMap<>();
         boolean ok = true;
         for (String s : r.strings) {
-          ok = resolveString(s, targets) && ok;
+          ok = resolveString(s, targets, Edge.FULL) && ok;
+          if (s.contains("resolve()") || s.contains("conformsTo(")) {
+            readsTargets.add(r);
+          }
         }
         for (String s : r.references) {
-          ok = resolveString(s, targets) && ok;
+          ok = resolveString(s, targets, Edge.FULL) && ok;
+        }
+        for (String s : r.instanceReferences) {
+          ok = resolveString(s, targets, Edge.REFERENCE) && ok;
+        }
+        for (String s : r.links) {
+          ok = resolveString(s, targets, Edge.LINK) && ok;
         }
         targets.remove(r);
         direct.put(r, targets);
@@ -292,39 +373,41 @@ public class RapidoDependencyAnalyser {
     String inventory = inventoryHash(files);
 
     // a profile is used by everything its derived profiles use (bindings, extensions and so on are inherited)
-    Map<ResourceNode, Set<ResourceNode>> effective = new HashMap<>();
+    Map<ResourceNode, Map<ResourceNode, Edge>> effective = new HashMap<>();
     for (ResourceNode r : direct.keySet()) {
       effective(r, effective, new HashSet<>());
     }
-    Map<ResourceNode, Set<ResourceNode>> referrers = new HashMap<>();
-    for (Map.Entry<ResourceNode, Set<ResourceNode>> e : effective.entrySet()) {
-      for (ResourceNode t : e.getValue()) {
-        referrers.computeIfAbsent(t, k -> new HashSet<>()).add(e.getKey());
+    Map<ResourceNode, Map<ResourceNode, Edge>> referrers = new HashMap<>();
+    for (Map.Entry<ResourceNode, Map<ResourceNode, Edge>> e : effective.entrySet()) {
+      for (Map.Entry<ResourceNode, Edge> t : e.getValue().entrySet()) {
+        referrers.computeIfAbsent(t.getKey(), k -> new HashMap<>()).merge(e.getKey(), t.getValue(), Edge::strongest);
       }
     }
 
-    Map<ResourceNode, Set<ResourceNode>> closures = new HashMap<>();
+    Map<Mode, Map<ResourceNode, Set<ResourceNode>>> closures = new EnumMap<>(Mode.class);
     Map<String, FileResult> results = new HashMap<>();
     for (FileNode f : files) {
       Set<ResourceNode> own = new HashSet<>(f.resources);
-      Set<ResourceNode> closure = new HashSet<>();
-      Set<ResourceNode> users = new HashSet<>();
+      Mode validation = Mode.VALIDATION;
       for (ResourceNode r : f.resources) {
-        closure.addAll(closure(r, closures));
-        Set<ResourceNode> rs = referrers.get(r);
-        if (rs != null) {
-          users.addAll(rs);
+        if (readsTargets(r, closures)) {
+          validation = Mode.ALL;
         }
       }
-      closure.removeAll(own);
-      users.removeAll(own);
-      boolean usesInventory = false;
+      Set<ResourceNode> vClosure = closure(f, validation, closures);
+      Set<ResourceNode> rClosure = closure(f, Mode.RENDER, closures);
+      Map<ResourceNode, Edge> users = new HashMap<>();
       for (ResourceNode r : f.resources) {
-        usesInventory = usesInventory || unresolved.contains(r);
+        Map<ResourceNode, Edge> rs = referrers.get(r);
+        if (rs != null) {
+          for (Map.Entry<ResourceNode, Edge> e : rs.entrySet()) {
+            users.merge(e.getKey(), e.getValue(), Edge::strongest);
+          }
+        }
       }
-      for (ResourceNode r : closure) {
-        usesInventory = usesInventory || unresolved.contains(r);
-      }
+      users.keySet().removeAll(own);
+      boolean vInventory = usesInventory(f, vClosure);
+      boolean rInventory = usesInventory(f, rClosure);
 
       Hasher oh = new Hasher();
       oh.add("own").add(f.key).add(f.sourceHash);
@@ -334,20 +417,107 @@ public class RapidoDependencyAnalyser {
       Hasher vh = new Hasher();
       vh.add("validation").add(ownHash);
       vh.add("depends-on");
-      addNodes(vh, closure);
-      if (usesInventory) {
+      addNodes(vh, vClosure);
+      vh.add("identity-of");
+      addIdentities(vh, identityTargets(f, vClosure, validation));
+      if (vInventory) {
         vh.add("inventory").add(inventory);
       }
       String validationHash = vh.finish();
 
       Hasher rh = new Hasher();
-      rh.add("render").add(validationHash).add("used-by");
-      addNodes(rh, users);
+      rh.add("render").add(validationHash).add("depends-on");
+      addNodes(rh, rClosure);
+      rh.add("identity-of");
+      addIdentities(rh, identityTargets(f, rClosure, Mode.RENDER));
+      if (rInventory) {
+        rh.add("inventory").add(inventory);
+      }
+      // a page lists what links to it by identity
+      Set<ResourceNode> fullUsers = new HashSet<>();
+      Set<ResourceNode> linkUsers = new HashSet<>();
+      for (Map.Entry<ResourceNode, Edge> e : users.entrySet()) {
+        (e.getValue() == Edge.LINK ? linkUsers : fullUsers).add(e.getKey());
+      }
+      rh.add("used-by");
+      addNodes(rh, fullUsers);
+      rh.add("linked-from");
+      addIdentities(rh, linkUsers);
       String renderHash = rh.finish();
 
-      results.put(f.key, new FileResult(ownHash, validationHash, renderHash, keys(closure), keys(users), usesInventory));
+      Set<ResourceNode> dependsOn = new HashSet<>(vClosure);
+      dependsOn.addAll(rClosure);
+      results.put(f.key, new FileResult(ownHash, validationHash, renderHash, keys(dependsOn), keys(users.keySet()), vInventory || rInventory));
     }
     return results;
+  }
+
+  private boolean usesInventory(FileNode f, Set<ResourceNode> closure) {
+    for (ResourceNode r : f.resources) {
+      if (unresolved.contains(r)) {
+        return true;
+      }
+    }
+    for (ResourceNode r : closure) {
+      if (unresolved.contains(r)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** whether validating r reads the content of what it refers to: a resolve() or conformsTo( in r, or in anything r
+   * depends on through full edges (a profile's snapshot, an extension, ...) */
+  private boolean readsTargets(ResourceNode r, Map<Mode, Map<ResourceNode, Set<ResourceNode>>> closures) {
+    if (readsTargets.contains(r)) {
+      return true;
+    }
+    for (ResourceNode n : closure(r, Mode.VALIDATION, closures)) {
+      if (readsTargets.contains(n)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private Set<ResourceNode> closure(FileNode f, Mode mode, Map<Mode, Map<ResourceNode, Set<ResourceNode>>> closures) {
+    Set<ResourceNode> res = new HashSet<>();
+    for (ResourceNode r : f.resources) {
+      res.addAll(closure(r, mode, closures));
+    }
+    res.removeAll(f.resources);
+    return res;
+  }
+
+  /**
+   * the resources that the file, or what it depends on through the edges the mode follows, refers to through the
+   * other edges, and whose identity the hash holds instead. A StructureDefinition's identity includes its base, so the
+   * profiles it's derived from are added too (the validator looks for a target profile's base type)
+   */
+  private Set<ResourceNode> identityTargets(FileNode f, Set<ResourceNode> closure, Mode mode) {
+    Set<ResourceNode> res = new HashSet<>();
+    List<ResourceNode> from = new ArrayList<>(f.resources);
+    from.addAll(closure);
+    for (ResourceNode n : from) {
+      for (Map.Entry<ResourceNode, Edge> e : direct.getOrDefault(n, Map.of()).entrySet()) {
+        if (!mode.follows.contains(e.getValue())) {
+          addWithBases(e.getKey(), res);
+        }
+      }
+    }
+    res.removeAll(closure);
+    res.removeAll(f.resources);
+    return res;
+  }
+
+  private void addWithBases(ResourceNode r, Set<ResourceNode> res) {
+    if (res.add(r) && r.baseDefinition != null) {
+      Map<ResourceNode, Edge> bases = new LinkedHashMap<>();
+      resolveReference(r.baseDefinition, bases, Edge.FULL);
+      for (ResourceNode b : bases.keySet()) {
+        addWithBases(b, res);
+      }
+    }
   }
 
   private void index(FileNode f, ResourceNode r) {
@@ -381,17 +551,17 @@ public class RapidoDependencyAnalyser {
    * @return false if the string contains something that looks like it is meant to refer to a resource in this IG,
    * but which can't be resolved
    */
-  private boolean resolveString(String s, Set<ResourceNode> targets) {
+  private boolean resolveString(String s, Map<ResourceNode, Edge> targets, Edge edge) {
     boolean ok = true;
     if (s.length() <= MAX_REF_LENGTH && !containsWhitespace(s)) {
-      ok = resolveReference(s, targets);
+      ok = resolveReference(s, targets, edge);
     }
     if (s.contains("://") || s.contains("urn:")) {
       Matcher m = URL_IN_TEXT.matcher(s);
       while (m.find()) {
         String u = trimPunctuation(m.group());
         if (!u.equals(s)) {
-          ok = resolveReference(u, targets) && ok;
+          ok = resolveReference(u, targets, edge) && ok;
         }
       }
     }
@@ -404,12 +574,12 @@ public class RapidoDependencyAnalyser {
         }
         List<ResourceNode> found = byLabel.get(label);
         if (found == null) {
-          ok = resolveReference(label, targets) && ok;
+          ok = resolveReference(label, targets, edge) && ok;
           if (!index.has(label)) {
             ok = false;
           }
         } else {
-          targets.addAll(found);
+          addAll(targets, found, edge);
         }
       }
     }
@@ -432,11 +602,11 @@ public class RapidoDependencyAnalyser {
     return u;
   }
 
-  private boolean resolveReference(String s, Set<ResourceNode> targets) {
+  private boolean resolveReference(String s, Map<ResourceNode, Edge> targets, Edge edge) {
     // what this string finds, apart from what the strings before it found (it can find the same resource again)
     Set<ResourceNode> found = new HashSet<>();
     resolveInto(s, found);
-    targets.addAll(found);
+    addAll(targets, found, edge);
     if (!found.isEmpty()) {
       return true;
     }
@@ -450,7 +620,7 @@ public class RapidoDependencyAnalyser {
     String last = parts.length == 0 ? path : parts[parts.length-1];
     if (ID_LIKE.matcher(last).matches()) {
       // be generous: anything with the same id might be what's meant
-      addAll(targets, byId.get(last));
+      addAll(targets, byId.get(last), edge);
     }
     return false;
   }
@@ -497,24 +667,28 @@ public class RapidoDependencyAnalyser {
     }
   }
 
-  private static void addAll(Set<ResourceNode> targets, List<ResourceNode> list) {
+  private static void addAll(Map<ResourceNode, Edge> targets, Collection<ResourceNode> list, Edge edge) {
     if (list != null) {
-      targets.addAll(list);
+      for (ResourceNode r : list) {
+        targets.merge(r, edge, Edge::strongest);
+      }
     }
   }
 
-  private Set<ResourceNode> effective(ResourceNode r, Map<ResourceNode, Set<ResourceNode>> memo, Set<ResourceNode> trail) {
-    Set<ResourceNode> res = memo.get(r);
+  private Map<ResourceNode, Edge> effective(ResourceNode r, Map<ResourceNode, Map<ResourceNode, Edge>> memo, Set<ResourceNode> trail) {
+    Map<ResourceNode, Edge> res = memo.get(r);
     if (res != null) {
       return res;
     }
-    res = new HashSet<>(direct.getOrDefault(r, new HashSet<>()));
+    res = new HashMap<>(direct.getOrDefault(r, Map.of()));
     if (r.baseDefinition != null && trail.add(r)) {
-      Set<ResourceNode> bases = new LinkedHashSet<>();
-      resolveReference(r.baseDefinition, bases);
-      for (ResourceNode b : bases) {
+      Map<ResourceNode, Edge> bases = new LinkedHashMap<>();
+      resolveReference(r.baseDefinition, bases, Edge.FULL);
+      for (ResourceNode b : bases.keySet()) {
         if (b != r) {
-          res.addAll(effective(b, memo, trail));
+          for (Map.Entry<ResourceNode, Edge> e : effective(b, memo, trail).entrySet()) {
+            res.merge(e.getKey(), e.getValue(), Edge::strongest);
+          }
         }
       }
       trail.remove(r);
@@ -526,7 +700,9 @@ public class RapidoDependencyAnalyser {
     return res;
   }
 
-  private Set<ResourceNode> closure(ResourceNode r, Map<ResourceNode, Set<ResourceNode>> memo) {
+  /** what r depends on through the edges the mode follows, transitively */
+  private Set<ResourceNode> closure(ResourceNode r, Mode mode, Map<Mode, Map<ResourceNode, Set<ResourceNode>>> closures) {
+    Map<ResourceNode, Set<ResourceNode>> memo = closures.computeIfAbsent(mode, m -> new HashMap<>());
     Set<ResourceNode> res = memo.get(r);
     if (res != null) {
       return res;
@@ -537,7 +713,11 @@ public class RapidoDependencyAnalyser {
     todo.push(r);
     while (!todo.isEmpty()) {
       ResourceNode n = todo.pop();
-      for (ResourceNode t : direct.getOrDefault(n, new HashSet<>())) {
+      for (Map.Entry<ResourceNode, Edge> e : direct.getOrDefault(n, Map.of()).entrySet()) {
+        if (!mode.follows.contains(e.getValue())) {
+          continue;
+        }
+        ResourceNode t = e.getKey();
         if (res.add(t)) {
           Set<ResourceNode> known = memo.get(t);
           if (known != null) {
@@ -563,6 +743,24 @@ public class RapidoDependencyAnalyser {
     sorted.sort(Comparator.comparing((String[] e) -> e[0]).thenComparing(e -> e[1]).thenComparing(e -> e[2]));
     for (String[] e : sorted) {
       h.add(e[0]).add(e[1]).add(e[2]);
+    }
+  }
+
+  /** what a weak edge to each of the nodes depends on: not their content, but what they are, and where */
+  private void addIdentities(Hasher h, Collection<ResourceNode> nodes) {
+    List<List<String>> sorted = new ArrayList<>();
+    for (ResourceNode n : nodes) {
+      List<String> id = new ArrayList<>(List.of(n.getKey(), String.valueOf(fileOf.get(n)), String.valueOf(n.url),
+          String.valueOf(n.version), String.valueOf(n.name), String.valueOf(n.title), String.valueOf(n.baseDefinition)));
+      id.addAll(n.identity);
+      sorted.add(id);
+    }
+    sorted.sort(Comparator.comparing((List<String> e) -> e.get(0)).thenComparing(e -> e.get(1)).thenComparing(e -> String.join("\u0001", e)));
+    for (List<String> id : sorted) {
+      h.add(Integer.toString(id.size()));
+      for (String s : id) {
+        h.add(s);
+      }
     }
   }
 

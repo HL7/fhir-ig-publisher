@@ -402,6 +402,8 @@ public class RapidoTracker {
       n.addReference(s);
     }
     n.addReference(r.getExampleUri());
+    // pages link to the resource by its web path
+    n.addIdentity(r.getPath());
     if (e != null) {
       n.setUrl(singleValue(e, "url"));
       n.setVersion(singleValue(e, "version"));
@@ -409,6 +411,9 @@ public class RapidoTracker {
       n.setTitle(singleValue(e, "title"));
       if ("StructureDefinition".equals(r.fhirType())) {
         n.setBaseDefinition(e.getNamedChildValue("baseDefinition"));
+        // what the validator checks of a target profile, besides that it exists
+        n.addIdentity(singleValue(e, "type")).addIdentity(singleValue(e, "kind")).addIdentity(singleValue(e, "derivation"))
+          .addIdentity(singleValue(e, "abstract"));
       }
       h.add("(").add(e.getName()).add(e.fhirType());
       for (String c : e.getComments()) {
@@ -419,7 +424,7 @@ public class RapidoTracker {
           // stamped by the loader because the source has no date: the same input every build, so hash it as such
           h.add("(build date)");
         } else {
-          scan(c, h, n);
+          scan(c, e, null, h, n);
         }
       }
       h.add(")");
@@ -437,22 +442,30 @@ public class RapidoTracker {
     return l.size() == 1 && l.get(0).isPrimitive() ? l.get(0).getValue() : null;
   }
 
-  private void scan(Element e, Hasher h, ResourceNode n) {
+  private void scan(Element e, Element parent, Element grandparent, Hasher h, ResourceNode n) {
     h.add("(").add(e.getName()).add(e.fhirType());
     if (e.isXhtml()) {
       String x = e.getXhtml() == null ? e.getValue() : new XhtmlComposer(XhtmlComposer.XML).compose(e.getXhtml());
       h.add(x);
-      n.addString(x);
+      // narrative only links to what it mentions
+      n.addLink(x);
     } else if (e.hasValue()) {
       h.add(e.getValue());
-      n.addString(e.getValue());
+      if ("reference".equals(e.getName()) && "Reference".equals(parent.fhirType())) {
+        n.addInstanceReference(e.getValue());
+      } else if ("targetProfile".equals(e.getName()) && "type".equals(parent.getName()) && grandparent != null
+          && "ElementDefinition".equals(grandparent.fhirType())) {
+        n.addLink(e.getValue());
+      } else {
+        n.addString(e.getValue());
+      }
     }
     for (String c : e.getComments()) {
       h.add("comment").add(c);
     }
     if (e.hasChildren()) {
       for (Element c : e.getChildList()) {
-        scan(c, h, n);
+        scan(c, e, parent, h, n);
       }
     }
     h.add(")");

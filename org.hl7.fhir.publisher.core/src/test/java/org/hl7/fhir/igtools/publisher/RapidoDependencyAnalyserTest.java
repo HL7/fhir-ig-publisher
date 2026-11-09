@@ -66,6 +66,18 @@ class RapidoDependencyAnalyserTest {
             n.addReference(s);
             content.append("ref:").append(s).append("\u0000");
           }
+          for (String s : r.instanceRefs) {
+            n.addInstanceReference(s);
+            content.append("reference:").append(s).append("\u0000");
+          }
+          for (String s : r.links) {
+            n.addLink(s);
+            content.append("link:").append(s).append("\u0000");
+          }
+          for (String s : r.identity) {
+            n.addIdentity(s);
+            content.append("identity:").append(s).append("\u0000");
+          }
           n.setContentHash(r.url+"|"+r.version+"|"+r.name+"|"+r.title+"|"+r.base+"|"+content);
           fn.addResource(n);
         }
@@ -85,6 +97,9 @@ class RapidoDependencyAnalyserTest {
     String base;
     final List<String> strings = new ArrayList<>();
     final List<String> refs = new ArrayList<>();
+    final List<String> instanceRefs = new ArrayList<>();
+    final List<String> links = new ArrayList<>();
+    final List<String> identity = new ArrayList<>();
 
     Res(String type, String id) {
       this.type = type;
@@ -110,6 +125,24 @@ class RapidoDependencyAnalyserTest {
 
     Res str(String s) {
       strings.add(s);
+      return this;
+    }
+
+    /** a Reference.reference */
+    Res ref(String s) {
+      instanceRefs.add(s);
+      return this;
+    }
+
+    /** a targetProfile, or a link in the narrative */
+    Res link(String s) {
+      links.add(s);
+      return this;
+    }
+
+    /** the StructureDefinition's type, the resource's web path, ... */
+    Res identity(String s) {
+      identity.add(s);
       return this;
     }
   }
@@ -218,6 +251,165 @@ class RapidoDependencyAnalyserTest {
     ig.add("unrelated", "Patient", "p3").str("nothing");
     Outcome o = edit(ig, i -> i.get("target").title("Dr Who 2"));
     assertEquals(List.of("target", "narrative", "md", "relative"), o.validate);
+  }
+
+  /**
+   * uz.dhp.core's shape: the adverse event profile targets the observation profile, which targets the specimen profile,
+   * and each has examples that refer to examples of the others
+   */
+  private static Ig targetProfileIg() {
+    Ig ig = new Ig();
+    ig.add("sd-specimen", "StructureDefinition", "specimen").url(B+"/StructureDefinition/specimen").title("Specimen")
+      .base("http://hl7.org/fhir/StructureDefinition/Specimen").identity("Specimen").str("Current lifecycle status");
+    ig.add("sd-observation", "StructureDefinition", "observation").url(B+"/StructureDefinition/observation").title("Observation")
+      .base("http://hl7.org/fhir/StructureDefinition/Observation").identity("Observation").link(B+"/StructureDefinition/specimen");
+    ig.add("sd-adverse", "StructureDefinition", "adverse").url(B+"/StructureDefinition/adverse").title("Adverse Event")
+      .base("http://hl7.org/fhir/StructureDefinition/AdverseEvent").identity("AdverseEvent").link(B+"/StructureDefinition/observation");
+    ig.add("ex-specimen", "Specimen", "s1").str(B+"/StructureDefinition/specimen").str("available");
+    ig.add("ex-observation", "Observation", "o1").str(B+"/StructureDefinition/observation").ref("Specimen/s1").str("120");
+    ig.add("ex-adverse", "AdverseEvent", "a1").str(B+"/StructureDefinition/adverse").ref("Observation/o1");
+    return ig;
+  }
+
+  @Test
+  void aTargetProfileOnlyNeedsTheTargetsIdentity() {
+    // the specimen profile's element shorts change: what only targets it, and what depends on that, keeps its
+    // validation and its pages
+    Outcome o = edit(targetProfileIg(), ig -> ig.get("sd-specimen").strings.set(2, "Bench1 lifecycle status"));
+    assertEquals(List.of("sd-specimen", "ex-specimen"), o.validate);
+    // the examples that refer to the specimen example are still rendered again: rendering a reference may show the
+    // target, which is a full edge
+    assertEquals(List.of("sd-specimen", "ex-specimen", "ex-observation", "ex-adverse"), o.render);
+
+    // renamed: the observation profile shows its title in the link, and its example's validation checks the type
+    o = edit(targetProfileIg(), ig -> ig.get("sd-specimen").title("Specimen renamed"));
+    assertTrue(o.validate.containsAll(List.of("sd-specimen", "sd-observation", "ex-specimen", "ex-observation")), o.validate.toString());
+    assertTrue(o.render.contains("sd-observation"), o.render.toString());
+    // the adverse event profile links to the observation profile, whose identity didn't change
+    assertFalse(o.validate.contains("sd-adverse"));
+  }
+
+  @Test
+  void aTargetProfilesTypeAndWebPathArePartOfItsIdentity() {
+    Outcome o = edit(targetProfileIg(), ig -> ig.get("sd-specimen").identity.set(0, "Substance"));
+    assertTrue(o.validate.contains("sd-observation"), o.validate.toString());
+    assertFalse(o.validate.contains("sd-adverse"));
+
+    o = edit(targetProfileIg(), ig -> ig.get("sd-specimen").identity.add("StructureDefinition-specimen-moved.html"));
+    assertTrue(o.render.contains("sd-observation"), o.render.toString());
+    assertFalse(o.render.contains("sd-adverse"));
+  }
+
+  /** the validator looks for a target profile's base type through the profiles it's derived from */
+  @Test
+  void aTargetProfilesIdentityIncludesItsBase() {
+    Ig ig = targetProfileIg();
+    ig.add("sd-specimen-base", "StructureDefinition", "specimen-base").url(B+"/StructureDefinition/specimen-base")
+      .base(B+"/StructureDefinition/specimen-root").identity("Specimen").str("base short");
+    ig.add("sd-specimen-root", "StructureDefinition", "specimen-root").url(B+"/StructureDefinition/specimen-root")
+      .base("http://hl7.org/fhir/StructureDefinition/Specimen").identity("Specimen");
+    ig.get("sd-specimen").base = B+"/StructureDefinition/specimen-base";
+    ig.get("sd-specimen").strings.set(1, B+"/StructureDefinition/specimen-base");
+
+    Outcome o = edit(ig, i -> i.get("sd-specimen-base").identity.set(0, "Substance"));
+    assertTrue(o.validate.contains("sd-observation"), o.validate.toString());
+    o = edit(ig, i -> i.get("sd-specimen-root").identity.set(0, "Substance"));
+    assertTrue(o.validate.contains("sd-observation"), o.validate.toString());
+    // but not its content
+    o = edit(ig, i -> i.get("sd-specimen-base").strings.set(2, "base short changed"));
+    assertFalse(o.validate.contains("sd-observation"), o.validate.toString());
+    assertTrue(o.validate.contains("sd-specimen"));
+  }
+
+  /** a resolve() or conformsTo( reads the target: what has one, or depends on a profile with one, follows every edge */
+  @Test
+  void resolveReadsTheTarget() {
+    Outcome o = edit(withConstraints(), ig -> ig.get("sd-specimen").strings.set(2, "Bench1 lifecycle status"));
+    // the observation profile has the resolve(), its example depends on it
+    assertTrue(o.validate.containsAll(List.of("sd-specimen", "ex-specimen", "sd-observation", "ex-observation")), o.validate.toString());
+    // the adverse event profile's conformsTo( makes it follow its target profile, the observation profile, and through
+    // it the specimen profile
+    assertTrue(o.validate.containsAll(List.of("sd-adverse", "ex-adverse")), o.validate.toString());
+
+    // without them, as aTargetProfileOnlyNeedsTheTargetsIdentity
+    o = edit(targetProfileIg(), ig -> ig.get("sd-specimen").strings.set(2, "Bench1 lifecycle status"));
+    assertFalse(o.validate.contains("ex-observation"));
+  }
+
+  private static Ig withConstraints() {
+    Ig ig = targetProfileIg();
+    ig.get("sd-observation").str("specimen.resolve().status = 'available'");
+    ig.get("sd-adverse").str("suspectEntity.instance.conformsTo('http://hl7.org/fhir/StructureDefinition/Observation')");
+    return ig;
+  }
+
+  @Test
+  void aReferenceIsValidatedByIdentityButRenderedWithTheTargetsContent() {
+    // the specimen example changes: the observation example that refers to it may show it (its narrative is
+    // generated after this analysis), so it's rendered again, but the validator only checks it exists as a Specimen
+    Outcome o = edit(targetProfileIg(), ig -> ig.get("ex-specimen").strings.set(1, "unavailable"));
+    assertEquals(List.of("ex-specimen"), o.validate);
+    assertTrue(o.render.contains("ex-observation"), o.render.toString());
+    // and rendering goes on through it: the adverse event example may show the observation, which shows the specimen
+    assertTrue(o.render.contains("ex-adverse"), o.render.toString());
+
+    // the adverse event example shows the observation example, which shows the specimen profile's title (here the
+    // observation example doesn't refer to the specimen example, which would bring in all of the specimen profile)
+    Ig noSpecimen = targetProfileIg();
+    noSpecimen.get("ex-observation").instanceRefs.clear();
+    o = edit(noSpecimen, ig -> ig.get("sd-specimen").title("Specimen renamed"));
+    assertTrue(o.render.contains("ex-adverse"), o.render.toString());
+    assertFalse(o.validate.contains("ex-adverse"), o.validate.toString());
+
+    o = edit(targetProfileIg(), ig -> ig.files.get("ex-specimen").set(0, new Res("Specimen", "s2").str(B+"/StructureDefinition/specimen")));
+    assertTrue(o.validate.contains("ex-observation"), "the target is gone");
+  }
+
+  /** the observation profile's page lists the adverse event profile, that targets it, by its identity */
+  @Test
+  void aPageListsWhatLinksToItByIdentity() {
+    Outcome o = edit(targetProfileIg(), ig -> ig.get("sd-adverse").str("a new short"));
+    assertFalse(o.render.contains("sd-observation"), o.render.toString());
+
+    o = edit(targetProfileIg(), ig -> ig.get("sd-adverse").title("Adverse Event renamed"));
+    assertTrue(o.render.contains("sd-observation"), o.render.toString());
+    assertFalse(o.validate.contains("sd-observation"));
+
+    // its examples claim it: any change to them is still a change to its page
+    o = edit(targetProfileIg(), ig -> ig.get("ex-observation").strings.set(1, "121"));
+    assertTrue(o.render.contains("sd-observation"), o.render.toString());
+  }
+
+  @Test
+  void theStrongestEdgeCounts() {
+    // the observation profile also binds something by the specimen profile's url, as an ordinary string
+    Ig ig = targetProfileIg();
+    ig.get("sd-observation").str(B+"/StructureDefinition/specimen");
+    Outcome o = edit(ig, i -> i.get("sd-specimen").strings.set(2, "Bench1 lifecycle status"));
+    assertTrue(o.validate.contains("sd-observation"), o.validate.toString());
+    assertFalse(o.validate.contains("sd-adverse"), o.validate.toString());
+  }
+
+  /** a dangling Reference still makes the file depend on the inventory, as any other dangling reference */
+  @Test
+  void anUnresolvedWeakReferenceDependsOnTheInventory() {
+    Ig ig = targetProfileIg();
+    ig.add("other", "Patient", "other");
+    ig.get("ex-adverse").ref("Observation/missing");
+    Outcome o = edit(ig, i -> i.get("other").title("renamed"));
+    assertTrue(o.validate.contains("ex-adverse"), o.validate.toString());
+    assertFalse(o.validate.contains("ex-observation"), o.validate.toString());
+    o = edit(ig, i -> i.add("ex-observation-2", "Observation", "missing"));
+    assertTrue(o.validate.contains("ex-adverse"));
+
+    // the specimen example's dangling reference: what renders it (through a reference) depends on the inventory too
+    Ig ig2 = targetProfileIg();
+    ig2.add("other", "Patient", "other");
+    ig2.get("ex-specimen").ref("Patient/missing");
+    o = edit(ig2, i -> i.get("other").title("renamed"));
+    assertTrue(o.validate.contains("ex-specimen"), o.validate.toString());
+    assertFalse(o.validate.contains("ex-observation"), o.validate.toString());
+    assertTrue(o.render.contains("ex-observation"), o.render.toString());
   }
 
   @Test
