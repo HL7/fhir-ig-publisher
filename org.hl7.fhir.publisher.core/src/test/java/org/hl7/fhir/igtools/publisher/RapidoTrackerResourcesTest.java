@@ -269,6 +269,10 @@ class RapidoTrackerResourcesTest {
       Element changed = parseJson(profile("spec", "Spec", "Specimen", "Specimen.status", "lifecycle status", null).replace(c[0], c[1]));
       assertFalse(base.getValidationHash().equals(analyse(parseJson(obsProfile), changed).get("StructureDefinition/obs").getValidationHash()), c[1]);
     }
+    // and, for a logical model, whether it can be a target
+    Element target = parseJson(profile("spec", "Spec", "Specimen", "Specimen.status", "lifecycle status", null).replace("\"status\":\"draft\",",
+        "\"status\":\"draft\",\"extension\":[{\"url\":\"http://hl7.org/fhir/StructureDefinition/structuredefinition-type-characteristics\",\"valueCode\":\"can-be-target\"}],"));
+    assertFalse(base.getValidationHash().equals(analyse(parseJson(obsProfile), target).get("StructureDefinition/obs").getValidationHash()));
     // the link goes to the target's page
     FileResult moved = analyse(Map.of("StructureDefinition/spec", "moved.html"), parseJson(obsProfile), spec).get("StructureDefinition/obs");
     assertFalse(base.getRenderHash().equals(moved.getRenderHash()));
