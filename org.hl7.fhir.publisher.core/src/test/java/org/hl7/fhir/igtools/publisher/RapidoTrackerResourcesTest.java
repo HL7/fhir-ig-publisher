@@ -84,6 +84,7 @@ class RapidoTrackerResourcesTest {
     assumeTrue(context != null, noContext);
     pf.tempDir = temp.toString();
     pf.context = context;
+    pf.version = "5.0.0";
     return new RapidoTracker(pf);
   }
 
@@ -385,6 +386,21 @@ class RapidoTrackerResourcesTest {
     }
     assertFalse(hashes.get(0).equals(hashes.get(1)), "the context failed");
 
+    // before R4, definitions are linked by Reference: every Reference is a full edge
+    pf.context = context;
+    pf.version = "3.0.2";
+    hashes.clear();
+    for (String name : new String[] {"Alice", "Bob"}) {
+      List<FileNode> nodes = new ArrayList<>();
+      for (Element e : new Element[] {parseJson(plain), parseJson(patient(name))}) {
+        FetchedFile f = new FetchedFile(e.getIdBase()+".json");
+        f.addResource(e.getIdBase()).setElement(e).setId(e.getIdBase());
+        nodes.add(new FileNode(e.fhirType()+"/"+e.getIdBase(), "source").addResource(new RapidoTracker(pf).resourceNode(f.getResources().get(0))));
+      }
+      hashes.add(new RapidoDependencyAnalyser("http://example.org/fhir").analyse(nodes).get("Condition/plain").getValidationHash());
+    }
+    assertFalse(hashes.get(0).equals(hashes.get(1)), "STU3");
+
     String report = "{\"resourceType\":\"MeasureReport\",\"id\":\"mr\",\"status\":\"complete\",\"type\":\"subject-list\",\"measure\":\"http://example.org/fhir/Measure/m\","
         + "\"group\":[{\"population\":[{\"count\":1,\"subjectResults\":{\"reference\":\"List/l\"}}]}]}";
     String list = "{\"resourceType\":\"List\",\"id\":\"l\",\"status\":\"current\",\"mode\":\"snapshot\",\"entry\":[%s]}";
@@ -430,7 +446,7 @@ class RapidoTrackerResourcesTest {
         {String.format(claims, "http://example.org/pkg/StructureDefinition/condition-logical"), "true"},
         {String.format(claims, "http://example.org/pkg/StructureDefinition/condition-imposes"), "true"}};
     definition("http://example.org/pkg/StructureDefinition/condition-sliced", "Condition", false);
-    sliced("http://example.org/pkg/StructureDefinition/condition-sliced", "evidence.reference.resolve()");
+    sliced("http://example.org/pkg/StructureDefinition/condition-sliced", "evidence.resolve()");
     definition("http://example.org/pkg/StructureDefinition/condition-sliced-by-reference", "Condition", false);
     sliced("http://example.org/pkg/StructureDefinition/condition-sliced-by-reference", "subject.reference");
     definition("http://example.org/pkg/StructureDefinition/logical-resolve", "http://example.org/pkg/StructureDefinition/logical-resolve", true);

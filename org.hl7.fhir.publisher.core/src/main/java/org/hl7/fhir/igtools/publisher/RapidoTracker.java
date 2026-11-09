@@ -64,6 +64,7 @@ import org.hl7.fhir.standalone.terminology.client.TerminologyClientManager;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.ToolingClientLogger;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonElement;
@@ -133,11 +134,18 @@ public class RapidoTracker {
   private int validationsDone;
   /** the date the loader puts on canonical resources that have none; it differs every build */
   private final String buildDate;
+  /**
+   * whether a Reference.reference only needs its target to exist with the right type. Before R4, definitions are
+   * linked by Reference too (a binding's valueSetReference, QuestionnaireResponse.questionnaire, ...), and the validator
+   * reads all of the target, so there it's a full edge
+   */
+  private final boolean weakReferences;
 
   public RapidoTracker(PublisherFields pf) throws IOException {
     this.pf = pf;
     this.stateFile = Utilities.path(pf.tempDir, "_rapido", "state.json");
     this.buildDate = new DateTimeType(pf.getExecTime()).asStringValue();
+    this.weakReferences = pf.version != null && VersionUtilities.isR4Plus(pf.version);
   }
 
   // ---- analysis ------------------------------------------------------------------------------------------------------
@@ -467,9 +475,8 @@ public class RapidoTracker {
     if (pf.context == null) {
       return true;
     }
-    if (Utilities.existsInList(r.fhirType(), "MeasureReport", "Measure", "ConceptMap")) {
-      // their validators read what they refer to: a subject-list MeasureReport counts the entries of its Lists, and in
-      // STU3 a MeasureReport's measure, a Measure's library and a ConceptMap's source and target are References
+    if ("MeasureReport".equals(r.fhirType())) {
+      // its validator reads what it refers to: a subject-list MeasureReport counts the entries of its Lists
       return true;
     }
     Set<String> urls = new LinkedHashSet<>();
@@ -605,7 +612,7 @@ public class RapidoTracker {
       if ("path".equals(e.getName()) && "discriminator".equals(parent.getName()) && discriminatorFollowsReference(e.getValue())) {
         n.setReadsTargets(true);
       }
-      if ("reference".equals(e.getName()) && "Reference".equals(parent.fhirType())) {
+      if (weakReferences && "reference".equals(e.getName()) && "Reference".equals(parent.fhirType())) {
         n.addInstanceReference(e.getValue());
       } else if ("targetProfile".equals(e.getName()) && "type".equals(parent.getName()) && grandparent != null
           && "ElementDefinition".equals(grandparent.fhirType())) {
