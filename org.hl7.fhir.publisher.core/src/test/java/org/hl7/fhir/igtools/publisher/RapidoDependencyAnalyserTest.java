@@ -290,6 +290,30 @@ class RapidoDependencyAnalyserTest {
   }
 
   @Test
+  void aTargetProfilesNameVersionAndBaseArePartOfItsIdentity() {
+    Outcome o = edit(targetProfileIg(), ig -> ig.get("sd-specimen").name = "SpecimenRenamed");
+    assertTrue(o.validate.contains("sd-observation"), o.validate.toString());
+    o = edit(targetProfileIg(), ig -> ig.get("sd-specimen").version = "2.0.0");
+    assertTrue(o.validate.contains("sd-observation"), o.validate.toString());
+    o = edit(targetProfileIg(), ig -> ig.get("sd-specimen").base = "http://hl7.org/fhir/StructureDefinition/Substance");
+    assertTrue(o.validate.contains("sd-observation"), o.validate.toString());
+    assertFalse(o.validate.contains("sd-adverse"), o.validate.toString());
+  }
+
+  /** a derived profile that names the target itself is a full user of it, though its base only links to it */
+  @Test
+  void aDerivedProfileKeepsItsOwnFullEdge() {
+    Ig ig = targetProfileIg();
+    ig.add("sd-observation-derived", "StructureDefinition", "observation-derived").url(B+"/StructureDefinition/observation-derived")
+      .base(B+"/StructureDefinition/observation").str(B+"/StructureDefinition/specimen").str("derived short");
+    Outcome o = edit(ig, i -> i.get("sd-observation-derived").strings.set(3, "derived short changed"));
+    assertTrue(o.render.contains("sd-specimen"), o.render.toString());
+    // the observation profile only links to it
+    o = edit(ig, i -> i.get("sd-observation").str("a new short"));
+    assertFalse(o.render.contains("sd-specimen"), o.render.toString());
+  }
+
+  @Test
   void aTargetProfilesTypeAndWebPathArePartOfItsIdentity() {
     Outcome o = edit(targetProfileIg(), ig -> ig.get("sd-specimen").identity.set(0, "Substance"));
     assertTrue(o.validate.contains("sd-observation"), o.validate.toString());

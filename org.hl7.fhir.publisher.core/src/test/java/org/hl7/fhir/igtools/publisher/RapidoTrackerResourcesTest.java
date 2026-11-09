@@ -246,6 +246,12 @@ class RapidoTrackerResourcesTest {
     // the validator checks the target profile's type
     Element specType = parseJson(profile("spec", "Spec", "Specimen", "Specimen.status", "lifecycle status", null).replace("\"type\":\"Specimen\"", "\"type\":\"Substance\""));
     assertFalse(base.getValidationHash().equals(analyse(parseJson(obsProfile), specType).get("StructureDefinition/obs").getValidationHash()));
+    // and its kind, derivation and abstract
+    for (String[] c : new String[][] {{"\"kind\":\"resource\"", "\"kind\":\"logical\""}, {"\"derivation\":\"constraint\"", "\"derivation\":\"specialization\""},
+        {"\"abstract\":false", "\"abstract\":true"}}) {
+      Element changed = parseJson(profile("spec", "Spec", "Specimen", "Specimen.status", "lifecycle status", null).replace(c[0], c[1]));
+      assertFalse(base.getValidationHash().equals(analyse(parseJson(obsProfile), changed).get("StructureDefinition/obs").getValidationHash()), c[1]);
+    }
     // the link goes to the target's page
     FileResult moved = analyse(Map.of("StructureDefinition/spec", "moved.html"), parseJson(obsProfile), spec).get("StructureDefinition/obs");
     assertFalse(base.getRenderHash().equals(moved.getRenderHash()));
@@ -258,6 +264,9 @@ class RapidoTrackerResourcesTest {
     assertTrue(p1.getDependsOn().isEmpty(), p1.getDependsOn().toString());
     assertEquals(p1.getValidationHash(), p2.getValidationHash());
     assertEquals(p1.getRenderHash(), p2.getRenderHash());
+    // but the link goes to the practitioner's page
+    FileResult p3 = analyse(Map.of("Practitioner/pr", "moved.html"), parseJson(linking), parseJson(String.format(pr, "female"))).get("Patient/q");
+    assertFalse(p1.getRenderHash().equals(p3.getRenderHash()));
   }
 
 
