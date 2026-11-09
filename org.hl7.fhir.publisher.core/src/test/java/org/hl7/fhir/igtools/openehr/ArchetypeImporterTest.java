@@ -82,6 +82,21 @@ class ArchetypeImporterTest {
   }
   
   @Test
+  void testImportArchetypeInputStreamString14_2()
+      throws ParserConfigurationException, SAXException, IOException, ADLParseException {
+    ArchetypeImporter importer = new ArchetypeImporter(context, "Test");
+    ProcessedArchetype archetype = importer.importArchetype(getClass().getResourceAsStream("/adl14/openEHR-EHR-ACTION.medication.v1.adl"),
+        "TEST_ADL_1.4.adl", "adl");
+    assertNotNull(archetype);
+    assertNotNull(archetype.getArchetype());
+    assertTrue(archetype.getArchetype() instanceof AuthoredArchetype);
+    AuthoredArchetype inner = (AuthoredArchetype)archetype.getArchetype();
+    assertEquals("1.4", inner.getAdlVersion());
+    assertEquals("1", archetype.getArchetype().getArchetypeId().getVersionId());
+    assertEquals("openEHR-EHR-ACTION.medication.v1", archetype.getArchetype().getArchetypeId().getFullId());
+  }
+  
+  @Test
   void testImportArchetypeInputStreamString20()
       throws ParserConfigurationException, SAXException, IOException, ADLParseException {
     ArchetypeImporter importer = new ArchetypeImporter(context, "Test");
@@ -94,6 +109,21 @@ class ArchetypeImporterTest {
     assertEquals("2.0.6", inner.getAdlVersion());
     assertEquals("1.0.0", archetype.getArchetype().getArchetypeId().getVersionId());
     assertEquals("openEHR-EHR-EVALUATION.problem_diagnosis.v1.0.0", archetype.getArchetype().getArchetypeId().getFullId());
+  }
+  
+  @Test
+  void testImportArchetypeInputStreamString20_2()
+      throws ParserConfigurationException, SAXException, IOException, ADLParseException {
+    ArchetypeImporter importer = new ArchetypeImporter(context, "Test");
+    ProcessedArchetype archetype = importer.importArchetype(getClass().getResourceAsStream("/adl20/openEHR-EHR-ACTION.medication.v1.0.0.adls"),
+        "openEHR-EHR-ACTION.medication.v1.0.0.adls", "adls");
+    assertNotNull(archetype);
+    assertNotNull(archetype.getArchetype());
+    assertTrue(archetype.getArchetype() instanceof AuthoredArchetype);
+    AuthoredArchetype inner = (AuthoredArchetype)archetype.getArchetype();
+    assertEquals("2.1.0", inner.getAdlVersion());
+    assertEquals("1.0.0", archetype.getArchetype().getArchetypeId().getVersionId());
+    assertEquals("openEHR-EHR-ACTION.medication.v1.0.0", archetype.getArchetype().getArchetypeId().getFullId());
   }
 
 }

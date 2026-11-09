@@ -3,6 +3,7 @@ package org.hl7.fhir.igtools.openehr;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.temporal.TemporalAccessor;
 import java.time.temporal.TemporalAmount;
 import java.util.Date;
 import java.util.HashMap;
@@ -22,6 +23,7 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.services.context.IWorkerContext;
 import org.hl7.fhir.model.extensions.ExtensionDefinitions;
 import org.hl7.fhir.model.core.*;
+import org.hl7.fhir.model.core.Bundle.BundleEntryComponent;
 import org.hl7.fhir.model.core.Bundle.BundleType;
 import org.hl7.fhir.model.core.CodeSystem.ConceptDefinitionComponent;
 import org.hl7.fhir.model.core.ContactPoint.ContactPointSystem;
@@ -43,8 +45,10 @@ import org.xml.sax.SAXException;
 
 import com.nedap.archie.adl14.ADL14ConversionConfiguration;
 import com.nedap.archie.adl14.ADL14Parser;
+import com.nedap.archie.adl14.aom14.CTerminologyCodeADL14;
 import com.nedap.archie.adlparser.ADLParseException;
 import com.nedap.archie.adlparser.ADLParser;
+import com.nedap.archie.adlparser.ADLParser3;
 import com.nedap.archie.aom.Archetype;
 import com.nedap.archie.aom.ArchetypeSlot;
 import com.nedap.archie.aom.CAttribute;
@@ -52,6 +56,7 @@ import com.nedap.archie.aom.CComplexObject;
 import com.nedap.archie.aom.CComplexObjectProxy;
 import com.nedap.archie.aom.CObject;
 import com.nedap.archie.aom.ResourceDescriptionItem;
+import com.nedap.archie.aom.primitives.CDateTime;
 import com.nedap.archie.aom.primitives.CDuration;
 import com.nedap.archie.aom.primitives.CInteger;
 import com.nedap.archie.aom.primitives.CReal;
@@ -241,7 +246,6 @@ public class ArchetypeImporter {
     Archetype archetype = null;
     try {
       ADL14ConversionConfiguration conversionConfiguration = new ADL14ConversionConfiguration();
-      System.out.println("RM Release: "+conversionConfiguration.getRmRelease());
       ADL14Parser adl14Parser = new ADL14Parser(metaModelProvider);
       archetype = adl14Parser.parse(stream, conversionConfiguration);
       BMMConstraintImposer constraintImposer = new BMMConstraintImposer(metaModelProvider.getMetaModel(archetype).getBmmModel());
@@ -256,6 +260,14 @@ public class ArchetypeImporter {
     return archetype;
   }
   
+  private CanonicalResource checkResource(String url) {
+    Optional<BundleEntryComponent> found = bnd.getEntryList().stream().filter(e -> e.getFullUrl().equals(url)).findAny();
+    if(found.isPresent()) {
+      return (CanonicalResource) found.get().getResource();
+    } else {
+      return null;
+    }
+  }
 
   private void addResource(CanonicalResource cr) {
     bnd.addEntry().setResource(cr).setFullUrl(cr.getUrl());
@@ -305,6 +317,25 @@ public class ArchetypeImporter {
             ed.getBinding().setStrength(BindingStrength.REQUIRED);
             ed.getBinding().setValueSet(makeValueSet(label, defn.getShort(), defn.getDefinition(), c));
           }
+        } else if (o instanceof CTerminologyCodeADL14) {
+          CTerminologyCodeADL14 c = (CTerminologyCodeADL14) o;
+          if ("property".equals(name)) {
+            System.out.println("not done yet: "+path+"."+name+": "+o.getClass().getName());
+          }
+          if (c.getConstraint()!= null) {
+            if (bindingGoesOnParent(source.getRmTypeName(), name)) {
+              defn.getBinding().setStrength(BindingStrength.REQUIRED);
+              defn.getBinding().setValueSet(makeValueSet(label, parent.getShort(), parent.getDefinition(), c));
+            } else {
+              ElementDefinition ed = new ElementDefinition(context.getModelContext(), path+"."+name);
+              ed.setId(id+"."+name);
+              defns.add(ed);
+              ed.getBinding().setStrength(BindingStrength.REQUIRED);
+              ed.getBinding().setValueSet(makeValueSet(label, defn.getShort(), defn.getDefinition(), c));
+            }
+          } else {
+            System.out.println("not done yet: "+path+"."+name+": "+o.getClass().getName());
+          }
         } else if (o instanceof CReal) {
           CReal c = (CReal) o;
           if (c.getConstraint().size() == 1) {
@@ -331,6 +362,23 @@ public class ArchetypeImporter {
             ed.setFixed(new StringType(v));
           } else {
             System.out.println("not done yet: "+path+"."+name+": "+o.getClass().getName());           
+          }
+        } else if (o instanceof CDateTime) {
+          CDateTime c = (CDateTime) o;
+          for( Interval<TemporalAccessor> v : c.getConstraint()) {
+            ElementDefinition ed = new ElementDefinition(context.getModelContext(), path+"."+name);
+            ed.setId(id+"."+name);
+            defns.add(ed);
+            if (v.getLower() != null && v.getUpper() != null && v.getLower().equals(v.getUpper())) {
+              ed.setFixed(quantityFromPeriod(v.getLower().toString()));
+            } else {
+              if (v.getLower() != null) {
+                ed.setMinValue(quantityFromPeriod(v.getLower().toString()));
+              }
+              if (v.getUpper() != null) {
+                ed.setMaxValue(quantityFromPeriod(v.getUpper().toString()));
+              }
+            }
           }
         } else if (o instanceof CDuration) {
           CDuration c = (CDuration) o;
@@ -398,9 +446,30 @@ public class ArchetypeImporter {
         }
         defns.add(slicer);
         for (CObject o : a.getChildren()) {
-          String sn  = typeSlicing ? o.getRmTypeName(): o.getNodeId();
+          String sn  = o.getNodeId();// ? o.getRmTypeName()+":"+o.getNodeId(): o.getNodeId();
           if (o instanceof CComplexObject) {
             processDefinition(defns, defn, (CComplexObject) o, path+"."+name, sn, id+"."+name+":"+sn, defn.hasLabel() ? defn.getLabel() : label);
+          } else if (o instanceof CDateTime) {
+            CDateTime c = (CDateTime) o;
+            if (c.getConstraint().size() == 1) {
+              Interval<TemporalAccessor> v = c.getConstraint().get(0);
+              ElementDefinition ed = new ElementDefinition(context.getModelContext(), path+"."+name);
+              ed.setId(id+"."+name);
+              defns.add(ed);
+              if (v.getLower() != null && v.getUpper() != null && v.getLower().equals(v.getUpper())) {
+                ed.setFixed(quantityFromPeriod(v.getLower().toString()));
+              } else {
+                if (v.getLower() != null) {
+                  ed.setMinValue(quantityFromPeriod(v.getLower().toString()));
+                }
+                if (v.getUpper() != null) {
+                  ed.setMaxValue(quantityFromPeriod(v.getUpper().toString()));
+                }
+              }
+              buildDefinition(c, ed);
+            } else {
+              System.out.println("not done yet: "+path+"."+name+": "+o.getClass().getName());           
+            }
           } else if (o instanceof ArchetypeSlot) {
             ArchetypeSlot c = (ArchetypeSlot) o;
             ElementDefinition ed = new ElementDefinition(context.getModelContext(), path+"."+name);
@@ -514,20 +583,119 @@ public class ArchetypeImporter {
     }
   }
 
+  private String makeValueSet(String label, String text, String desc, CTerminologyCodeADL14 c) {
+    String id = sd.getId()+"."+label;
+    String url = canonicalBase+"/ValueSet/"+id;
+    
+    CanonicalResource resource = checkResource(url);
+    ValueSet vs = null;
+    if(resource != null) {
+      vs = (ValueSet) resource;
+    }else {
+      vs = new ValueSet();
+      vs.setIdBase(id);
+      vs.setUrl(url);
+      vs.setName(Utilities.javaTokenize(text, true)+"VS");
+      vs.setTitle(text+" ValueSet");
+      vs.setStatus(sd.getStatus());
+      vs.setDate(sd.getDate());
+      vs.setVersion(sd.getVersion());
+      vs.setDescription("ValueSet for "+desc);
+      addResource(vs);
+    }
+    
+    CodeSystem cs = null;
+    
+    Map<String, ConceptSetComponent> incs = new HashMap<String, ValueSet.ConceptSetComponent>();
+    boolean hasOpenEHR = false;
+    for (String s : c.getConstraint()) {
+      if(s.equals(label)) {
+        continue;
+      }
+      if("openehr".equals(s)) {
+        hasOpenEHR = true;
+        continue;
+      }
+      String code = s;
+      ConceptSetComponent inc;
+      if (s.contains("::")) {
+        String sys = s.substring(0, s.indexOf("::")).replace("[", "");
+        code = s.substring(s.indexOf("::")+2).replace("]", "");
+        if ("openehr".equals(sys)) {
+          String system = getSystemForConcept(code);
+          inc = incs.get(system);
+          if (inc == null) {
+            inc = vs.getCompose().addInclude();
+            inc.setSystem(system);
+            incs.put(system,  inc);
+          }
+        } else {
+          throw new Error("Not handled yet");
+        }
+      } else if (hasOpenEHR) {
+        String system = getSystemForConcept(code);
+        inc = incs.get(system);
+        if (inc == null) {
+          inc = vs.getCompose().addInclude();
+          inc.setSystem(system);
+          incs.put(system,  inc);
+        }
+      } else {
+        
+        CanonicalResource csresource = checkResource(canonicalBase+"/CodeSystem/"+id);
+        if(csresource!=null) {
+          cs = (CodeSystem) csresource;
+        } else{
+          cs = new CodeSystem();
+          cs.setIdBase(id);
+          cs.setUrl(canonicalBase+"/CodeSystem/"+id);
+          cs.setStatus(sd.getStatus());
+          cs.setName(Utilities.javaTokenize(text, true)+"CS");
+          cs.setTitle(text);
+          cs.setDate(sd.getDate());
+          cs.setVersion(sd.getVersion());
+          cs.setDescription("CodeSystem for "+desc);
+          cs.setContent(CodeSystemContentMode.COMPLETE);
+          cs.setCaseSensitive(true);
+          addResource(cs);
+        }
+        inc = incs.get("");
+        if (inc == null) {
+          inc = vs.getCompose().addInclude();
+          inc.setSystem(cs.getUrl());
+          incs.put("",  inc);
+        }
+        ConceptDefinitionComponent cd = cs.addConcept();
+        cd.setCode(s);
+        cd.setDisplay(lookup(s));
+        cd.setDefinition(lookupDesc(s));
+      }
+      inc.addConcept().setCode(code);
+    }
+    return vs.getUrl();
+  }
+
+
   private String makeValueSet(String label, String text, String desc, CTerminologyCode c) {
     String id = sd.getId()+"."+label;
     String url = canonicalBase+"/ValueSet/"+id;
     
-    ValueSet vs = new ValueSet();
-    vs.setIdBase(id);
-    vs.setUrl(url);
-    vs.setName(Utilities.javaTokenize(text, true)+"VS");
-    vs.setTitle(text+" ValueSet");
-    vs.setStatus(sd.getStatus());
-    vs.setDate(sd.getDate());
-    vs.setVersion(sd.getVersion());
-    vs.setDescription("ValueSet for "+desc);
-    addResource(vs);
+    CanonicalResource resource = checkResource(url);
+    ValueSet vs = null;
+    if(resource != null) {
+      vs = (ValueSet) resource;
+    }else {
+      vs = new ValueSet();
+      vs.setIdBase(id);
+      vs.setUrl(url);
+      vs.setName(Utilities.javaTokenize(text, true)+"VS");
+      vs.setTitle(text+" ValueSet");
+      vs.setStatus(sd.getStatus());
+      vs.setDate(sd.getDate());
+      vs.setVersion(sd.getVersion());
+      vs.setDescription("ValueSet for "+desc);
+      addResource(vs);
+    }
     
     CodeSystem cs = null;
     
@@ -551,7 +719,10 @@ public class ArchetypeImporter {
           throw new Error("Not handled yet");
         }
       } else {
-        if (cs == null) {
+        CanonicalResource csresource = checkResource(canonicalBase+"/CodeSystem/"+id);
+        if(csresource!=null) {
+          cs = (CodeSystem) csresource;
+        } else{
           cs = new CodeSystem();
           cs.setIdBase(id);
           cs.setUrl(canonicalBase+"/CodeSystem/"+id);
