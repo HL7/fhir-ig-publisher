@@ -2,6 +2,7 @@ package org.hl7.fhir.igtools.publisher;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -17,6 +18,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.lang3.StringUtils;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_50_N;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.HTMLInspector.LoadedFile;
 import org.hl7.fhir.igtools.publisher.HTMLInspector.XhtmlNodeHolder;
@@ -224,15 +226,9 @@ class ConformanceStatementHandler {
         oldReq.put(comp.getKey(), comp);
       }
       req.setStatementList(new ArrayList<>());
-      if (req.getActorList().size()!=this.usedActors.size())
+      if (!actorsMatch(req, usedActors.values()))
         mismatch = true;
-      else {
-        for (ActorDefinition actor: usedActors.values()) {
-          if(!req.hasActor(actor.getUrl()))
-            mismatch = true;
-        }
-      }
-      
+
     } else {
       req = new Requirements();
       req.setId("fromNarrative");
@@ -373,12 +369,48 @@ class ConformanceStatementHandler {
     
     if (mismatch) {
       String fname = Utilities.path(reqFolder, "Requirements-fromNarrative.json");
-      FileOutputStream fs = new FileOutputStream(fname);
       if (!oldReq.isEmpty())
         messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Requirements/fromNarrative", "There are differences between the requirements found in the narrative and what's found the provided Requirements resource.  A new version has been generated in the root.  It should be used to replace the one in the input folder.",
             IssueSeverity.WARNING));
-        
-      new org.hl7.fhir.model.core.formats.JsonParser(context.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(fs, req);
+
+      try (FileOutputStream fs = new FileOutputStream(fname)) {
+        composeRequirements(fs, req, context);
+      }
+    }
+  }
+
+  /**
+   * True if the Requirements lists exactly these actors, each with its id as key. A file written by an older
+   * publisher carries the key in the tools extension requirements-actorkey, which is not converted when the
+   * file is loaded as R5, so its actors have no key and the actor list has to be regenerated
+   */
+  static boolean actorsMatch(Requirements req, Collection<ActorDefinition> actors) {
+    if (req.getActorList().size() != actors.size())
+      return false;
+    for (ActorDefinition actor : actors) {
+      boolean found = false;
+      for (Requirements.RequirementsActorComponent actorRef : req.getActorList()) {
+        if (actor.getUrl().equals(actorRef.getReference()) && actor.getId().equals(actorRef.getKey()))
+          found = true;
+      }
+      if (!found)
+        return false;
+    }
+    return true;
+  }
+
+  /**
+   * Writes the generated Requirements resource in the format the publisher expects when it is copied
+   * into the input folder. In an R4/R4B/R5 IG Requirements is a special type that is authored (and
+   * loaded, see PublisherIGLoader.parseContent) as R5, so it has to be written as R5: otherwise
+   * actor is written in the R6 shape (reference + key) and the next build can't parse it.
+   */
+  static void composeRequirements(OutputStream stream, Requirements req, IWorkerContext context) throws IOException {
+    if (SpecialTypeHandler.handlesType(req.fhirType(), context.getFHIRVersion())) {
+      new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(org.hl7.fhir.r5.formats.IParser.OutputStyle.PRETTY)
+        .compose(stream, VersionConvertorFactory_50_N.convertResource(req));
+    } else {
+      new org.hl7.fhir.model.core.formats.JsonParser(context.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(stream, req);
     }
   }
   
@@ -899,10 +931,14 @@ class ConformanceStatementHandler {
         x.getChildNodes().clear();
         hasClauses.set(true);
       }
-    } else if (text != null && "!§§".equals(text)) {
+    } else if (text != null && (x.getNodeType() == NodeType.Element || x.getNodeType() == NodeType.Text) && "!§§".equals(text)) {
       // special placeholder for documentation
-      x.getChildNodes().clear();
-      x.tx("§§");
+      if (x.getNodeType() == NodeType.Text) {
+        x.setContent("§§");
+      } else {
+        x.getChildNodes().clear();
+        x.tx("§§");
+      }
       hasClauses.set(true);
     } else {
       do {
@@ -911,7 +947,7 @@ class ConformanceStatementHandler {
         tryAgain = false;
         for (int i = 0; i < x.getChildNodes().size(); i++) {
           XhtmlNode c = x.getChildNodes().get(i);
-          if (c.getNodeType() == NodeType.Text && c.getContent().contains("§")) {
+          if (c.getNodeType() == NodeType.Text && c.getContent().contains("§") && !"!§§".equals(c.getContent())) {
             int offset = c.getContent().indexOf("§");
             if (start == -1) {
               start = i;

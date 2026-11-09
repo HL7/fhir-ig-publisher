@@ -1,5 +1,6 @@
 package org.hl7.fhir.igtools.renderers;
 
+import org.hl7.fhir.igtools.publisher.PackageListFetcher;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -171,7 +172,9 @@ public class PublicationChecker {
     if (check(messages, exists("output", "package.tgz"), "No output package found - can't check publication details"+mkWarning())) {
       NpmPackage npm = null;
       try {
-        npm = NpmPackage.fromPackage(new FileInputStream(Utilities.path(folder, "output", "package.tgz")));
+        try (FileInputStream in = new FileInputStream(Utilities.path(folder, "output", "package.tgz"))) {
+          npm = NpmPackage.fromPackage(in);
+        }
       } catch (Exception e) {
         check(messages, false, "Error reading package: "+e.getMessage()+mkError());
       }
@@ -543,7 +546,7 @@ public class PublicationChecker {
   
   private PackageList readPackageList(String dst) throws IOException {
     final String secureDst = ManagedWebAccess.makeSecureRef(dst);
-    return PackageList.fromUrl(Utilities.pathURL(secureDst, "package-list.json"));
+    return PackageListFetcher.fromUrl(Utilities.pathURL(secureDst, "package-list.json"));
   }
 
   private String determineDestination(NpmPackage npm) {

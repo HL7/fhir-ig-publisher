@@ -29,6 +29,7 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -62,6 +63,10 @@ public class TemplateManager {
   private boolean autoMode;
   private Map<String, String> templateOverrides = new LinkedHashMap<>(); // template id (name#version, or just name) -> local folder
   private boolean usedOverride;
+  private final List<String> localFolders = new ArrayList<>(); // the local folders the last template was loaded from
+
+  private static final String ACCESSIBLE_MARKER = "[%accessibility-routines%]";
+  private static final String JS_ROUTINE_NAME_REGEX = "[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)*";
 
   public TemplateManager(FilesystemPackageCacheManager pcm, ILoggingService logger) {
     this.pcm = pcm;
@@ -112,6 +117,7 @@ public class TemplateManager {
   public Template loadTemplate(String template, String rootFolder, String packageId, boolean autoMode, boolean wantLog, boolean rapidoMode) throws FHIRException, IOException {
     this.autoMode = autoMode;
     this.usedOverride = false;
+    localFolders.clear();
     if (autoMode && !templateOverrides.isEmpty()) {
       // overrides would let an IG substitute arbitrary content for a trusted template id
       logger.logMessage("Template overrides in ig.ini are ignored in auto-build mode: "+String.join(", ", templateOverrides.keySet()));
@@ -129,6 +135,9 @@ public class TemplateManager {
     NpmPackage npm;
     if (!inPlace) {
       installTemplate(template, rootFolder, templateDir, scriptTemplates, new ArrayList<String>(), 0);
+    } else {
+      // the IG's own template folder is the template, as it is: a change to it needs a rebuild
+      localFolders.add(new File(templateDir).getAbsolutePath());
     }
     
     if (!autoMode) {
@@ -138,6 +147,14 @@ public class TemplateManager {
       logger.logMessage("IG template '"+templateThatCantExecute+"' is not trusted.  No scripts will be executed");
     }
     return new Template(rootFolder, canExecute, templateThatCantExecute, templateReason, wantLog, rapidoMode, usedOverride || isDevMode(template));
+  }
+
+  /**
+   * The local folders that the template loaded last, and its base templates, came from (not those from the package
+   * cache): a template that is being worked on. Watch mode watches them
+   */
+  public List<String> getLocalFolders() {
+    return Collections.unmodifiableList(localFolders);
   }
 
   private boolean isDevMode(String template) {
@@ -153,6 +170,8 @@ public class TemplateManager {
       if (!f.exists() || !f.isDirectory()) {
         throw new FHIRException("The ig.ini override for template "+template+" names the folder "+override+" which does not exist");
       }
+      // recorded first, so that a template that can't be read now is still watched: fixing it needs a rebuild
+      localFolders.add(f.getAbsolutePath());
       npm = NpmPackage.fromFolder(f.getAbsolutePath(), PackageType.IG_TEMPLATE, "output", ".git");
       usedOverride = true;
       String id = template.contains("#") ? template.substring(0, template.indexOf("#")) : template;
@@ -291,6 +310,48 @@ public class TemplateManager {
       String configPath = Utilities.path(templateDir, "config.json");
       FileUtilities.stringToFile(configString, configPath);
     }
+    if (level==0 && !configs.isEmpty()) {
+      generateMakeAccessible(templateDir, configs.get(0));
+    }
+  }
+
+  /**
+   * Each template in the hierarchy can register javascript routines in its config.json:
+   *
+   *   "accessibility-routines": ["myTemplateMakeAccessible"]
+   *
+   * Arrays are concatenated when the configs are merged (base template first), so the
+   * merged config lists the routines in template order. They're written into the body of
+   * makeAccessible(accessible) in content/assets/js/accessible.js, replacing the marker line,
+   * and each is called as routine(accessible). Each template is responsible for making sure
+   * that any routine it registers is loaded in the page before accessible.js runs
+   */
+  private void generateMakeAccessible(String templateDir, JsonObject config) throws IOException {
+    String path = Utilities.path(templateDir, "content", "assets", "js", "accessible.js");
+    File f = new File(path);
+    if (!f.exists()) {
+      return;
+    }
+    List<String> routines = config.has("accessibility-routines") ? config.getStrings("accessibility-routines") : new ArrayList<>();
+    StringBuilder b = new StringBuilder();
+    for (String r : routines) {
+      if (!r.matches(JS_ROUTINE_NAME_REGEX)) {
+        throw new FHIRException("The template accessibility-routine '"+r+"' is not a valid javascript function name");
+      }
+      b.append("  "+r+"(accessible);\n");
+    }
+    String src = FileUtilities.fileToString(f);
+    String nl = src.contains("\r\n") ? "\r\n" : "\n";
+    int i = src.indexOf(ACCESSIBLE_MARKER);
+    if (i == -1) {
+      logger.logMessage("Template accessible.js has no '"+ACCESSIBLE_MARKER+"' marker, so the accessibility-routines were not added to makeAccessible()");
+      return;
+    }
+    int start = src.lastIndexOf('\n', i) + 1;
+    int end = src.indexOf('\n', i);
+    end = end == -1 ? src.length() : end + 1;
+    src = src.substring(0, start) + b.toString().replace("\n", nl) + src.substring(end);
+    FileUtilities.stringToFile(src, path);
   }
   
   private void applyConfigChanges(JsonObject baseConfig, JsonObject deltaConfig) throws FHIRException {
@@ -393,8 +454,8 @@ public class TemplateManager {
       if (template.startsWith("#")) {
         File f = new File(Utilities.path(rootFolder, template.substring(1)));
         if (f.exists() && f.isDirectory()) {
-          NpmPackage npm = NpmPackage.fromFolder(f.getAbsolutePath(), PackageType.IG_TEMPLATE, "output", ".git");
-          return npm;
+          localFolders.add(f.getAbsolutePath()); // first, as for an override
+          return NpmPackage.fromFolder(f.getAbsolutePath(), PackageType.IG_TEMPLATE, "output", ".git");
         }
       }
 
@@ -411,9 +472,12 @@ public class TemplateManager {
       }
       if (f.exists()) {
         if (f.isDirectory()) {
+          localFolders.add(f.getAbsolutePath());
           return NpmPackage.fromFolder(f.getAbsolutePath());
         } else {
-          return NpmPackage.fromPackage(new FileInputStream(template));
+          try (FileInputStream in = new FileInputStream(template)) {
+            return NpmPackage.fromPackage(in);
+          }
         }
       }
       if (template.startsWith("https://github.") || template.startsWith("http://github.")) {

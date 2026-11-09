@@ -1,5 +1,6 @@
 package org.hl7.fhir.igtools.publisher.comparators;
 
+import org.hl7.fhir.igtools.publisher.PackageListFetcher;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -150,7 +151,7 @@ public class IpaComparator {
       final String secureCanonical = ManagedWebAccess.makeSecureRef(canonical);
       String ppl = Utilities.pathURL(secureCanonical, "package-list.json");
       logger.logMessage("Fetch "+ppl+" for version check");
-      PackageList pl = PackageList.fromUrl(ppl);
+      PackageList pl = PackageListFetcher.fromUrl(ppl);
       if (!canonical.equals(pl.canonical())) {
         throw new FHIRException("Mismatch canonical URL");
       } else if (!pl.hasPid()) {
@@ -187,7 +188,7 @@ public class IpaComparator {
           vi.context = new SimpleWorkerContext.SimpleWorkerContextBuilder(ModelContext.fullCoreContext()).withTerminologyCachePath(Utilities.path(context.getTxCache().getFolder(), vi.version)).fromPackage(core,
                   new PublisherLoader(core, SpecMapManager.fromPackage(core), core.getWebLocation(), null, false, ModelContext.fullCoreContext()).makeLoader(), true);
           //vi.context.initTS();
-          vi.context.connectToTSServer(context.getTxClientManager().getFactory(), context.getTxClientManager().getMasterClient(), false);
+          vi.context.connectToTSServer(context.getTxClientManager().getFactory(), context.getTxClientManager().getMasterClient(), null);
           vi.context.setExpansionParameters(context.getExpansionParameters());
           vi.context.setUcumService(context.getUcumService());
           vi.context.setLocale(context.getLocale());

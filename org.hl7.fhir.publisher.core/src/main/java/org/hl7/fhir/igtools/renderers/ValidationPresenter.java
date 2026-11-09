@@ -546,9 +546,9 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
         }
       }
     }
-    FileOutputStream s = new FileOutputStream(FileUtilities.changeFileExt(path, ".xml"));
-    new XmlParser(context.getModelContext()).compose(s, validationBundle, true);
-    s.close();
+    try (FileOutputStream s = new FileOutputStream(FileUtilities.changeFileExt(path, ".xml"))) {
+      new XmlParser(context.getModelContext()).compose(s, validationBundle, true);
+    }
 
     genQAText(title, files, path, filteredMessages, linkErrors);
     genQATextForCompare(title, files, path, filteredMessages, linkErrors);

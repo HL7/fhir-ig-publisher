@@ -2,6 +2,7 @@ package org.hl7.fhir.igtools.publisher;
 
 import lombok.Getter;
 import lombok.Setter;
+import org.hl7.fhir.utilities.settings.FhirSettings;
 import org.hl7.fhir.utilities.Utilities;
 
 import java.util.ArrayList;
@@ -27,6 +28,8 @@ public class PublisherSettings {
     @Getter @Setter private String sourceDir;
     @Getter @Setter private String destDir;
     @Getter @Setter private String txServer;
+    // the terminology ecosystem coordination server (tx-reg), or null for none - see Publisher.setTxServerValue
+    @Getter @Setter private String ecosystem = FhirSettings.getTxEcosystem();
     @Getter @Setter private String packageCacheFolder = null;
     @Getter @Setter private String configFile;
     @Getter @Setter private String packagesFolder;
@@ -37,4 +40,11 @@ public class PublisherSettings {
     @Getter private final List<String> noNarratives = new ArrayList<String>();
     @Getter private final List<String> noValidate = new ArrayList<String>();
     @Getter @Setter String jekyllCommand = "jekyll";
+    /**
+     * How many threads, beyond its own, the publisher may use for work that it can do in parallel
+     * (-threads). 0, the default, means none: the publisher does everything on one thread, so a build
+     * doesn't load more than one core unless the user asks for it. Anything that does work in parallel
+     * takes its thread count from here.
+     */
+    @Getter @Setter private int threads = 0;
 }

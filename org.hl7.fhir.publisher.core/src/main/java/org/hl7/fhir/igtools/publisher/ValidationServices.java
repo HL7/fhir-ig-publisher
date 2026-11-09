@@ -126,6 +126,19 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
     initOtherUrls();
   }
 
+  /** The Binary a logical model instance is published as (its element itself, if it is a Binary). */
+  private Element binaryFor(FetchedResource r) throws IOException {
+    if ("Binary".equals(r.getElement().fhirType())) {
+      return r.getElement();
+    }
+    java.io.ByteArrayOutputStream b = new java.io.ByteArrayOutputStream();
+    new org.hl7.fhir.services.elementmodel.JsonParser(context).compose(r.getElement(), b, org.hl7.fhir.model.utilities.formats.OutputStyle.NORMAL, null);
+    Binary bin = new Binary(context.getModelContext(), "application/json");
+    bin.setId(r.getId());
+    bin.setContent(b.toByteArray());
+    return new ObjectConverter(context).convert(bin);
+  }
+
   @Override
   public Element fetch(IResourceValidator validator, Object appContext, String url) throws FHIRException, IOException {
     if (url == null)
@@ -187,6 +200,11 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
           for (FetchedResource r : f.getResources()) {
             if (r.getElement().fhirType().equals(parts[parts.length-2]) && r.getId().equals(parts[parts.length-1]))
               return r.getElement();
+            // an instance of a logical model is loaded as a Binary, and referred to as one
+            // (Binary/{id}), but its element is of the logical model's type - so resolve the
+            // reference to the Binary that it is published as
+            if ("Binary".equals(parts[parts.length-2]) && "Binary".equals(r.fhirType()) && r.getId().equals(parts[parts.length-1]))
+              return binaryFor(r);
           }
         }
       }

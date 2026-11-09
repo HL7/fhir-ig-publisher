@@ -30,7 +30,10 @@ public class DataSetInformation {
     Map<String, SearchParameter> map = new HashMap<>();
     for (String s : config.getStrings("searches")) {
       String file = Utilities.path(rootDir, s);
-      SearchParameter sp = (SearchParameter) new JsonParser(ModelContext.fullCoreContext()).parse(new FileInputStream(file));
+      SearchParameter sp;
+      try (FileInputStream in = new FileInputStream(file)) {
+        sp = (SearchParameter) new JsonParser(ModelContext.fullCoreContext()).parse(in);
+      }
       allSearchParameters.add(sp);
       map.put(sp.getCode(), sp);
     }

@@ -115,12 +115,12 @@ public class CodeSystemRenderer extends CanonicalRenderer {
     }
   }
 
-  public String content(Set<String> outputTracker) throws EOperationOutcome, FHIRException, IOException, org.hl7.fhir.exceptions.FHIRException {
+  public String content(Set<String> outputTracker, boolean properties) throws EOperationOutcome, FHIRException, IOException, org.hl7.fhir.exceptions.FHIRException {
     CodeSystem csc = cs.copy(Base.COPY_DATA);
 
     csc.setId(cs.getId()); // because that's not copied
     csc.setText(null);
-    gen.getRendererFactory().factory(csc, gen).renderResource(ResourceWrapper.forResource(gen.getContextUtilities(), csc));
+    gen.getRendererFactory().factory(csc, gen.withCSProperties(properties)).renderResource(ResourceWrapper.forResource(gen.getContextUtilities(), csc));
 
     return new XhtmlComposer(XhtmlComposer.HTML).compose(csc.getText().getDiv());
     //    }

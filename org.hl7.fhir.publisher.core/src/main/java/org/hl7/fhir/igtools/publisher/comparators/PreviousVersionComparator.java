@@ -1,5 +1,6 @@
 package org.hl7.fhir.igtools.publisher.comparators;
 
+import org.hl7.fhir.igtools.publisher.PackageListFetcher;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -165,7 +166,9 @@ public class PreviousVersionComparator {
   private IniFile makeIni(String rootDir, String v) throws IOException {
     File ini = new File(Utilities.path(rootDir, "url-map-v-"+v+".ini"));
     if (ini.exists()) {
-      return new IniFile(new FileInputStream(ini));
+      try (FileInputStream in = new FileInputStream(ini)) {
+        return new IniFile(in);
+      }
     } else {
       return null;
     }
@@ -177,7 +180,7 @@ public class PreviousVersionComparator {
       final String secureCanonical = ManagedWebAccess.makeSecureRef(canonical);
       String ppl = Utilities.pathURL(secureCanonical, "package-list.json");
       logger.logMessage("Fetch "+ppl+" for version check");
-      PackageList pl = PackageList.fromUrl(ppl);
+      PackageList pl = PackageListFetcher.fromUrl(ppl);
       if (!canonical.equals(pl.canonical())) {
         throw new FHIRException("Mismatch canonical URL");
       } else if (!pl.hasPid()) {
@@ -212,7 +215,7 @@ public class PreviousVersionComparator {
           NpmPackage core = pcm.loadPackage(VersionUtilities.packageForVersion(current.fhirVersion()), VersionUtilities.getCurrentVersion(current.fhirVersion()));
           vi.context = new SimpleWorkerContext.SimpleWorkerContextBuilder(ModelContext.fullCoreContext()).withTerminologyCachePath(Utilities.path(context.getTxCache().getFolder(), vi.version)).fromPackage(core,
                   new PublisherLoader(core, SpecMapManager.fromPackage(core), core.getWebLocation(), null, false, ModelContext.fullCoreContext()).makeLoader(), true);
-          vi.context.connectToTSServer(context.getTxClientManager().getFactory(), context.getTxClientManager().getMasterClient(), false);
+          vi.context.connectToTSServer(context.getTxClientManager().getFactory(), context.getTxClientManager().getMasterClient(), null);
           vi.context.setAllowLoadingDuplicates(true);
           vi.context.setExpansionParameters(context.getExpansionParameters());
           vi.context.setUcumService(context.getUcumService());
