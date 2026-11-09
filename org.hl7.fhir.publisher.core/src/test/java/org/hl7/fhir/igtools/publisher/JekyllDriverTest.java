@@ -445,25 +445,25 @@ class JekyllDriverTest {
     // _data
     write(src, "_data/d.json", "{\"v\": 2}\n");
     JekyllDriver.Result r = update(src, out, "_data/d.json");
-    assertTrue(r.isFull());
+    assertEquals("_data/d.json is not a page, a static file or an include", r.getReason());
     assertFalse(r.isAllWritten());
     assertEquals(Arrays.asList("a.html"), r.getWritten());
     // a page that's gone
     Files.delete(src.resolve("gone.html"));
     r = update(src, out, "gone.html");
-    assertTrue(r.isFull());
+    assertEquals("gone.html is not there (any more)", r.getReason());
     assertFalse(r.isAllWritten());
     assertEquals(Collections.emptyList(), r.getWritten());
     assertFalse(Files.exists(out.resolve("gone.html")));
     // a page that no longer has front matter, a static file that now has
     write(src, "c.html", "<h1>C</h1>\n");
     r = update(src, out, "c.html");
-    assertTrue(r.isFull());
+    assertEquals("c.html no longer has front matter", r.getReason());
     assertFalse(r.isAllWritten());
     assertEquals(Arrays.asList("c.html"), r.getWritten());
     write(src, "style.css", "---\n---\nbody { }\n");
     r = update(src, out, "style.css");
-    assertTrue(r.isFull());
+    assertEquals("style.css now has front matter", r.getReason());
     assertFalse(r.isAllWritten());
     assertEquals(Arrays.asList("style.css"), r.getWritten());
 
