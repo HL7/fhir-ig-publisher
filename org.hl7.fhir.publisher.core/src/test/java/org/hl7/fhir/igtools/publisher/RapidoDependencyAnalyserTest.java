@@ -314,12 +314,12 @@ class RapidoDependencyAnalyserTest {
   }
 
   @Test
-  void aTargetProfilesTypeAndWebPathArePartOfItsIdentity() {
+  void aTargetProfilesTypeAndOtherIdentityArePartOfItsIdentity() {
     Outcome o = edit(targetProfileIg(), ig -> ig.get("sd-specimen").identity.set(0, "Substance"));
     assertTrue(o.validate.contains("sd-observation"), o.validate.toString());
     assertFalse(o.validate.contains("sd-adverse"));
 
-    o = edit(targetProfileIg(), ig -> ig.get("sd-specimen").identity.add("StructureDefinition-specimen-moved.html"));
+    o = edit(targetProfileIg(), ig -> ig.get("sd-specimen").identity.add("logical"));
     assertTrue(o.render.contains("sd-observation"), o.render.toString());
     assertFalse(o.render.contains("sd-adverse"));
   }

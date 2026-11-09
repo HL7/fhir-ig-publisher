@@ -143,18 +143,11 @@ class RapidoTrackerResourcesTest {
 
   /** the analysis of files holding the given resources, keyed by the resources' Type/id */
   private Map<String, FileResult> analyse(Element... resources) throws Exception {
-    return analyse(Map.of(), resources);
-  }
-
-  /** as analyse(resources), with the web paths given (Type/id to path), and Type-id.html for the others */
-  private Map<String, FileResult> analyse(Map<String, String> paths, Element... resources) throws Exception {
     RapidoTracker t = tracker();
     List<FileNode> nodes = new ArrayList<>();
     for (Element e : resources) {
       FetchedFile f = new FetchedFile(e.fhirType()+"-"+e.getIdBase()+".json");
-      String key = e.fhirType()+"/"+e.getIdBase();
       f.addResource(e.getIdBase()).setElement(e).setId(e.getIdBase());
-      f.getResources().get(0).setPath(paths.getOrDefault(key, e.fhirType()+"-"+e.getIdBase()+".html"));
       nodes.add(new FileNode(e.fhirType()+"/"+e.getIdBase(), "source").addResource(t.resourceNode(f.getResources().get(0))));
     }
     return new RapidoDependencyAnalyser("http://example.org/fhir").analyse(nodes);
@@ -273,9 +266,6 @@ class RapidoTrackerResourcesTest {
     Element target = parseJson(profile("spec", "Spec", "Specimen", "Specimen.status", "lifecycle status", null).replace("\"status\":\"draft\",",
         "\"status\":\"draft\",\"extension\":[{\"url\":\"http://hl7.org/fhir/StructureDefinition/structuredefinition-type-characteristics\",\"valueCode\":\"can-be-target\"}],"));
     assertFalse(base.getValidationHash().equals(analyse(parseJson(obsProfile), target).get("StructureDefinition/obs").getValidationHash()));
-    // the link goes to the target's page
-    FileResult moved = analyse(Map.of("StructureDefinition/spec", "moved.html"), parseJson(obsProfile), spec).get("StructureDefinition/obs");
-    assertFalse(base.getRenderHash().equals(moved.getRenderHash()));
 
     String linking = "{\"resourceType\":\"Patient\",\"id\":\"q\",\"text\":{\"status\":\"generated\",\"div\":"
         + "\"<div xmlns=\\\"http://www.w3.org/1999/xhtml\\\">Seen by <a href=\\\"http://example.org/fhir/Practitioner/pr\\\">the GP</a></div>\"}}";
@@ -285,9 +275,8 @@ class RapidoTrackerResourcesTest {
     assertTrue(p1.getDependsOn().isEmpty(), p1.getDependsOn().toString());
     assertEquals(p1.getValidationHash(), p2.getValidationHash());
     assertEquals(p1.getRenderHash(), p2.getRenderHash());
-    // but the link goes to the practitioner's page
-    FileResult p3 = analyse(Map.of("Practitioner/pr", "moved.html"), parseJson(linking), parseJson(String.format(pr, "female"))).get("Patient/q");
-    assertFalse(p1.getRenderHash().equals(p3.getRenderHash()));
+    // but it does link to the practitioner
+    assertTrue(analyse(parseJson(linking), parseJson(String.format(pr, "female"))).get("Practitioner/pr").getUsedBy().contains("Patient/q"));
   }
 
 
@@ -304,6 +293,116 @@ class RapidoTrackerResourcesTest {
       sd.getSnapshot().addElement().setPath(type+".code").addType().setCode("CodeableConcept").addProfile(p);
     }
     context.cacheResource(sd);
+  }
+
+  private static void sliced(String url, String discriminatorPath) {
+    StructureDefinition sd = context.fetchResource(StructureDefinition.class, url);
+    sd.getSnapshot().addElement().setPath(sd.getType()+".evidence").getSlicing().addDiscriminator()
+      .setType(ElementDefinition.DiscriminatorType.VALUE).setPath(discriminatorPath);
+  }
+
+  /**
+   * Package definitions that reach each other: a reaches c, which has a resolve(), and b, which reaches a. b is looked at
+   * before c in the walk from a: that mustn't leave b known as not reading the targets
+   */
+  @Test
+  void definitionsThatReachEachOtherReadTheTargetsOfEither() throws Exception {
+    tracker();
+    StructureDefinition a = new StructureDefinition();
+    a.setUrl("http://example.org/pkg/StructureDefinition/cycle-a").setName("A").setType("Condition").setDerivation(StructureDefinition.TypeDerivationRule.CONSTRAINT);
+    a.getSnapshot().addElement().setPath("Condition.note").addType().setCode("Annotation").addProfile("http://example.org/pkg/StructureDefinition/cycle-c");
+    a.getSnapshot().addElement().setPath("Condition.code").addType().setCode("CodeableConcept").addProfile("http://example.org/pkg/StructureDefinition/cycle-b");
+    StructureDefinition c = new StructureDefinition();
+    c.setUrl("http://example.org/pkg/StructureDefinition/cycle-c").setName("C").setType("Annotation").setDerivation(StructureDefinition.TypeDerivationRule.CONSTRAINT);
+    c.getSnapshot().addElement().setPath("Annotation").addConstraint().setKey("c-1").setExpression("author.resolve().exists()");
+    context.cacheResource(c);
+    StructureDefinition b = new StructureDefinition();
+    b.setUrl("http://example.org/pkg/StructureDefinition/cycle-b").setName("B").setType("Condition").setDerivation(StructureDefinition.TypeDerivationRule.CONSTRAINT);
+    b.getSnapshot().addElement().setPath("Condition.code").addType().setCode("CodeableConcept").addProfile("http://example.org/pkg/StructureDefinition/cycle-a");
+    context.cacheResource(a);
+    context.cacheResource(b);
+    String claims = "{\"resourceType\":\"Condition\",\"id\":\"%s\",\"meta\":{\"profile\":[\"%s\"]},\"subject\":{\"reference\":\"Patient/p\"}}";
+    // one analysis (one tracker), with the resource that claims a looked at first
+    String plain = CONDITION.replace("\"id\":\"c\"", "\"id\":\"plain\"");
+    Element[] before = {parseJson(String.format(claims, "ca", a.getUrl())), parseJson(String.format(claims, "cb", b.getUrl())), parseJson(plain), parseJson(patient("Alice"))};
+    Element[] after = {parseJson(String.format(claims, "ca", a.getUrl())), parseJson(String.format(claims, "cb", b.getUrl())), parseJson(plain), parseJson(patient("Bob"))};
+    Map<String, FileResult> rb = analyse(before);
+    Map<String, FileResult> ra = analyse(after);
+    // a resource that claims neither only needs the patient to exist
+    assertEquals(rb.get("Condition/plain").getValidationHash(), ra.get("Condition/plain").getValidationHash());
+    assertFalse(rb.get("Condition/ca").getValidationHash().equals(ra.get("Condition/ca").getValidationHash()));
+    assertFalse(rb.get("Condition/cb").getValidationHash().equals(ra.get("Condition/cb").getValidationHash()));
+  }
+
+  /**
+   * In one analysis: what the resource before claimed isn't taken for the next one's. Without a context, what a
+   * resource is validated against isn't known, so it may read the targets. Some validators read what a resource refers
+   * to whatever the definitions say (a subject-list MeasureReport counts the entries of its Lists), and so does a
+   * discriminator path that goes through a reference, in a profile the IG holds
+   */
+  @Test
+  void otherWaysOfReadingTheTargets() throws Exception {
+    tracker();
+    definition("http://example.org/pkg/StructureDefinition/condition-reads", "Condition", true);
+    String claims = "{\"resourceType\":\"Condition\",\"id\":\"c\",\"meta\":{\"profile\":[\"http://example.org/pkg/StructureDefinition/condition-reads\"]},\"subject\":{\"reference\":\"Patient/p\"}}";
+    String plain = CONDITION.replace("\"id\":\"c\"", "\"id\":\"plain\"");
+    Map<String, FileResult> rb = analyse(parseJson(claims), parseJson(plain), parseJson(patient("Alice")));
+    Map<String, FileResult> ra = analyse(parseJson(claims), parseJson(plain), parseJson(patient("Bob")));
+    assertFalse(rb.get("Condition/c").getValidationHash().equals(ra.get("Condition/c").getValidationHash()));
+    rb = analyse(parseJson(claims), parseJson(plain), parseJson(patient("Alice")));
+    ra = analyse(parseJson(claims), parseJson(plain), parseJson(patient("Bob")));
+    assertEquals(rb.get("Condition/plain").getValidationHash(), ra.get("Condition/plain").getValidationHash());
+
+    PublisherFields pf = new PublisherFields();
+    RapidoTracker noContext = tracker(pf);
+    pf.context = null;
+    List<String> hashes = new ArrayList<>();
+    for (String name : new String[] {"Alice", "Bob"}) {
+      List<FileNode> nodes = new ArrayList<>();
+      for (Element e : new Element[] {parseJson(plain), parseJson(patient(name))}) {
+        FetchedFile f = new FetchedFile(e.getIdBase()+".json");
+        f.addResource(e.getIdBase()).setElement(e).setId(e.getIdBase());
+        nodes.add(new FileNode(e.fhirType()+"/"+e.getIdBase(), "source").addResource(noContext.resourceNode(f.getResources().get(0))));
+      }
+      hashes.add(new RapidoDependencyAnalyser("http://example.org/fhir").analyse(nodes).get("Condition/plain").getValidationHash());
+    }
+    assertFalse(hashes.get(0).equals(hashes.get(1)), "without a context");
+
+    // nor when the context fails
+    SimpleWorkerContext failing = mock(SimpleWorkerContext.class);
+    when(failing.fetchResource(org.mockito.ArgumentMatchers.eq(StructureDefinition.class), org.mockito.ArgumentMatchers.anyString()))
+      .thenThrow(new IllegalStateException("broken"));
+    pf.context = failing;
+    hashes.clear();
+    for (String name : new String[] {"Alice", "Bob"}) {
+      List<FileNode> nodes = new ArrayList<>();
+      for (Element e : new Element[] {parseJson(plain), parseJson(patient(name))}) {
+        FetchedFile f = new FetchedFile(e.getIdBase()+".json");
+        f.addResource(e.getIdBase()).setElement(e).setId(e.getIdBase());
+        nodes.add(new FileNode(e.fhirType()+"/"+e.getIdBase(), "source").addResource(new RapidoTracker(pf).resourceNode(f.getResources().get(0))));
+      }
+      hashes.add(new RapidoDependencyAnalyser("http://example.org/fhir").analyse(nodes).get("Condition/plain").getValidationHash());
+    }
+    assertFalse(hashes.get(0).equals(hashes.get(1)), "the context failed");
+
+    String report = "{\"resourceType\":\"MeasureReport\",\"id\":\"mr\",\"status\":\"complete\",\"type\":\"subject-list\",\"measure\":\"http://example.org/fhir/Measure/m\","
+        + "\"group\":[{\"population\":[{\"count\":1,\"subjectResults\":{\"reference\":\"List/l\"}}]}]}";
+    String list = "{\"resourceType\":\"List\",\"id\":\"l\",\"status\":\"current\",\"mode\":\"snapshot\",\"entry\":[%s]}";
+    String entry = "{\"item\":{\"display\":\"x\"}}";
+    assertFalse(analyse(parseJson(report), parseJson(String.format(list, entry))).get("MeasureReport/mr").getValidationHash()
+        .equals(analyse(parseJson(report), parseJson(String.format(list, entry+","+entry))).get("MeasureReport/mr").getValidationHash()));
+
+    String profile = "{\"resourceType\":\"StructureDefinition\",\"id\":\"sliced\",\"url\":\"http://example.org/fhir/StructureDefinition/sliced\","
+        + "\"name\":\"Sliced\",\"status\":\"draft\",\"kind\":\"resource\",\"abstract\":false,\"type\":\"Condition\","
+        + "\"baseDefinition\":\"http://hl7.org/fhir/StructureDefinition/Condition\",\"derivation\":\"constraint\",\"differential\":{\"element\":["
+        + "{\"id\":\"Condition.evidence\",\"path\":\"Condition.evidence\",\"slicing\":{\"discriminator\":[{\"type\":\"value\",\"path\":\"%s\"}],\"rules\":\"open\"}}]}}";
+    String claimsLocal = "{\"resourceType\":\"Condition\",\"id\":\"local\",\"meta\":{\"profile\":[\"http://example.org/fhir/StructureDefinition/sliced\"]},"
+        + "\"subject\":{\"reference\":\"Patient/p\"}}";
+    for (String[] c : new String[][] {{"reference", "true"}, {"code", "false"}}) {
+      FileResult b = analyse(parseJson(String.format(profile, c[0])), parseJson(claimsLocal), parseJson(patient("Alice"))).get("Condition/local");
+      FileResult a = analyse(parseJson(String.format(profile, c[0])), parseJson(claimsLocal), parseJson(patient("Bob"))).get("Condition/local");
+      assertEquals(Boolean.parseBoolean(c[1]), !b.getValidationHash().equals(a.getValidationHash()), c[0]);
+    }
   }
 
   /**
@@ -325,7 +424,23 @@ class RapidoTrackerResourcesTest {
         {String.format(uses, "http://example.org/pkg/StructureDefinition/ext-resolve"), "true"},
         {String.format(claims, "http://example.org/pkg/StructureDefinition/condition-typed"), "true"},
         {String.format(claims, "http://example.org/pkg/StructureDefinition/condition-plain"), "false"},
-        {String.format(uses, "http://example.org/pkg/StructureDefinition/condition-plain"), "false"}};
+        {String.format(uses, "http://example.org/pkg/StructureDefinition/condition-plain"), "false"},
+        {String.format(claims, "http://example.org/pkg/StructureDefinition/condition-sliced"), "true"},
+        {String.format(claims, "http://example.org/pkg/StructureDefinition/condition-sliced-by-reference"), "true"},
+        {String.format(claims, "http://example.org/pkg/StructureDefinition/condition-logical"), "true"},
+        {String.format(claims, "http://example.org/pkg/StructureDefinition/condition-imposes"), "true"}};
+    definition("http://example.org/pkg/StructureDefinition/condition-sliced", "Condition", false);
+    sliced("http://example.org/pkg/StructureDefinition/condition-sliced", "evidence.reference.resolve()");
+    definition("http://example.org/pkg/StructureDefinition/condition-sliced-by-reference", "Condition", false);
+    sliced("http://example.org/pkg/StructureDefinition/condition-sliced-by-reference", "subject.reference");
+    definition("http://example.org/pkg/StructureDefinition/logical-resolve", "http://example.org/pkg/StructureDefinition/logical-resolve", true);
+    definition("http://example.org/pkg/StructureDefinition/condition-logical", "Condition", false);
+    ((StructureDefinition) context.fetchResource(StructureDefinition.class, "http://example.org/pkg/StructureDefinition/condition-logical"))
+      .getSnapshot().addElement().setPath("Condition.note").addType().setCode("http://example.org/pkg/StructureDefinition/logical-resolve");
+    definition("http://example.org/pkg/StructureDefinition/condition-imposes", "Condition", false);
+    context.fetchResource(StructureDefinition.class, "http://example.org/pkg/StructureDefinition/condition-imposes")
+      .addExtension("http://hl7.org/fhir/StructureDefinition/structuredefinition-imposeProfile",
+          new org.hl7.fhir.model.core.CanonicalType("http://example.org/pkg/StructureDefinition/condition-resolve"));
     for (String[] c : cases) {
       FileResult before = analyse(parseJson(c[0]), parseJson(patient("Alice"))).get("Condition/c");
       FileResult after = analyse(parseJson(c[0]), parseJson(patient("Bob"))).get("Condition/c");

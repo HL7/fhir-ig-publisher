@@ -40,7 +40,8 @@ import java.util.regex.Pattern;
  *   derived from), because pages list their usages, examples, derived profiles and so on.</li>
  * </ul>
  * Some edges are weak: what's at the other end only needs to exist, with the same identity (key, file, url, version,
- * name, title, web path, and for a StructureDefinition its type, kind, derivation and base). The hash then holds that
+ * name, title, and for a StructureDefinition its type, kind, derivation and base; a page's web path follows from its
+ * type and id and the IG's settings). The hash then holds that
  * identity rather than the target's content, and doesn't go on through the target's own dependencies:
  * <ul>
  *   <li>a Reference.reference ({@link ResourceNode#addInstanceReference}) is weak for validation, which only checks that
@@ -166,7 +167,7 @@ public class RapidoDependencyAnalyser {
     }
 
     /** something about the resource that a weak edge to it depends on, besides its key, url, version, name and title
-     * (its web path, a StructureDefinition's type, ...) */
+     * (a StructureDefinition's type, ...) */
     public ResourceNode addIdentity(String s) {
       identity.add(s);
       return this;
