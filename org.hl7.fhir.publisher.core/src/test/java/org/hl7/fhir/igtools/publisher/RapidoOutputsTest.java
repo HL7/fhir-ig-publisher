@@ -71,6 +71,28 @@ class RapidoOutputsTest {
     assertEquals(Set.of(p(temp, "Patient-p.html"), p(temp, "en/Patient-p.html")), change.getGone());
   }
 
+  /**
+   * Once the temp folder is cleared, what is in it is this build's, whoever wrote it (a template script writes into
+   * _includes what were pages in the last build, say): nothing is gone, and what this build wrote is recorded
+   */
+  @Test
+  void afterTheTempFolderIsClearedNothingIsGone() throws Exception {
+    String temp = dir.resolve("temp").toString();
+    String cache = dir.resolve("cache").toString();
+    Files.createDirectories(dir.resolve("cache"));
+    FetchedFile page = file("a.md", temp, "a.md");
+    FetchedFile diagram = file("d.svg", temp, "_includes/d.svg", "_includes/en/d.svg");
+    new RapidoOutputs(cache, temp).update(List.of(page, diagram), List.of(page, diagram));
+
+    new RapidoOutputs(cache, temp).forget();
+    FetchedFile page2 = file("a.md", temp, "a.md");
+    RapidoOutputs.Change change = new RapidoOutputs(cache, temp).update(List.of(page2), List.of(page2));
+
+    assertEquals(Set.of(), change.getGone());
+    assertEquals(Set.of(), change.getKept());
+    assertTrue(Files.exists(dir.resolve("cache").resolve(".build-outputs.json")), "recorded for the next build");
+  }
+
   @Test
   void aFileRenamedInCaseOnlyIsStillWritten() throws Exception {
     // on macOS and Windows, removing the old name would remove the file just written
