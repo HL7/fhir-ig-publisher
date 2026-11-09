@@ -1,0 +1,1 @@
+* Validator: quantities with different but comparable UCUM units are compared after conversion, as in the validator (e.g. `rng-2` on a Range from 1 mg to 2 g); the publisher context had no UCUM service
