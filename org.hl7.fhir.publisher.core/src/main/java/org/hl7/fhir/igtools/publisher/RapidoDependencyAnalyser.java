@@ -70,6 +70,7 @@ public class RapidoDependencyAnalyser {
     private final Set<String> instanceReferences = new LinkedHashSet<>();
     private final Set<String> links = new LinkedHashSet<>();
     private final List<String> identity = new ArrayList<>();
+    private boolean readsTargets;
 
     public ResourceNode(String type, String id) {
       this.type = type;
@@ -154,6 +155,13 @@ public class RapidoDependencyAnalyser {
       if (s != null && !s.isEmpty()) {
         links.add(s);
       }
+      return this;
+    }
+
+    /** validating the resource reads the content of what it refers to, through a definition from outside the IG (its
+     * type's, a profile or extension from a package) that has a resolve() or conformsTo( */
+    public ResourceNode setReadsTargets(boolean readsTargets) {
+      this.readsTargets = readsTargets;
       return this;
     }
 
@@ -348,6 +356,9 @@ public class RapidoDependencyAnalyser {
       for (ResourceNode r : f.resources) {
         Map<ResourceNode, Edge> targets = new LinkedHashMap<>();
         boolean ok = true;
+        if (r.readsTargets) {
+          readsTargets.add(r);
+        }
         for (String s : r.strings) {
           ok = resolveString(s, targets, Edge.FULL) && ok;
           if (s.contains("resolve()") || s.contains("conformsTo(")) {

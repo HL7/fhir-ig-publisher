@@ -22,6 +22,8 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.RapidoDependencyAnalyser.FileNode;
 import org.hl7.fhir.igtools.publisher.RapidoDependencyAnalyser.FileResult;
 import org.hl7.fhir.model.ModelContext;
+import org.hl7.fhir.model.core.ElementDefinition;
+import org.hl7.fhir.model.core.StructureDefinition;
 import org.hl7.fhir.model.utilities.formats.FhirFormat;
 import org.hl7.fhir.services.context.IWorkerContext;
 import org.hl7.fhir.services.elementmodel.Element;
@@ -48,7 +50,7 @@ import org.junit.jupiter.api.io.TempDir;
  */
 class RapidoTrackerResourcesTest {
 
-  private static IWorkerContext context;
+  private static SimpleWorkerContext context;
   private static String noContext;
   private static String noPackage;
 
@@ -81,6 +83,7 @@ class RapidoTrackerResourcesTest {
   private RapidoTracker tracker(PublisherFields pf) throws Exception {
     assumeTrue(context != null, noContext);
     pf.tempDir = temp.toString();
+    pf.context = context;
     return new RapidoTracker(pf);
   }
 
@@ -157,8 +160,14 @@ class RapidoTrackerResourcesTest {
     return new RapidoDependencyAnalyser("http://example.org/fhir").analyse(nodes);
   }
 
+  private static final String CONDITION = "{\"resourceType\":\"Condition\",\"id\":\"c\",\"code\":{\"text\":\"Asthma\"},"
+      + "\"subject\":{\"reference\":\"Patient/p\"}}";
+  /** core's Observation has an invariant with a resolve() (obs-9) */
   private static final String OBSERVATION = "{\"resourceType\":\"Observation\",\"id\":\"o\",\"status\":\"final\",\"code\":{\"text\":\"Weight\"},"
       + "\"subject\":{\"reference\":\"Patient/p\"}}";
+  /** a contained resource is validated against the target profiles of the references to it (CHECK_VALID) */
+  private static final String CONTAINED = "{\"resourceType\":\"Condition\",\"id\":\"k\",\"contained\":[{\"resourceType\":\"Practitioner\",\"id\":\"pr\"}],"
+      + "\"code\":{\"text\":\"Asthma\"},\"subject\":{\"reference\":\"Patient/p\"},\"asserter\":{\"reference\":\"#pr\"}}";
 
   private static String patient(String family) {
     return "{\"resourceType\":\"Patient\",\"id\":\"p\",\"name\":[{\"family\":\""+family+"\"}]}";
@@ -185,14 +194,14 @@ class RapidoTrackerResourcesTest {
 
   /**
    * A Reference is weak for validation (the validator only checks that the target exists with the right type), but
-   * the page of the resource that refers to it shows the target's content: the observation's narrative names the
-   * patient. So when the patient changes, the observation keeps its validation and is rendered again. Only a
+   * the page of the resource that refers to it shows the target's content: the condition's narrative names the
+   * patient. So when the patient changes, the condition keeps its validation and is rendered again. Only a
    * Reference's reference is weak: DetectedIssue.reference (and Expression.reference, ...) is a uri like any other
    */
   @Test
   void aReferenceIsWeakForValidationOnly() throws Exception {
     RapidoTracker t = tracker();
-    Element obs = parseJson(OBSERVATION);
+    Element obs = parseJson(CONDITION);
     Element alice = parseJson(patient("Alice"));
     Element bob = parseJson(patient("Bob"));
     String before = narrative(obs, alice);
@@ -200,11 +209,19 @@ class RapidoTrackerResourcesTest {
     assertTrue(before.contains("Alice"), before);
     assertTrue(after.contains("Bob"), after);
 
-    FileResult b = analyse(parseJson(OBSERVATION), alice).get("Observation/o");
-    FileResult a = analyse(parseJson(OBSERVATION), bob).get("Observation/o");
+    FileResult b = analyse(parseJson(CONDITION), alice).get("Condition/c");
+    FileResult a = analyse(parseJson(CONDITION), bob).get("Condition/c");
     assertTrue(b.getDependsOn().contains("Patient/p"), b.getDependsOn().toString());
     assertEquals(b.getValidationHash(), a.getValidationHash());
-    assertFalse(b.getRenderHash().equals(a.getRenderHash()), "the observation's page shows the patient's name");
+    assertFalse(b.getRenderHash().equals(a.getRenderHash()), "the condition's page shows the patient's name");
+
+    // validation reads the target where a definition from outside the IG has a resolve(), and where the resource
+    // holds others
+    for (String[] r : new String[][] {{OBSERVATION, "Observation/o"}, {CONTAINED, "Condition/k"}}) {
+      FileResult rb = analyse(parseJson(r[0]), parseJson(patient("Alice"))).get(r[1]);
+      FileResult ra = analyse(parseJson(r[0]), parseJson(patient("Bob"))).get(r[1]);
+      assertFalse(rb.getValidationHash().equals(ra.getValidationHash()), r[1]);
+    }
 
     String issue = "{\"resourceType\":\"DetectedIssue\",\"id\":\"d\",\"status\":\"final\",\"reference\":\"http://example.org/fhir/Library/lib\"}";
     String lib = "{\"resourceType\":\"Library\",\"id\":\"lib\",\"url\":\"http://example.org/fhir/Library/lib\",\"status\":\"draft\","
@@ -269,6 +286,48 @@ class RapidoTrackerResourcesTest {
     assertFalse(p1.getRenderHash().equals(p3.getRenderHash()));
   }
 
+
+  /** a StructureDefinition from a package, with the given element types (profiles), and a resolve() if asked */
+  private static void definition(String url, String type, boolean resolve, String... typeProfiles) {
+    StructureDefinition sd = new StructureDefinition();
+    sd.setUrl(url).setName("Def").setType(type).setDerivation(StructureDefinition.TypeDerivationRule.CONSTRAINT)
+      .setBaseDefinition("http://hl7.org/fhir/StructureDefinition/"+type);
+    ElementDefinition root = sd.getSnapshot().addElement().setPath(type);
+    if (resolve) {
+      root.addConstraint().setKey("x-1").setExpression("subject.resolve().exists()");
+    }
+    for (String p : typeProfiles) {
+      sd.getSnapshot().addElement().setPath(type+".code").addType().setCode("CodeableConcept").addProfile(p);
+    }
+    context.cacheResource(sd);
+  }
+
+  /**
+   * The analysis only sees the IG's own resources: a profile or extension from a package that has a resolve() makes
+   * what claims or uses it read the targets of its references too (directly, or through the types it uses)
+   */
+  @Test
+  void definitionsFromPackagesCanReadTheTargets() throws Exception {
+    tracker();
+    definition("http://example.org/pkg/StructureDefinition/condition-resolve", "Condition", true);
+    definition("http://example.org/pkg/StructureDefinition/ext-resolve", "Extension", true);
+    definition("http://example.org/pkg/StructureDefinition/condition-plain", "Condition", false);
+    definition("http://example.org/pkg/StructureDefinition/cc-resolve", "CodeableConcept", true);
+    definition("http://example.org/pkg/StructureDefinition/condition-typed", "Condition", false, "http://example.org/pkg/StructureDefinition/cc-resolve");
+    String claims = "{\"resourceType\":\"Condition\",\"id\":\"c\",\"meta\":{\"profile\":[\"%s\"]},\"subject\":{\"reference\":\"Patient/p\"}}";
+    String uses = "{\"resourceType\":\"Condition\",\"id\":\"c\",\"extension\":[{\"url\":\"%s\",\"valueBoolean\":true}],\"subject\":{\"reference\":\"Patient/p\"}}";
+    String[][] cases = {
+        {String.format(claims, "http://example.org/pkg/StructureDefinition/condition-resolve"), "true"},
+        {String.format(uses, "http://example.org/pkg/StructureDefinition/ext-resolve"), "true"},
+        {String.format(claims, "http://example.org/pkg/StructureDefinition/condition-typed"), "true"},
+        {String.format(claims, "http://example.org/pkg/StructureDefinition/condition-plain"), "false"},
+        {String.format(uses, "http://example.org/pkg/StructureDefinition/condition-plain"), "false"}};
+    for (String[] c : cases) {
+      FileResult before = analyse(parseJson(c[0]), parseJson(patient("Alice"))).get("Condition/c");
+      FileResult after = analyse(parseJson(c[0]), parseJson(patient("Bob"))).get("Condition/c");
+      assertEquals(Boolean.parseBoolean(c[1]), !before.getValidationHash().equals(after.getValidationHash()), c[0]);
+    }
+  }
 
   /**
    * Whatever else in a resource the analysis can't handle: the build is a complete one, as a build without -rapido
