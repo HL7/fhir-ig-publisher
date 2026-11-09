@@ -425,6 +425,54 @@ class JekyllDriverTest {
     sameAsBuild(src, out);
   }
 
+  @Test
+  void aChangeOnlyAFullBuildHandlesOnlyWritesWhatChanged() throws Exception {
+    assumeTrue(jekyllInstalled(), "jekyll is not installed");
+    Path src = Files.createDirectories(dir.resolve("src"));
+    Path out = dir.resolve("out");
+    write(src, "a.html", "---\ntitle: A\n---\n<h1>{{ site.data.d.v }}</h1>\n");
+    write(src, "b.html", "---\ntitle: B\n---\n<h1>{{ page.title }}</h1>\n");
+    write(src, "c.html", "---\ntitle: C\n---\n<h1>{{ page.title }}</h1>\n");
+    write(src, "gone.html", "---\ntitle: Gone\n---\n<h1>{{ page.title }}</h1>\n");
+    write(src, "style.css", "body { }\n");
+    write(src, "_data/d.json", "{\"v\": 1}\n");
+
+    driver = JekyllDriver.forCommand("jekyll");
+    assertTrue(driver.build(src.toString(), out.toString(), TIMEOUT, log::add).isOk());
+    // changed after Jekyll wrote it (the html checks): left as it is by each of these full builds
+    write(out, "b.html", "checked");
+
+    // _data
+    write(src, "_data/d.json", "{\"v\": 2}\n");
+    JekyllDriver.Result r = update(src, out, "_data/d.json");
+    assertTrue(r.isFull());
+    assertFalse(r.isAllWritten());
+    assertEquals(Arrays.asList("a.html"), r.getWritten());
+    // a page that's gone
+    Files.delete(src.resolve("gone.html"));
+    r = update(src, out, "gone.html");
+    assertTrue(r.isFull());
+    assertFalse(r.isAllWritten());
+    assertEquals(Collections.emptyList(), r.getWritten());
+    assertFalse(Files.exists(out.resolve("gone.html")));
+    // a page that no longer has front matter, a static file that now has
+    write(src, "c.html", "<h1>C</h1>\n");
+    r = update(src, out, "c.html");
+    assertTrue(r.isFull());
+    assertFalse(r.isAllWritten());
+    assertEquals(Arrays.asList("c.html"), r.getWritten());
+    write(src, "style.css", "---\n---\nbody { }\n");
+    r = update(src, out, "style.css");
+    assertTrue(r.isFull());
+    assertFalse(r.isAllWritten());
+    assertEquals(Arrays.asList("style.css"), r.getWritten());
+
+    assertEquals("checked", new String(Files.readAllBytes(out.resolve("b.html")), StandardCharsets.UTF_8));
+    assertEquals(Arrays.asList("b.html"), driver.changedSinceWritten(src.toString(), out.toString()));
+    assertTrue(driver.rewrite(src.toString(), out.toString(), Arrays.asList("b.html"), TIMEOUT, log::add).isOk());
+    sameAsBuild(src, out);
+  }
+
   private JekyllDriver.Result update(Path src, Path out, String... changed) throws IOException {
     JekyllDriver.Result r = driver.update(src.toString(), out.toString(), Arrays.asList(changed), TIMEOUT, log::add);
     assertTrue(r.isOk(), r.getError() + " " + log);

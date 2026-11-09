@@ -386,19 +386,19 @@ class Driver
     changed_statics = []
     changed.each do |rel|
       abs = abs_source(rel)
-      return full_build("#{rel} is not there (any more)") unless File.file?(abs)
+      return full_build("#{rel} is not there (any more)", keep: keep) unless File.file?(abs)
 
       paths << abs
       if pages.key?(abs)
-        return full_build("#{rel} no longer has front matter") unless Jekyll::Utils.has_yaml_header?(abs)
+        return full_build("#{rel} no longer has front matter", keep: keep) unless Jekyll::Utils.has_yaml_header?(abs)
 
         changed_pages << pages[abs]
       elsif statics.key?(abs)
-        return full_build("#{rel} now has front matter") if Jekyll::Utils.has_yaml_header?(abs)
+        return full_build("#{rel} now has front matter", keep: keep) if Jekyll::Utils.has_yaml_header?(abs)
 
         changed_statics << statics[abs]
       elsif !include_file?(abs)
-        return full_build("#{rel} is not a page, a static file or an include")
+        return full_build("#{rel} is not a page, a static file or an include", keep: keep)
       end
     end
 
