@@ -480,7 +480,6 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     for (FetchedFile f : pf.fileList) {
       f.trim();
     }
-    genCombinedPackage();
     if (pf.txUnloadEarly) {
       // memory-starved IGs opt into unloading terminology now, before HTML inspection.
       // The trade-off is that conformance statement rendering (which needs terminology) won't work.
@@ -546,6 +545,13 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           } catch (Exception e) {
             pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.EXCEPTION, "package.tgz", "Error converting pacakge to R4B: "+e.getMessage(), ValidationMessage.IssueSeverity.ERROR));
           }
+        }
+        // the combined package is made from package.tgz, so it has to wait until that has been written. It needs
+        // terminology for the expansions, which is still loaded here unless the IG unloads it early
+        if (pf.txUnloadEarly) {
+          log("Not generating the combined package: terminology has been unloaded (tx-unload-early)");
+        } else {
+          genCombinedPackage();
         }
 
         if (settings.getMode() == null || settings.getMode() == PublisherUtils.IGBuildMode.MANUAL) {
