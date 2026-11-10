@@ -2,6 +2,7 @@ package org.hl7.fhir.igtools.publisher;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -21,10 +22,11 @@ import org.hl7.fhir.utilities.json.parser.JsonParser;
  * next (in a file next to the build tracker).
  *
  * <p>Once the output has been generated, the temp folder is cleared of what the build didn't write, so that what a
- * removed or renamed source wrote isn't published again. A differential build only generates the files that changed,
- * so what the others wrote in an earlier build is still needed, and this is how it is known (without it, the pages of
- * the unchanged files and template files such as Jekyll's _config.yml would be removed before Jekyll runs). It is also
- * how what a removed file, or an earlier version of a changed one, wrote in the folders of the temp folder is known.
+ * removed or renamed source wrote isn't published again. This is how what a removed file, or an earlier version of a
+ * changed one, wrote in the folders of the temp folder is known (cleanOutput only clears the top of it). A Rapido
+ * build takes every file through generation: for a file whose outputs it reuses, they are what the file wrote in the
+ * last build (see RapidoTracker), so a differential build is only made when all that this records is still there. A
+ * build that generates only some of the files keeps what the others wrote before.
  */
 public class RapidoOutputs {
 
@@ -59,14 +61,12 @@ public class RapidoOutputs {
    */
   public Change update(List<FetchedFile> fileList, Collection<FetchedFile> changeList) throws IOException {
     Set<FetchedFile> generated = new HashSet<>(changeList);
-    JsonObject before = null;
-    if (generated.size() < fileList.size() || !generated.containsAll(fileList)) {
-      before = read();
-      if (before == null) {
-        // a differential build after a build that didn't record its outputs: the next complete build does
-        record.delete();
-        return null;
-      }
+    // what was written before is needed for the files that weren't generated, and to know what is gone since
+    JsonObject before = read();
+    if (before == null && (generated.size() < fileList.size() || !generated.containsAll(fileList))) {
+      // a differential build after a build that didn't record its outputs: the next complete build does
+      record.delete();
+      return null;
     }
     Change change = new Change();
     Set<String> written = new HashSet<>();
@@ -114,6 +114,16 @@ public class RapidoOutputs {
     }
     FileUtilities.stringToFile(JsonParser.compose(now, false), record);
     return change;
+  }
+
+  /**
+   * The temp folder was cleared, so the record no longer says what is in it: everything there now is this build's.
+   * Kept, the next build of every file would report as gone what the files of an earlier build wrote that this build
+   * writes another way (the diagrams a template script writes into _includes, say), and they would be removed before
+   * Jekyll runs.
+   */
+  public void forget() throws IOException {
+    Files.deleteIfExists(record.toPath());
   }
 
   /**
