@@ -16,8 +16,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.hl7.fhir.igtools.templates.Template;
 import org.hl7.fhir.model.core.StructureDefinition;
@@ -253,6 +255,56 @@ class PublisherRapidoWatchTest {
     return r;
   }
 
+  /**
+   * A template script writes diagrams into _includes (onGenerate.plantUml), after the template has listed the svgs in
+   * there as pages (onGenerate.artifactList): from the second build on, the diagrams are pages too, and recorded as
+   * what those pages wrote. A build after the day changed clears the temp folder, so the template lists none and the
+   * diagrams are the script's again: they're not gone, or Jekyll can't include them
+   */
+  @Test
+  void aCompleteBuildDoesntRemoveWhatTheTemplateScriptsWrote() throws Exception {
+    PublisherFields pf = build("a");
+    writeDiagram();
+    finish(pf);
+
+    pf = build("a2");
+    assertFalse(pf.rapido.isCompleteBuild(), pf.rapido.getReason());
+    FetchedFile svg = file("diagram.svg", "<svg/>");
+    svg.setProcessMode(FetchedFile.PROCESS_NONE);
+    pf.fileList.add(svg); // as templateBeforeGenerate loads it
+    pf.changeList.add(svg);
+    writeDiagram();
+    svg.getOutputNames().add(includes("diagram.svg").toString());
+    svg.getOutputNames().add(includes("en", "diagram.svg").toString());
+    Files.createDirectories(includes("en"));
+    Files.writeString(includes("en", "diagram.svg"), "<svg/>");
+    finish(pf);
+
+    pf = build("a2", 1);
+    assertTrue(pf.rapido.isCompleteBuild());
+    assertEquals("changed: date", pf.rapido.getReason());
+    writeDiagram();
+    RapidoOutputs.Change change = finish(pf);
+
+    assertEquals(Set.of(), change.getGone());
+    // and what the complete build wrote is recorded: the next build is differential again
+    assertFalse(build("a2", 1).rapido.isCompleteBuild());
+  }
+
+  /** what onGenerate.plantUml does */
+  private void writeDiagram() throws Exception {
+    Files.createDirectories(includes());
+    Files.writeString(includes("diagram.svg"), "<svg/>");
+  }
+
+  private Path includes(String... names) {
+    Path p = dir.resolve("temp").resolve("_includes");
+    for (String n : names) {
+      p = p.resolve(n);
+    }
+    return p;
+  }
+
   private static FetchedFile file(PublisherFields pf, String name) {
     return pf.fileList.stream().filter(f -> f.getLoadPath().equals(name)).findFirst().orElseThrow();
   }
@@ -305,6 +357,11 @@ class PublisherRapidoWatchTest {
 
   /** checkDependencies on new files, as a watch rebuild loads them, with the given content for Patient/a */
   private PublisherFields build(String patientContent) throws Exception {
+    return build(patientContent, 0);
+  }
+
+  /** as build(patientContent), on a day that many days later */
+  private PublisherFields build(String patientContent, int daysLater) throws Exception {
     FetchedFile ig = file("ig.json", "{}");
     FetchedFile patient = file("Patient-a.json", patientContent, resource("Patient", "a", primitive(patientContent)));
     FetchedFile other = file("Patient-b.json", "b", resource("Patient", "b"));
@@ -323,6 +380,7 @@ class PublisherRapidoWatchTest {
     pf.igpkp = mock(IGKnowledgeProvider.class);
     when(pf.igpkp.getCanonical()).thenReturn("http://example.org/ig");
     pf.template = mock(Template.class);
+    pf.getExecTime().add(Calendar.DATE, daysLater);
     pf.fileList.addAll(List.of(ig, patient, other, observation, page));
     pf.changeList.addAll(pf.fileList); // as the loader leaves it
     publisher.setPf(pf);

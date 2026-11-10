@@ -32,6 +32,7 @@ import java.io.OutputStream;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
@@ -244,6 +245,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
             log("");
             log("Stack Dump (for debugging):");
             e.printStackTrace();
+            recordWatchFailure(e);
             try {
               session.buildFailed();
             } catch (IOException e2) {
@@ -591,14 +593,14 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       checkForSnomedVersion();
       if (pf.txLog != null) {
         if (ManagedFileAccess.file(pf.txLog).exists()) {
-           FileUtilities.copyFile(pf.txLog, Utilities.path(pf.rootDir, "output", "qa-tx.html"));
+           FileUtilities.copyFile(pf.txLog, stagedPath(Utilities.path(pf.rootDir, "output", "qa-tx.html")));
         }
       }
       deleteDuplicateMessages();
       ValidationPresenter val = new ValidationPresenter(pf.version, workingVersion(), pf.igpkp, pf.rootDir, pf.npmName,
           IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), pf.realmRules, pf.previousVersionComparator, pf.ipaComparator, pf.ipsComparator,
           new DependencyRenderer(pf.pcm, pf.outputDir, pf.npmName, pf.templateManager, pf.dependencyList, pf.context, pf.markdownEngine, pf.rc, pf.specMaps, pf.effectiveBaseIg).setFetchedPackageLists(pf.fetchedPackageLists).render(pf.getEffectiveBaseIg(), true, false, false), new HTAAnalysisRenderer(pf.context, pf.outputDir, pf.markdownEngine).render(pf.packageId(), pf.fileList, pf.publishedIg.present()),
-          new PublicationChecker(pf.repoRoot, pf.historyPage, pf.markdownEngine, findReleaseLabelString(), pf.getEffectiveBaseIg(), pf.relatedIGs).check(), renderGlobals(), pf.copyrightYear, pf.context, scanForR5Extensions(), pf.modifierExtensions,
+          new PublicationChecker(pf.repoRoot, pf.historyPage, pf.markdownEngine, findReleaseLabelString(), pf.getEffectiveBaseIg(), pf.relatedIGs).setOutputFolder(stagedPath(Utilities.path(pf.repoRoot, "output"))).check(), renderGlobals(), pf.copyrightYear, pf.context, scanForR5Extensions(), pf.modifierExtensions,
           generateDraftDependencies(), pf.noNarrativeResources, pf.noValidateResources, settings.isValidationOff(), settings.isGenerationOff(), pf.dependentIgFinder, pf.context.getTxClientManager(),
           fragments, makeLangInfo(), pf.relatedIGs);
       val.setValidationFlags(pf.hintAboutNonMustSupport, pf.anyExtensionsAllowed, pf.checkAggregation, pf.autoLoad, pf.showReferenceMessages, pf.noExperimentalContent, pf.displayWarnings);
@@ -614,6 +616,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       }
       buildTracker.setBooleanProperty("status", "complete", true, null);
       buildTracker.save();
+      syncWatchOutput();
       log("Finished @ "+nowString()+". Max Memory Used = "+Utilities.describeSize(pf.maxMemory)+logSummary());
     } catch (Exception e) {
       try {
@@ -628,6 +631,86 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       // three still earned everything it learned up to that point, and there is no reason to
       // make the next attempt ask for all of it again.
       saveTerminologyCache();
+    }
+  }
+
+  private String stagedPath(String path) {
+    return stagedPath(path, pf.watchOutputDir, pf.outputDir);
+  }
+
+  /**
+   * in watch mode, a path in the output folder is written in the staging folder that the build writes to
+   */
+  static String stagedPath(String path, String watchOutputDir, String stagingDir) {
+    if (watchOutputDir != null) {
+      Path out = Paths.get(watchOutputDir).toAbsolutePath().normalize();
+      Path p = Paths.get(path).toAbsolutePath().normalize();
+      if (p.startsWith(out)) {
+        return Paths.get(stagingDir).toAbsolutePath().normalize().resolve(out.relativize(p)).toString();
+      }
+    }
+    return path;
+  }
+
+  /**
+   * in watch mode, moves what changed from the staging folder into the output folder, and deletes what the build no
+   * longer produced. The build itself succeeded, so a failure here is logged rather than failing it
+   */
+  private void syncWatchOutput() {
+    if (pf.watchOutputDir == null) {
+      return;
+    }
+    long start = System.nanoTime();
+    OutputFolderSync.Result r;
+    try {
+      r = OutputFolderSync.sync(Paths.get(pf.outputDir), Paths.get(pf.watchOutputDir));
+      pf.watchOutputSynced = true;
+    } catch (IOException e) {
+      log("Unable to update "+ pf.watchOutputDir +" (it still has the output of the last build that succeeded): "+e);
+      return;
+    }
+    for (String s : r.getFailures()) {
+      log("  "+s);
+    }
+    log("Updated "+ pf.watchOutputDir +": "+r.getWritten()+" written, "+r.getDeleted()+" deleted, "+r.getUnchanged()+" unchanged"
+        +(r.getFailures().isEmpty() ? "" : ", "+r.getFailures().size()+" failed (tried again on the next rebuild)")
+        +" ("+DurationUtil.presentDuration(System.nanoTime() - start)+")");
+  }
+
+  /**
+   * in watch mode, a failed build isn't synced, but what reads qa.json in the output folder should see that it failed
+   */
+  private void recordWatchFailure(Throwable e) {
+    if (pf == null || pf.watchOutputDir == null || settings.getDestDir() != null) {
+      return;
+    }
+    if (pf.watchOutputSynced) {
+      // it failed after the output folder was brought up to date
+      return;
+    }
+    log("The build failed, so the pages in "+ pf.watchOutputDir +" are still those of the last build that succeeded");
+    if (!new File(pf.outputDir, "qa.json").exists()) {
+      // an Error, or a failure before the IG was loaded
+      recordOutcome(e instanceof Exception ? (Exception) e : new Exception(e.toString(), e), null);
+    }
+    try {
+      recordFailure(Paths.get(pf.outputDir), Paths.get(pf.watchOutputDir));
+    } catch (IOException ex) {
+      log("Unable to record the failure in "+ pf.watchOutputDir +"/qa.json: "+ex);
+    }
+  }
+
+  /**
+   * puts the failed build's qa.json in the output folder, or, if it didn't write one, removes the last one there (as
+   * when the output folder was emptied for each build)
+   */
+  static void recordFailure(Path staging, Path output) throws IOException {
+    Path staged = staging.resolve("qa.json");
+    Path qa = output.resolve("qa.json");
+    if (Files.exists(staged)) {
+      OutputFolderSync.move(staged, qa);
+    } else {
+      Files.deleteIfExists(qa);
     }
   }
 
@@ -1248,7 +1331,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   }
 
   public String getQAFile() throws IOException {
-    return Utilities.path(pf.outputDir, "qa.html");
+    return Utilities.path(finalOutputDir(), "qa.html");
   }
 
 

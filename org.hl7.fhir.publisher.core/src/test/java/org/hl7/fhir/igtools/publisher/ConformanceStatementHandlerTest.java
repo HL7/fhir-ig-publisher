@@ -34,7 +34,6 @@ import org.hl7.fhir.services.context.IWorkerContext;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.hl7.fhir.validation.BaseValidator.BooleanHolder;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -289,13 +288,13 @@ class ConformanceStatementHandlerTest {
   }
 
   /**
-   * https://github.com/HL7/fhir-ig-publisher/issues/1449#issuecomment-6607441479: a file written by an older publisher
-   * (or converted by hand) carries the actor key in requirements-actorkey, which is dropped when it is loaded, so the
-   * actor list must not be treated as up to date, otherwise the regenerated file loses the keys
+   * https://github.com/HL7/fhir-ig-publisher/issues/1449#issuecomment-6607441479: the actor list of a loaded
+   * Requirements-fromNarrative.json is only up to date when every actor still has its key after loading. A file
+   * written by an older publisher carries the key in requirements-actorkey, which core reads since 7.0.5
+   * (hapifhir/org.hl7.fhir.core#2821); an actor without any key must make the actor list be regenerated
    */
   @Test
-  @Disabled("Failing for an unknown reason - Oliver to follow up")
-  void regeneratesActorsWhenKeyIsLostOnLoad() throws Exception {
+  void regeneratesActorsWhenKeyIsMissingAfterLoad() throws Exception {
     ActorDefinition actor = new ActorDefinition();
     actor.setId("client");
     actor.setUrl("http://example.org/ig/ActorDefinition/client");
@@ -303,7 +302,11 @@ class ConformanceStatementHandlerTest {
     String legacy = "{\"resourceType\":\"Requirements\",\"id\":\"fromNarrative\",\"status\":\"active\","
         + "\"actor\":[\"http://example.org/ig/ActorDefinition/client\"],"
         + "\"_actor\":[{\"extension\":[{\"url\":\"" + ConformanceStatementHandler.EXT_REQACTORKEY + "\",\"valueId\":\"client\"}]}]}";
-    assertFalse(ConformanceStatementHandler.actorsMatch(loadAsSpecialType(legacy.getBytes()), List.of(actor)));
+    assertTrue(ConformanceStatementHandler.actorsMatch(loadAsSpecialType(legacy.getBytes()), List.of(actor)));
+
+    String noKey = "{\"resourceType\":\"Requirements\",\"id\":\"fromNarrative\",\"status\":\"active\","
+        + "\"actor\":[\"http://example.org/ig/ActorDefinition/client\"]}";
+    assertFalse(ConformanceStatementHandler.actorsMatch(loadAsSpecialType(noKey.getBytes()), List.of(actor)));
 
     Requirements req = new Requirements();
     req.setId("fromNarrative");
