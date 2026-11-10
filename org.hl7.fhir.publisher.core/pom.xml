@@ -42,6 +42,14 @@
             <groupId>org.cqframework</groupId>
             <artifactId>elm-fhir</artifactId>
             <version>${info_cqframework_version}</version>
+            <exclusions>
+                <!-- org.ogce:xpp3 declares junit:junit 4.7 as a runtime dependency,
+                     which would otherwise be bundled into the publisher. -->
+                <exclusion>
+                    <groupId>junit</groupId>
+                    <artifactId>junit</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.cqframework</groupId>

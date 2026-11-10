@@ -4,6 +4,8 @@ import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_10_50;
 import org.hl7.fhir.convertors.factory.*;
 import org.hl7.fhir.convertors.txClient.TerminologyClientFactory;
 import org.hl7.fhir.services.client.ITerminologyClientFactoryN;
+import org.fhir.ucum.UcumEssenceService;
+import org.fhir.ucum.UcumService;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.openehr.ArchetypeImporter;
 import org.hl7.fhir.igtools.openehr.CKMClient;
@@ -1656,6 +1658,7 @@ public class PublisherIGLoader extends PublisherBase {
     sp.loadBinariesFromFolder(pi);
     sp.setForPublication(true);
     sp.setSuppressedMappings(pf.suppressedMappings);
+    sp.setUcumService(loadUcumService());
     if (!pf.version.equals(Constants.VERSION)) {
       // If it wasn't a 4.0 source, we need to set the ids because they might not have been set in the source
       ProfileUtilities utils = new ProfileUtilities(pf.context, new ArrayList<ValidationMessage>(), pf.igpkp);
@@ -1674,6 +1677,21 @@ public class PublisherIGLoader extends PublisherBase {
       res = pf.txFailures;
     }
     return res;
+  }
+
+  /**
+   * UCUM service for unit-aware FHIRPath operations, loaded from the embedded ucum-essence.xml
+   * in the same way as the validator (ValidationEngine).
+   */
+  static UcumService loadUcumService() {
+    try (InputStream ue = PublisherIGLoader.class.getClassLoader().getResourceAsStream("ucum-essence.xml")) {
+      if (ue == null) {
+        throw new FHIRException("ucum-essence.xml not found on the classpath");
+      }
+      return new UcumEssenceService(ue);
+    } catch (Exception e) {
+      throw new FHIRException("Error loading UCUM from embedded ucum-essence.xml: "+e.getMessage(), e);
+    }
   }
 
   private Parameters makeExpProfile() {
