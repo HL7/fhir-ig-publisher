@@ -1839,23 +1839,25 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
         fragment("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", html, f.getOutputNames(), r, vars, null, start, "expansion", "ValueSet", lang);
       } else {
-        ValueSetExpansionOutcome exp = this.pf.context.expandVS(new ExpansionOptions().withHierarchical(true).withLanguage(lrc.getLocale().getLanguage()).withIncompleteOk(true), vs);
+        ValueSetExpansionOutcome exp = this.pf.context.expandVS(new ExpansionOptions().withCacheOk(true).withHierarchical(true).withLanguage(lrc.getLocale().getLanguage()).withIncompleteOk(true), vs);
 
         if (db != null) {
           db.recordExpansion(vs, exp);
         }
         if (exp.getValueset() != null) {
+          // the tx cache holds on to this expansion, so it's rendered from a copy
+          ValueSet expansion = exp.getValueset().copy(Base.COPY_ALL);
           if (pf.savingExpansions) {
-            this.pf.expansions.add(exp.getValueset());
+            this.pf.expansions.add(expansion);
           }
           RenderingContext elrc = lrc.withUniqueLocalPrefix("x").withMode(RenderingContext.ResourceRendererMode.END_USER);
-          exp.getValueset().setCompose(null);
-          exp.getValueset().setText(null);
-          pf.rendererFactory.factory(exp.getValueset(), elrc).renderResource(ResourceWrapper.forResource(elrc, exp.getValueset()));
-          String html = new XhtmlComposer(XhtmlComposer.XML).compose(exp.getValueset().getText().getDiv());
+          expansion.setCompose(null);
+          expansion.setText(null);
+          pf.rendererFactory.factory(expansion, elrc).renderResource(ResourceWrapper.forResource(elrc, expansion));
+          String html = new XhtmlComposer(XhtmlComposer.XML).compose(expansion.getText().getDiv());
           fragment("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", html, f.getOutputNames(), r, vars, null, start, "expansion", "ValueSet", lang);
           elrc = elrc.withOids(true);
-          XhtmlNode node = pf.rendererFactory.factory(exp.getValueset(), elrc).buildNarrative(ResourceWrapper.forResource(elrc, exp.getValueset()));
+          XhtmlNode node = pf.rendererFactory.factory(expansion, elrc).buildNarrative(ResourceWrapper.forResource(elrc, expansion));
           html = new XhtmlComposer(XhtmlComposer.XML).compose(node);
           fragment("ValueSet-"+prefixForContainer+vs.getId()+"-expansion-oids", html, f.getOutputNames(), r, vars, null, start, "expansion", "ValueSet", lang);
           if (ValueSetUtilities.isIncompleteExpansion(exp.getValueset())) {
