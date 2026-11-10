@@ -356,12 +356,19 @@ public class PublisherBase implements ILoggingService {
     return p.asString();
   }
 
+  /**
+   * the output folder: in watch mode, the build writes to a staging folder that is synced into it
+   */
+  protected String finalOutputDir() {
+    return pf.watchOutputDir != null ? pf.watchOutputDir : pf.outputDir;
+  }
+
   protected String targetUrl() {
     if (settings.getMode() == null)
-      return "file://"+ pf.outputDir;
+      return "file://"+ finalOutputDir();
     switch (settings.getMode()) {
     case AUTOBUILD: return settings.getTargetOutput() == null ? "https://build.fhir.org/ig/[org]/[repo]" : settings.getTargetOutput();
-    case MANUAL: return "file://"+ pf.outputDir;
+    case MANUAL: return "file://"+ finalOutputDir();
     case WEBSERVER: return "http://unknown";
     case PUBLICATION: return settings.getTargetOutput();
     default: return pf.igpkp.getCanonical();
