@@ -14,7 +14,9 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
 import java.util.Map;
@@ -96,6 +98,10 @@ class RapidoFileNamesTest {
     Files.createDirectories(t);
     Files.writeString(t.resolve("a.html"), "x");
     assumeTrue(sh(t, "mkfifo pipe"), "can't make a FIFO here");
+    // Git for Windows' mkfifo makes a plain pipe.lnk instead
+    Path pipe = t.resolve("pipe");
+    assumeTrue(Files.exists(pipe, LinkOption.NOFOLLOW_LINKS)
+        && Files.readAttributes(pipe, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS).isOther(), "mkfifo didn't make a FIFO here");
     try {
       // opening a FIFO to read waits for a writer, so a scan that does would hang
       assertTimeoutPreemptively(Duration.ofSeconds(30), () -> {
@@ -104,7 +110,7 @@ class RapidoFileNamesTest {
         assertEquals(Set.of("template/a.html"), RapidoTracker.scanTree(dir.toFile(), Set.of()).keySet());
       });
     } finally {
-      new RandomAccessFile(t.resolve("pipe").toFile(), "rw").close(); // lets a stuck open go on
+      new RandomAccessFile(pipe.toFile(), "rw").close(); // lets a stuck open go on
     }
   }
 
