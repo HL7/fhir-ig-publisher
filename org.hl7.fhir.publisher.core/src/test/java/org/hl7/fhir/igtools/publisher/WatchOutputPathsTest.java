@@ -81,6 +81,7 @@ class WatchOutputPathsTest {
     pf.logger = mock(ILoggingService.class);
     pf.tempDir = temp.toString();
     pf.watchOutputDir = watchOutputDir;
+    pf.vsCache = dir.toString();
     PublisherIGLoader loader = new PublisherIGLoader(new PublisherSettings());
     loader.setPf(pf);
     loader.clearTempFolder();

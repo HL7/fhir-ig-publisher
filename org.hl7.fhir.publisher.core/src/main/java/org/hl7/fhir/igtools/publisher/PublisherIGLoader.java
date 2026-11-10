@@ -1495,6 +1495,7 @@ public class PublisherIGLoader extends PublisherBase {
     for (String s : allLangs()) {
       forceDir(Utilities.path(pf.tempDir, s));
     }
+    new RapidoOutputs(pf.vsCache, pf.tempDir).forget();
   }
 
   private IPublisherModule loadModule(String name) throws Exception {
