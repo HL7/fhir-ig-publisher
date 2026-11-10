@@ -480,7 +480,6 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     for (FetchedFile f : pf.fileList) {
       f.trim();
     }
-    genCombinedPackage();
     if (pf.txUnloadEarly) {
       // memory-starved IGs opt into unloading terminology now, before HTML inspection.
       // The trade-off is that conformance statement rendering (which needs terminology) won't work.
@@ -546,6 +545,13 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           } catch (Exception e) {
             pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.EXCEPTION, "package.tgz", "Error converting pacakge to R4B: "+e.getMessage(), ValidationMessage.IssueSeverity.ERROR));
           }
+        }
+        // the combined package is made from package.tgz, so it has to wait until that has been written. It needs
+        // terminology for the expansions, which is still loaded here unless the IG unloads it early
+        if (pf.txUnloadEarly) {
+          log("Not generating the combined package: terminology has been unloaded (tx-unload-early)");
+        } else {
+          genCombinedPackage();
         }
 
         if (settings.getMode() == null || settings.getMode() == PublisherUtils.IGBuildMode.MANUAL) {
@@ -660,10 +666,16 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       String fragment = pf.sourceIg.present()+" - Downloaded Version "+ pf.businessVersion +" See the <a href=\""+ pf.igpkp.getCanonical()+"/history.html\">Directory of published versions</a></p>";
       igvu.updateStatement(fragment, 0, null);
     }
-    ZipGenerator zip = new ZipGenerator(Utilities.path(pf.tempDir, "full-ig.zip"));
-    zip.addFolder(pf.outputDir, "site/", false);
-    zip.addFileSource("index.html", REDIRECT_SOURCE, false);
-    zip.close();
+    if (settings.getThreads() > 0) {
+      // the same entries, compressed on the extra threads (-threads)
+      new ParallelFolderZip(settings.getThreads()).write(Utilities.path(pf.tempDir, "full-ig.zip"), pf.outputDir, "site/",
+          "index.html", REDIRECT_SOURCE.getBytes(StandardCharsets.UTF_8));
+    } else {
+      ZipGenerator zip = new ZipGenerator(Utilities.path(pf.tempDir, "full-ig.zip"));
+      zip.addFolder(pf.outputDir, "site/", false);
+      zip.addFileSource("index.html", REDIRECT_SOURCE, false);
+      zip.close();
+    }
     FileUtilities.copyFile(Utilities.path(pf.tempDir, "full-ig.zip"), Utilities.path(pf.outputDir, "full-ig.zip"));
     log("Final .zip built");
     if (!pf.txUnloadEarly) {
@@ -1827,23 +1839,25 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
         fragment("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", html, f.getOutputNames(), r, vars, null, start, "expansion", "ValueSet", lang);
       } else {
-        ValueSetExpansionOutcome exp = this.pf.context.expandVS(new ExpansionOptions().withHierarchical(true).withLanguage(lrc.getLocale().getLanguage()).withIncompleteOk(true), vs);
+        ValueSetExpansionOutcome exp = this.pf.context.expandVS(new ExpansionOptions().withCacheOk(true).withHierarchical(true).withLanguage(lrc.getLocale().getLanguage()).withIncompleteOk(true), vs);
 
         if (db != null) {
           db.recordExpansion(vs, exp);
         }
         if (exp.getValueset() != null) {
+          // the tx cache holds on to this expansion, so it's rendered from a copy
+          ValueSet expansion = exp.getValueset().copy(Base.COPY_ALL);
           if (pf.savingExpansions) {
-            this.pf.expansions.add(exp.getValueset());
+            this.pf.expansions.add(expansion);
           }
           RenderingContext elrc = lrc.withUniqueLocalPrefix("x").withMode(RenderingContext.ResourceRendererMode.END_USER);
-          exp.getValueset().setCompose(null);
-          exp.getValueset().setText(null);
-          pf.rendererFactory.factory(exp.getValueset(), elrc).renderResource(ResourceWrapper.forResource(elrc, exp.getValueset()));
-          String html = new XhtmlComposer(XhtmlComposer.XML).compose(exp.getValueset().getText().getDiv());
+          expansion.setCompose(null);
+          expansion.setText(null);
+          pf.rendererFactory.factory(expansion, elrc).renderResource(ResourceWrapper.forResource(elrc, expansion));
+          String html = new XhtmlComposer(XhtmlComposer.XML).compose(expansion.getText().getDiv());
           fragment("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", html, f.getOutputNames(), r, vars, null, start, "expansion", "ValueSet", lang);
           elrc = elrc.withOids(true);
-          XhtmlNode node = pf.rendererFactory.factory(exp.getValueset(), elrc).buildNarrative(ResourceWrapper.forResource(elrc, exp.getValueset()));
+          XhtmlNode node = pf.rendererFactory.factory(expansion, elrc).buildNarrative(ResourceWrapper.forResource(elrc, expansion));
           html = new XhtmlComposer(XhtmlComposer.XML).compose(node);
           fragment("ValueSet-"+prefixForContainer+vs.getId()+"-expansion-oids", html, f.getOutputNames(), r, vars, null, start, "expansion", "ValueSet", lang);
           if (ValueSetUtilities.isIncompleteExpansion(exp.getValueset())) {
@@ -4296,7 +4310,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       return true;
     }
     if (settings.isGenerationOff()) {
-      FileUtils.copyDirectory(new File(pf.tempDir), new File(pf.outputDir));
+      File out = new File(pf.outputDir).getAbsoluteFile();
+      // in watch mode the output folder is in temp: it isn't copied into itself
+      FileUtils.copyDirectory(new File(pf.tempDir), out, f -> !f.getAbsoluteFile().equals(out));
       return true;
     }
     return runJekyll();

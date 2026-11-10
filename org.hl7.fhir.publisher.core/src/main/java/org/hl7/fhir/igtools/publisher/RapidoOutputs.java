@@ -2,6 +2,7 @@ package org.hl7.fhir.igtools.publisher;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -113,6 +114,16 @@ public class RapidoOutputs {
     }
     FileUtilities.stringToFile(JsonParser.compose(now, false), record);
     return change;
+  }
+
+  /**
+   * The temp folder was cleared, so the record no longer says what is in it: everything there now is this build's.
+   * Kept, the next build of every file would report as gone what the files of an earlier build wrote that this build
+   * writes another way (the diagrams a template script writes into _includes, say), and they would be removed before
+   * Jekyll runs.
+   */
+  public void forget() throws IOException {
+    Files.deleteIfExists(record.toPath());
   }
 
   /**
