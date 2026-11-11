@@ -23,18 +23,21 @@ import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.hl7.fhir.igtools.templates.Template;
 import org.hl7.fhir.model.ModelContext;
 import org.hl7.fhir.model.core.StructureDefinition;
 import org.hl7.fhir.model.core.ValueSet;
-import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.services.elementmodel.Element;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.NamedItemList;
+import org.hl7.fhir.utilities.json.model.JsonObject;
+import org.hl7.fhir.utilities.json.model.JsonString;
 import org.hl7.fhir.utilities.logging.ILoggingService;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
@@ -475,7 +478,7 @@ class PublisherRapidoWatchTest {
     List<String> seen = new ArrayList<>();
     JsonObject state = new JsonObject().add("version", 5).add("uuid", "after");
     // a value that looks at the file while the state is being written
-    state.add("probe", new org.hl7.fhir.utilities.json.model.JsonString("x") {
+    state.add("probe", new JsonString("x") {
       @Override
       public String toJson() {
         try {
@@ -496,7 +499,7 @@ class PublisherRapidoWatchTest {
     // a state that couldn't be written leaves no state at all (not the one of the build before, nor half of one): the
     // next build is a complete one
     JsonObject failing = new JsonObject().add("version", 5);
-    failing.add("probe", new org.hl7.fhir.utilities.json.model.JsonString("x") {
+    failing.add("probe", new JsonString("x") {
       @Override
       public String toJson() {
         throw new IllegalStateException("disk full");
@@ -637,7 +640,7 @@ class PublisherRapidoWatchTest {
   /** the expansions that the html of the files the last finish reused had made */
   private final List<ValueSet> replayedExpansions = new ArrayList<>();
   /** the expansion that rendering a file (by name) makes */
-  private final java.util.Map<String, ValueSet> expansions = new java.util.HashMap<>();
+  private final Map<String, ValueSet> expansions = new HashMap<>();
 
   /**
    * What the rest of a build does for -rapido: each file's html and spreadsheet phases are reused if they can be, and

@@ -40,6 +40,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -126,20 +127,7 @@ public class RapidoTracker {
    * has the size and times it had then, and starts with the id that was written into it. So a state saved by another
    * process since, or a file that was replaced or removed, is read (or missed) as in a new process.
    */
-  private static final class Kept {
-    private final String file;
-    private final String id;
-    private final String stamp;
-    private final JsonObject state;
-    private final Map<String, ValueSet> expansions;
-
-    private Kept(String file, String id, String stamp, JsonObject state, Map<String, ValueSet> expansions) {
-      this.file = file;
-      this.id = id;
-      this.stamp = stamp;
-      this.state = state;
-      this.expansions = expansions;
-    }
+  private record Kept(String file, String id, String stamp, JsonObject state, Map<String, ValueSet> expansions) {
   }
 
   private static Kept kept;
@@ -150,7 +138,7 @@ public class RapidoTracker {
   }
 
   private static synchronized Kept kept(String file) {
-    return kept != null && kept.file.equals(file) ? kept : null;
+    return kept != null && kept.file().equals(file) ? kept : null;
   }
 
   private static synchronized void keep(Kept k) {
@@ -1032,9 +1020,9 @@ public class RapidoTracker {
       return null;
     }
     Kept k = kept(stateFile);
-    if (k != null && isStillTheFile(f, k.id, k.stamp)) {
-      oldExpansions = k.expansions;
-      return k.state;
+    if (k != null && isStillTheFile(f, k.id(), k.stamp())) {
+      oldExpansions = k.expansions();
+      return k.state();
     }
     keep(null);
     try {
@@ -1290,21 +1278,28 @@ public class RapidoTracker {
       vs = oldExpansions.get(hash);
     }
     if (vs == null) {
-      File f = expansionFile(hash);
-      try {
-        String json = new String(read(f), StandardCharsets.UTF_8);
-        if (hash.equals(new Hasher().add(json).finish())) {
-          vs = readExpansion(new JsonParser(pf.context.getModelContext()), json);
-        }
-      } catch (Exception e) {
-        // as for a file that doesn't hold what was written
-      }
-      if (vs == null) {
-        f.delete();
-        return null;
-      }
+      vs = readExpansionFile(hash);
     }
-    expansions.put(hash, vs);
+    if (vs != null) {
+      expansions.put(hash, vs);
+    }
+    return vs;
+  }
+
+  private ValueSet readExpansionFile(String hash) {
+    File f = expansionFile(hash);
+    ValueSet vs = null;
+    try {
+      String json = new String(read(f), StandardCharsets.UTF_8);
+      if (hash.equals(new Hasher().add(json).finish())) {
+        vs = readExpansion(new JsonParser(pf.context.getModelContext()), json);
+      }
+    } catch (Exception e) {
+      // as for a file that doesn't hold what was written
+    }
+    if (vs == null) {
+      f.delete();
+    }
     return vs;
   }
 
@@ -1381,7 +1376,7 @@ public class RapidoTracker {
 
     /** whether a reading of the clock after this stamp was taken would be later than the times in it */
     boolean settledAt(FileStamp clock) {
-      return clock != null && java.util.Objects.equals(device, clock.device) && latest < clock.earliest;
+      return clock != null && Objects.equals(device, clock.device) && latest < clock.earliest;
     }
   }
 
