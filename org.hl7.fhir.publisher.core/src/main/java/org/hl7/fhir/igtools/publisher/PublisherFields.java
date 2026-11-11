@@ -235,6 +235,8 @@ public class PublisherFields {
     JsonObject templateInfo;
     ExtensionTracker extensionTracker;
     String currVer;
+    /** what the build put in qa.html as the draft dependencies (see Publisher.draftDependencies()) */
+    String draftDependencies;
     List<String> codeSystemProps = new ArrayList<String>();
     List<PublisherUtils.JsonDependency> jsonDependencies = new ArrayList<PublisherUtils.JsonDependency>();
     Coding expectedJurisdiction;

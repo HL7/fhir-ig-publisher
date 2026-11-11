@@ -16,6 +16,7 @@ import org.hl7.fhir.model.core.CanonicalResource;
 import org.hl7.fhir.model.core.Enumerations.PublicationStatus;
 import org.hl7.fhir.model.core.Resource;
 import org.hl7.fhir.model.core.VersionResolutionRules;
+import org.hl7.fhir.model.core.XhtmlType;
 import org.hl7.fhir.model.utilities.ElementVisitor;
 import org.hl7.fhir.model.utilities.ElementVisitor.ElementVisitorInstruction;
 import org.hl7.fhir.model.utilities.ElementVisitor.IElementVisitor;
@@ -164,10 +165,23 @@ public class DraftDependenciesRenderer implements IElementVisitor {
 
   @Override
   public ElementVisitorInstruction visit(Object context, org.hl7.fhir.model.core.Element element) {
-    if (element.isPrimitive()) {
+    if (element.isPrimitive() && !isXhtmlElement(element)) {
       checkReference((FetchedResource) context, element);
     }
     return ElementVisitorInstruction.VISIT_CHILDREN;
+  }
+
+  /**
+   * A narrative's div is visited as a primitive, and its value is the whole narrative composed as a string, which costs
+   * more than the rest of the scan. When the div is an element, that string starts with "&lt;", so it's never an
+   * absolute url, and there's nothing to check
+   */
+  private static boolean isXhtmlElement(org.hl7.fhir.model.core.Element element) {
+    if (!(element instanceof XhtmlType)) {
+      return false;
+    }
+    XhtmlNode x = ((XhtmlType) element).getXhtml();
+    return x != null && x.getNodeType() == NodeType.Element;
   }
 
   public String render() throws IOException {

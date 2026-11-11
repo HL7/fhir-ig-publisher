@@ -14,6 +14,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 import org.hl7.fhir.igtools.templates.Template;
 
@@ -68,6 +69,9 @@ public class WatchSession {
   /** files that a window writes on every build, with different content: taken as its output */
   private final Map<String, Set<Path>> alwaysWritten = new HashMap<>();
   private Consumer<String> log = s -> { };
+  /** the latest release of the IG publisher, once it has been asked for (null if that failed) */
+  private String publisherVersion;
+  private boolean publisherVersionLookedUp;
 
   private static class OutputWindow {
     final Path folder;
@@ -103,6 +107,18 @@ public class WatchSession {
 
   private SourceSnapshot take(Collection<Path> roots, SourceSnapshot previous) throws IOException {
     return SourceSnapshot.take(roots, previous, excluded);
+  }
+
+  /**
+   * The latest release of the IG publisher, looked up by the first build that asks. If that fails (null), the session
+   * doesn't try again: every later build would wait for it to fail again
+   */
+  public String currentPublisherVersion(Supplier<String> lookup) {
+    if (!publisherVersionLookedUp) {
+      publisherVersion = lookup.get();
+      publisherVersionLookedUp = true;
+    }
+    return publisherVersion;
   }
 
   /** Records the content of the watched files as the build that is starting will see them */
