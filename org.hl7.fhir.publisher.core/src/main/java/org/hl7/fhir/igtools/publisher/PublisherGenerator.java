@@ -105,6 +105,7 @@ import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.function.Supplier;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -1083,12 +1084,131 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
 
   private void generateNativeOutputs(FetchedFile f, boolean regen, DBBuilder db) throws IOException, FHIRException, SQLException {
-    for (FetchedResource r : f.getResources()) {
+    NativePlan plan = regen ? NativePlan.NONE : planNativeOutputs(f);
+    for (int i = 0; i < f.getResources().size(); i++) {
+      FetchedResource r = f.getResources().get(i);
       logDebugMessage(LogCategory.PROGRESS, "Produce resources for "+r.fhirType()+"/"+r.getId());
-      var json = saveNativeResourceOutputs(f, r, null);
+      var json = plan.reuse != null ? reuseNativeResourceOutputs(r, plan.reuse.resources.get(i), null)
+          : saveNativeResourceOutputs(f, r, null, plan.record == null ? null : plan.record.resources.get(i));
       if (db != null) {
         db.saveResource(f, r, json);
       }
+    }
+    finishNativeOutputs(f, plan);
+  }
+
+  /** -rapido: what the native outputs step did for each file, for the next build to reuse (null without -rapido) */
+  private RapidoNativeOutputs nativeRecords;
+  /** -rapido: how many files' native outputs were left as the last build wrote them */
+  private final AtomicInteger nativeFilesReused = new AtomicInteger();
+
+  /** how the native outputs of a file are done: left as the last build wrote them (reuse), or written, and if so, recorded or not */
+  private static class NativePlan {
+    private static final NativePlan NONE = new NativePlan(null, null);
+    private final RapidoNativeOutputs.FileRecord reuse;
+    private final RapidoNativeOutputs.FileRecord record;
+
+    private NativePlan(RapidoNativeOutputs.FileRecord reuse, RapidoNativeOutputs.FileRecord record) {
+      this.reuse = reuse;
+      this.record = record;
+    }
+  }
+
+  /**
+   * In a Rapido build, the native outputs of a file are left as the last build wrote them when Rapido found that nothing
+   * they are made from has changed (the file, what it depends on, what refers to it), each resource as it is now, after
+   * loading and narrative generation, has the content the outputs were written from, and every file written then is still
+   * there with the same size and time. What the step adds to the packages, the database and the resource's messages
+   * then comes from the record of that build. In any other case the outputs are written, and recorded for the next
+   * build if a record can hold what the step does for them.
+   */
+  private NativePlan planNativeOutputs(FetchedFile f) throws IOException {
+    if (nativeRecords == null || f.getResources().isEmpty()) {
+      return NativePlan.NONE;
+    }
+    List<String> keys = new ArrayList<>();
+    try {
+      for (FetchedResource r : f.getResources()) {
+        keys.add(nativeKey(f, r));
+      }
+    } catch (RuntimeException e) {
+      // whatever is wrong with the resource is for the step itself to report
+      keys.add(null);
+    }
+    if (keys.contains(null)) {
+      nativeRecords.forget(f);
+      return NativePlan.NONE;
+    }
+    if (pf.rapido.isRenderClean(f)) {
+      RapidoNativeOutputs.FileRecord old = nativeRecords.read(f);
+      if (old != null && sameNativeKeys(old, keys) && nativeRecords.filesUnchanged(old)) {
+        return new NativePlan(old, null);
+      }
+    }
+    nativeRecords.forget(f);
+    RapidoNativeOutputs.FileRecord record = new RapidoNativeOutputs.FileRecord();
+    for (String key : keys) {
+      record.add(key);
+    }
+    return new NativePlan(null, record);
+  }
+
+  private boolean sameNativeKeys(RapidoNativeOutputs.FileRecord old, List<String> keys) {
+    if (old.resources.size() != keys.size()) {
+      return false;
+    }
+    for (int i = 0; i < keys.size(); i++) {
+      RapidoNativeOutputs.ResourceRecord r = old.resources.get(i);
+      if (!keys.get(i).equals(r.key)) {
+        return false;
+      }
+      for (RapidoNativeOutputs.Entry e : r.entries) {
+        if (e.lang != null && !pf.lnpms.containsKey(e.lang)) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  /**
+   * What the native outputs of the resource are made from, or null if that is more than the resource's content as it
+   * is now and the settings here: the IG itself (its packaged form is built from the dependencies), a custom resource,
+   * or packages for other versions (they are converted from the resource object, not from this content).
+   */
+  private String nativeKey(FetchedFile f, FetchedResource r) {
+    Element e = r.getElement();
+    if (e == null || r.isCustomResource() || !pf.generateVersions.isEmpty() || (r.getResource() != null && r.getResource() == pf.publishedIg)) {
+      return null;
+    }
+    RapidoDependencyAnalyser.Hasher h = new RapidoDependencyAnalyser.Hasher();
+    h.add(r.fhirType()).add(r.getId()).add(pf.igpkp.getCanonical()).add(pf.version);
+    h.add(isExample(f, r)+" "+includedInVersion(r, pf.version)+" "+suppressId(f, r)+" "+wantGen(r, "xml")+" "+wantGen(r, "json")+" "+wantGen(r, "ttl")
+        +" "+forHL7orFHIR()+" "+pf.module.isNoNarrative()+" "+settings.isNewMultiLangTemplateFormat());
+    h.add(String.join(",", allLangs())).add(pf.defaultTranslationLang);
+    RapidoNativeOutputs.contentKey(h, e);
+    return h.finish();
+  }
+
+  /** what saveNativeResourceOutputs did for the resource in the build that wrote its outputs, apart from writing them */
+  private byte[] reuseNativeResourceOutputs(FetchedResource r, RapidoNativeOutputs.ResourceRecord rec, List<PackageStep> later) throws IOException {
+    r.getErrors().addAll(rec.messages);
+    for (RapidoNativeOutputs.Entry e : rec.entries) {
+      NPMPackageGenerator npm = e.lang == null ? pf.npm : pf.lnpms.get(e.lang);
+      packageStep(later, () -> npm.addFile(e.category, e.name, e.content));
+    }
+    return rec.json;
+  }
+
+  /** once the step is done for all the file's resources */
+  private void finishNativeOutputs(FetchedFile f, NativePlan plan) throws IOException {
+    if (plan.reuse != null) {
+      for (String name : plan.reuse.outputNames) {
+        f.getOutputNames().add(nativeRecords.absolute(name));
+      }
+      nativeFilesReused.incrementAndGet();
+    } else if (plan.record != null) {
+      nativeRecords.save(f, plan.record);
     }
   }
 
@@ -1102,6 +1222,15 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
    * If a file fails, the files after it may already have written their outputs into temp; the build stops anyway.
    */
   void generateNativeOutputs(DBBuilder db) throws Exception {
+    nativeRecords = pf.rapido == null ? null : new RapidoNativeOutputs(pf.tempDir);
+    nativeFilesReused.set(0);
+    generateAllNativeOutputs(db);
+    if (pf.rapido != null && !pf.rapido.isCompleteBuild()) {
+      logMessage("Rapido Mode: the native outputs of " + nativeFilesReused.get() + " of " + pf.changeList.size() + " files are reused");
+    }
+  }
+
+  private void generateAllNativeOutputs(DBBuilder db) throws Exception {
     int threads = settings.getThreads();
     if (threads == 0 || pf.changeList.size() < 2 || nativeOutputNamesClash(pf.changeList)) {
       for (FetchedFile f : pf.changeList) {
@@ -1160,6 +1289,23 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
   }
 
+  /** a step that a record of the native outputs (see RapidoNativeOutputs) can't hold: then there is no record */
+  private static void packageStep(List<PackageStep> steps, RapidoNativeOutputs.ResourceRecord rec, PackageStep step) throws IOException {
+    if (rec != null) {
+      rec.file().unsupported();
+    }
+    packageStep(steps, step);
+  }
+
+  /** the step that adds a file to the main package (lang is null) or a language's package */
+  private void packageEntryStep(List<PackageStep> steps, RapidoNativeOutputs.ResourceRecord rec, String lang, NPMPackageGenerator.Category cat, String name, byte[] content) throws IOException {
+    if (rec != null) {
+      rec.entries.add(new RapidoNativeOutputs.Entry(lang, cat, name, content));
+    }
+    NPMPackageGenerator npm = lang == null ? pf.npm : pf.lnpms.get(lang);
+    packageStep(steps, () -> npm.addFile(cat, name, content));
+  }
+
   /** one resource's native outputs: written, but with its package steps still to run */
   private static class NativeOutputs {
     private final FetchedResource resource;
@@ -1184,11 +1330,15 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     FileNativeOutputs result = new FileNativeOutputs();
     f.start("generate1");
     try {
-      for (FetchedResource r : f.getResources()) {
+      NativePlan plan = planNativeOutputs(f);
+      for (int i = 0; i < f.getResources().size(); i++) {
+        FetchedResource r = f.getResources().get(i);
         NativeOutputs o = new NativeOutputs(r);
         result.resources.add(o);
-        o.json = saveNativeResourceOutputs(f, r, o.steps);
+        o.json = plan.reuse != null ? reuseNativeResourceOutputs(r, plan.reuse.resources.get(i), o.steps)
+            : saveNativeResourceOutputs(f, r, o.steps, plan.record == null ? null : plan.record.resources.get(i));
       }
+      finishNativeOutputs(f, plan);
     } catch (Exception | Error e) {
       // the package steps before the failure still run, as in the loop without threads
       result.failure = e;
@@ -1506,7 +1656,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     return b.toByteArray();
   }
 
-  private void saveNativeResourceOutputFormats(FetchedFile f, FetchedResource r, Element element, String lang) throws IOException, FileNotFoundException {
+  private void saveNativeResourceOutputFormats(FetchedFile f, FetchedResource r, Element element, String lang, RapidoNativeOutputs.ResourceRecord rec) throws IOException, FileNotFoundException {
     String path;
     if (wantGen(r, "xml") || forHL7orFHIR()) {
       if (this.settings.isNewMultiLangTemplateFormat() && lang != null) {
@@ -1515,6 +1665,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         path = Utilities.path(this.pf.tempDir, r.fhirType()+"-"+r.getId()+".xml");
       }
       f.getOutputNames().add(path);
+      if (rec != null) {
+        nativeRecords.wrote(rec.file(), path, true);
+      }
       try (FileOutputStream stream = new FileOutputStream(path)) {
         org.hl7.fhir.services.elementmodel.XmlParser xp = new org.hl7.fhir.services.elementmodel.XmlParser(this.pf.context);
         if (suppressId(f, r)) {
@@ -1530,6 +1683,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         path = Utilities.path(this.pf.tempDir, r.fhirType()+"-"+r.getId()+".json");
       }
       f.getOutputNames().add(path);
+      if (rec != null) {
+        nativeRecords.wrote(rec.file(), path, true);
+      }
       try (FileOutputStream stream = new FileOutputStream(path)) {
         org.hl7.fhir.services.elementmodel.JsonParser jp = new org.hl7.fhir.services.elementmodel.JsonParser(this.pf.context);
         if (suppressId(f, r)) {
@@ -1545,6 +1701,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         path = Utilities.path(this.pf.tempDir, r.fhirType()+"-"+r.getId()+".ttl");
       }
       f.getOutputNames().add(path);
+      if (rec != null) {
+        nativeRecords.wrote(rec.file(), path, true);
+      }
       try (FileOutputStream stream = new FileOutputStream(path)) {
         org.hl7.fhir.services.elementmodel.TurtleParser tp = new org.hl7.fhir.services.elementmodel.TurtleParser(this.pf.context);
         if (suppressId(f, r)) {
@@ -6761,7 +6920,8 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
    * @throws FileNotFoundException
    * @throws Exception
    */
-  private byte[] saveNativeResourceOutputs(FetchedFile f, FetchedResource r, List<PackageStep> later) throws FHIRException, IOException {
+  private byte[] saveNativeResourceOutputs(FetchedFile f, FetchedResource r, List<PackageStep> later, RapidoNativeOutputs.ResourceRecord rec) throws FHIRException, IOException {
+    int messagesBefore = r.getErrors().size();
     ByteArrayOutputStream bsj = new ByteArrayOutputStream();
     org.hl7.fhir.services.elementmodel.JsonParser jp = new org.hl7.fhir.services.elementmodel.JsonParser(this.pf.context);
     Element element = r.getElement();
@@ -6794,14 +6954,14 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       String name = "Binary-"+r.getId()+".json";
       if (includedInVersion(r, this.pf.version)) {
         byte[] bin = wrapAsBinary(r.getId(), bsj.toByteArray());
-        packageStep(later, () -> this.pf.npm.addFile(cat, name, bin));
+        packageEntryStep(later, rec, null, cat, name, bin);
         if (isNewML()) {
           for (String l : allLangs()) {
             Element le = this.pf.langUtils.copyToLanguage(baseElement, l, true, r.getElement().getChildValue("language"), pf.defaultTranslationLang, r.getErrors());
             ByteArrayOutputStream bsjl = new ByteArrayOutputStream();
             jp.compose(le, bsjl, OutputStyle.NORMAL, this.pf.igpkp.getCanonical());
             byte[] binl = wrapAsBinary(r.getId(), bsjl.toByteArray());
-            packageStep(later, () -> this.pf.lnpms.get(l).addFile(cat, name, binl));
+            packageEntryStep(later, rec, l, cat, name, binl);
           }
         }
       }
@@ -6809,28 +6969,28 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         String ver = VersionUtilities.versionFromCode(v);
         if (!includedInVersion(r, ver)) {
           if (this.pf.cvAnalyser != null) {
-            packageStep(later, () -> this.pf.cvAnalyser.recordOmission(ver, r.fhirType()+"/"+r.getId()));
+            packageStep(later, rec, () -> this.pf.cvAnalyser.recordOmission(ver, r.fhirType()+"/"+r.getId()));
           }
           continue;
         }
         // a Binary is the same in every version, and the instance inside it is not a FHIR resource,
         // so there is nothing to convert
         byte[] binv = wrapAsBinary(r.getId(), bsj.toByteArray());
-        packageStep(later, () -> this.pf.vnpms.get(v).addFile(cat, name, binv));
+        packageStep(later, rec, () -> this.pf.vnpms.get(v).addFile(cat, name, binv));
       }
     } else if (!r.isCustomResource()) {
       if (includedInVersion(r, this.pf.version)) {
         NPMPackageGenerator.Category cat = isExample(f,r ) ? NPMPackageGenerator.Category.EXAMPLE : NPMPackageGenerator.Category.RESOURCE;
         String name = element.fhirTypeRoot()+"-"+r.getId()+".json";
         byte[] cnt = bsj.toByteArray();
-        packageStep(later, () -> this.pf.npm.addFile(cat, name, cnt));
+        packageEntryStep(later, rec, null, cat, name, cnt);
         if (isNewML()) {
           for (String l : allLangs()) {
             Element le = this.pf.langUtils.copyToLanguage(baseElement, l, true, r.getElement().getChildValue("language"), pf.defaultTranslationLang, r.getErrors()); // todo: should we keep this?
             ByteArrayOutputStream bsjl = new ByteArrayOutputStream();
             jp.compose(le, bsjl, OutputStyle.NORMAL, this.pf.igpkp.getCanonical());
             byte[] cntl = bsjl.toByteArray();
-            packageStep(later, () -> this.pf.lnpms.get(l).addFile(cat, name, cntl));
+            packageEntryStep(later, rec, l, cat, name, cntl);
           }
         }
       }
@@ -6838,7 +6998,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         String ver = VersionUtilities.versionFromCode(v);
         if (!includedInVersion(r, ver)) {
           if (this.pf.cvAnalyser != null) {
-            packageStep(later, () -> this.pf.cvAnalyser.recordOmission(ver, r.fhirType()+"/"+r.getId()));
+            packageStep(later, rec, () -> this.pf.cvAnalyser.recordOmission(ver, r.fhirType()+"/"+r.getId()));
           }
           continue; // resource scoped out of this target version via *-inclusion (intentional membership omission)
         }
@@ -6863,7 +7023,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
             String type = res.fhirType();
             String resId = res.getId();
             String msg = e.getMessage();
-            packageStep(later, () -> {
+            packageStep(later, rec, () -> {
               System.out.println("Unable to convert "+type+"/"+resId+" to "+ver+": "+msg);
               if (this.pf.cvAnalyser != null) {
                 this.pf.cvAnalyser.recordProblem(ver, type+"/"+r.getId(), msg);
@@ -6875,29 +7035,29 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
             NPMPackageGenerator.Category cat = isExample(f,r ) ? NPMPackageGenerator.Category.EXAMPLE : NPMPackageGenerator.Category.RESOURCE;
             String name = element.fhirTypeRoot()+"-"+r.getId()+".json";
             byte[] cntv = resVer;
-            packageStep(later, () -> this.pf.vnpms.get(v).addFile(cat, name, cntv));
+            packageStep(later, rec, () -> this.pf.vnpms.get(v).addFile(cat, name, cntv));
           }
         }
       }
       if (r.getResource() != null && r.getResource().hasUserData(UserDataNames.archetypeSource)) {
         String adlName = r.getResource().getUserString(UserDataNames.archetypeName);
         byte[] adl = r.getResource().getUserString(UserDataNames.archetypeSource).getBytes(StandardCharsets.UTF_8);
-        packageStep(later, () -> addFileToNpm(NPMPackageGenerator.Category.ADL, adlName, adl));
+        packageStep(later, rec, () -> addFileToNpm(NPMPackageGenerator.Category.ADL, adlName, adl));
       }
 
     } else  if ("StructureDefinition".equals(r.fhirType())) {
       // GG 20-Feb 2025 - how can you ever get to here?
       byte[] cnt = bsj.toByteArray();
-      packageStep(later, () -> addFileToNpm(NPMPackageGenerator.Category.RESOURCE, element.fhirType()+"-"+r.getId()+".json", cnt));
+      packageStep(later, rec, () -> addFileToNpm(NPMPackageGenerator.Category.RESOURCE, element.fhirType()+"-"+r.getId()+".json", cnt));
       StructureDefinition sdt = (StructureDefinition) r.getResource().copy(Base.COPY_DATA);
       sdt.setKind(StructureDefinition.StructureDefinitionKind.RESOURCE);
       bsj = new ByteArrayOutputStream();
       new JsonParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.NORMAL).compose(bsj, sdt);
       byte[] cntSd = bsj.toByteArray();
-      packageStep(later, () -> addFileToNpm(NPMPackageGenerator.Category.CUSTOM, "StructureDefinition-"+r.getId()+".json", cntSd));
+      packageStep(later, rec, () -> addFileToNpm(NPMPackageGenerator.Category.CUSTOM, "StructureDefinition-"+r.getId()+".json", cntSd));
     } else {
       byte[] cnt = bsj.toByteArray();
-      packageStep(later, () -> addFileToNpm(NPMPackageGenerator.Category.CUSTOM, element.fhirType()+"-"+r.getId()+".json", cnt));
+      packageStep(later, rec, () -> addFileToNpm(NPMPackageGenerator.Category.CUSTOM, element.fhirType()+"-"+r.getId()+".json", cnt));
       Binary bin = new Binary(pf.context.getModelContext(), "application/fhir+json");
       bin.setId(r.getId());
       bin.setContent(bsj.toByteArray());
@@ -6905,7 +7065,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       new JsonParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.NORMAL).compose(bsj, bin);
       NPMPackageGenerator.Category cat = isExample(f,r ) ? NPMPackageGenerator.Category.EXAMPLE : NPMPackageGenerator.Category.RESOURCE;
       byte[] cntBin = bsj.toByteArray();
-      packageStep(later, () -> addFileToNpm(cat, "Binary-"+r.getId()+".json", cntBin));
+      packageStep(later, rec, () -> addFileToNpm(cat, "Binary-"+r.getId()+".json", cntBin));
     }
 
     if (this.pf.module.isNoNarrative()) {
@@ -6919,8 +7079,12 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     FileUtilities.bytesToFile(bsj.toByteArray(), path);
     String pathEsc = Utilities.path(this.pf.tempDir, "_includes", r.fhirType()+"-"+r.getId()+".escaped.json");
     XmlEscaper.convert(path, pathEsc);
+    if (rec != null) {
+      nativeRecords.wrote(rec.file(), path, false);
+      nativeRecords.wrote(rec.file(), pathEsc, false);
+    }
 
-    saveNativeResourceOutputFormats(f, r, element, "");
+    saveNativeResourceOutputFormats(f, r, element, "", rec);
     for (String lang : allLangs()) {
       Element e = (Element) element.copy(Base.COPY_DATA);
       boolean changed = this.pf.langUtils.switchLanguage(e, lang, true, r.getElement().getChildValue("language"), pf.defaultTranslationLang, r.getErrors());
@@ -6932,11 +7096,16 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       // In the old format the language copies are written over the root files, so there, only
       // write them when the language actually changed something.
       if (changed || this.settings.isNewMultiLangTemplateFormat()) {
-        saveNativeResourceOutputFormats(f, r, e, lang);
+        saveNativeResourceOutputFormats(f, r, e, lang, rec);
       }
     }
 
-    return bsj.toByteArray();
+    byte[] json = bsj.toByteArray();
+    if (rec != null) {
+      rec.json = json;
+      rec.messages.addAll(r.getErrors().subList(messagesBefore, r.getErrors().size()));
+    }
+    return json;
   }
 
 

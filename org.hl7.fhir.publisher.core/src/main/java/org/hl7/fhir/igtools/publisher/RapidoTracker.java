@@ -407,6 +407,14 @@ public class RapidoTracker {
     this.uuid = uuid;
   }
 
+  /**
+   * Whether nothing that the file's outputs are made from has changed since the build whose state this build loaded:
+   * the file, what it depends on, and what refers to it (always false in a complete build)
+   */
+  public boolean isRenderClean(FetchedFile f) {
+    return renderClean.contains(f);
+  }
+
   public int countValidationDirty() {
     return pf.fileList.size() - validationClean.size();
   }
