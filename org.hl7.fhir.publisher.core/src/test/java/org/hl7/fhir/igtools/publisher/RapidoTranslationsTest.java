@@ -98,6 +98,7 @@ class RapidoTranslationsTest {
   private static final List<String> O = List.of("ru/json/Observation-o.json", "ru/po/Observation-o.po", "ru/xliff/Observation-o.xliff",
       "uz/json/Observation-o.json", "uz/po/Observation-o.po", "uz/xliff/Observation-o.xliff");
 
+  @SafeVarargs
   private static List<String> all(List<String>... lists) {
     List<String> res = new ArrayList<>();
     for (List<String> l : lists) {
@@ -158,9 +159,7 @@ class RapidoTranslationsTest {
   void aCompleteBuildWritesThemAll() throws Exception {
     Map<String, FileTime> first = translate(build("Alice", true));
     // as after a build that failed
-    IniFile buildTracker = new IniFile(dir.resolve(".build-tracker.ini").toString());
-    buildTracker.setBooleanProperty("status", "complete", false, null);
-    buildTracker.save();
+    setBuildComplete(false);
 
     PublisherFields pf = build("Alice", true);
     assertTrue(pf.rapido.isCompleteBuild());
@@ -211,8 +210,12 @@ class RapidoTranslationsTest {
     }
     new RapidoOutputs(pf.vsCache, pf.tempDir).update(pf.fileList, pf.changeList);
     pf.rapido.save();
+    setBuildComplete(true);
+  }
+
+  private void setBuildComplete(boolean complete) throws Exception {
     IniFile buildTracker = new IniFile(dir.resolve(".build-tracker.ini").toString());
-    buildTracker.setBooleanProperty("status", "complete", true, null);
+    buildTracker.setBooleanProperty("status", "complete", complete, null);
     buildTracker.save();
   }
 
