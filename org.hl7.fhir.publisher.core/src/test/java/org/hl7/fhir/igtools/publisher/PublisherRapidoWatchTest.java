@@ -417,9 +417,10 @@ class PublisherRapidoWatchTest {
   @Test
   void aBuildKilledWhileItSavesIsFollowedByACompleteBuild() throws Exception {
     finish(build("a"));
+    Path partial = state().resolveSibling("state.json.tmp");
     for (boolean sameProcess : new boolean[] {true, false}) {
       build("a2"); // and no more: the build tracker says it started
-      Files.writeString(dir.resolve("temp").resolve("_rapido").resolve("state.json.tmp"), "{\"version\":5,\"id\":\"x\",\"files\":{\"Pat");
+      Files.writeString(partial, "{\"version\":5,\"id\":\"x\",\"files\":{\"Pat");
       if (!sameProcess) {
         RapidoTracker.forgetKept();
       }
@@ -428,7 +429,7 @@ class PublisherRapidoWatchTest {
       assertTrue(pf.rapido.isCompleteBuild());
       assertEquals("after failure", pf.rapido.getReason());
       finish(pf);
-      assertFalse(Files.exists(dir.resolve("temp").resolve("_rapido").resolve("state.json.tmp")));
+      assertFalse(Files.exists(partial));
       assertFalse(build("a2").rapido.isCompleteBuild());
       stopped();
     }
