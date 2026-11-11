@@ -132,6 +132,8 @@ class NativeOutputsReuseTest {
     boolean complete;
     int threads;
     boolean otherVersion;
+    /** resources with no object to convert for the other version: nothing of them goes in its package */
+    boolean elementsOnly;
     String archetypeOn;
     PublisherGenerator generator;
     Map<String, FileTime> timesBefore;
@@ -207,7 +209,9 @@ class NativeOutputsReuseTest {
           FetchedResource r = f.addResource(id);
           String json = "{\"resourceType\":\"Basic\",\"id\":\"" + id + "\",\"code\":\"" + codes.getOrDefault(id, "code " + id) + "\",\"subject\":[\"" + "x".repeat(i * 53) + "\"]}";
           r.setElement(new JsonParser(context).parseSingle(new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8)), null)).setId(id);
-          r.setResource(new Basic().setId(id));
+          if (!elementsOnly) {
+            r.setResource(new Basic().setId(id));
+          }
           if (id.equals(archetypeOn)) {
             r.getResource().setUserData(UserDataNames.archetypeSource, "archetype " + id);
             r.getResource().setUserData(UserDataNames.archetypeName, id + ".adl");
@@ -515,6 +519,21 @@ class NativeOutputsReuseTest {
     next.run();
     assertEquals(FILES + 1, next.written().size());
     assertSameEffects(first, next);
+
+    // also when the step adds nothing to the other version's package
+    Build third = new Build();
+    third.complete = true;
+    third.otherVersion = true;
+    third.elementsOnly = true;
+    third.run();
+    assertEquals(List.of(), records());
+    assertFalse(third.calls.stream().anyMatch(c -> c.startsWith("npm-r4 ")), third.calls.toString());
+    Build fourth = new Build().cleanAll();
+    fourth.otherVersion = true;
+    fourth.elementsOnly = true;
+    fourth.run();
+    assertEquals(FILES + 1, fourth.written().size());
+    assertSameEffects(third, fourth);
   }
 
   @Test

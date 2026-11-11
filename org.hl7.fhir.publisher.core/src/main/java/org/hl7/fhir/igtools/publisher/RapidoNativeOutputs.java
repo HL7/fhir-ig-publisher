@@ -110,8 +110,13 @@ public class RapidoNativeOutputs {
     this.folder = new File(Utilities.path(tempDir, "_rapido", "native"));
   }
 
+  /** what the file's record goes by: where it was loaded from, as for RapidoTracker's state */
+  private static String name(FetchedFile f) {
+    return f.getLoadPath() != null ? f.getLoadPath() : f.getPath();
+  }
+
   private File recordFile(FetchedFile f) {
-    return new File(folder, new Hasher().add(f.getLoadPath()).finish() + ".bin");
+    return new File(folder, new Hasher().add(name(f)).finish() + ".bin");
   }
 
   /** before a file's outputs are made again: what is recorded for it no longer describes them */
@@ -199,7 +204,7 @@ public class RapidoNativeOutputs {
 
   private static void write(DataOutputStream out, FetchedFile f, FileRecord rec) throws IOException {
     out.writeInt(VERSION);
-    string(out, f.getLoadPath());
+    string(out, name(f));
     out.writeInt(rec.resources.size());
     for (ResourceRecord r : rec.resources) {
       string(out, r.key);
@@ -245,7 +250,7 @@ public class RapidoNativeOutputs {
       return null;
     }
     try (DataInputStream in = new DataInputStream(new BufferedInputStream(Files.newInputStream(src.toPath()), 1 << 16))) {
-      if (in.readInt() != VERSION || !f.getLoadPath().equals(string(in))) {
+      if (in.readInt() != VERSION || !name(f).equals(string(in))) {
         return null;
       }
       FileRecord rec = new FileRecord();
