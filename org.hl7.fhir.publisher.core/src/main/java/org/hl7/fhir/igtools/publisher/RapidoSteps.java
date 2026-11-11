@@ -33,7 +33,7 @@ public class RapidoSteps {
     public final long size;
     /** the fragment's file as the step left it (see stamp()) */
     public final String stamp;
-    /** the copy without the language in its name, as the step left it; null if the step didn't write one */
+    /** the copy without the language in its name, as the step left it; null if the fragment has no such copy */
     public final String copyStamp;
 
     public Fragment(String name, String lang, String code, String context, long time, long size, String stamp, String copyStamp) {
