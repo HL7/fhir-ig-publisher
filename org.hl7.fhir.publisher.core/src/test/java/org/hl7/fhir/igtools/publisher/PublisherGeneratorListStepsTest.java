@@ -244,6 +244,8 @@ class PublisherGeneratorListStepsTest {
         shown("the title it is sorted by", "CodeSystem", l -> l.get(0).title = "0 codes"),
         shown("the title given for want of a description", "CodeSystem", l -> l.get(1).title = "The other"),
         shown("no title of its own", "CodeSystem", l -> l.get(1).title = null),
+        // the title a resource has without one of its own is its type and id
+        shown("no title of its own, with the same title", "CodeSystem", l -> l.get(1).title = null, l -> l.get(1).title = "CodeSystem/other"),
         shown("its file's title", "CodeSystem", l -> {
           l.get(1).title = null;
           l.get(1).fileTitle = "another file";
