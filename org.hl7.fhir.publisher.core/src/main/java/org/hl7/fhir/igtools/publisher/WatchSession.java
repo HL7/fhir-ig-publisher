@@ -117,6 +117,9 @@ public class WatchSession {
     if (!publisherVersionLookedUp) {
       publisherVersion = lookup.get();
       publisherVersionLookedUp = true;
+      if (publisherVersion == null) {
+        log.accept("Watch mode: unable to find the latest release of the IG Publisher, so qa.html doesn't have it: not tried again in this watch session");
+      }
     }
     return publisherVersion;
   }
