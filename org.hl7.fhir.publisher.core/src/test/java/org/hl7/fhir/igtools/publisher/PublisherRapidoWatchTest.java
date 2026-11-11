@@ -381,6 +381,59 @@ class PublisherRapidoWatchTest {
     assertEquals("no state from a previous build", pf.rapido.getReason());
   }
 
+  /** a state that another process saved since, in this format: the build goes by the file, not by what it remembers */
+  @Test
+  void aStateSavedByAnotherProcessIsTheOneUsed() throws Exception {
+    finish(build("a"));
+    Path copy = dir.resolve("state-of-a.json");
+    Files.copy(state(), copy);
+    finish(build("a2"));
+    Files.move(copy, state(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+
+    PublisherFields pf = build("a");
+    assertFalse(pf.rapido.isCompleteBuild(), pf.rapido.getReason());
+    assertEquals(List.of("ig.json (always processed)", "page.md (always processed)"), pf.rapido.listRenderDirty());
+  }
+
+  /** what the process keeps is what it wrote: a new process, reading the file, starts from the same state */
+  @Test
+  void theStateKeptIsTheStateInTheFile() throws Exception {
+    expansions.put("Patient-b.json", expansion("http://example.org/vs"));
+    PublisherFields pf = build("a");
+    validateB(pf);
+    finish(pf);
+    finish(build("a2"));
+
+    JsonObject kept = RapidoTracker.keptState(state().toFile());
+    assertEquals(org.hl7.fhir.utilities.json.parser.JsonParser.compose(RapidoTracker.readState(state().toFile()), true),
+        org.hl7.fhir.utilities.json.parser.JsonParser.compose(kept, true));
+  }
+
+  /**
+   * A build killed while it saves its state (or before) leaves the state of the build before it, which doesn't say what
+   * is in the temp folder now: the next build is a complete one, whether or not the process remembers that state, and
+   * what was written of the new state is gone once it has saved its own
+   */
+  @Test
+  void aBuildKilledWhileItSavesIsFollowedByACompleteBuild() throws Exception {
+    finish(build("a"));
+    for (boolean sameProcess : new boolean[] {true, false}) {
+      build("a2"); // and no more: the build tracker says it started
+      Files.writeString(dir.resolve("temp").resolve("_rapido").resolve("state.json.tmp"), "{\"version\":5,\"id\":\"x\",\"files\":{\"Pat");
+      if (!sameProcess) {
+        RapidoTracker.forgetKept();
+      }
+
+      PublisherFields pf = build("a2");
+      assertTrue(pf.rapido.isCompleteBuild());
+      assertEquals("after failure", pf.rapido.getReason());
+      finish(pf);
+      assertFalse(Files.exists(dir.resolve("temp").resolve("_rapido").resolve("state.json.tmp")));
+      assertFalse(build("a2").rapido.isCompleteBuild());
+      stopped();
+    }
+  }
+
   /** the file is the one that was written only with the id that was written into it, and the stamp it had */
   @Test
   void theStateFileIsKnownByItsIdAndItsStamp() throws Exception {
@@ -409,11 +462,11 @@ class PublisherRapidoWatchTest {
     assertFalse(Files.readString(state()).contains("http://example.org/vs"));
 
     // Patient/a changes, and has another expansion now: the one of Patient/b stays, as it is
-    FileTime written = Files.getLastModifiedTime(files[0].toPath());
+    String written = RapidoTracker.FileStamp.of(files[0].getPath()).text;
     expansions.put("Patient-a.json", expansion("http://example.org/other"));
     finish(build("a2"));
     assertEquals(2, expansionDir().toFile().listFiles().length);
-    assertEquals(written, Files.getLastModifiedTime(files[0].toPath()));
+    assertEquals(written, RapidoTracker.FileStamp.of(files[0].getPath()).text);
 
     expansions.remove("Patient-a.json");
     finish(build("a3"));
@@ -579,6 +632,51 @@ class PublisherRapidoWatchTest {
     written.set(file.toString(), RapidoTracker.fileHash(file.toString()));
     assertTrue(RapidoTracker.holds(file.toString(), written, stamps, clockAfter(file)));
     assertTrue(stamps.has(file.toString()));
+  }
+
+  /** a file that couldn't be read when it was to be hashed has no stamp to go by: it is read (or not) again next time */
+  @Test
+  void aFileThatCouldntBeReadHasNoStamp() throws Exception {
+    // a file that is there, but can't be read (even by root), and one made after it that has a later time
+    String file = "/proc/self/mem";
+    org.junit.jupiter.api.Assumptions.assumeTrue(new File(file).isFile() && RapidoTracker.fileHash(file).startsWith("unreadable: "));
+    RapidoTracker.FileStamp stamp = RapidoTracker.FileStamp.of(file);
+    Thread.sleep(50);
+    RapidoTracker.FileStamp clock = RapidoTracker.FileStamp.of("/proc/self/environ");
+    org.junit.jupiter.api.Assumptions.assumeTrue(stamp != null && stamp.settledAt(clock));
+    JsonObject written = new JsonObject();
+    JsonObject stamps = new JsonObject();
+
+    written.set(file, RapidoTracker.hashAndStamp(file, stamps, clock));
+
+    assertFalse(stamps.has(file));
+    assertFalse(RapidoTracker.holds(file, written, stamps, clock));
+    // nor is a stamp gone by for one that is recorded as not read
+    stamps.set(file, stamp.text);
+    assertFalse(RapidoTracker.holds(file, written, stamps, clock));
+  }
+
+  /** where the file system only says size and times, a file on another volume isn't settled by this one's clock */
+  @Test
+  void aStampWithoutADeviceIsOfTheVolumeOfItsPath() throws Exception {
+    Path file = dir.resolve("out.html");
+    Files.writeString(file, "<p>one</p>");
+    Files.setLastModifiedTime(file, FileTime.fromMillis(System.currentTimeMillis() - 10000));
+    Path clock = dir.resolve("clock");
+    Files.writeString(clock, "0");
+
+    RapidoTracker.FileStamp stamp = RapidoTracker.FileStamp.basic(file);
+    assertEquals(3, stamp.text.split(" ").length, stamp.text);
+    // all it can tell: written again with the same size, and given the time it had, it has the same stamp
+    FileTime time = Files.getLastModifiedTime(file);
+    Files.writeString(file, "<p>two</p>");
+    Files.setLastModifiedTime(file, time);
+    assertEquals(stamp.text, RapidoTracker.FileStamp.basic(file).text);
+    assertTrue(stamp.settledAt(RapidoTracker.FileStamp.basic(clock)));
+    // a clock that isn't known to be of the same device (here: one that the file system says more of)
+    if (java.nio.file.FileSystems.getDefault().supportedFileAttributeViews().contains("unix")) {
+      assertFalse(stamp.settledAt(RapidoTracker.FileStamp.of(clock.toString())));
+    }
   }
 
   /**

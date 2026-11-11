@@ -137,6 +137,12 @@ public class RapidoTracker {
     kept = null;
   }
 
+  /** for a test: the state this process has kept for that state file, or null */
+  static JsonObject keptState(File file) {
+    Kept k = kept(file.getPath());
+    return k == null ? null : k.state();
+  }
+
   private static synchronized Kept kept(String file) {
     return kept != null && kept.file().equals(file) ? kept : null;
   }
@@ -1330,6 +1336,10 @@ public class RapidoTracker {
    * stamp. This doesn't depend on how coarse the file system's times are: a file written in the same tick as the clock
    * was read (within the second, on a file system that keeps seconds) has a stamp that isn't settled, and is hashed in
    * the next build, as every file was before. It does assume that the file system's clock doesn't go back.
+   *
+   * <p>Where the file system doesn't say that much (no unix attributes, as on Windows), the stamp is the size, the
+   * modified time and the creation time, and the device is the volume of the path. There, a file written again with the
+   * same size by a program that then sets its modified time back to what it was is taken as unchanged.
    */
   static final class FileStamp {
     private static final boolean UNIX = FileSystems.getDefault().supportedFileAttributeViews().contains("unix");
@@ -1359,22 +1369,31 @@ public class RapidoTracker {
           long c = nanos((FileTime) a.get("ctime"));
           return new FileStamp(a.get("size")+" "+m+" "+c+" "+a.get("ino")+" "+a.get("dev"), Math.min(m, c), Math.max(m, c), a.get("dev"));
         }
-        BasicFileAttributes a = Files.readAttributes(p, BasicFileAttributes.class);
-        if (!a.isRegularFile()) {
-          return null;
-        }
-        long m = nanos(a.lastModifiedTime());
-        return new FileStamp(a.size()+" "+m+" "+nanos(a.creationTime()), m, m, null);
+        return basic(p);
       } catch (IOException | RuntimeException e) {
         return null;
       }
+    }
+
+    /** the stamp where the file system doesn't say more: the device is the volume the path is on */
+    static FileStamp basic(Path p) throws IOException {
+      BasicFileAttributes a = Files.readAttributes(p, BasicFileAttributes.class);
+      if (!a.isRegularFile()) {
+        return null;
+      }
+      long m = nanos(a.lastModifiedTime());
+      Path root = p.toAbsolutePath().getRoot();
+      return new FileStamp(a.size()+" "+m+" "+nanos(a.creationTime()), m, m, String.valueOf(root));
     }
 
     private static long nanos(FileTime t) {
       return t.to(TimeUnit.NANOSECONDS);
     }
 
-    /** whether a reading of the clock after this stamp was taken would be later than the times in it */
+    /**
+     * whether that reading of the clock, which has to be from before this stamp was taken, was already past the times
+     * in it, and is of the same device. False without a reading
+     */
     boolean settledAt(FileStamp clock) {
       return clock != null && Objects.equals(device, clock.device) && latest < clock.earliest;
     }
@@ -1406,7 +1425,7 @@ public class RapidoTracker {
   static String hashAndStamp(String path, JsonObject stamps, FileStamp clock) {
     FileStamp stamp = FileStamp.of(path);
     String hash = fileHash(path);
-    if (stamp != null && stamp.settledAt(clock)) {
+    if (isContentHash(hash) && stamp != null && stamp.settledAt(clock)) {
       stamps.set(path, stamp.text);
     } else {
       stamps.remove(path);
@@ -1417,7 +1436,7 @@ public class RapidoTracker {
   /** whether the file holds what the phase recorded that it wrote, reading it only if its stamp doesn't say */
   static boolean holds(String path, JsonObject written, JsonObject stamps, FileStamp clock) {
     FileStamp stamp = FileStamp.of(path);
-    if (stamp != null && stamp.text.equals(stamps.asString(path))) {
+    if (stamp != null && stamp.text.equals(stamps.asString(path)) && isContentHash(written.asString(path))) {
       return true;
     }
     boolean same = fileHash(path).equals(written.asString(path));
@@ -1936,6 +1955,11 @@ public class RapidoTracker {
       return false;
     }
     return true;
+  }
+
+  /** whether it is the hash of what a file held: not what fileHash() gives for a file that is missing, or can't be read */
+  static boolean isContentHash(String hash) {
+    return hash != null && !hash.equals("missing") && !hash.startsWith("unreadable: ");
   }
 
   static String fileHash(String path) {
