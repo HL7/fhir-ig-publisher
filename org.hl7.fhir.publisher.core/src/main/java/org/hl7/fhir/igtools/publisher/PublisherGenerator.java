@@ -1101,7 +1101,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
   private RapidoNativeOutputs nativeRecords;
   /** -rapido: how many files' native outputs were left as an earlier build wrote them */
   private final AtomicInteger nativeFilesReused = new AtomicInteger();
-  /** -rapido: how many times a record couldn't be kept or removed, and the first of them, for the log */
+  /** -rapido: how many times a record couldn't be kept or removed, or its key worked out, and the first of them, for the log */
   private final AtomicInteger nativeRecordProblems = new AtomicInteger();
   private final AtomicReference<String> firstNativeRecordProblem = new AtomicReference<>();
 

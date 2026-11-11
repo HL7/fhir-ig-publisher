@@ -632,9 +632,10 @@ class NativeOutputsReuseTest {
     assertSameEffects(fresh, next);
     // and the log says so, once
     String logged = log.toString();
-    // (each file's record can't be removed, and then can't be saved)
-    assertTrue(logged.contains(2 * FILES + " problems with the records of the native outputs"), logged);
-    assertTrue(logged.contains("The first: unable to remove the record of the native outputs of input/file"), logged);
+    // (each file's record can't be saved, and where removing it under a file is an error, can't be removed either)
+    assertTrue(logged.contains(FILES + " problems with the records of the native outputs") || logged.contains(2 * FILES + " problems with the records of the native outputs"), logged);
+    assertTrue(logged.contains("The first: unable to "), logged);
+    assertTrue(logged.contains(" the native outputs of input/file"), logged);
     assertEquals(logged.indexOf("problems with the records"), logged.lastIndexOf("problems with the records"), logged);
   }
 
