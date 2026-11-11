@@ -1088,8 +1088,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     for (int i = 0; i < f.getResources().size(); i++) {
       FetchedResource r = f.getResources().get(i);
       logDebugMessage(LogCategory.PROGRESS, "Produce resources for "+r.fhirType()+"/"+r.getId());
-      var json = plan.reuse != null ? reuseNativeResourceOutputs(r, plan.reuse.resources.get(i), null)
-          : saveNativeResourceOutputs(f, r, null, plan.record == null ? null : plan.record.resources.get(i));
+      var json = plannedNativeResourceOutputs(f, r, i, plan, null);
       if (db != null) {
         db.saveResource(f, r, json);
       }
@@ -1198,6 +1197,15 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       packageStep(later, () -> npm.addFile(e.category, e.name, e.content));
     }
     return rec.json;
+  }
+
+  /** the step for the file's resource at index i, as the plan has it: from the record of the last build, or written */
+  private byte[] plannedNativeResourceOutputs(FetchedFile f, FetchedResource r, int i, NativePlan plan, List<PackageStep> later) throws FHIRException, IOException {
+    if (plan.reuse != null) {
+      return reuseNativeResourceOutputs(r, plan.reuse.resources.get(i), later);
+    }
+    RapidoNativeOutputs.ResourceRecord rec = plan.record == null ? null : plan.record.resources.get(i);
+    return saveNativeResourceOutputs(f, r, later, rec);
   }
 
   /** once the step is done for all the file's resources */
@@ -1335,8 +1343,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         FetchedResource r = f.getResources().get(i);
         NativeOutputs o = new NativeOutputs(r);
         result.resources.add(o);
-        o.json = plan.reuse != null ? reuseNativeResourceOutputs(r, plan.reuse.resources.get(i), o.steps)
-            : saveNativeResourceOutputs(f, r, o.steps, plan.record == null ? null : plan.record.resources.get(i));
+        o.json = plannedNativeResourceOutputs(f, r, i, plan, o.steps);
       }
       finishNativeOutputs(f, plan);
     } catch (Exception | Error e) {
