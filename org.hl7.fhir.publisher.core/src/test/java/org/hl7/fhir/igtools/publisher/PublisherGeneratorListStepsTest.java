@@ -368,6 +368,7 @@ class PublisherGeneratorListStepsTest {
 
     assertTrue(e.getMessage().contains("generated more than once"), e.getMessage());
     assertNull(second.steps().save().getJsonObject("lists/en/CodeSystem"));
+    assertFalse(second.steps().isRecording());
   }
 
   @Test
@@ -492,5 +493,27 @@ class PublisherGeneratorListStepsTest {
     Build third = new Build("ig", more, second.steps().save()).lists("Patient");
     assertEquals(1, third.steps().getRun());
     assertTrue(third.fragments().get("list-patients-en.xhtml").contains("Patient-p.html"));
+  }
+
+  @Test
+  void aFragmentWithTheNameOfACopyIsLeftAlone() throws Exception {
+    Build first = new Build("ig", resources(), null);
+    Path mine = first.includes.resolve("list-codesystems.xhtml");
+    Files.createDirectories(first.includes);
+    Files.writeString(mine, "mine");
+    first.pf.allOutputs.add(mine.toString().toLowerCase());
+    first.lists("CodeSystem");
+    assertEquals("mine", Files.readString(mine));
+
+    Build second = new Build("ig", resources(), first.steps().save());
+    second.pf.allOutputs.add(mine.toString().toLowerCase());
+    second.lists("CodeSystem");
+    assertEquals(1, second.steps().getReused());
+    assertEquals("mine", Files.readString(mine));
+
+    // without that fragment, the list has its copy
+    Build third = new Build("ig", resources(), second.steps().save()).lists("CodeSystem");
+    assertEquals(1, third.steps().getRun());
+    assertEquals(third.fragments().get("list-codesystems-en.xhtml"), Files.readString(mine));
   }
 }
