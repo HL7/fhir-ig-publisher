@@ -541,12 +541,9 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
   }
 
   private List<String> fixedFileTypes() {
-    return Utilities.strings(
-        // known file types we have parsers for
-        "json", "ttl", "html", "txt", "fml", "adl","adls",
-        
-        // known files types to not even try parsing
-        "jpg", "png", "gif", "mp3", "mp4", "pfd", "doc", "docx", "ppt", "pptx", "svg");
+    List<String> res = Utilities.strings("json", "ttl", "html", "txt", "fml", "adl","adls");
+    Collections.addAll(res, UNPARSED_FILE_TYPES);
+    return res;
   }
 
   private void addFileForElement(List<FetchedFile> res, File f, org.hl7.fhir.services.elementmodel.Element e, String cnt) throws IOException {
