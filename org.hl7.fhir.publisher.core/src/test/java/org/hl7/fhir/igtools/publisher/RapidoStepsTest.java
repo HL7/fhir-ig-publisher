@@ -79,6 +79,12 @@ class RapidoStepsTest {
 
     steps.load(JsonParser.parseObject("{\"step\":{\"key\":\"key\"}}"));
     assertNull(steps.reusable("step", "key"));
+
+    steps.load(JsonParser.parseObject("{\"step\":{\"key\":\"key\",\"fragments\":{}}}"));
+    assertNull(steps.reusable("step", "key"));
+
+    steps.load(JsonParser.parseObject("{\"step\":{\"key\":\"key\",\"fragments\":[[\"a\",\"en\",\"c\",\"Cross\",\"1\",\"2\",{},\"\"]]}}"));
+    assertNull(steps.reusable("step", "key"));
   }
 
   @Test

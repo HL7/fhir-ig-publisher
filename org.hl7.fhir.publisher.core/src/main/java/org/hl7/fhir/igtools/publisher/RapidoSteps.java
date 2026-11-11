@@ -72,16 +72,17 @@ public class RapidoSteps {
       return null;
     }
     List<Fragment> res = new ArrayList<>();
-    for (JsonElement e : step.getJsonArray("fragments").getItems()) {
-      if (!(e instanceof JsonArray) || ((JsonArray) e).size() != 8) {
-        return null;
-      }
-      List<String> a = ((JsonArray) e).asStrings();
-      try {
+    try {
+      for (JsonElement e : step.getJsonArray("fragments").getItems()) {
+        List<String> a = ((JsonArray) e).asStrings();
+        if (((JsonArray) e).size() != 8 || a.size() != 8) {
+          return null;
+        }
         res.add(new Fragment(a.get(0), text(a.get(1)), a.get(2), a.get(3), Long.parseLong(a.get(4)), Long.parseLong(a.get(5)), a.get(6), text(a.get(7))));
-      } catch (NumberFormatException ex) {
-        return null;
       }
+    } catch (RuntimeException ex) {
+      // not a record this class wrote: the step runs
+      return null;
     }
     return res;
   }
