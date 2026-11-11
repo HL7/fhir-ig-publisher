@@ -63,6 +63,8 @@ class RapidoTranslationsTest {
   Path dir;
 
   private final String uuid = HierarchicalTableGenerator.uuid;
+  private List<String> langs = List.of("ru", "uz");
+  private String defaultLang = "en";
 
   @AfterEach
   void restoreUuid() {
@@ -136,11 +138,12 @@ class RapidoTranslationsTest {
     Path edited = dir.resolve("translations/uz/json/Patient-a.json");
     String content = Files.readString(edited);
     Files.delete(gone);
+    Files.delete(dir.resolve("translations/uz/xliff/Observation-o.xliff"));
     Files.writeString(edited, content.replace("Alice", "Alisa"));
 
     Map<String, FileTime> second = translate(build("Alice", true));
 
-    assertEquals(all(A, B), written(first, second), "each file's artifacts are written together");
+    assertEquals(all(A, B, O), written(first, second), "each file's artifacts are written together");
     assertEquals(content, Files.readString(edited));
   }
 
@@ -164,6 +167,18 @@ class RapidoTranslationsTest {
     PublisherFields pf = build("Alice", true);
     assertTrue(pf.rapido.isCompleteBuild());
     assertEquals(all(A, B, O), written(first, translate(pf)));
+  }
+
+  @Test
+  void withOneLanguageTheArtifactsOfWhatDidntChangeAreKept() throws Exception {
+    // (the default translation language is one of them)
+    langs = List.of();
+    defaultLang = "ru";
+    Map<String, FileTime> first = translate(build("Alice", true));
+    assertEquals(List.of("json/Patient-a.json", "po/Patient-a.po", "xliff/Patient-a.xliff"),
+        first.keySet().stream().filter(k -> k.contains("Patient-a")).toList(), "no language folder");
+
+    assertEquals(List.of(), written(first, translate(build("Alice", true))));
   }
 
   /** The producers are core's: an artifact that isn't where it was expected to be written has no stamp, and isn't reused */
@@ -240,8 +255,8 @@ class RapidoTranslationsTest {
     pf.pcm = pcm; // where the build looks for the packages it loaded, to see whether they changed
     pf.version = "5.0.0";
     pf.sourceIg = new ImplementationGuide();
-    pf.defaultTranslationLang = "en";
-    pf.translationLangs.addAll(List.of("ru", "uz"));
+    pf.defaultTranslationLang = defaultLang;
+    pf.translationLangs.addAll(langs);
     pf.igpkp = mock(IGKnowledgeProvider.class);
     when(pf.igpkp.getCanonical()).thenReturn("http://example.org/ig");
     pf.template = mock(Template.class);
