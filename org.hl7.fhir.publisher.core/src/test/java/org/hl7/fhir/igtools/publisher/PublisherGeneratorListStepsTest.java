@@ -428,7 +428,7 @@ class PublisherGeneratorListStepsTest {
   void aStepThatReportsMessagesIsNotRecorded() throws Exception {
     Build build = new Build("ig", resources(), null);
 
-    build.generator.fragmentStep("step", "key", () -> build.pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher,
+    build.generator.fragmentStep("step", () -> "key", () -> build.pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher,
         ValidationMessage.IssueType.NOTFOUND, "here", "not found", ValidationMessage.IssueSeverity.WARNING)));
 
     assertNull(build.steps().save().getJsonObject("step"));
@@ -438,13 +438,13 @@ class PublisherGeneratorListStepsTest {
   @Test
   void aStepInsideAStepIsPartOfIt() throws Exception {
     Build first = new Build("ig", resources(), null);
-    first.generator.fragmentStep("outer", "key", () -> first.lists("CodeSystem"));
+    first.generator.fragmentStep("outer", () -> "key", () -> first.lists("CodeSystem"));
     assertNotNull(first.steps().save().getJsonObject("outer"));
     assertNull(first.steps().save().getJsonObject("lists/en/CodeSystem"));
     assertFalse(first.steps().save().getJsonObject("outer").getJsonArray("fragments").getItems().isEmpty());
 
     Build second = new Build("ig", resources(), first.steps().save());
-    second.generator.fragmentStep("outer", "key", () -> second.lists("CodeSystem"));
+    second.generator.fragmentStep("outer", () -> "key", () -> second.lists("CodeSystem"));
 
     assertEquals(1, second.steps().getReused());
     assertEquals(first.pf.otherFilesRun, second.pf.otherFilesRun);

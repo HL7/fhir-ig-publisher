@@ -104,6 +104,7 @@ import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -3218,12 +3219,13 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
   /**
    * Runs a step that makes fragments for the IG as a whole; in a Rapido differential build, not if the last build's
    * step had the same key and the files it wrote are as it left them (see RapidoSteps): then all that's left to do is
-   * what fragment() does besides writing the files. key is a hash of everything the step reads that can change
-   * between two builds of a differential build; null if that can't be told, and then the step runs
+   * what fragment() does besides writing the files. keyOf gives a hash of everything the step reads that can
+   * change between two builds of a differential build; null if that can't be told, and then the step runs
    */
-  void fragmentStep(String name, String key, FragmentStep step) throws Exception {
+  void fragmentStep(String name, Supplier<String> keyOf, FragmentStep step) throws Exception {
     RapidoSteps steps = pf.rapido == null ? null : pf.rapido.getSteps();
-    if (steps == null || key == null || steps.isRecording()) {
+    String key = steps == null || steps.isRecording() ? null : keyOf.get();
+    if (key == null) {
       step.run();
       return;
     }
@@ -5766,7 +5768,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
     if (items.size() > 0) {
       Collections.sort(items, new ItemSorter());
-      fragmentStep(listStep("(profiles)", lang), listKey("(profiles)", items, false), () -> genEntryLists("profiles", items, start, lang));
+      fragmentStep(listStep("(profiles)", lang), () -> listKey("(profiles)", items, false), () -> genEntryLists("profiles", items, start, lang));
     }
   }
 
@@ -5845,7 +5847,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       }
     }
 
-    fragmentStep(listStep("(extensions)", lang), listKey("(extensions)", items, false), () -> genEntryLists("extensions", items, start, lang));
+    fragmentStep(listStep("(extensions)", lang), () -> listKey("(extensions)", items, false), () -> genEntryLists("extensions", items, start, lang));
   }
 
   void generateLogicals(String lang) throws Exception {
@@ -5867,7 +5869,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       }
     }
 
-    fragmentStep(listStep("(logicals)", lang), listKey("(logicals)", items, false), () -> genEntryLists("logicals", items, start, lang));
+    fragmentStep(listStep("(logicals)", lang), () -> listKey("(logicals)", items, false), () -> genEntryLists("logicals", items, start, lang));
   }
 
   private void genEntryItem(StringBuilder list, StringBuilder lists, StringBuilder table, StringBuilder listMM, StringBuilder listsMM, StringBuilder tableMM, FetchedFile f, FetchedResource r, String name, String prefixType) throws Exception {
@@ -5934,7 +5936,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
 
     boolean grid = pf.cu.getCanonicalResourceNames().contains(rt);
-    fragmentStep(listStep(rt, lang), listKey(rt, items, grid), () -> {
+    fragmentStep(listStep(rt, lang), () -> listKey(rt, items, grid), () -> {
       genResourceReferencesList(rt, items, "", lang);
       Collections.sort(items, new ItemSorterById());
       if (grid) {
