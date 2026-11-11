@@ -1175,8 +1175,11 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
    */
   private void nativeRecordProblem(String doing, Exception e) {
     nativeRecordProblems.incrementAndGet();
-    StackTraceElement[] at = e instanceof RuntimeException ? e.getStackTrace() : null;
-    firstNativeRecordProblem.compareAndSet(null, "unable to " + doing + ": " + e + (at == null || at.length == 0 ? "" : " at " + at[0]));
+    String problem = "unable to " + doing + ": " + e;
+    if (e instanceof RuntimeException && e.getStackTrace().length > 0) {
+      problem += " at " + e.getStackTrace()[0];
+    }
+    firstNativeRecordProblem.compareAndSet(null, problem);
   }
 
   private boolean sameNativeKeys(RapidoNativeOutputs.FileRecord old, List<String> keys) {
