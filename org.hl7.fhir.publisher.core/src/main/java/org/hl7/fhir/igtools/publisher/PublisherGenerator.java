@@ -437,6 +437,10 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         } else {
           generateSummaryOutputsAfter(null, pf.rc);
         }
+        if (pf.rapido != null && !pf.rapido.isCompleteBuild()) {
+          RapidoSteps steps = pf.rapido.getSteps();
+          log("Rapido Mode: reused "+steps.getReused()+" of "+(steps.getReused()+steps.getRun())+" sets of resource lists");
+        }
       }
       pf.template.rapidoSummary();
       genBasePages();
@@ -3144,6 +3148,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     if (pf.rapido != null) {
       pf.rapido.recordTrackedFragment(id, name+".xhtml");
     }
+    if (pf.rapido != null && pf.rapido.getSteps().isRecording()) {
+      pf.rapido.getSteps().abandon(); // not what a step's record holds
+    }
     fragment(name, content+HTMLInspector.TRACK_PREFIX+id+HTMLInspector.TRACK_SUFFIX, outputTracker, null, null, null, start, code, context, lang);
   }
 
@@ -3165,19 +3172,115 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       pf.rapido.recordFragmentUse(context+"."+code, time, fixedContent.length());
     }
 
-    if (checkMakeFile(FileUtilities.stringToBytes(wrapLiquid(fixedContent)), Utilities.path(pf.tempDir, "_includes", name+(lang == null ? "" : "-" + lang)+".xhtml"), outputTracker)) {
+    String path = fragmentPath(name, lang);
+    if (checkMakeFile(FileUtilities.stringToBytes(wrapLiquid(fixedContent)), path, outputTracker)) {
       if (settings.getMode() != PublisherUtils.IGBuildMode.AUTOBUILD && pf.makeQA) {
         FileUtilities.stringToFile(pageWrap(fixedContent, name), Utilities.path(pf.qaDir, name+(lang == null ? "" : "-" + lang)+".html"));
       }
     }
     // For multi-language IGs, also write a non-suffixed copy for the default language
     // so templates that reference e.g. "cross-version-analysis.xhtml" (without -en) still work
-    if (lang != null && lang.equals(pf.defaultTranslationLang)) {
-      String unsuffixedPath = Utilities.path(pf.tempDir, "_includes", name+".xhtml");
-      if (!pf.allOutputs.contains(unsuffixedPath.toLowerCase())) {
-        FileUtilities.bytesToFile(FileUtilities.stringToBytes(wrapLiquid(fixedContent)), unsuffixedPath);
+    String copy = fragmentCopyPath(name, lang, pf.allOutputs);
+    if (copy != null) {
+      // (a file that isn't written keeps its modified time: Jekyll, kept running, doesn't have to read it again)
+      writeIfChanged(FileUtilities.stringToBytes(wrapLiquid(fixedContent)), copy);
+    }
+    RapidoSteps steps = pf.rapido == null ? null : pf.rapido.getSteps();
+    if (steps != null && steps.isRecording()) {
+      if (outputTracker != pf.otherFilesRun || r != null) {
+        steps.abandon(); // not what a record holds
+      } else {
+        steps.record(new RapidoSteps.Fragment(name, lang, code, context, time, fixedContent.length(), RapidoSteps.stamp(path), copy == null ? null : RapidoSteps.stamp(copy)));
       }
     }
+  }
+
+  private String fragmentPath(String name, String lang) throws IOException {
+    return Utilities.path(pf.tempDir, "_includes", name+(lang == null ? "" : "-" + lang)+".xhtml");
+  }
+
+  /**
+   * Where the copy of a fragment without the language in its name goes: null if it has none (it's not in the default
+   * language, or a fragment of that name is one of the outputs)
+   */
+  private String fragmentCopyPath(String name, String lang, Set<String> outputs) throws IOException {
+    if (lang == null || !lang.equals(pf.defaultTranslationLang)) {
+      return null;
+    }
+    String path = Utilities.path(pf.tempDir, "_includes", name+".xhtml");
+    return outputs.contains(path.toLowerCase()) ? null : path;
+  }
+
+  /** A step of the generate phase that only makes fragments, with fragment(name, content, pf.otherFilesRun, ...) */
+  interface FragmentStep {
+    void run() throws Exception;
+  }
+
+  /**
+   * Runs a step that makes fragments for the IG as a whole; in a Rapido differential build, not if the last build's
+   * step had the same key and the files it wrote are as it left them (see RapidoSteps): then all that's left to do is
+   * what fragment() does besides writing the files. key is a hash of everything the step reads that can change
+   * between two builds of a differential build; null if that can't be told, and then the step runs
+   */
+  void fragmentStep(String name, String key, FragmentStep step) throws Exception {
+    RapidoSteps steps = pf.rapido == null ? null : pf.rapido.getSteps();
+    if (steps == null || key == null || steps.isRecording()) {
+      step.run();
+      return;
+    }
+    List<RapidoSteps.Fragment> last = steps.reusable(name, key);
+    if (last != null && asTheStepLeftThem(last)) {
+      for (RapidoSteps.Fragment f : last) {
+        String path = fragmentPath(f.name, f.lang);
+        PublisherBase.FragmentUseRecord frag = pf.fragmentUses.get(f.context+"."+f.code);
+        if (frag == null) {
+          frag = new PublisherBase.FragmentUseRecord();
+          pf.fragmentUses.put(f.context+"."+f.code, frag);
+        }
+        frag.record(f.time, f.size);
+        pf.rapido.recordFragmentUse(f.context+"."+f.code, f.time, f.size);
+        pf.allOutputs.add(path.toLowerCase());
+        pf.rapido.recordOutput(path.toLowerCase());
+        pf.otherFilesRun.add(path);
+      }
+      steps.keep(name);
+      return;
+    }
+    int errors = pf.errors.size();
+    steps.start(name, key);
+    try {
+      step.run();
+    } catch (Exception | Error e) {
+      steps.abandon();
+      throw e;
+    }
+    if (pf.errors.size() != errors) {
+      steps.abandon(); // a record doesn't hold messages
+    }
+    steps.finish();
+  }
+
+  /**
+   * Whether running the step again would leave the files it made as they are: they still are what it wrote, none of
+   * them is an output of this build already (a build that makes a file twice fails: running the step says so), and
+   * the fragments that got a copy without the language in its name are the ones that would get it now
+   */
+  private boolean asTheStepLeftThem(List<RapidoSteps.Fragment> fragments) throws IOException {
+    Set<String> outputs = new HashSet<>(); // what the step adds to the outputs as it goes
+    for (RapidoSteps.Fragment f : fragments) {
+      String path = fragmentPath(f.name, f.lang);
+      if (pf.allOutputs.contains(path.toLowerCase()) || !outputs.add(path.toLowerCase()) || !f.stamp.equals(RapidoSteps.stamp(path))) {
+        return false;
+      }
+      String copy = fragmentCopyPath(f.name, f.lang, pf.allOutputs);
+      if (copy != null && outputs.contains(copy.toLowerCase())) {
+        copy = null;
+      }
+      if (copy == null ? f.copyStamp != null : !RapidoSteps.stamp(copy).equals(f.copyStamp)) {
+        return false;
+      }
+    }
+    return true;
   }
 
 
@@ -3374,7 +3477,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       }
     }
     String json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(data, true);
-    FileUtilities.stringToFile(json, Utilities.path(pf.tempDir, "_data", "fhir.json"));
+    FileUtilities.stringToFileIfDifferent(json, Utilities.path(pf.tempDir, "_data", "fhir.json"));
     JsonObject related = new JsonObject();
     for (RelatedIG rig : pf.relatedIGs) {
       JsonObject o = new JsonObject();
@@ -3387,7 +3490,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       o.add("version", rig.getVersion());
     }
     json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(related, true);
-    FileUtilities.stringToFile(json, Utilities.path(pf.tempDir, "_data", "related.json"));
+    FileUtilities.stringToFileIfDifferent(json, Utilities.path(pf.tempDir, "_data", "related.json"));
   }
 
 
@@ -3757,7 +3860,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
 
     String json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(data, true);
-    FileUtilities.stringToFile(json, Utilities.path(pf.tempDir, "_data", "structuredefinitions.json"));
+    FileUtilities.stringToFileIfDifferent(json, Utilities.path(pf.tempDir, "_data", "structuredefinitions.json"));
 
     // now, list the profiles - all the profiles
     data = new JsonObject();
@@ -3787,7 +3890,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
 
     json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(data, true);
-    FileUtilities.stringToFile(json, Utilities.path(pf.tempDir, "_data", "questionnaires.json"));
+    FileUtilities.stringToFileIfDifferent(json, Utilities.path(pf.tempDir, "_data", "questionnaires.json"));
 
     // now, list the profiles - all the profiles
     data = new JsonObject();
@@ -3866,7 +3969,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
 
     json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(data, true);
-    FileUtilities.stringToFile(json, Utilities.path(pf.tempDir, "_data", "resources.json"));
+    FileUtilities.stringToFileIfDifferent(json, Utilities.path(pf.tempDir, "_data", "resources.json"));
 
     data = new JsonObject();
     if (pf.sourceIg.hasLanguage()) {
@@ -3939,7 +4042,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
 
     json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(data, true);
-    FileUtilities.stringToFile(json, Utilities.path(pf.tempDir, "_data", "languages.json"));
+    FileUtilities.stringToFileIfDifferent(json, Utilities.path(pf.tempDir, "_data", "languages.json"));
   }
 
   public ValueSet.ConceptReferenceComponent getConceptReference(ValueSet vs, String system, String code) {
@@ -4101,7 +4204,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         priorEntry = entry;
       }
       json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(pages, true);
-      FileUtilities.stringToFile(json, Utilities.path(pf.tempDir, "_data", "pages.json"));
+      FileUtilities.stringToFileIfDifferent(json, Utilities.path(pf.tempDir, "_data", "pages.json"));
 
       createToc();
       if (pf.htmlTemplate != null || pf.mdTemplate != null) {
@@ -5578,8 +5681,8 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       list.add(obj);
     }
     String json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(list, true);
-    FileUtilities.stringToFile(json, Utilities.path(pf.tempDir, "_data", "canonicals.json"));
-    FileUtilities.stringToFile(json, Utilities.path(pf.tempDir, "canonicals.json"));
+    FileUtilities.stringToFileIfDifferent(json, Utilities.path(pf.tempDir, "_data", "canonicals.json"));
+    FileUtilities.stringToFileIfDifferent(json, Utilities.path(pf.tempDir, "canonicals.json"));
     pf.otherFilesRun.add(Utilities.path(pf.tempDir, "canonicals.json"));
 
     Collections.sort(crlist, new ResourceSorters.CanonicalResourceSortByTypeId());
@@ -5646,7 +5749,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     return null;
   }
 
-  private void generateProfiles(String lang) throws Exception {
+  void generateProfiles(String lang) throws Exception {
     long start = System.currentTimeMillis();
     List<Item> items = new ArrayList<Item>();
     for (FetchedFile f : pf.fileList) {
@@ -5661,23 +5764,69 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
     if (items.size() > 0) {
       Collections.sort(items, new ItemSorter());
-      StringBuilder list = new StringBuilder();
-      StringBuilder lists = new StringBuilder();
-      StringBuilder table = new StringBuilder();
-      StringBuilder listMM = new StringBuilder();
-      StringBuilder listsMM = new StringBuilder();
-      StringBuilder tableMM = new StringBuilder();
-      for (Item i : items) {
-        StructureDefinition sd = (StructureDefinition) i.r.getResource();
-        genEntryItem(list, lists, table, listMM, listsMM, tableMM, i.f, i.r, i.sort, null);
-      }
-      fragment("list-profiles", list.toString(), pf.otherFilesRun, start, "list-profiles", "Cross", lang);
-      fragment("list-simple-profiles", lists.toString(), pf.otherFilesRun, start, "list-simple-profiles", "Cross", lang);
-      fragment("table-profiles", table.toString(), pf.otherFilesRun, start, "table-profiles", "Cross", lang);
-      fragment("list-profiles-mm", listMM.toString(), pf.otherFilesRun, start, "list-profiles-mm", "Cross", lang);
-      fragment("list-simple-profiles-mm", listsMM.toString(), pf.otherFilesRun, start, "list-simple-profiles-mm", "Cross", lang);
-      fragment("table-profiles-mm", tableMM.toString(), pf.otherFilesRun, start, "table-profiles-mm", "Cross", lang);
+      fragmentStep(listStep("(profiles)", lang), listKey("(profiles)", items, false), () -> genEntryLists("profiles", items, start, lang));
     }
+  }
+
+  /** The lists of the profiles, extensions or logical models (kind: the word for them in the names of the fragments) */
+  private void genEntryLists(String kind, List<Item> items, long start, String lang) throws Exception {
+    StringBuilder list = new StringBuilder();
+    StringBuilder lists = new StringBuilder();
+    StringBuilder table = new StringBuilder();
+    StringBuilder listMM = new StringBuilder();
+    StringBuilder listsMM = new StringBuilder();
+    StringBuilder tableMM = new StringBuilder();
+    for (Item i : items) {
+      genEntryItem(list, lists, table, listMM, listsMM, tableMM, i.f, i.r, i.sort, null);
+    }
+    fragment("list-"+kind, list.toString(), pf.otherFilesRun, start, "list-"+kind, "Cross", lang);
+    fragment("list-simple-"+kind, lists.toString(), pf.otherFilesRun, start, "list-simple-"+kind, "Cross", lang);
+    fragment("table-"+kind, table.toString(), pf.otherFilesRun, start, "table-"+kind, "Cross", lang);
+    fragment("list-"+kind+"-mm", listMM.toString(), pf.otherFilesRun, start, "list-"+kind+"-mm", "Cross", lang);
+    fragment("list-simple-"+kind+"-mm", listsMM.toString(), pf.otherFilesRun, start, "list-simple-"+kind+"-mm", "Cross", lang);
+    fragment("table-"+kind+"-mm", tableMM.toString(), pf.otherFilesRun, start, "table-"+kind+"-mm", "Cross", lang);
+  }
+
+  /** The name of the step that makes the lists of some of the IG's resources, in a language (see fragmentStep()) */
+  private static String listStep(String what, String lang) {
+    return "lists/"+(lang == null ? "" : lang)+"/"+what;
+  }
+
+  /**
+   * A hash of everything the lists made from these items show, in the order of the items: what genEntryItem() reads
+   * of each one and, if the lists include the grid, what genResourceReferencesGrid() reads. (The sort orders of the
+   * lists go by the items' id and title, which are part of that.) null if it can't be worked out: then the lists are
+   * made, and say what's wrong
+   */
+  String listKey(String what, List<Item> items, boolean grid) {
+    RapidoDependencyAnalyser.Hasher h = new RapidoDependencyAnalyser.Hasher().add("lists-1").add(what).add(Boolean.toString(grid));
+    try {
+      for (Item i : items) {
+        FetchedResource r = i.r;
+        h.add("item").add(i.sort).add(i.f.getTitle()).add(r.fhirType()).add(r.getId()).add(Boolean.toString(r.hasTitle())).add(r.getTitle());
+        h.add(pf.igpkp.doReplacements(pf.igpkp.getLinkFor(r, false), r, null, null));
+        if (r.getResource() instanceof CanonicalResource) {
+          h.add("canonical").add(((CanonicalResource) r.getResource()).present()).add(getDesc((CanonicalResource) r.getResource()));
+        } else if (r.getElement() != null && r.getElement().hasChild("description")) {
+          h.add("element").add(r.getElement().getChildValue("description"));
+        } else {
+          h.add("neither");
+        }
+        h.add(r.getResource() instanceof DomainResource ? ExtensionUtilities.readStringExtension((DomainResource) r.getResource(), ExtensionDefinitions.EXT_FMM_LEVEL) : null);
+        if (grid) {
+          Element e = r.getElement();
+          h.add("row").add(e.fhirType()).add(e.getIdBase()).add(r.getLocalRef()).add(e.getNamedChildValueSingle("title", "name"))
+            .add(e.getNamedChildValueSingle("version")).add(e.getExtensionString(ExtensionDefinitions.EXT_STANDARDS_STATUS))
+            .add(e.getNamedChildValueSingle("status")).add(e.getNamedChildValueSingle("content"))
+            .add(Boolean.toString(e.hasExtension(ExtensionDefinitions.EXT_WORKGROUP))).add(e.getExtensionString(ExtensionDefinitions.EXT_WORKGROUP))
+            .add(ownerUrl(e)).add(e.getNamedChildValueSingle("publisher")).add(e.getNamedChildValueSingle("copyright"))
+            .add(e.getNamedChildValueSingle("copyrightLabel")).add(e.getNamedChildValueSingle("date")).add(e.getNamedChildValueSingle("description"));
+        }
+      }
+    } catch (Exception e) {
+      return null;
+    }
+    return h.finish();
   }
 
   private void generateExtensions(String lang) throws Exception {
@@ -5694,22 +5843,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       }
     }
 
-    StringBuilder list = new StringBuilder();
-    StringBuilder lists = new StringBuilder();
-    StringBuilder table = new StringBuilder();
-    StringBuilder listMM = new StringBuilder();
-    StringBuilder listsMM = new StringBuilder();
-    StringBuilder tableMM = new StringBuilder();
-    for (Item i : items) {
-      StructureDefinition sd = (StructureDefinition) i.r.getResource();
-      genEntryItem(list, lists, table, listMM, listsMM, tableMM, i.f, i.r, i.sort, null);
-    }
-    fragment("list-extensions", list.toString(), pf.otherFilesRun, start, "list-extensions", "Cross", lang);
-    fragment("list-simple-extensions", lists.toString(), pf.otherFilesRun, start, "list-simple-extensions", "Cross", lang);
-    fragment("table-extensions", table.toString(), pf.otherFilesRun, start, "table-extensions", "Cross", lang);
-    fragment("list-extensions-mm", listMM.toString(), pf.otherFilesRun, start, "list-extensions-mm", "Cross", lang);
-    fragment("list-simple-extensions-mm", listsMM.toString(), pf.otherFilesRun, start, "list-simple-extensions-mm", "Cross", lang);
-    fragment("table-extensions-mm", tableMM.toString(), pf.otherFilesRun, start, "table-extensions-mm", "Cross", lang);
+    fragmentStep(listStep("(extensions)", lang), listKey("(extensions)", items, false), () -> genEntryLists("extensions", items, start, lang));
   }
 
   private void generateLogicals(String lang) throws Exception {
@@ -5731,22 +5865,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       }
     }
 
-    StringBuilder list = new StringBuilder();
-    StringBuilder lists = new StringBuilder();
-    StringBuilder table = new StringBuilder();
-    StringBuilder listMM = new StringBuilder();
-    StringBuilder listsMM = new StringBuilder();
-    StringBuilder tableMM = new StringBuilder();
-    for (Item i : items) {
-      StructureDefinition sd = (StructureDefinition) i.r.getResource();
-      genEntryItem(list, lists, table, listMM, listsMM, tableMM, i.f, i.r, i.sort, null);
-    }
-    fragment("list-logicals", list.toString(), pf.otherFilesRun, start, "list-logicals", "Cross", lang);
-    fragment("list-simple-logicals", lists.toString(), pf.otherFilesRun, start, "list-simple-logicals", "Cross", lang);
-    fragment("table-logicals", table.toString(), pf.otherFilesRun, start, "table-logicals", "Cross", lang);
-    fragment("list-logicals-mm", listMM.toString(), pf.otherFilesRun, start, "list-logicals-mm", "Cross", lang);
-    fragment("list-simple-logicals-mm", listsMM.toString(), pf.otherFilesRun, start, "list-simple-logicals-mm", "Cross", lang);
-    fragment("table-logicals-mm", tableMM.toString(), pf.otherFilesRun, start, "table-logicals-mm", "Cross", lang);
+    fragmentStep(listStep("(logicals)", lang), listKey("(logicals)", items, false), () -> genEntryLists("logicals", items, start, lang));
   }
 
   private void genEntryItem(StringBuilder list, StringBuilder lists, StringBuilder table, StringBuilder listMM, StringBuilder listsMM, StringBuilder tableMM, FetchedFile f, FetchedResource r, String name, String prefixType) throws Exception {
@@ -5798,7 +5917,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
   }
 
-  private void generateResourceReferences(String rt, String lang) throws Exception {
+  void generateResourceReferences(String rt, String lang) throws Exception {
     List<Item> items = new ArrayList<Item>();
     for (FetchedFile f : pf.fileList) {
       for (FetchedResource r : f.getResources()) {
@@ -5812,14 +5931,17 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       }
     }
 
-    genResourceReferencesList(rt, items, "", lang);
-    Collections.sort(items, new ItemSorterById());
-    if (pf.cu.getCanonicalResourceNames().contains(rt)) {
-      genResourceReferencesGrid(rt, items, "grid-", lang);
-    }
-    genResourceReferencesList(rt, items, "byid-", lang);
-    Collections.sort(items, new ItemSorterByName());
-    genResourceReferencesList(rt, items, "name-", lang);
+    boolean grid = pf.cu.getCanonicalResourceNames().contains(rt);
+    fragmentStep(listStep(rt, lang), listKey(rt, items, grid), () -> {
+      genResourceReferencesList(rt, items, "", lang);
+      Collections.sort(items, new ItemSorterById());
+      if (grid) {
+        genResourceReferencesGrid(rt, items, "grid-", lang);
+      }
+      genResourceReferencesList(rt, items, "byid-", lang);
+      Collections.sort(items, new ItemSorterByName());
+      genResourceReferencesList(rt, items, "name-", lang);
+    });
   }
 
 
@@ -6316,6 +6438,21 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
   }
 
+  /** the web address of the resource's contacts (the last one, if there are several) */
+  private static String ownerUrl(Element element) {
+    String url = null;
+    for (Element tc : element.getChildrenByName("contact")) {
+      if (tc != null) {
+        for (Element t : tc.getChildrenByName("telecom")) {
+          if ("url".equals(t.getNamedChildValueSingle("system"))) {
+            url = t.getNamedChildValueSingle("value");
+          }
+        }
+      }
+    }
+    return url;
+  }
+
   private void describeOwner(XhtmlNode x, Element element) {
     if (element.hasExtension(ExtensionDefinitions.EXT_WORKGROUP)) {
       String wg = element.getExtensionString(ExtensionDefinitions.EXT_WORKGROUP);
@@ -6325,16 +6462,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       } else
         x.ah(wgo.getLink()).tx(wg);
     } else {
-      String url = null;
-      for (Element tc : element.getChildrenByName("contact")) {
-        if (tc != null) {
-          for (Element t : tc.getChildrenByName("telecom")) {
-            if ("url".equals(t.getNamedChildValueSingle("system"))) {
-              url = t.getNamedChildValueSingle("value");
-            }
-          }
-        }
-      }
+      String url = ownerUrl(element);
       String pub = element.getNamedChildValueSingle("publisher");
       if (pub == null) {
         x.ahOrNot(url).tx("n/a");
