@@ -37,6 +37,7 @@ import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -79,6 +80,14 @@ class PublisherGeneratorListStepsTest {
       + "\"baseDefinition\":\"http://hl7.org/fhir/StructureDefinition/Patient\",\"derivation\":\"constraint\"}";
   /** not a type: the lists of the profiles */
   private static final String PROFILES = "(profiles)";
+  private static final String EXTENSIONS = "(extensions)";
+  private static final String LOGICALS = "(logicals)";
+  private static final String EXTENSION = "{\"resourceType\":\"StructureDefinition\",\"id\":\"ext\",\"url\":\"http://example.org/StructureDefinition/ext\","
+      + "\"name\":\"Ext\",\"title\":\"An extension\",\"status\":\"draft\",\"kind\":\"complex-type\",\"abstract\":false,\"type\":\"Extension\","
+      + "\"baseDefinition\":\"http://hl7.org/fhir/StructureDefinition/Extension\",\"derivation\":\"constraint\"}";
+  private static final String LOGICAL = "{\"resourceType\":\"StructureDefinition\",\"id\":\"model\",\"url\":\"http://example.org/StructureDefinition/model\","
+      + "\"name\":\"Model\",\"title\":\"A model\",\"status\":\"draft\",\"kind\":\"logical\",\"abstract\":false,\"type\":\"http://example.org/StructureDefinition/model\","
+      + "\"baseDefinition\":\"http://hl7.org/fhir/StructureDefinition/Base\",\"derivation\":\"specialization\"}";
   private static final String PLACE = "{\"resourceType\":\"Location\",\"id\":\"place\",\"name\":\"A place\",\"description\":\"Where it is\"}";
 
   /** A resource as the loader leaves it */
@@ -87,6 +96,7 @@ class PublisherGeneratorListStepsTest {
     private String title; // the FetchedResource's
     private String fileTitle;
     private String linkBase;
+    private boolean elementOnly; // as an example is: not loaded as a resource
 
     private Res(String json, String title, String fileTitle) {
       this.json = json;
@@ -137,7 +147,9 @@ class PublisherGeneratorListStepsTest {
         FetchedFile f = new FetchedFile(e.fhirType() + "-" + e.getIdBase() + ".json");
         f.setTitle(res.fileTitle);
         FetchedResource r = f.addResource(f.getName()).setElement(e).setId(e.getIdBase()).setTitle(res.title);
-        r.setResource(new JsonParser(context.getModelContext()).parse(bytes));
+        if (!res.elementOnly) {
+          r.setResource(new JsonParser(context.getModelContext()).parse(bytes));
+        }
         if (res.linkBase != null) {
           JsonObject config = new JsonObject();
           config.add("base", res.linkBase);
@@ -148,10 +160,18 @@ class PublisherGeneratorListStepsTest {
     }
 
     private Build lists(String type) throws Exception {
+      return lists(type, "en");
+    }
+
+    private Build lists(String type, String lang) throws Exception {
       if (PROFILES.equals(type)) {
-        generator.generateProfiles("en");
+        generator.generateProfiles(lang);
+      } else if (EXTENSIONS.equals(type)) {
+        generator.generateExtensions(lang);
+      } else if (LOGICALS.equals(type)) {
+        generator.generateLogicals(lang);
       } else {
-        generator.generateResourceReferences(type, "en");
+        generator.generateResourceReferences(type, lang);
       }
       return this;
     }
@@ -258,6 +278,15 @@ class PublisherGeneratorListStepsTest {
         shown("title of a profile", PROFILES, l -> l.get(3).replace("A profile", "The profile")),
         shown("description of a profile", PROFILES, l -> l.get(3).replace("Of a patient", "Of patients")),
         shown("maturity of a profile", PROFILES, l -> l.get(3).replace("\"valueInteger\":1", "\"valueInteger\":3")),
+        shown("description of a resource that isn't loaded as one", "Location", l -> l.get(2).replace("Where it is", "Where it was"), l -> l.get(2).elementOnly = true),
+        shown("a description, for a resource that isn't loaded as one", "Location", l -> l.get(2).replace("\"name\"", "\"description\":\"Where\",\"name\""), l -> {
+          l.get(2).elementOnly = true;
+          l.get(2).replace(",\"description\":\"Where it is\"", "");
+        }),
+        shown("title of an extension", EXTENSIONS, l -> l.get(4).replace("An extension", "The extension"), l -> l.add(new Res(EXTENSION, "Ext", "ext file"))),
+        shown("the first extension", EXTENSIONS, l -> l.add(new Res(EXTENSION, "Ext", "ext file"))),
+        shown("title of a logical model", LOGICALS, l -> l.get(4).replace("A model", "The model"), l -> l.add(new Res(LOGICAL, "Model", "model file"))),
+        shown("the first logical model", LOGICALS, l -> l.add(new Res(LOGICAL, "Model", "model file"))),
         shown("one more profile", PROFILES, l -> l.add(new Res(PROFILE.replace("\"id\":\"profile\"", "\"id\":\"second\""), "Second", "second file"))));
   }
 
@@ -369,5 +398,99 @@ class PublisherGeneratorListStepsTest {
     assertNotEquals(old, Files.getLastModifiedTime(changed));
     assertEquals(first.fragments().get("table-grid-codesystems-en.xhtml"), second.fragments().get("table-grid-codesystems.xhtml"));
     assertNotNull(second.steps().save().getJsonObject("lists/en/CodeSystem"));
+  }
+
+  @Test
+  void aCopyOfTheSameSizeWithOtherContentIsWrittenAgain() throws Exception {
+    Build first = new Build("ig", resources(), null).lists("CodeSystem");
+    Path copy = first.includes.resolve("list-codesystems.xhtml");
+    String content = Files.readString(copy);
+    Files.writeString(copy, content.replace('a', 'b'));
+
+    new Build("ig", resources(), null).lists("CodeSystem");
+
+    assertEquals(content, Files.readString(copy));
+  }
+
+  @Test
+  void aBuildWithoutRapidoMakesTheLists() throws Exception {
+    Build rapido = new Build("a", resources(), null).lists("CodeSystem").lists(PROFILES).lists(EXTENSIONS).lists(LOGICALS);
+    Build plain = new Build("b", resources(), null);
+    plain.pf.rapido = null;
+
+    plain.lists("CodeSystem").lists(PROFILES).lists(EXTENSIONS).lists(LOGICALS);
+
+    assertEquals(rapido.fragments(), plain.fragments());
+    assertEquals(rapido.uses(), plain.uses());
+  }
+
+  @Test
+  void aStepThatReportsMessagesIsNotRecorded() throws Exception {
+    Build build = new Build("ig", resources(), null);
+
+    build.generator.fragmentStep("step", "key", () -> build.pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher,
+        ValidationMessage.IssueType.NOTFOUND, "here", "not found", ValidationMessage.IssueSeverity.WARNING)));
+
+    assertNull(build.steps().save().getJsonObject("step"));
+    assertEquals(1, build.pf.errors.size());
+  }
+
+  @Test
+  void aStepInsideAStepIsPartOfIt() throws Exception {
+    Build first = new Build("ig", resources(), null);
+    first.generator.fragmentStep("outer", "key", () -> first.lists("CodeSystem"));
+    assertNotNull(first.steps().save().getJsonObject("outer"));
+    assertNull(first.steps().save().getJsonObject("lists/en/CodeSystem"));
+    assertFalse(first.steps().save().getJsonObject("outer").getJsonArray("fragments").getItems().isEmpty());
+
+    Build second = new Build("ig", resources(), first.steps().save());
+    second.generator.fragmentStep("outer", "key", () -> second.lists("CodeSystem"));
+
+    assertEquals(1, second.steps().getReused());
+    assertEquals(first.pf.otherFilesRun, second.pf.otherFilesRun);
+  }
+
+  @Test
+  void listsInNoLanguageOrAnotherThanTheDefaultHaveNoCopy() throws Exception {
+    Build first = new Build("ig", resources(), null).lists("CodeSystem", null).lists("Location", "fr");
+    assertTrue(first.fragments().containsKey("list-codesystems.xhtml"));
+    assertTrue(first.fragments().containsKey("list-locations-fr.xhtml"));
+    assertFalse(first.fragments().containsKey("list-locations.xhtml"));
+    Map<String, FileTime> written = first.written();
+
+    Build second = new Build("ig", resources(), first.steps().save()).lists("CodeSystem", null).lists("Location", "fr");
+
+    assertEquals(2, second.steps().getReused());
+    assertEquals(written, second.written());
+    assertEquals(first.pf.otherFilesRun, second.pf.otherFilesRun);
+
+    // now French is the default language: its lists get a copy
+    Build third = new Build("ig", resources(), second.steps().save());
+    third.pf.defaultTranslationLang = "fr";
+    third.lists("Location", "fr");
+    assertEquals(1, third.steps().getRun());
+    assertEquals(third.fragments().get("list-locations-fr.xhtml"), third.fragments().get("list-locations.xhtml"));
+
+    // and when it no longer is, they are made again as well (the copy isn't theirs to count on)
+    Build fourth = new Build("ig", resources(), third.steps().save()).lists("Location", "fr");
+    assertEquals(1, fourth.steps().getRun());
+  }
+
+  @Test
+  void listsOfNothingAreReusedToo() throws Exception {
+    Build first = new Build("ig", resources(), null).lists("Patient").lists(EXTENSIONS).lists(LOGICALS);
+    assertEquals(3, first.steps().getRun());
+
+    Build second = new Build("ig", resources(), first.steps().save()).lists("Patient").lists(EXTENSIONS).lists(LOGICALS);
+
+    assertEquals(3, second.steps().getReused());
+    assertEquals(first.pf.otherFilesRun, second.pf.otherFilesRun);
+
+    // the first patient: its lists are made
+    List<Res> more = resources();
+    more.add(new Res("{\"resourceType\":\"Patient\",\"id\":\"p\"}", "Pat", "patient file"));
+    Build third = new Build("ig", more, second.steps().save()).lists("Patient");
+    assertEquals(1, third.steps().getRun());
+    assertTrue(third.fragments().get("list-patients-en.xhtml").contains("Patient-p.html"));
   }
 }
