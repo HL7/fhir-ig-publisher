@@ -1265,9 +1265,10 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
   /**
    * The native outputs of every file in the change list. With -threads, the files are done on the extra threads:
    * each worker writes its file's outputs into temp (or, with -rapido, finds them as they were written), and keeps
-   * the steps that add to shared state (the packages, the cross-version notes, the log) for this thread, which runs them in change list order. The database rows come
-   * last, in the same order, once no worker is left: saving a row marks the resource (and, for a custom resource,
-   * its structure definition) with its key, which the workers read. Until then, the rows hold the resources' json.
+   * the steps that add to shared state (the packages, the cross-version notes, the log) for this thread, which runs
+   * them in change list order. The database rows come last, in the same order, once no worker is left: saving a row
+   * marks the resource (and, for a custom resource, its structure definition) with its key, which the workers read.
+   * Until then, the rows hold the resources' json.
    * <p>
    * If a file fails, the files after it may already have written their outputs into temp; the build stops anyway.
    */

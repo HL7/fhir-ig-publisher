@@ -14,7 +14,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -231,8 +233,8 @@ class RapidoNativeOutputsTest {
     FileRecord one = record(outputs);
     FileRecord other = record(outputs);
     other.resources.get(0).entries.clear();
-    List<Throwable> failures = java.util.Collections.synchronizedList(new java.util.ArrayList<>());
-    List<Thread> threads = new java.util.ArrayList<>();
+    List<Throwable> failures = Collections.synchronizedList(new ArrayList<>());
+    List<Thread> threads = new ArrayList<>();
     for (FileRecord rec : List.of(one, other)) {
       Thread t = new Thread(() -> {
         try {
