@@ -1,0 +1,12 @@
+{
+  "resourceType": "Device",
+  "id": "ct-scanner",
+  "name": [
+    { "value": "SOMATOM Edge", "type": "registered-name" },
+    { "value": "KT skaner", "type": "user-friendly-name" }
+  ],
+  "version": [
+    { "value": "VA30" },
+    { "value": "VB10" }
+  ]
+}

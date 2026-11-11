@@ -1,0 +1,15 @@
+{
+  "resourceType": "Bundle",
+  "id": "collection",
+  "type": "collection",
+  "entry": [
+    {
+      "fullUrl": "http://example.org/fhir/Device/in-bundle",
+      "resource": {
+        "resourceType": "Device",
+        "id": "in-bundle",
+        "name": [ { "value": "A", "type": "user-friendly-name" }, { "value": "B", "type": "user-friendly-name" } ]
+      }
+    }
+  ]
+}

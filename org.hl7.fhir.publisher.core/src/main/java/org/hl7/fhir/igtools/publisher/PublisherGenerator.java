@@ -323,7 +323,19 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         for (FetchedFile f : pf.changeList) {
           f.start("generate2");
           try {
-            generateHtmlOutputs(f, false, db, null);
+            if (pf.rapido != null && !settings.isGenerationOff() && pf.rapido.canReplay(f, RapidoTracker.PHASE_HTML)) {
+              replayGeneration(f, RapidoTracker.PHASE_HTML);
+              convertForRendering(f);
+              redoRenderingChanges(f);
+            } else {
+              if (pf.rapido != null) {
+                pf.rapido.startRecording(f, RapidoTracker.PHASE_HTML);
+              }
+              generateHtmlOutputs(f, false, db, null);
+              if (pf.rapido != null) {
+                pf.rapido.stopRecording();
+              }
+            }
           } finally {
             f.finish("generate2");
           }
@@ -334,12 +346,44 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
       logMessage("Generate Spreadsheets");
       columnWidths = new ColumnWidthCache();
-      spreadsheetPrefetcher = startSpreadsheetPrefetcher();
+      // the files whose spreadsheets are reused from the last build: decided before the prefetcher starts, so that it
+      // doesn't build their workbooks
+      Set<FetchedFile> replaySheets = new HashSet<>();
+      if (pf.rapido != null && !settings.isGenerationOff()) {
+        for (FetchedFile f : pf.changeList) {
+          if (pf.rapido.canReplay(f, RapidoTracker.PHASE_SHEETS)) {
+            replaySheets.add(f);
+          }
+        }
+      }
+      spreadsheetPrefetcher = startSpreadsheetPrefetcher(replaySheets);
       try {
         for (FetchedFile f : pf.changeList) {
           f.start("generate2");
           try {
-            generateSpreadsheets(f, false, db);
+            if (replaySheets.contains(f)) {
+              replayGeneration(f, RapidoTracker.PHASE_SHEETS);
+              // the rows in the all-profiles spreadsheets. A phase that threw isn't replayed, so this didn't throw last
+              // time: an exception now is reported as generateResourceSpreadsheets reports it
+              for (FetchedResource r : f.getResources()) {
+                if (r.getResource() instanceof StructureDefinition) {
+                  try {
+                    addToAllProfiles(r, (StructureDefinition) r.getResource(), new ArrayList<>());
+                  } catch (Exception e) {
+                    log("Exception generating resource "+f.getName()+"::"+r.fhirType()+"/"+r.getId()+": "+e.getMessage());
+                    f.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.EXCEPTION, r.fhirType(), "Error Rendering Resource: "+e.getMessage(), ValidationMessage.IssueSeverity.ERROR));
+                  }
+                }
+              }
+            } else {
+              if (pf.rapido != null) {
+                pf.rapido.startRecording(f, RapidoTracker.PHASE_SHEETS);
+              }
+              generateSpreadsheets(f, false, db);
+              if (pf.rapido != null) {
+                pf.rapido.stopRecording();
+              }
+            }
           } finally {
             f.finish("generate2");
           }
@@ -417,7 +461,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     printMemUsage();
     log("Reclaiming memory...");
     if (pf.hasCheckedDependencies) {
-      // rapido: a differential build keeps what the files it didn't generate wrote in an earlier build
+      // rapido: what the files wrote in the temp folder, and what an earlier build wrote that no file writes now
       RapidoOutputs.Change change = new RapidoOutputs(pf.vsCache, pf.tempDir).update(pf.fileList, pf.changeList);
       if (change != null) {
         pf.otherFilesRun.addAll(change.getKept());
@@ -436,7 +480,6 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     for (FetchedFile f : pf.fileList) {
       f.trim();
     }
-    genCombinedPackage();
     if (pf.txUnloadEarly) {
       // memory-starved IGs opt into unloading terminology now, before HTML inspection.
       // The trade-off is that conformance statement rendering (which needs terminology) won't work.
@@ -502,6 +545,13 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           } catch (Exception e) {
             pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.EXCEPTION, "package.tgz", "Error converting pacakge to R4B: "+e.getMessage(), ValidationMessage.IssueSeverity.ERROR));
           }
+        }
+        // the combined package is made from package.tgz, so it has to wait until that has been written. It needs
+        // terminology for the expansions, which is still loaded here unless the IG unloads it early
+        if (pf.txUnloadEarly) {
+          log("Not generating the combined package: terminology has been unloaded (tx-unload-early)");
+        } else {
+          genCombinedPackage();
         }
 
         if (settings.getMode() == null || settings.getMode() == PublisherUtils.IGBuildMode.MANUAL) {
@@ -616,10 +666,16 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       String fragment = pf.sourceIg.present()+" - Downloaded Version "+ pf.businessVersion +" See the <a href=\""+ pf.igpkp.getCanonical()+"/history.html\">Directory of published versions</a></p>";
       igvu.updateStatement(fragment, 0, null);
     }
-    ZipGenerator zip = new ZipGenerator(Utilities.path(pf.tempDir, "full-ig.zip"));
-    zip.addFolder(pf.outputDir, "site/", false);
-    zip.addFileSource("index.html", REDIRECT_SOURCE, false);
-    zip.close();
+    if (settings.getThreads() > 0) {
+      // the same entries, compressed on the extra threads (-threads)
+      new ParallelFolderZip(settings.getThreads()).write(Utilities.path(pf.tempDir, "full-ig.zip"), pf.outputDir, "site/",
+          "index.html", REDIRECT_SOURCE.getBytes(StandardCharsets.UTF_8));
+    } else {
+      ZipGenerator zip = new ZipGenerator(Utilities.path(pf.tempDir, "full-ig.zip"));
+      zip.addFolder(pf.outputDir, "site/", false);
+      zip.addFileSource("index.html", REDIRECT_SOURCE, false);
+      zip.close();
+    }
     FileUtilities.copyFile(Utilities.path(pf.tempDir, "full-ig.zip"), Utilities.path(pf.outputDir, "full-ig.zip"));
     log("Final .zip built");
     if (!pf.txUnloadEarly) {
@@ -987,14 +1043,14 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
    * everything else in the same order as before (csv, all-profiles, schematron), and builds a workbook itself
    * whenever the prefetcher has no result for it.
    */
-  private ProfileSpreadsheetPrefetcher<FetchedResource> startSpreadsheetPrefetcher() {
+  private ProfileSpreadsheetPrefetcher<FetchedResource> startSpreadsheetPrefetcher(Set<FetchedFile> replayed) {
     int threads = this.settings.getThreads();
     if (threads == 0 || this.settings.isGenerationOff()) {
       return null;
     }
     List<FetchedResource> candidates = new ArrayList<>();
     for (FetchedFile f : pf.changeList) {
-      if (f.getProcessMode() != FetchedFile.PROCESS_NONE && f.getProcessMode() != FetchedFile.PROCESS_XSLT) {
+      if (f.getProcessMode() != FetchedFile.PROCESS_NONE && f.getProcessMode() != FetchedFile.PROCESS_XSLT && !replayed.contains(f)) {
         for (FetchedResource r : f.getResources()) {
           // wantGen(r, "xlsx") without the template check, which is always true for xlsx but counts the calls;
           // the loop still asks wantGen itself
@@ -1783,23 +1839,25 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
         fragment("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", html, f.getOutputNames(), r, vars, null, start, "expansion", "ValueSet", lang);
       } else {
-        ValueSetExpansionOutcome exp = this.pf.context.expandVS(new ExpansionOptions().withHierarchical(true).withLanguage(lrc.getLocale().getLanguage()).withIncompleteOk(true), vs);
+        ValueSetExpansionOutcome exp = this.pf.context.expandVS(new ExpansionOptions().withCacheOk(true).withHierarchical(true).withLanguage(lrc.getLocale().getLanguage()).withIncompleteOk(true), vs);
 
         if (db != null) {
           db.recordExpansion(vs, exp);
         }
         if (exp.getValueset() != null) {
+          // the tx cache holds on to this expansion, so it's rendered from a copy
+          ValueSet expansion = exp.getValueset().copy(Base.COPY_ALL);
           if (pf.savingExpansions) {
-            this.pf.expansions.add(exp.getValueset());
+            this.pf.expansions.add(expansion);
           }
           RenderingContext elrc = lrc.withUniqueLocalPrefix("x").withMode(RenderingContext.ResourceRendererMode.END_USER);
-          exp.getValueset().setCompose(null);
-          exp.getValueset().setText(null);
-          pf.rendererFactory.factory(exp.getValueset(), elrc).renderResource(ResourceWrapper.forResource(elrc, exp.getValueset()));
-          String html = new XhtmlComposer(XhtmlComposer.XML).compose(exp.getValueset().getText().getDiv());
+          expansion.setCompose(null);
+          expansion.setText(null);
+          pf.rendererFactory.factory(expansion, elrc).renderResource(ResourceWrapper.forResource(elrc, expansion));
+          String html = new XhtmlComposer(XhtmlComposer.XML).compose(expansion.getText().getDiv());
           fragment("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", html, f.getOutputNames(), r, vars, null, start, "expansion", "ValueSet", lang);
           elrc = elrc.withOids(true);
-          XhtmlNode node = pf.rendererFactory.factory(exp.getValueset(), elrc).buildNarrative(ResourceWrapper.forResource(elrc, exp.getValueset()));
+          XhtmlNode node = pf.rendererFactory.factory(expansion, elrc).buildNarrative(ResourceWrapper.forResource(elrc, expansion));
           html = new XhtmlComposer(XhtmlComposer.XML).compose(node);
           fragment("ValueSet-"+prefixForContainer+vs.getId()+"-expansion-oids", html, f.getOutputNames(), r, vars, null, start, "expansion", "ValueSet", lang);
           if (ValueSetUtilities.isIncompleteExpansion(exp.getValueset())) {
@@ -2005,12 +2063,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       try (FileOutputStream out = new FileOutputStream(path)) {
         pu.generateCsv(out, sd, true);
       }
-      if (this.pf.allProfilesCsv == null) {
-        this.pf.allProfilesCsv = new  org.hl7.fhir.services.utilities.CSVWriter(new FileOutputStream(Utilities.path(this.pf.tempDir, "all-profiles.csv")), this.pf.context, true);
-        this.pf.otherFilesRun.add(Utilities.path(this.pf.tempDir, "all-profiles.csv"));
-
-      }
-      pu.addToCSV(this.pf.allProfilesCsv, sd);
+      addToAllProfilesCsv(pu, sd);
     }
     if (wantGen(r, "xlsx")) {
       lapsed(null);
@@ -2029,11 +2082,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         }
       }
       lapsed("xslx");
-      if (this.pf.allProfilesXlsx == null) {
-        this.pf.allProfilesXlsx = new ProfileSpreadsheetGenerator(this.pf.context, true, false, pf.rendererFactory, columnWidths());
-      }
-      this.pf.allProfilesXlsx.renderStructureDefinition(sd, true);
-      lapsed("all-xslx");
+      addToAllProfilesXlsx(sd);
     }
 
     if (!regen && sd.getDerivation() == StructureDefinition.TypeDerivationRule.CONSTRAINT && wantGen(r, "sch")) {
@@ -2047,6 +2096,114 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 //    if (wantGen(r, "sch"))
 //      start = System.currentTimeMillis();
 //    fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-sch", "yet to be done: schematron as html", null, f.getOutputNames(), start, "sch", "StructureDefinition");
+  }
+
+  /**
+   * The rows for the profile in all-profiles.csv and all-profiles.xlsx. These are built from every profile, so Rapido
+   * has to add them even for a profile whose other outputs it reuses from the last build
+   */
+  private void addToAllProfiles(FetchedResource r, StructureDefinition sd, List<ValidationMessage> errors) throws Exception {
+    if (wantGen(r, "csv")) {
+      addToAllProfilesCsv(new ProfileUtilities(this.pf.context, errors, this.pf.igpkp), sd);
+    }
+    if (wantGen(r, "xlsx")) {
+      lapsed(null);
+      addToAllProfilesXlsx(sd);
+    }
+  }
+
+  private void addToAllProfilesCsv(ProfileUtilities pu, StructureDefinition sd) throws Exception {
+    if (this.pf.allProfilesCsv == null) {
+      this.pf.allProfilesCsv = new  org.hl7.fhir.services.utilities.CSVWriter(new FileOutputStream(Utilities.path(this.pf.tempDir, "all-profiles.csv")), this.pf.context, true);
+      this.pf.otherFilesRun.add(Utilities.path(this.pf.tempDir, "all-profiles.csv"));
+
+    }
+    pu.addToCSV(this.pf.allProfilesCsv, sd);
+  }
+
+  private void addToAllProfilesXlsx(StructureDefinition sd) throws Exception {
+    if (this.pf.allProfilesXlsx == null) {
+      this.pf.allProfilesXlsx = new ProfileSpreadsheetGenerator(this.pf.context, true, false, pf.rendererFactory, columnWidths());
+    }
+    this.pf.allProfilesXlsx.renderStructureDefinition(sd, true);
+    lapsed("all-xslx");
+  }
+
+  /**
+   * Rapido: the file's outputs from the last build are still in the temp folder. Do what generating them would have
+   * done to the rest of the build
+   */
+  private void replayGeneration(FetchedFile f, String phase) throws IOException {
+    RapidoTracker.Journal j = pf.rapido.replay(f, phase);
+    f.getOutputNames().addAll(j.outputs);
+    for (String s : j.allOutputs) {
+      if (!pf.allOutputs.add(s)) {
+        throw new Error("Error generating build: the file "+s+" is being generated more than once (may differ by case)");
+      }
+    }
+    pf.otherFilesRun.addAll(j.otherFiles);
+    for (int i : j.umlGenerated) {
+      f.getResources().get(i).setUmlGenerated(true);
+    }
+    pf.errors.addAll(j.errors);
+    f.getErrors().addAll(j.fileErrors);
+    for (Map.Entry<Integer, List<ValidationMessage>> e : j.resErrors.entrySet()) {
+      f.getResources().get(e.getKey()).getErrors().addAll(e.getValue());
+    }
+    for (RapidoTracker.NpmEntry e : j.npm) {
+      if (e.category != null) {
+        addFileToNpm(NPMPackageGenerator.Category.valueOf(e.category), e.name, e.content);
+      } else {
+        addFileToNpm(e.folder, e.name, e.content);
+      }
+    }
+    pf.expansions.addAll(j.expansions);
+    for (String[] t : j.tracked) {
+      pf.trackedFragments.computeIfAbsent(t[0], k -> new ArrayList<>()).add(t[1]);
+    }
+    for (int i = 0; i < j.fragUseKeys.size(); i++) {
+      PublisherBase.FragmentUseRecord frag = pf.fragmentUses.get(j.fragUseKeys.get(i));
+      if (frag == null) {
+        frag = new PublisherBase.FragmentUseRecord();
+        pf.fragmentUses.put(j.fragUseKeys.get(i), frag);
+      }
+      frag.record(j.fragUseNumbers.get(i)[0], j.fragUseNumbers.get(i)[1]);
+    }
+  }
+
+  /** generating the html converts the resources that haven't been converted yet: later steps rely on that */
+  private void convertForRendering(FetchedFile f) {
+    for (FetchedResource r : f.getResources()) {
+      if (r.getResource() == null && !r.isCustomResource()) {
+        try {
+          r.setResource(convertFromElement(r.getElement()));
+        } catch (Exception e) {
+          // the same as generating the html: it's reported there, and nothing here depends on it
+        }
+      }
+    }
+  }
+
+  private StructureDefinitionRenderer structureDefinitionRenderer(StructureDefinition sd, RenderingContext lrc, String lang) throws IOException {
+    String structureDefinitionImageFolder = lang == null ? Utilities.path(this.pf.tempDir) : Utilities.path(this.pf.tempDir, lang);
+    StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(this.pf.context, this.pf.packageId(), checkAppendSlash(this.pf.specPath), sd, structureDefinitionImageFolder, this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, this.pf.fileList, lrc, this.pf.allInvariants, this.pf.sdMapCache, this.pf.specPath, this.pf.versionToAnnotate, this.pf.relatedIGs, this);
+    sdr.setNoXigLink(this.pf.noXigLink);
+    sdr.setUsageCache(this.pf.sdUsageCache);
+    return sdr;
+  }
+
+  /**
+   * Rapido: rendering a profile's expansion fragment adds an empty type to its elements that have none (the root, for
+   * one), and all-profiles.csv and all-profiles.xlsx, made later from the same objects, show it. Do the same for a
+   * profile whose html is reused, so those files come out as they do from a complete build
+   */
+  private void redoRenderingChanges(FetchedFile f) throws IOException {
+    for (FetchedResource r : f.getResources()) {
+      if (r.getResource() instanceof StructureDefinition && wantGen(r, "expansion")) {
+        structureDefinitionRenderer((StructureDefinition) r.getResource(), this.pf.rc.copy(true), null)
+          .expansion(this.pf.igpkp.getDefinitionsName(r), this.pf.otherFilesRun, "x");
+      }
+    }
   }
 
   private void generateOutputsStructureDefinition(FetchedFile f, FetchedResource r, StructureDefinition sd, Map<String, String> vars, boolean regen, String prefixForContainer, RenderingContext lrc, String lang) throws Exception {
@@ -2067,10 +2224,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-json-schema", "yet to be done: json schema as html", null, f.getOutputNames(), start, "json-schema", "StructureDefinition", lang);
     }
 
-    String structureDefinitionImageFolder = lang == null ? Utilities.path(this.pf.tempDir) : Utilities.path(this.pf.tempDir, lang);
-    StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(this.pf.context, this.pf.packageId(), checkAppendSlash(this.pf.specPath), sd, structureDefinitionImageFolder, this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, this.pf.fileList, lrc, this.pf.allInvariants, this.pf.sdMapCache, this.pf.specPath, this.pf.versionToAnnotate, this.pf.relatedIGs, this);
-    sdr.setNoXigLink(this.pf.noXigLink);
-    sdr.setUsageCache(this.pf.sdUsageCache);
+    StructureDefinitionRenderer sdr = structureDefinitionRenderer(sd, lrc, lang);
 
     if (wantGen(r, "summary")) {
       long start = System.currentTimeMillis();
@@ -2711,6 +2865,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       pf.trackedFragments.put(id, new ArrayList<>());
     }
     pf.trackedFragments.get(id).add(name+".xhtml");
+    if (pf.rapido != null) {
+      pf.rapido.recordTrackedFragment(id, name+".xhtml");
+    }
     fragment(name, content+HTMLInspector.TRACK_PREFIX+id+HTMLInspector.TRACK_SUFFIX, outputTracker, null, null, null, start, code, context, lang);
   }
 
@@ -2726,7 +2883,11 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       frag = new PublisherBase.FragmentUseRecord();
       pf.fragmentUses.put(context+"."+code, frag);
     }
-    frag.record(System.currentTimeMillis() - start, fixedContent.length());
+    long time = System.currentTimeMillis() - start;
+    frag.record(time, fixedContent.length());
+    if (pf.rapido != null) {
+      pf.rapido.recordFragmentUse(context+"."+code, time, fixedContent.length());
+    }
 
     if (checkMakeFile(FileUtilities.stringToBytes(wrapLiquid(fixedContent)), Utilities.path(pf.tempDir, "_includes", name+(lang == null ? "" : "-" + lang)+".xhtml"), outputTracker)) {
       if (settings.getMode() != PublisherUtils.IGBuildMode.AUTOBUILD && pf.makeQA) {
@@ -4149,7 +4310,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       return true;
     }
     if (settings.isGenerationOff()) {
-      FileUtils.copyDirectory(new File(pf.tempDir), new File(pf.outputDir));
+      File out = new File(pf.outputDir).getAbsoluteFile();
+      // in watch mode the output folder is in temp: it isn't copied into itself
+      FileUtils.copyDirectory(new File(pf.tempDir), out, f -> !f.getAbsoluteFile().equals(out));
       return true;
     }
     return runJekyll();
@@ -4301,6 +4464,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
 
   private void addFileToNpm(NPMPackageGenerator.Category other, String name, byte[] cnt) throws IOException {
+    if (pf.rapido != null) {
+      pf.rapido.recordNpm(other.name(), null, name, cnt);
+    }
     pf.npm.addFile(other, name, cnt);
     for (NPMPackageGenerator vnpm : pf.vnpms.values()) {
       vnpm.addFile(other, name, cnt);
@@ -4308,6 +4474,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
   }
 
   private void addFileToNpm(String other, String name, byte[] cnt) throws IOException {
+    if (pf.rapido != null) {
+      pf.rapido.recordNpm(null, other, name, cnt);
+    }
     pf.npm.addFile(other, name, cnt);
     for (NPMPackageGenerator vnpm : pf.vnpms.values()) {
       vnpm.addFile(other, name, cnt);

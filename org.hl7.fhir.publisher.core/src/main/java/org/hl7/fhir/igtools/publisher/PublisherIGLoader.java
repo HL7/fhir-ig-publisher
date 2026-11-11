@@ -3,6 +3,9 @@ package org.hl7.fhir.igtools.publisher;
 import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_10_50;
 import org.hl7.fhir.convertors.factory.*;
 import org.hl7.fhir.convertors.txClient.TerminologyClientFactory;
+import org.hl7.fhir.services.client.ITerminologyClientFactoryN;
+import org.fhir.ucum.UcumEssenceService;
+import org.fhir.ucum.UcumService;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.openehr.ArchetypeImporter;
 import org.hl7.fhir.igtools.openehr.CKMClient;
@@ -78,6 +81,8 @@ import org.hl7.fhir.validation.ValidatorUtils;
 import org.hl7.fhir.validation.instance.InstanceValidator;
 import org.hl7.fhir.validation.profile.ProfileValidator;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.io.FileUtils;
+import org.w3._1999.xhtml.B;
 import org.w3c.dom.Document;
 import org.xml.sax.SAXException;
 
@@ -110,6 +115,8 @@ public class PublisherIGLoader extends PublisherBase {
    * mirroring the pattern already used for {@code ig-link-dependency}. The exact URL is not yet
    * ratified in the tools IG (Open Question) and is isolated here so a rename is one line.
    */
+  // in watch mode, the folder in temp that the build writes its output to (Jekyll skips names that start with a dot)
+  public static final String WATCH_OUTPUT_STAGING = ".watch-output";
   public static final String EXT_IG_DEP_VERSION = "http://hl7.org/fhir/tools/StructureDefinition/ig-dependency-for-version";
 
   /**
@@ -361,7 +368,7 @@ public class PublisherIGLoader extends PublisherBase {
     }
     pf.templateManager.loadTemplateOverrides(ini, pf.rootDir);
     try {
-      pf.template = pf.templateManager.loadTemplate(templateName, pf.rootDir, pf.packageId(), settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD, pf.logOptions.contains("template"), settings.isRapidoMode());
+      pf.template = pf.templateManager.loadTemplate(templateName, pf.rootDir, pf.packageId(), settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD, pf.logOptions.contains("template"), false); // Rapido has to produce every fragment that a full build does
     } catch (Throwable e) {
       if (watchSession != null) {
         // a template that is being worked on, and can't be loaded now: fixing it needs a rebuild
@@ -377,10 +384,6 @@ public class PublisherIGLoader extends PublisherBase {
       // a template that is being worked on: a change to it needs a rebuild
       watchSession.watchTemplateFolders(pf.templateManager.getLocalFolders());
       pf.template.setOutputListener(watchSession.templateOutputs());
-    }
-    if (settings.isRapidoMode() && pf.template.isDevMode()) {
-      // the temp folder is cleared on every run for a template in development, so every rapido build is a complete one (see Publisher.checkDependencies)
-      log("Rapido Mode: the template is in development mode (a local folder), so -rapido has no effect: every build is a complete build");
     }
     if (pf.template.hasExtraTemplates()) {
       processExtraTemplates(pf.template.getExtraTemplates());
@@ -996,7 +999,9 @@ public class PublisherIGLoader extends PublisherBase {
       pf.jekyllTimeout = ini.getLongProperty("IG", "jekyll-timeout") * 1000;
     }
 
-    if (pf.template.isDevMode()) {
+    if (pf.template.isDevMode() && !settings.isRapidoMode()) {
+      // (Rapido hashes the template, and clears the temp folder itself when it changes: clearing it here would throw
+      // away what Rapido reuses, in every build with a local template)
       FileUtilities.clearDirectory(pf.tempDir);
     } else {
       File fTempDir = new File(pf.tempDir);
@@ -1071,6 +1076,7 @@ public class PublisherIGLoader extends PublisherBase {
 
     logDebugMessage(LogCategory.INIT, "Output: "+ pf.outputDir);
     forceDir(pf.outputDir);
+    setUpWatchOutput();
     FileUtilities.clearDirectory(pf.outputDir);
     if (pf.qaDir != null) {
       logDebugMessage(LogCategory.INIT, "QA Dir: "+ pf.qaDir);
@@ -1129,10 +1135,10 @@ public class PublisherIGLoader extends PublisherBase {
         pf.txLog = null;
       } else {
         log("Connect to Terminology Server at "+ settings.getTxServer()+(settings.getEcosystem() == null ? " (no ecosystem)" : " (ecosystem: "+settings.getEcosystem()+")"));
-        pf.context.connectToTSServer(new TerminologyClientFactory(pf.version), settings.getTxServer(), "fhir/publisher", pf.txLog, settings.getEcosystem());
+        pf.context.connectToTSServer(txClientFactory(), settings.getTxServer(), "fhir/publisher", pf.txLog, settings.getEcosystem());
       }
     } else {
-      pf.context.connectToTSServer(new TerminologyClientFactory(pf.version), pf.webTxServer.getAddress(), "fhir/publisher", pf.txLog, settings.getEcosystem());
+      pf.context.connectToTSServer(txClientFactory(), pf.webTxServer.getAddress(), "fhir/publisher", pf.txLog, settings.getEcosystem());
     }
     if (expParams != null) {
       /* This call to uncheckedPath is allowed here because the path is used to
@@ -1420,15 +1426,75 @@ public class PublisherIGLoader extends PublisherBase {
     return dsi;
   }
 
+  /**
+   * In watch mode the output folder isn't emptied: the build writes to a staging folder in temp, and when it succeeds
+   * what changed is moved into the output folder, so the pages there can be browsed while a rebuild runs
+   */
+  void setUpWatchOutput() throws Exception {
+    String staging = Utilities.path(pf.tempDir, WATCH_OUTPUT_STAGING);
+    if (settings.isWatchMode() && !nested(staging, pf.outputDir)) {
+      pf.watchOutputDir = pf.outputDir;
+      pf.outputDir = staging;
+      logDebugMessage(LogCategory.INIT, "Staging: "+ pf.outputDir);
+      forceDir(pf.outputDir);
+      if (pf.qaDir != null) {
+        // or the sync would delete it
+        pf.qaDir = Publisher.stagedPath(pf.qaDir, pf.watchOutputDir, pf.outputDir);
+      }
+      return;
+    }
+    if (settings.isWatchMode()) {
+      log("The output folder "+ pf.outputDir +" is, or is inside, the temp folder's "+ WATCH_OUTPUT_STAGING +", so it is emptied on each rebuild");
+    }
+    if (new File(staging).exists() && !nested(staging, pf.outputDir)) {
+      // left by a watch session: it isn't part of this build
+      try {
+        FileUtils.deleteDirectory(new File(staging));
+      } catch (IOException e) {
+        log("Unable to delete "+ staging +", left by a watch session (it isn't used by this build): "+e.getMessage());
+      }
+    }
+  }
+
+  /** whether one folder is the other or inside it */
+  static boolean nested(String a, String b) throws IOException {
+    Path pa = realPath(a);
+    Path pb = realPath(b);
+    return pa.startsWith(pb) || pb.startsWith(pa);
+  }
+
+  /** the path with links followed, as far as it exists */
+  private static Path realPath(String s) throws IOException {
+    Path p = Paths.get(s).toAbsolutePath().normalize();
+    Path existing = p;
+    while (existing != null && !Files.exists(existing)) {
+      existing = existing.getParent();
+    }
+    return existing == null ? p : existing.toRealPath().resolve(existing.relativize(p));
+  }
+
   public void clearTempFolder() throws Exception {
     logDebugMessage(LogCategory.INIT, "Temp: "+ pf.tempDir);
-    FileUtilities.clearDirectory(pf.tempDir);
+    if (pf.watchOutputDir != null) {
+      // everything but the staging folder, which already has what this build wrote to the output so far
+      File[] children = new File(pf.tempDir).listFiles();
+      if (children != null) {
+        for (File f : children) {
+          if (!f.getName().equals(WATCH_OUTPUT_STAGING)) {
+            FileUtils.forceDelete(f);
+          }
+        }
+      }
+    } else {
+      FileUtilities.clearDirectory(pf.tempDir);
+    }
     forceDir(pf.tempDir);
     forceDir(Utilities.path(pf.tempDir, "_includes"));
     forceDir(Utilities.path(pf.tempDir, "_data"));
     for (String s : allLangs()) {
       forceDir(Utilities.path(pf.tempDir, s));
     }
+    new RapidoOutputs(pf.vsCache, pf.tempDir).forget();
   }
 
   private IPublisherModule loadModule(String name) throws Exception {
@@ -1655,6 +1721,7 @@ public class PublisherIGLoader extends PublisherBase {
     sp.loadBinariesFromFolder(pi);
     sp.setForPublication(true);
     sp.setSuppressedMappings(pf.suppressedMappings);
+    sp.setUcumService(loadUcumService());
     if (!pf.version.equals(Constants.VERSION)) {
       // If it wasn't a 4.0 source, we need to set the ids because they might not have been set in the source
       ProfileUtilities utils = new ProfileUtilities(pf.context, new ArrayList<ValidationMessage>(), pf.igpkp);
@@ -1663,6 +1730,31 @@ public class PublisherIGLoader extends PublisherBase {
       }
     }
     return sp;
+  }
+
+  private ITerminologyClientFactoryN txClientFactory() {
+    ITerminologyClientFactoryN res = new TerminologyClientFactory(pf.version);
+    if (settings.isRapidoMode()) {
+      // a call that got no answer from the server means the next build can't reuse this one
+      pf.txFailures = new RapidoTracker.TxFailures(res);
+      res = pf.txFailures;
+    }
+    return res;
+  }
+
+  /**
+   * UCUM service for unit-aware FHIRPath operations, loaded from the embedded ucum-essence.xml
+   * in the same way as the validator (ValidationEngine).
+   */
+  static UcumService loadUcumService() {
+    try (InputStream ue = PublisherIGLoader.class.getClassLoader().getResourceAsStream("ucum-essence.xml")) {
+      if (ue == null) {
+        throw new FHIRException("ucum-essence.xml not found on the classpath");
+      }
+      return new UcumEssenceService(ue);
+    } catch (Exception e) {
+      throw new FHIRException("Error loading UCUM from embedded ucum-essence.xml: "+e.getMessage(), e);
+    }
   }
 
   private Parameters makeExpProfile() {

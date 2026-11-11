@@ -307,6 +307,9 @@ public class PublisherBase implements ILoggingService {
     String s = path.toLowerCase();
     if (!pf.allOutputs.add(s))
       throw new Error("Error generating build: the file "+path+" is being generated more than once (may differ by case)");
+    if (pf.rapido != null) {
+      pf.rapido.recordOutput(s);
+    }
     outputTracker.add(path);
 
     File f = new CSFile(path);
@@ -353,12 +356,19 @@ public class PublisherBase implements ILoggingService {
     return p.asString();
   }
 
+  /**
+   * the output folder: in watch mode, the build writes to a staging folder that is synced into it
+   */
+  protected String finalOutputDir() {
+    return pf.watchOutputDir != null ? pf.watchOutputDir : pf.outputDir;
+  }
+
   protected String targetUrl() {
     if (settings.getMode() == null)
-      return "file://"+ pf.outputDir;
+      return "file://"+ finalOutputDir();
     switch (settings.getMode()) {
     case AUTOBUILD: return settings.getTargetOutput() == null ? "https://build.fhir.org/ig/[org]/[repo]" : settings.getTargetOutput();
-    case MANUAL: return "file://"+ pf.outputDir;
+    case MANUAL: return "file://"+ finalOutputDir();
     case WEBSERVER: return "http://unknown";
     case PUBLICATION: return settings.getTargetOutput();
     default: return pf.igpkp.getCanonical();
@@ -630,9 +640,8 @@ public class PublisherBase implements ILoggingService {
     if (add) {
       pf.fileList.add(file);
     }
-    if (!settings.isRapidoMode() || pf.hasCheckedDependencies) {
-      pf.changeList.add(file);
-    }
+    // Rapido works out what it can reuse from the last build after loading, so every file goes through every step
+    pf.changeList.add(file);
     //  	}
   }
 
