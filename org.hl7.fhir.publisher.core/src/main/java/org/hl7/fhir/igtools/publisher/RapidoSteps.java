@@ -2,7 +2,6 @@ package org.hl7.fhir.igtools.publisher;
 
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
@@ -152,8 +151,7 @@ public class RapidoSteps {
    */
   public static String stamp(String path) {
     try {
-      Path p = Paths.get(path);
-      BasicFileAttributes a = Files.readAttributes(p, BasicFileAttributes.class);
+      BasicFileAttributes a = Files.readAttributes(Paths.get(path), BasicFileAttributes.class);
       if (!a.isRegularFile()) {
         return "not a file: "+System.nanoTime();
       }

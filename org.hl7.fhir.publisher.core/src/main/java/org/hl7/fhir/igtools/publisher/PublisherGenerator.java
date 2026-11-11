@@ -3147,8 +3147,6 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     pf.trackedFragments.get(id).add(name+".xhtml");
     if (pf.rapido != null) {
       pf.rapido.recordTrackedFragment(id, name+".xhtml");
-    }
-    if (pf.rapido != null && pf.rapido.getSteps().isRecording()) {
       pf.rapido.getSteps().abandon(); // not what a step's record holds
     }
     fragment(name, content+HTMLInspector.TRACK_PREFIX+id+HTMLInspector.TRACK_SUFFIX, outputTracker, null, null, null, start, code, context, lang);
@@ -3173,17 +3171,18 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
 
     String path = fragmentPath(name, lang);
-    if (checkMakeFile(FileUtilities.stringToBytes(wrapLiquid(fixedContent)), path, outputTracker)) {
+    byte[] bytes = FileUtilities.stringToBytes(wrapLiquid(fixedContent));
+    if (checkMakeFile(bytes, path, outputTracker)) {
       if (settings.getMode() != PublisherUtils.IGBuildMode.AUTOBUILD && pf.makeQA) {
         FileUtilities.stringToFile(pageWrap(fixedContent, name), Utilities.path(pf.qaDir, name+(lang == null ? "" : "-" + lang)+".html"));
       }
     }
     // For multi-language IGs, also write a non-suffixed copy for the default language
     // so templates that reference e.g. "cross-version-analysis.xhtml" (without -en) still work
-    String copy = fragmentCopyPath(name, lang, pf.allOutputs);
+    String copy = fragmentCopyPath(name, lang);
     if (copy != null) {
       // (a file that isn't written keeps its modified time: Jekyll, kept running, doesn't have to read it again)
-      writeIfChanged(FileUtilities.stringToBytes(wrapLiquid(fixedContent)), copy);
+      writeIfChanged(bytes, copy);
     }
     RapidoSteps steps = pf.rapido == null ? null : pf.rapido.getSteps();
     if (steps != null && steps.isRecording()) {
@@ -3203,12 +3202,12 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
    * Where the copy of a fragment without the language in its name goes: null if it has none (it's not in the default
    * language, or a fragment of that name is one of the outputs)
    */
-  private String fragmentCopyPath(String name, String lang, Set<String> outputs) throws IOException {
+  private String fragmentCopyPath(String name, String lang) throws IOException {
     if (lang == null || !lang.equals(pf.defaultTranslationLang)) {
       return null;
     }
     String path = Utilities.path(pf.tempDir, "_includes", name+".xhtml");
-    return outputs.contains(path.toLowerCase()) ? null : path;
+    return pf.allOutputs.contains(path.toLowerCase()) ? null : path;
   }
 
   /** A step of the generate phase that only makes fragments, with fragment(name, content, pf.otherFilesRun, ...) */
@@ -3232,13 +3231,14 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     if (last != null && asTheStepLeftThem(last)) {
       for (RapidoSteps.Fragment f : last) {
         String path = fragmentPath(f.name, f.lang);
-        PublisherBase.FragmentUseRecord frag = pf.fragmentUses.get(f.context+"."+f.code);
+        String use = f.context+"."+f.code;
+        PublisherBase.FragmentUseRecord frag = pf.fragmentUses.get(use);
         if (frag == null) {
           frag = new PublisherBase.FragmentUseRecord();
-          pf.fragmentUses.put(f.context+"."+f.code, frag);
+          pf.fragmentUses.put(use, frag);
         }
         frag.record(f.time, f.size);
-        pf.rapido.recordFragmentUse(f.context+"."+f.code, f.time, f.size);
+        pf.rapido.recordFragmentUse(use, f.time, f.size);
         pf.allOutputs.add(path.toLowerCase());
         pf.rapido.recordOutput(path.toLowerCase());
         pf.otherFilesRun.add(path);
@@ -3256,8 +3256,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
     if (pf.errors.size() != errors) {
       steps.abandon(); // a record doesn't hold messages
+    } else {
+      steps.finish();
     }
-    steps.finish();
   }
 
   /**
@@ -3272,11 +3273,12 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       if (pf.allOutputs.contains(path.toLowerCase()) || !outputs.add(path.toLowerCase()) || !f.stamp.equals(RapidoSteps.stamp(path))) {
         return false;
       }
-      String copy = fragmentCopyPath(f.name, f.lang, pf.allOutputs);
+      String copy = fragmentCopyPath(f.name, f.lang);
       if (copy != null && outputs.contains(copy.toLowerCase())) {
         copy = null;
       }
-      if (copy == null ? f.copyStamp != null : !RapidoSteps.stamp(copy).equals(f.copyStamp)) {
+      String copyStamp = copy == null ? null : RapidoSteps.stamp(copy);
+      if (!Objects.equals(copyStamp, f.copyStamp)) {
         return false;
       }
     }
