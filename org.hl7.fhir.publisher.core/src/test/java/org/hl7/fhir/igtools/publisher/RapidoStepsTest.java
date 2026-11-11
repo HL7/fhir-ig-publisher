@@ -12,6 +12,7 @@ import java.nio.file.attribute.FileTime;
 import java.util.List;
 import java.util.Set;
 
+import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.junit.jupiter.api.Test;
@@ -68,7 +69,8 @@ class RapidoStepsTest {
   @Test
   void aRecordThatCantBeReadIsNotReused() throws Exception {
     JsonObject last = lastBuild(fragment("a", "en", null));
-    last.getJsonObject("step").getJsonArray("fragments").get(0).asJsonArray().remove(last.getJsonObject("step").getJsonArray("fragments").get(0).asJsonArray().get(7));
+    JsonArray fragment = last.getJsonObject("step").getJsonArray("fragments").get(0).asJsonArray();
+    fragment.remove(fragment.get(7));
     RapidoSteps steps = new RapidoSteps();
     steps.load(last);
     assertNull(steps.reusable("step", "key"));
