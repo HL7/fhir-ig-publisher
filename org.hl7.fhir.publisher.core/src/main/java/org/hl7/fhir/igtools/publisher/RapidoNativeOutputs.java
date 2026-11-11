@@ -7,6 +7,7 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -30,8 +31,9 @@ import org.hl7.fhir.utilities.xhtml.XhtmlNode;
  * (_rapido/native) so that a later build can do the same for a file that hasn't changed without composing its
  * resources again.
  *
- * <p>The step writes each resource as json, xml and turtle, in the temp folder and in each language's folder, and adds
- * it to the packages. A {@link FileRecord} holds, for a file, what the next build needs to leave the files where they
+ * <p>The step writes each resource in the formats wanted (json, xml, turtle) in the temp folder and for each language
+ * (in the language's folder, in the new template format), with the json for the pages in _includes, and adds it to the
+ * packages. A {@link FileRecord} holds, for a file, what the next build needs to leave the files where they
  * are: a key for what each resource was made from (see {@link #contentKey}), the entries that went in the packages, the
  * json for the database row, the messages the step added to the resource, the outputs it claimed for the file, and
  * the size and time of every file it wrote. The record is used only when the keys are the same and every file is still
@@ -110,7 +112,10 @@ public class RapidoNativeOutputs {
     this.folder = new File(Utilities.path(tempDir, "_rapido", "native"));
   }
 
-  /** what the file's record goes by: where it was loaded from, as for RapidoTracker's state */
+  /**
+   * What the file's record goes by: where it was loaded from. Files loaded from the same place share a record, which
+   * is then of the one written last, and the keys tell whose it is.
+   */
   private static String name(FetchedFile f) {
     return f.getLoadPath() != null ? f.getLoadPath() : f.getPath();
   }
@@ -191,14 +196,23 @@ public class RapidoNativeOutputs {
     }
     Files.createDirectories(folder.toPath());
     File dst = recordFile(f);
-    Path tmp = new File(folder, dst.getName() + ".tmp").toPath();
+    Path tmp = Files.createTempFile(folder.toPath(), dst.getName(), ".tmp");
     try {
       try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(Files.newOutputStream(tmp), 1 << 16))) {
         write(out, f, rec);
       }
-      Files.move(tmp, dst.toPath(), StandardCopyOption.REPLACE_EXISTING);
+      try {
+        // in one step, so that two files loaded from the same place, saved at once, leave one whole record
+        Files.move(tmp, dst.toPath(), StandardCopyOption.ATOMIC_MOVE);
+      } catch (AtomicMoveNotSupportedException e) {
+        Files.move(tmp, dst.toPath(), StandardCopyOption.REPLACE_EXISTING);
+      }
     } finally {
-      Files.deleteIfExists(tmp);
+      try {
+        Files.deleteIfExists(tmp);
+      } catch (IOException e) {
+        // left behind: nothing reads it
+      }
     }
   }
 
@@ -265,6 +279,9 @@ public class RapidoNativeOutputs {
         }
         int same = in.readInt();
         r.json = same < 0 ? bytes(in) : r.entries.get(same).content;
+        if (r.json == null) {
+          return null;
+        }
         int messages = count(in);
         for (int j = 0; j < messages; j++) {
           ValidationMessage vm = RapidoTracker.readMessage(org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(string(in)));
@@ -332,7 +349,9 @@ public class RapidoNativeOutputs {
   /**
    * Everything of the element that the json, xml and turtle composers and the language copies write from: names,
    * types, values, narrative (the tree, and the source text the json composer writes when the tree is as parsed),
-   * comments, and the order of it all. Two elements with the same key are written the same by the same publisher.
+   * comments, and the order of it all. Two elements with the same key are written the same by the same publisher as
+   * long as the definitions they were parsed against are the same: those are not in here, they are in Rapido's hash
+   * of what the file depends on.
    */
   public static void contentKey(Hasher h, Element e) {
     h.add("(").add(e.getName()).add(e.fhirType()).add(e.getType()).add(e.getExplicitType());

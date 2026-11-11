@@ -105,6 +105,7 @@ import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.function.Supplier;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -1100,6 +1101,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
   private RapidoNativeOutputs nativeRecords;
   /** -rapido: how many files' native outputs were left as the last build wrote them */
   private final AtomicInteger nativeFilesReused = new AtomicInteger();
+  private final AtomicBoolean nativeRecordProblemLogged = new AtomicBoolean();
 
   /** how the native outputs of a file are done: left as the last build wrote them (reuse), or written, and if so, recorded or not */
   private static class NativePlan {
@@ -1114,14 +1116,14 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
   }
 
   /**
-   * In a Rapido build, the native outputs of a file are left as the last build wrote them when Rapido found that nothing
-   * they are made from has changed (the file, what it depends on, what refers to it), each resource as it is now, after
-   * loading and narrative generation, has the content the outputs were written from, and every file written then is still
-   * there with the same size and time. What the step adds to the packages, the database and the resource's messages
-   * then comes from the record of that build. In any other case the outputs are written, and recorded for the next
-   * build if a record can hold what the step does for them.
+   * In a Rapido build, the native outputs of a file are left as an earlier build wrote them when Rapido found that
+   * nothing they are made from has changed (the file, what it depends on, what refers to it), they were written from
+   * that same state and from the content each resource has now, after loading and narrative generation, and every file
+   * written then is still there with the same size and time. What the step adds to the packages, the database and the
+   * resource's messages then comes from the record of that build. In any other case the outputs are written, and
+   * recorded for the next build if a record can hold what the step does for them.
    */
-  private NativePlan planNativeOutputs(FetchedFile f) throws IOException {
+  private NativePlan planNativeOutputs(FetchedFile f) {
     if (nativeRecords == null || f.getResources().isEmpty()) {
       return NativePlan.NONE;
     }
@@ -1135,7 +1137,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       keys.add(null);
     }
     if (keys.contains(null)) {
-      nativeRecords.forget(f);
+      forgetNativeRecord(f);
       return NativePlan.NONE;
     }
     if (pf.rapido.isRenderClean(f)) {
@@ -1144,12 +1146,31 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         return new NativePlan(old, null);
       }
     }
-    nativeRecords.forget(f);
+    forgetNativeRecord(f);
     RapidoNativeOutputs.FileRecord record = new RapidoNativeOutputs.FileRecord();
     for (String key : keys) {
       record.add(key);
     }
     return new NativePlan(null, record);
+  }
+
+  /**
+   * Before a file's outputs are written again. If the record can't be removed the build goes on: the files written
+   * now won't have the times it holds, so it won't be used.
+   */
+  private void forgetNativeRecord(FetchedFile f) {
+    try {
+      nativeRecords.forget(f);
+    } catch (IOException | RuntimeException e) {
+      nativeRecordProblem(f, e);
+    }
+  }
+
+  /** the records only save time: a problem with one is no reason to stop a build whose outputs are written */
+  private void nativeRecordProblem(FetchedFile f, Exception e) {
+    if (nativeRecordProblemLogged.compareAndSet(false, true)) {
+      logMessage("Rapido Mode: unable to keep a record of the native outputs of " + f.getName() + " (this is only reported once): " + e);
+    }
   }
 
   private boolean sameNativeKeys(RapidoNativeOutputs.FileRecord old, List<String> keys) {
@@ -1171,17 +1192,23 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
   }
 
   /**
-   * What the native outputs of the resource are made from, or null if that is more than the resource's content as it
-   * is now and the settings here: the IG itself (its packaged form is built from the dependencies), a custom resource,
-   * or packages for other versions (they are converted from the resource object, not from this content).
+   * What the native outputs of the resource are made from: Rapido's hash of the file, what it depends on and what
+   * refers to it (the definitions the content is written by are in there), the settings here, and the resource's
+   * content as it is now. Null if that isn't known or is more than that: a resource with no content, the IG itself
+   * (its packaged form is built from the dependencies), a custom resource, or packages for other versions (they are
+   * converted from the resource object, not from this content).
    */
   private String nativeKey(FetchedFile f, FetchedResource r) {
     Element e = r.getElement();
     if (e == null || r.isCustomResource() || !pf.generateVersions.isEmpty() || (r.getResource() != null && r.getResource() == pf.publishedIg)) {
       return null;
     }
+    String renderHash = pf.rapido.renderHash(f);
+    if (renderHash == null) {
+      return null;
+    }
     RapidoDependencyAnalyser.Hasher h = new RapidoDependencyAnalyser.Hasher();
-    h.add(r.fhirType()).add(r.getId()).add(pf.igpkp.getCanonical()).add(pf.version);
+    h.add(renderHash).add(r.fhirType()).add(r.getId()).add(pf.igpkp.getCanonical()).add(pf.version);
     h.add(isExample(f, r)+" "+includedInVersion(r, pf.version)+" "+suppressId(f, r)+" "+wantGen(r, "xml")+" "+wantGen(r, "json")+" "+wantGen(r, "ttl")
         +" "+forHL7orFHIR()+" "+pf.module.isNoNarrative()+" "+settings.isNewMultiLangTemplateFormat());
     h.add(String.join(",", allLangs())).add(pf.defaultTranslationLang);
@@ -1209,35 +1236,41 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
   }
 
   /** once the step is done for all the file's resources */
-  private void finishNativeOutputs(FetchedFile f, NativePlan plan) throws IOException {
+  private void finishNativeOutputs(FetchedFile f, NativePlan plan) {
     if (plan.reuse != null) {
       for (String name : plan.reuse.outputNames) {
         f.getOutputNames().add(nativeRecords.absolute(name));
       }
       nativeFilesReused.incrementAndGet();
     } else if (plan.record != null) {
-      nativeRecords.save(f, plan.record);
+      try {
+        nativeRecords.save(f, plan.record);
+      } catch (IOException | RuntimeException e) {
+        nativeRecordProblem(f, e);
+      }
     }
   }
 
-  /**
-   * The native outputs of every file in the change list. With -threads, the files are done on the extra threads:
-   * each worker writes its file's outputs into temp, and keeps the steps that add to shared state (the packages,
-   * the cross-version notes, the log) for this thread, which runs them in change list order. The database rows come
-   * last, in the same order, once no worker is left: saving a row marks the resource (and, for a custom resource,
-   * its structure definition) with its key, which the workers read. Until then, the rows hold the resources' json.
-   * <p>
-   * If a file fails, the files after it may already have written their outputs into temp; the build stops anyway.
-   */
+  /** the native outputs step, with the -rapido records set up, and how many files were left as they were logged */
   void generateNativeOutputs(DBBuilder db) throws Exception {
     nativeRecords = pf.rapido == null ? null : new RapidoNativeOutputs(pf.tempDir);
     nativeFilesReused.set(0);
+    nativeRecordProblemLogged.set(false);
     generateAllNativeOutputs(db);
     if (pf.rapido != null && !pf.rapido.isCompleteBuild()) {
       logMessage("Rapido Mode: the native outputs of " + nativeFilesReused.get() + " of " + pf.changeList.size() + " files are reused");
     }
   }
 
+  /**
+   * The native outputs of every file in the change list. With -threads, the files are done on the extra threads:
+   * each worker writes its file's outputs into temp (or, with -rapido, finds them as they were written), and keeps
+   * the steps that add to shared state (the packages, the cross-version notes, the log) for this thread, which runs them in change list order. The database rows come
+   * last, in the same order, once no worker is left: saving a row marks the resource (and, for a custom resource,
+   * its structure definition) with its key, which the workers read. Until then, the rows hold the resources' json.
+   * <p>
+   * If a file fails, the files after it may already have written their outputs into temp; the build stops anyway.
+   */
   private void generateAllNativeOutputs(DBBuilder db) throws Exception {
     int threads = settings.getThreads();
     if (threads == 0 || pf.changeList.size() < 2 || nativeOutputNamesClash(pf.changeList)) {

@@ -226,12 +226,50 @@ class RapidoNativeOutputsTest {
   }
 
   @Test
+  void filesLoadedFromTheSamePlaceCanBeSavedAtOnce() throws Exception {
+    RapidoNativeOutputs outputs = new RapidoNativeOutputs(temp.toString());
+    FileRecord one = record(outputs);
+    FileRecord other = record(outputs);
+    other.resources.get(0).entries.clear();
+    List<Throwable> failures = java.util.Collections.synchronizedList(new java.util.ArrayList<>());
+    List<Thread> threads = new java.util.ArrayList<>();
+    for (FileRecord rec : List.of(one, other)) {
+      Thread t = new Thread(() -> {
+        try {
+          for (int i = 0; i < 300; i++) {
+            outputs.save(new FetchedFile("input/a.json"), rec);
+          }
+        } catch (Throwable e) {
+          failures.add(e);
+        }
+      });
+      threads.add(t);
+      t.start();
+    }
+    for (Thread t : threads) {
+      t.join();
+    }
+    assertEquals(List.of(), failures);
+    // the record is one of the two, whole
+    FileRecord back = outputs.read(new FetchedFile("input/a.json"));
+    assertNotNull(back);
+    assertTrue(outputs.filesUnchanged(back));
+    assertEquals(1, recordFiles().size());
+  }
+
+  @Test
   void noRecordIsKeptOfWhatItCantHold() throws Exception {
     RapidoNativeOutputs outputs = new RapidoNativeOutputs(temp.toString());
     FetchedFile f = new FetchedFile("input/a.json");
 
     FileRecord rec = record(outputs);
     rec.unsupported();
+    outputs.save(f, rec);
+    assertNull(outputs.read(f));
+
+    // a resource the step didn't get to the end of
+    rec = record(outputs);
+    rec.resources.get(1).json = null;
     outputs.save(f, rec);
     assertNull(outputs.read(f));
 

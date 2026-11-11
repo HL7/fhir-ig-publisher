@@ -135,6 +135,18 @@ class NativeOutputsReuseTest {
     /** resources with no object to convert for the other version: nothing of them goes in its package */
     boolean elementsOnly;
     String archetypeOn;
+    /** an instance of a logical model, loaded as a Binary */
+    String binaryOn;
+    /** one more example */
+    String exampleOn;
+    /** how many resources the last file has */
+    int lastFileResources = 2;
+    /** Rapido's hash of a file, what it depends on and what refers to it, where that isn't "state 1" */
+    final Map<String, String> states = new TreeMap<>();
+    /** Rapido has no such hashes */
+    boolean noStates;
+    /** the folder for the records can't be made */
+    boolean noRecordFolder;
     PublisherGenerator generator;
     Map<String, FileTime> timesBefore;
 
@@ -201,22 +213,30 @@ class NativeOutputsReuseTest {
         pf.rapido = mock(RapidoTracker.class);
         when(pf.rapido.isCompleteBuild()).thenReturn(complete);
         when(pf.rapido.isRenderClean(any(FetchedFile.class))).thenAnswer(inv -> !complete && clean.contains(((FetchedFile) inv.getArgument(0)).getStatedPath()));
+        when(pf.rapido.renderHash(any(FetchedFile.class))).thenAnswer(inv -> noStates ? null : states.getOrDefault(((FetchedFile) inv.getArgument(0)).getStatedPath(), "state 1"));
       }
       for (int i = 0; i < FILES; i++) {
         FetchedFile f = new FetchedFile("input/file" + i + ".json");
         // the last file has two resources
-        for (String id : i == FILES - 1 ? new String[] {"b" + i, "b" + (i + 1)} : new String[] {"b" + i}) {
+        for (String id : i == FILES - 1 && lastFileResources == 2 ? new String[] {"b" + i, "b" + (i + 1)} : new String[] {"b" + i}) {
           FetchedResource r = f.addResource(id);
           String json = "{\"resourceType\":\"Basic\",\"id\":\"" + id + "\",\"code\":\"" + codes.getOrDefault(id, "code " + id) + "\",\"subject\":[\"" + "x".repeat(i * 53) + "\"]}";
           r.setElement(new JsonParser(context).parseSingle(new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8)), null)).setId(id);
           if (!elementsOnly) {
             r.setResource(new Basic().setId(id));
           }
+          if (id.equals(binaryOn)) {
+            r.setType("Binary");
+          }
+          if (i % 5 == 2) {
+            // from before the step
+            r.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.INVALID, "Basic.code", "an earlier message for " + id, IssueSeverity.ERROR));
+          }
           if (id.equals(archetypeOn)) {
             r.getResource().setUserData(UserDataNames.archetypeSource, "archetype " + id);
             r.getResource().setUserData(UserDataNames.archetypeName, id + ".adl");
           }
-          if (i % 4 == 1) {
+          if (i % 4 == 1 || id.equals(exampleOn)) {
             pf.publishedIg.getDefinition().addResource().setIsExample(true).getReference().setReference("Basic/" + id);
           }
         }
@@ -229,6 +249,10 @@ class NativeOutputsReuseTest {
       }).when(db).saveResource(any(FetchedFile.class), any(FetchedResource.class), any(byte[].class));
       generator = new PublisherGenerator(settings);
       generator.setPf(pf);
+      if (noRecordFolder) {
+        Files.createDirectories(temp.resolve("_rapido"));
+        Files.write(temp.resolve("_rapido").resolve("native"), new byte[0]);
+      }
       timesBefore = times();
       Thread.sleep(20); // so that a file written again has another time
       generator.generateNativeOutputs(db);
@@ -266,7 +290,7 @@ class NativeOutputsReuseTest {
       for (Map.Entry<String, FileTime> e : times().entrySet()) {
         if (!e.getValue().equals(timesBefore.get(e.getKey()))) {
           String name = Path.of(e.getKey()).getFileName().toString();
-          ids.add(name.substring("Basic-".length(), name.indexOf('.')));
+          ids.add(name.substring(name.indexOf('-') + 1, name.indexOf('.')));
         }
       }
       return ids;
@@ -549,6 +573,111 @@ class NativeOutputsReuseTest {
     next.run();
     assertEquals(ids(6), next.written());
     assertSameEffects(first, next);
+  }
+
+  @Test
+  void outputsWrittenFromAnotherStateAreWritten() throws Exception {
+    Build first = new Build();
+    first.complete = true;
+    first.run();
+
+    // a build that Rapido keeps no state of (it failed later) wrote file 3 when what it depends on was different
+    Build second = new Build().cleanAll();
+    second.clean.remove("input/file3.json");
+    second.states.put("input/file3.json", "state 2");
+    second.run();
+    assertEquals(ids(3), second.written());
+
+    // what it depends on is as it was for the first build again: to Rapido nothing changed, but the files aren't from then
+    Build third = new Build().cleanAll().run();
+    assertEquals(ids(3), third.written());
+    assertSameEffects(first, third);
+    assertEquals(Set.of(), new Build().cleanAll().run().written());
+
+    // and with no hash from Rapido there is nothing to go by
+    Build none = new Build().cleanAll();
+    none.noStates = true;
+    none.run();
+    assertEquals(FILES + 1, none.written().size());
+    assertEquals(List.of(), records());
+    assertSameEffects(first, none);
+  }
+
+  @Test
+  void aProblemWithTheRecordsDoesNotStopTheBuild() throws Exception {
+    Build fresh = new Build();
+    fresh.rapido = false;
+    fresh.run();
+
+    Build first = new Build();
+    first.complete = true;
+    first.noRecordFolder = true;
+    first.run();
+    assertEquals(FILES + 1, first.written().size());
+    assertSameEffects(fresh, first);
+
+    Build next = new Build().cleanAll();
+    next.noRecordFolder = true;
+    next.run();
+    assertEquals(FILES + 1, next.written().size());
+    assertSameEffects(fresh, next);
+  }
+
+  @Test
+  void anInstanceOfALogicalModelGoesInThePackagesAsABinaryFromTheRecordToo() throws Exception {
+    Build first = new Build();
+    first.complete = true;
+    first.binaryOn = "b9";
+    first.run();
+    assertTrue(first.calls.stream().anyMatch(c -> c.startsWith("npm RESOURCE Binary-b9.json ")), first.calls.toString());
+    assertTrue(first.calls.stream().anyMatch(c -> c.startsWith("npm-de RESOURCE Binary-b9.json ")), first.calls.toString());
+
+    Build next = new Build().cleanAll();
+    next.binaryOn = "b9";
+    next.run();
+    assertEquals(Set.of(), next.written());
+    assertSameEffects(first, next);
+  }
+
+  @Test
+  void aSettingThatChangesWhatIsDoneForAResourceHasItWritten() throws Exception {
+    Build first = new Build();
+    first.complete = true;
+    first.run();
+    assertTrue(first.calls.stream().anyMatch(c -> c.startsWith("npm RESOURCE Basic-b6.json ")), first.calls.toString());
+
+    // b6 is an example now: the same files, but another place in the packages
+    Build next = new Build().cleanAll();
+    next.exampleOn = "b6";
+    next.run();
+    assertEquals(ids(6), next.written());
+    assertTrue(next.calls.stream().anyMatch(c -> c.startsWith("npm EXAMPLE Basic-b6.json ")), next.calls.toString());
+    Build fresh = new Build();
+    fresh.rapido = false;
+    fresh.exampleOn = "b6";
+    fresh.run();
+    assertSameEffects(fresh, next);
+  }
+
+  @Test
+  void aFileWithAnotherNumberOfResourcesIsWritten() throws Exception {
+    Build fresh = new Build();
+    fresh.rapido = false;
+    fresh.lastFileResources = 1;
+    fresh.run();
+    Build first = new Build();
+    first.complete = true;
+    first.run();
+
+    Build next = new Build().cleanAll();
+    next.lastFileResources = 1;
+    next.run();
+    assertEquals(ids(FILES - 1), next.written());
+    assertSameEffects(fresh, next);
+
+    Build third = new Build().cleanAll().run();
+    assertEquals(ids(FILES - 1, FILES), third.written());
+    assertSameEffects(first, third);
   }
 
   @Test
