@@ -166,7 +166,7 @@ class RapidoTranslationsTest {
     assertEquals(all(A, B, O), written(first, translate(pf)));
   }
 
-  /** The producers are core's: if one writes somewhere else, there's nothing to compare, and nothing is reused */
+  /** The producers are core's: an artifact that isn't where it was expected to be written has no stamp, and isn't reused */
   @Test
   void artifactsThatAreNotWhereTheyAreExpectedAreNotReused() throws Exception {
     PublisherFields pf = build("Alice", true);
