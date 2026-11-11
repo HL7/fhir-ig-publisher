@@ -13,6 +13,8 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -57,7 +59,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * -rapido: the native outputs of a file that Rapido found unchanged are left as the last build wrote them, and the
+ * -rapido: the native outputs of a file that Rapido found unchanged are left as an earlier build wrote them, and the
  * step still adds the same entries to the packages, the same rows to the database, the same messages to the resources
  * and the same output names to the files, in the same order, with and without -threads. Anything else is written.
  */
@@ -618,9 +620,22 @@ class NativeOutputsReuseTest {
 
     Build next = new Build().cleanAll();
     next.noRecordFolder = true;
-    next.run();
+    PrintStream out = System.out;
+    ByteArrayOutputStream log = new ByteArrayOutputStream();
+    System.setOut(new PrintStream(log, true));
+    try {
+      next.run();
+    } finally {
+      System.setOut(out);
+    }
     assertEquals(FILES + 1, next.written().size());
     assertSameEffects(fresh, next);
+    // and the log says so, once
+    String logged = log.toString();
+    // (each file's record can't be removed, and then can't be saved)
+    assertTrue(logged.contains(2 * FILES + " problems with the records of the native outputs"), logged);
+    assertTrue(logged.contains("The first: unable to remove the record of the native outputs of input/file"), logged);
+    assertEquals(logged.indexOf("problems with the records"), logged.lastIndexOf("problems with the records"), logged);
   }
 
   @Test

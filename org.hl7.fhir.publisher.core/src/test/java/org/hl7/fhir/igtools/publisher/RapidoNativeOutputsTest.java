@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
@@ -241,6 +242,8 @@ class RapidoNativeOutputsTest {
           for (int i = 0; i < 300; i++) {
             outputs.save(new FetchedFile("input/a.json"), rec);
           }
+        } catch (AccessDeniedException e) {
+          // Windows can refuse a move onto a file that is being replaced: the build goes on without that record
         } catch (Throwable e) {
           failures.add(e);
         }
@@ -269,7 +272,7 @@ class RapidoNativeOutputsTest {
     outputs.save(f, rec);
     assertNull(outputs.read(f));
 
-    // a resource the step didn't get to the end of
+    // a resource with no json (the step didn't get to its end): the record is written but not read back
     rec = record(outputs);
     rec.resources.get(1).json = null;
     outputs.save(f, rec);

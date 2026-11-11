@@ -17,6 +17,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import org.hl7.fhir.igtools.publisher.RapidoDependencyAnalyser.Hasher;
@@ -34,7 +35,8 @@ import org.hl7.fhir.utilities.xhtml.XhtmlNode;
  * <p>The step writes each resource in the formats wanted (json, xml, turtle) in the temp folder and for each language
  * (in the language's folder, in the new template format), with the json for the pages in _includes, and adds it to the
  * packages. A {@link FileRecord} holds, for a file, what the next build needs to leave the files where they
- * are: a key for what each resource was made from (see {@link #contentKey}), the entries that went in the packages, the
+ * are: a key for what each resource was made from
+ * (PublisherGenerator.nativeKey; {@link #contentKey} is the content part of it), the entries that went in the packages, the
  * json for the database row, the messages the step added to the resource, the outputs it claimed for the file, and
  * the size and time of every file it wrote. The record is used only when the keys are the same and every file is still
  * as it was written; otherwise the outputs are made again.
@@ -196,7 +198,8 @@ public class RapidoNativeOutputs {
     }
     Files.createDirectories(folder.toPath());
     File dst = recordFile(f);
-    Path tmp = Files.createTempFile(folder.toPath(), dst.getName(), ".tmp");
+    // a name of its own, and not Files.createTempFile: that file would be readable by its owner only
+    Path tmp = new File(folder, dst.getName() + "." + UUID.randomUUID() + ".tmp").toPath();
     try {
       try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(Files.newOutputStream(tmp), 1 << 16))) {
         write(out, f, rec);

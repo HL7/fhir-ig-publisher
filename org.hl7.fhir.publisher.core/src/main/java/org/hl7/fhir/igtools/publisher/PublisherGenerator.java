@@ -105,8 +105,8 @@ import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.function.Supplier;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -1099,11 +1099,13 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
   /** -rapido: what the native outputs step did for each file, for the next build to reuse (null without -rapido) */
   private RapidoNativeOutputs nativeRecords;
-  /** -rapido: how many files' native outputs were left as the last build wrote them */
+  /** -rapido: how many files' native outputs were left as an earlier build wrote them */
   private final AtomicInteger nativeFilesReused = new AtomicInteger();
-  private final AtomicBoolean nativeRecordProblemLogged = new AtomicBoolean();
+  /** -rapido: how many times a record couldn't be kept or removed, and the first of them, for the log */
+  private final AtomicInteger nativeRecordProblems = new AtomicInteger();
+  private final AtomicReference<String> firstNativeRecordProblem = new AtomicReference<>();
 
-  /** how the native outputs of a file are done: left as the last build wrote them (reuse), or written, and if so, recorded or not */
+  /** how the native outputs of a file are done: left as an earlier build wrote them (reuse), or written, and if so, recorded or not */
   private static class NativePlan {
     private static final NativePlan NONE = new NativePlan(null, null);
     private final RapidoNativeOutputs.FileRecord reuse;
@@ -1133,7 +1135,8 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         keys.add(nativeKey(f, r));
       }
     } catch (RuntimeException e) {
-      // whatever is wrong with the resource is for the step itself to report
+      // whatever is wrong with the resource is for the step itself to report: here, it only means no record
+      nativeRecordProblem("work out what the native outputs of " + f.getStatedPath() + " are made from", e);
       keys.add(null);
     }
     if (keys.contains(null)) {
@@ -1162,15 +1165,18 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     try {
       nativeRecords.forget(f);
     } catch (IOException | RuntimeException e) {
-      nativeRecordProblem(f, e);
+      nativeRecordProblem("remove the record of the native outputs of " + f.getStatedPath(), e);
     }
   }
 
-  /** the records only save time: a problem with one is no reason to stop a build whose outputs are written */
-  private void nativeRecordProblem(FetchedFile f, Exception e) {
-    if (nativeRecordProblemLogged.compareAndSet(false, true)) {
-      logMessage("Rapido Mode: unable to keep a record of the native outputs of " + f.getName() + " (this is only reported once): " + e);
-    }
+  /**
+   * The records only save time: a problem with one is no reason to stop a build whose outputs are written. It is
+   * counted, and logged once the step is done (this can be on one of the step's threads).
+   */
+  private void nativeRecordProblem(String doing, Exception e) {
+    nativeRecordProblems.incrementAndGet();
+    StackTraceElement[] at = e instanceof RuntimeException ? e.getStackTrace() : null;
+    firstNativeRecordProblem.compareAndSet(null, "unable to " + doing + ": " + e + (at == null || at.length == 0 ? "" : " at " + at[0]));
   }
 
   private boolean sameNativeKeys(RapidoNativeOutputs.FileRecord old, List<String> keys) {
@@ -1226,7 +1232,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     return rec.json;
   }
 
-  /** the step for the file's resource at index i, as the plan has it: from the record of the last build, or written */
+  /** the step for the file's resource at index i, as the plan has it: from the record of the build that wrote them, or written */
   private byte[] plannedNativeResourceOutputs(FetchedFile f, FetchedResource r, int i, NativePlan plan, List<PackageStep> later) throws FHIRException, IOException {
     if (plan.reuse != null) {
       return reuseNativeResourceOutputs(r, plan.reuse.resources.get(i), later);
@@ -1246,7 +1252,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       try {
         nativeRecords.save(f, plan.record);
       } catch (IOException | RuntimeException e) {
-        nativeRecordProblem(f, e);
+        nativeRecordProblem("keep a record of the native outputs of " + f.getStatedPath(), e);
       }
     }
   }
@@ -1255,8 +1261,15 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
   void generateNativeOutputs(DBBuilder db) throws Exception {
     nativeRecords = pf.rapido == null ? null : new RapidoNativeOutputs(pf.tempDir);
     nativeFilesReused.set(0);
-    nativeRecordProblemLogged.set(false);
-    generateAllNativeOutputs(db);
+    nativeRecordProblems.set(0);
+    firstNativeRecordProblem.set(null);
+    try {
+      generateAllNativeOutputs(db);
+    } finally {
+      if (nativeRecordProblems.get() > 0) {
+        logMessage("Rapido Mode: " + nativeRecordProblems.get() + " problems with the records of the native outputs (the outputs are written as usual). The first: " + firstNativeRecordProblem.get());
+      }
+    }
     if (pf.rapido != null && !pf.rapido.isCompleteBuild()) {
       logMessage("Rapido Mode: the native outputs of " + nativeFilesReused.get() + " of " + pf.changeList.size() + " files are reused");
     }
