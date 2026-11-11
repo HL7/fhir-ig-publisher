@@ -110,7 +110,7 @@ public class PublisherTranslator {
     }
   }
 
-  /** where the producers write (see LanguageFileProducer.getTargetFileName) */
+  /** where the producers write (see LanguageFileProducer.getTargetFileName, and PoGetTextProducer.getFileName without incLangInFilename) */
   private void addWritten(List<String> written, String lang, String srcFile) throws IOException {
     for (String format : new String[] {"po", "xliff", "json"}) {
       written.add(Utilities.path(dst, translationLangs.size() > 1 ? lang : ".", format, srcFile+"."+format));

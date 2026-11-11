@@ -99,8 +99,8 @@ import org.hl7.fhir.utilities.xhtml.XhtmlNode;
  *   that generation has on the rest of the build (outputs it claims, npm entries, expansions, errors, tracked
  *   fragments) are replayed from a journal, if nothing that the file depends on, or that refers to it, has
  *   changed</li>
- *   <li>translation artifacts: the files from the last build are still in the translations folder, if nothing the
- *   file depends on has changed</li>
+ *   <li>translation artifacts: the files from the last build are kept in the translations folder, if nothing the
+ *   file depends on has changed and they are as that build wrote them</li>
  * </ul>
  * Anything outside the files of the IG that could affect the build (the publisher itself, the command line, the IG
  * resource, the template, other files in the IG folder, the day) goes into a global hash, and each package the build loaded is
