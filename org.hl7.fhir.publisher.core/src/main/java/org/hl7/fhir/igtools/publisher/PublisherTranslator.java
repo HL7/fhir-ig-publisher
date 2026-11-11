@@ -24,6 +24,7 @@ public class PublisherTranslator {
   private List<String> translationLangs = new ArrayList<>();
   private String baseLang;
   private LanguageUtils lu;
+  private String dst;
 
   public PublisherTranslator(SimpleWorkerContext context, String baseLang, String defaultTranslationLang, List<String> translationLangs) {
     super();
@@ -37,6 +38,7 @@ public class PublisherTranslator {
   }
 
   public void start(String dst) throws IOException {
+    this.dst = dst;
     FileUtilities.createDirectory(dst);
     
     if (translationLangs.size() > 1) {
@@ -59,12 +61,15 @@ public class PublisherTranslator {
     json = new JsonLangFileProducer(dst, "json", translationLangs.size() > 1);
   }
 
-  public void translate(FetchedFile f, FetchedResource r) throws IOException {
+  /** @return the files written for the resource */
+  public List<String> translate(FetchedFile f, FetchedResource r) throws IOException {
+    List<String> written = new ArrayList<>();
     for (String lang : translationLangs) {
       if (baseLang == null || !baseLang.equals(lang)) {
-        genTranslations(f, r, lang, translationLangs.size() > 0);
+        genTranslations(f, r, lang, translationLangs.size() > 0, written);
       }
     }
+    return written;
   }
 //
 //  private void translate(FetchedFile f, FetchedResource r, LanguageFileProducer lp) throws IOException {
@@ -81,7 +86,7 @@ public class PublisherTranslator {
   public void finish() throws IOException {
   }
   
-  private void genTranslations(FetchedFile f, FetchedResource r, String lang, boolean langInId) throws IOException {
+  private void genTranslations(FetchedFile f, FetchedResource r, String lang, boolean langInId, List<String> written) throws IOException {
     Resource res = r.getResource();
     if (res != null && lu.handlesAsResource(res)) {
 
@@ -91,6 +96,7 @@ public class PublisherTranslator {
       po.produce(srcFile, baseLang, lang, translations, srcFile+".po");
       xliff.produce(srcFile, baseLang, lang, translations, srcFile+".xliff");
       json.produce(srcFile, baseLang, lang, translations, srcFile+".json");
+      addWritten(written, lang, srcFile);
       
     } else if (lu.handlesAsElement(r.getElement())) {
       
@@ -100,6 +106,14 @@ public class PublisherTranslator {
       po.produce(srcFile, baseLang, lang, translations, srcFile+".po");
       xliff.produce(srcFile, baseLang, lang, translations, srcFile+".xliff");
       json.produce(srcFile, baseLang, lang, translations, srcFile+".json");
+      addWritten(written, lang, srcFile);
+    }
+  }
+
+  /** where the producers write (see LanguageFileProducer.getTargetFileName) */
+  private void addWritten(List<String> written, String lang, String srcFile) throws IOException {
+    for (String format : new String[] {"po", "xliff", "json"}) {
+      written.add(Utilities.path(dst, translationLangs.size() > 1 ? lang : ".", format, srcFile+"."+format));
     }
   }
 

@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Calendar;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Deque;
@@ -98,6 +99,8 @@ import org.hl7.fhir.utilities.xhtml.XhtmlNode;
  *   that generation has on the rest of the build (outputs it claims, npm entries, expansions, errors, tracked
  *   fragments) are replayed from a journal, if nothing that the file depends on, or that refers to it, has
  *   changed</li>
+ *   <li>translation artifacts: the files from the last build are still in the translations folder, if nothing the
+ *   file depends on has changed</li>
  * </ul>
  * Anything outside the files of the IG that could affect the build (the publisher itself, the command line, the IG
  * resource, the template, other files in the IG folder, the day) goes into a global hash, and each package the build loaded is
@@ -1517,6 +1520,58 @@ public class RapidoTracker {
       newFiles.add(key, res);
     }
     return res;
+  }
+
+  // ---- translation artifacts -----------------------------------------------------------------------------------------
+
+  private static final String TRANSLATIONS = "translations";
+
+  /**
+   * Whether the translation artifacts the last build wrote for the file are what this build would write. They are made
+   * from the file's resources as loaded (with the translations from the translation sources) and the languages of the
+   * IG: the sources, the IG and the packages are in the global hash, so it's enough that the file and what it depends
+   * on are unchanged, and that the artifacts are on disk as they were written. The record is carried over to the next
+   * build
+   */
+  public boolean reuseTranslations(FetchedFile f) {
+    if (complete || !validationClean.contains(f)) {
+      return false;
+    }
+    JsonObject written = oldFiles.getJsonObject(keys.get(f)).getJsonObject(TRANSLATIONS);
+    if (written == null) {
+      return false;
+    }
+    for (String path : written.getNames()) {
+      String stamp = fileStamp(path);
+      // (a file that wasn't written where it was expected has no stamp, and is never reused)
+      if (stamp == null || !stamp.equals(written.asString(path))) {
+        return false;
+      }
+    }
+    newFile(f).set(TRANSLATIONS, written);
+    return true;
+  }
+
+  /** the translation artifacts written for the file, to check before they're reused in the next build */
+  public void recordTranslations(FetchedFile f, Collection<String> paths) {
+    if (!keys.containsKey(f)) {
+      return;
+    }
+    JsonObject written = new JsonObject();
+    for (String path : paths) {
+      written.set(path, fileStamp(path));
+    }
+    newFile(f).set(TRANSLATIONS, written);
+  }
+
+  /** size and time of the last change of a file, or null if it isn't one */
+  static String fileStamp(String path) {
+    try {
+      BasicFileAttributes a = Files.readAttributes(new File(path).toPath(), BasicFileAttributes.class);
+      return a.isRegularFile() ? a.size()+"@"+a.lastModifiedTime().to(TimeUnit.NANOSECONDS) : null;
+    } catch (IOException | InvalidPathException e) {
+      return null;
+    }
   }
 
   // ---- validation ----------------------------------------------------------------------------------------------------
