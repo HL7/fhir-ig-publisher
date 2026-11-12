@@ -24,6 +24,7 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.templates.Template;
 import org.hl7.fhir.model.ModelContext;
 import org.hl7.fhir.model.core.ImplementationGuide;
+import org.hl7.fhir.model.core.StructureDefinition;
 import org.hl7.fhir.model.utilities.formats.FhirFormat;
 import org.hl7.fhir.services.elementmodel.Element;
 import org.hl7.fhir.services.elementmodel.Manager;
@@ -65,6 +66,7 @@ class RapidoTranslationsTest {
   private final String uuid = HierarchicalTableGenerator.uuid;
   private List<String> langs = List.of("ru", "uz");
   private String defaultLang = "en";
+  private boolean withProfile;
 
   @AfterEach
   void restoreUuid() {
@@ -181,6 +183,21 @@ class RapidoTranslationsTest {
     assertEquals(List.of(), written(first, translate(build("Alice", true))));
   }
 
+  @Test
+  void theArtifactsOfAProfileAreKeptOnlyIfTheyAreAsTheyWereWritten() throws Exception {
+    // a profile's are made from the resource, not the element
+    withProfile = true;
+    List<String> p = List.of("ru/json/StructureDefinition-p.json", "ru/po/StructureDefinition-p.po", "ru/xliff/StructureDefinition-p.xliff",
+        "uz/json/StructureDefinition-p.json", "uz/po/StructureDefinition-p.po", "uz/xliff/StructureDefinition-p.xliff");
+    Map<String, FileTime> first = translate(build("Alice", true));
+    assertTrue(first.keySet().containsAll(p), first.keySet().toString());
+    Map<String, FileTime> second = translate(build("Alice", true));
+    assertEquals(List.of(), written(first, second));
+
+    Files.delete(dir.resolve("translations/uz/xliff/StructureDefinition-p.xliff"));
+    assertEquals(p, written(second, translate(build("Alice", true))));
+  }
+
   /** The producers are core's: an artifact that isn't where it was expected to be written has no stamp, and isn't reused */
   @Test
   void artifactsThatAreNotWhereTheyAreExpectedAreNotReused() throws Exception {
@@ -261,6 +278,17 @@ class RapidoTranslationsTest {
     when(pf.igpkp.getCanonical()).thenReturn("http://example.org/ig");
     pf.template = mock(Template.class);
     pf.fileList.addAll(List.of(ig, a, b, o));
+    if (withProfile) {
+      FetchedFile p = file("StructureDefinition-p.json", "{\"resourceType\":\"StructureDefinition\",\"id\":\"p\","
+          + "\"url\":\"http://example.org/StructureDefinition/p\",\"name\":\"P\",\"title\":\"A profile\",\"status\":\"draft\","
+          + "\"kind\":\"resource\",\"abstract\":false,\"type\":\"Patient\","
+          + "\"baseDefinition\":\"http://hl7.org/fhir/StructureDefinition/Patient\",\"derivation\":\"constraint\"}");
+      StructureDefinition sd = new StructureDefinition();
+      sd.setId("p");
+      sd.setUrl("http://example.org/StructureDefinition/p").setName("P").setTitle("A profile");
+      p.getResources().get(0).setResource(sd);
+      pf.fileList.add(p);
+    }
     pf.changeList.addAll(pf.fileList); // as the loader leaves it
     publisher.setPf(pf);
     Field loader = Publisher.class.getDeclaredField("loader");
