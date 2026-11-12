@@ -1528,10 +1528,10 @@ public class RapidoTracker {
 
   /**
    * Whether the translation artifacts the last build wrote for the file are what this build would write. They are made
-   * from the file's resources as loaded (with the translations from the translation sources) and the languages of the
-   * IG: the sources and the IG are in the global hash and the packages are recorded with it, so it's enough that the
-   * file and what it depends on are unchanged, and that the artifacts are on disk as they were written. The record is carried over to the next
-   * build
+   * from the file's resources as loaded, with the translations imported from the translation sources (which are part
+   * of the content that is hashed), and the languages of the IG (in the global hash), so it's enough that the file and
+   * what it depends on are unchanged, and that the artifacts are on disk as they were written. The record is carried
+   * over to the next build
    */
   public boolean reuseTranslations(FetchedFile f) {
     if (complete || !validationClean.contains(f)) {
