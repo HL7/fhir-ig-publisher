@@ -1,4 +1,4 @@
-archetype (adl_version=1.4; rm_release=1.0.2; uid=0033ab5c-cde0-4402-8b64-d30c188adf79)
+archetype (adl_version=1.4; uid=0033ab5c-cde0-4402-8b64-d30c188adf79)
 	openEHR-EHR-ACTION.medication.v1
 
 concept

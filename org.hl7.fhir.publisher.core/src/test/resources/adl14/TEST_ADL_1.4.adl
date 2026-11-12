@@ -1,4 +1,4 @@
-archetype (adl_version=1.4; rm_release=1.0.2; uid=cc3a20b3-8928-4c2a-babd-fe9e28987be7)
+archetype (adl_version=1.4; uid=cc3a20b3-8928-4c2a-babd-fe9e28987be7)
 	openEHR-EHR-EVALUATION.problem_diagnosis.v1
 
 concept
