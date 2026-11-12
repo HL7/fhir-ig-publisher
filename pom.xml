@@ -437,18 +437,23 @@
             <artifactId>plantuml-mit</artifactId>
             <version>1.2026.1</version>
         </dependency>
-
+        <!-- archie -->
         <dependency>
             <groupId>com.nedap.healthcare.archie</groupId>
             <artifactId>aom</artifactId>
             <version>${nedap-healthcare-archie.version}</version>
         </dependency>
-
         <dependency>
             <groupId>com.nedap.healthcare.archie</groupId>
             <artifactId>referencemodels</artifactId>
             <version>${nedap-healthcare-archie.version}</version>
         </dependency>
+        <dependency>
+            <groupId>com.nedap.healthcare.archie</groupId>
+            <artifactId>archie-utils</artifactId>
+            <version>${nedap-healthcare-archie.version}</version>
+        </dependency>
+        
         <dependency>
             <groupId>io.methvin</groupId>
             <artifactId>directory-watcher</artifactId>
