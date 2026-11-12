@@ -67,6 +67,7 @@ class RapidoTranslationsTest {
   private List<String> langs = List.of("ru", "uz");
   private String defaultLang = "en";
   private boolean withProfile;
+  private boolean withTwoInOne;
 
   @AfterEach
   void restoreUuid() {
@@ -198,6 +199,17 @@ class RapidoTranslationsTest {
     assertEquals(p, written(second, translate(build("Alice", true))));
   }
 
+  @Test
+  void aFileWithSeveralResourcesIsWrittenAgainIfAnyOfTheirArtifactsIsNotAsItWasWritten() throws Exception {
+    withTwoInOne = true;
+    Map<String, FileTime> first = translate(build("Alice", true));
+    Files.delete(dir.resolve("translations/ru/po/Patient-c.po"));
+    Map<String, FileTime> second = translate(build("Alice", true));
+    assertEquals(List.of("ru/json/Patient-c.json", "ru/json/Patient-d.json", "ru/po/Patient-c.po", "ru/po/Patient-d.po",
+        "ru/xliff/Patient-c.xliff", "ru/xliff/Patient-d.xliff", "uz/json/Patient-c.json", "uz/json/Patient-d.json",
+        "uz/po/Patient-c.po", "uz/po/Patient-d.po", "uz/xliff/Patient-c.xliff", "uz/xliff/Patient-d.xliff"), written(first, second));
+  }
+
   /** The producers are core's: an artifact that isn't where it was expected to be written has no stamp, and isn't reused */
   @Test
   void artifactsThatAreNotWhereTheyAreExpectedAreNotReused() throws Exception {
@@ -278,6 +290,16 @@ class RapidoTranslationsTest {
     when(pf.igpkp.getCanonical()).thenReturn("http://example.org/ig");
     pf.template = mock(Template.class);
     pf.fileList.addAll(List.of(ig, a, b, o));
+    if (withTwoInOne) {
+      // (the first resource's artifacts are written first)
+      String c = "{\"resourceType\":\"Patient\",\"id\":\"c\",\"name\":[{\"text\":\"Dave\"}]}";
+      String d = "{\"resourceType\":\"Patient\",\"id\":\"d\",\"name\":[{\"text\":\"Erin\"}]}";
+      FetchedFile cd = file("Patients-cd.json", c);
+      cd.setSource((c + d).getBytes(StandardCharsets.UTF_8));
+      Element e = Manager.parseSingle(context, new ByteArrayInputStream(d.getBytes(StandardCharsets.UTF_8)), FhirFormat.JSON);
+      cd.addResource("Patients-cd.json#d").setElement(e).setId(e.getIdBase());
+      pf.fileList.add(cd);
+    }
     if (withProfile) {
       FetchedFile p = file("StructureDefinition-p.json", "{\"resourceType\":\"StructureDefinition\",\"id\":\"p\","
           + "\"url\":\"http://example.org/StructureDefinition/p\",\"name\":\"P\",\"title\":\"A profile\",\"status\":\"draft\","
