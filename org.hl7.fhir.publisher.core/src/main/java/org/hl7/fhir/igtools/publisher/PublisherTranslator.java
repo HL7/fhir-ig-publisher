@@ -93,25 +93,25 @@ public class PublisherTranslator {
       List<TranslationUnit> translations = lu.generateTranslations(res, lang);
       String srcFile = res.hasUserData(UserDataNames.pub_source_filename) ? res.getUserString(UserDataNames.pub_source_filename) : r.fhirType()+"-"+r.getId();
       
-      po.produce(srcFile, baseLang, lang, translations, srcFile+".po");
-      xliff.produce(srcFile, baseLang, lang, translations, srcFile+".xliff");
-      json.produce(srcFile, baseLang, lang, translations, srcFile+".json");
-      addWritten(written, lang, srcFile);
+      produce(srcFile, lang, translations, written);
       
     } else if (lu.handlesAsElement(r.getElement())) {
       
       List<TranslationUnit> translations = lu.generateTranslations(r.getElement(), lang);
       String srcFile = r.fhirType()+"-"+r.getId();
       
-      po.produce(srcFile, baseLang, lang, translations, srcFile+".po");
-      xliff.produce(srcFile, baseLang, lang, translations, srcFile+".xliff");
-      json.produce(srcFile, baseLang, lang, translations, srcFile+".json");
-      addWritten(written, lang, srcFile);
+      produce(srcFile, lang, translations, written);
     }
   }
 
-  /** where the producers write (see LanguageFileProducer.getTargetFileName, and PoGetTextProducer.getFileName without incLangInFilename) */
-  private void addWritten(List<String> written, String lang, String srcFile) throws IOException {
+  /**
+   * writes the po, xliff and json artifacts, and adds where the producers write them to written (see
+   * LanguageFileProducer.getTargetFileName, and PoGetTextProducer.getFileName without incLangInFilename)
+   */
+  private void produce(String srcFile, String lang, List<TranslationUnit> translations, List<String> written) throws IOException {
+    po.produce(srcFile, baseLang, lang, translations, srcFile+".po");
+    xliff.produce(srcFile, baseLang, lang, translations, srcFile+".xliff");
+    json.produce(srcFile, baseLang, lang, translations, srcFile+".json");
     for (String format : new String[] {"po", "xliff", "json"}) {
       written.add(Utilities.path(dst, translationLangs.size() > 1 ? lang : ".", format, srcFile+"."+format));
     }
