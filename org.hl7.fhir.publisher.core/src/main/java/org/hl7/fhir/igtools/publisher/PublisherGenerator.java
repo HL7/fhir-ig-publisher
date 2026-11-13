@@ -100,7 +100,9 @@ import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -211,6 +213,38 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
   }
 
+
+  // watch mode: what this build keeps for a page-only rebuild (see PageRebuild), or null
+  private PageRebuild pageRebuild;
+  // while regeneratePages() writes the pages again
+  private boolean regeneratingPages;
+
+  public void setPageRebuild(PageRebuild pageRebuild) {
+    this.pageRebuild = pageRebuild;
+  }
+
+  // watch mode: the Jekyll that stays running between builds, and the final zip writer (null: not watch mode)
+  private JekyllDriver jekyllDriver;
+  private FullIgZip fullIgZip;
+  // watch mode: the files in the temp folder changed since Jekyll last ran there (the pages written again by a page
+  // rebuild), or null if not known
+  private List<String> changedTempFiles;
+  // the files in the output folder that the last Jekyll run wrote (null: all of them)
+  private Set<String> jekyllWritten;
+  // watch mode: where the html-checked versions of the output files that Jekyll wrote again for the template's check
+  // are kept meanwhile (null: none), and those files (relative to the output folder)
+  private Path checkedStash;
+  private final List<String> stashed = new ArrayList<>();
+
+  /** Watch mode: whether Jekyll is kept running for this build's site, and writes only what changed next time */
+  public boolean keepsJekyllRunning() {
+    return jekyllDriver != null && jekyllDriver.isRunningFor(new File(pf.tempDir).getAbsolutePath(), new File(pf.outputDir).getAbsolutePath());
+  }
+
+  public void setWatchTools(JekyllDriver jekyllDriver, FullIgZip fullIgZip) {
+    this.jekyllDriver = jekyllDriver;
+    this.fullIgZip = fullIgZip;
+  }
 
   public PublisherGenerator(PublisherSettings settings) {
     super(settings);
@@ -491,12 +525,288 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     System.gc();
     printMemUsage();
 
-    fixSearchForm();
-    if (!settings.isGenerationOff()) {
-      templateBeforeJekyll();
+    if (pageRebuild != null) {
+      try {
+        checkPageRebuild();
+      } catch (Exception | StackOverflowError e) {
+        // (a template script that the patterns can't take is one that can't be told about)
+        // only watch mode needs it: the build goes on
+        pageRebuild.notReusable("it couldn't be told if a page rebuild can follow this build (" + e + ")");
+        log("Couldn't tell if a page rebuild can follow this build: " + e);
+        if (settings.isDebug() || !(e instanceof IOException)) {
+          e.printStackTrace();
+        }
+      }
+    }
+    finishGenerate(null);
+  }
+
+  /**
+   * Whether watch mode sees changes in the folder (see Publisher.execute()), or it has only what the build puts there
+   * (the template's folder, which the build makes from the template)
+   */
+  private boolean isWatched(String folder) throws IOException {
+    java.nio.file.Path p = new File(folder).getCanonicalFile().toPath();
+    for (String w : new String[] {"input", "fsh", "fsh-generated", "template"}) {
+      if (p.startsWith(new File(Utilities.path(pf.rootDir, w)).getCanonicalFile().toPath())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Why a page-only rebuild (see PageRebuild) can't reuse what this build did, if it can't: these are the cases where
+   * something before Jekyll could depend on the content of a page, or the output doesn't go where the rebuild expects it
+   */
+  void checkPageRebuild() throws IOException {
+    if (!isNewML() && (pf.hasTranslations || !pf.translationLangs.isEmpty())) {
+      pageRebuild.notReusable("the IG is translated, but not in the multi-language template format");
+    }
+    // the languages that each page is written in again from its translation (see generateFileOutput())
+    List<String> langs = new ArrayList<>();
+    for (String l : allLangs()) {
+      if (!Objects.equals(pf.defaultTranslationLang, l)) {
+        langs.add(l);
+      }
+    }
+    pageRebuild.setPageLanguages(langs);
+    // watch mode doesn't see changes outside the folders it watches: a rebuild after one would miss it
+    for (String ts : pf.translationSources) {
+      if (!isWatched(Utilities.path(pf.rootDir, ts))) {
+        pageRebuild.notReusable("the translations in " + ts + " are outside the folders that are watched");
+      }
+    }
+    if (!pf.pageFactories.isEmpty()) {
+      // they are made again only in a build, from files that may be anywhere
+      pageRebuild.notReusable("the IG has page factories");
+    }
+    // (the loader has taken out the folders that don't exist, such as the default pages folder)
+    for (String d : pf.pagesDirs) {
+      if (!isWatched(d)) {
+        pageRebuild.notReusable("the pages in " + d + " are outside the folders that are watched");
+      }
+    }
+    for (String d : pf.prePagesDirs) {
+      if (!isWatched(d)) {
+        pageRebuild.notReusable("the pages in " + d + " are outside the folders that are watched");
+      }
+    }
+    if (settings.isGenerationOff() || settings.isSimplifierMode()) {
+      pageRebuild.notReusable("the IG isn't generated by Jekyll");
+    }
+    if (settings.getDestDir() != null) {
+      pageRebuild.notReusable("the output is copied to another folder");
+    }
+    if (settings.getMode() != null && settings.getMode() != PublisherUtils.IGBuildMode.MANUAL) {
+      pageRebuild.notReusable("this isn't a local build");
+    }
+    if (pf.changeList.isEmpty()) {
+      pageRebuild.notReusable("the package wasn't built");
+    }
+    if (pf.txUnloadEarly) {
+      // the pages would be rendered again with the terminology unloaded
+      pageRebuild.notReusable("the terminology is unloaded early (tx-unload-early)");
+    }
+    if (pf.template != null) {
+      try {
+        String reason = pf.template.pageOnlyRebuildBlocker();
+        if (reason != null) {
+          pageRebuild.notReusable(reason);
+        }
+        pageRebuild.setFolderBlockers(pf.template.pageFolderBlockers());
+      } catch (IOException e) {
+        pageRebuild.notReusable("the template's scripts can't be read (" + e + ")");
+      }
+    }
+  }
+
+  /**
+   * The pages that the build wraps the page in, if it is one that has a page template (see applyPageTemplate()): what
+   * they say doesn't depend on the page's content
+   */
+  private Set<String> wrapperPaths(FetchedFile f) throws IOException {
+    Set<String> res = new HashSet<>();
+    String rp = f.getRelativePath();
+    String inc = "_includes" + File.separator;
+    if (rp != null && rp.startsWith(inc) && (rp.endsWith(".md") || rp.endsWith(".xml"))) {
+      String p = rp.substring(inc.length(), rp.lastIndexOf('.')) + ".html";
+      res.add(Utilities.path(pf.tempDir, p));
+      if (isNewML()) {
+        for (String l : allLangs()) {
+          res.add(Utilities.path(pf.tempDir, l, p));
+        }
+      }
+    }
+    return res;
+  }
+
+  /**
+   * Watch mode: copies the pages to the temp folder again after only their content (or that of their translations)
+   * changed (see PageRebuild); returns the files whose content changed
+   */
+  public List<String> regeneratePages(List<FetchedFile> pages) throws Exception {
+    List<String> res = new ArrayList<>();
+    regeneratingPages = true;
+    try {
+      for (FetchedFile f : pages) {
+        File src = new File(f.getPath());
+        f.setSource(FileUtilities.fileToBytes(src));
+        f.setTime(src.lastModified());
+        List<String> dsts = pageOutputPaths(f);
+        // what the build wrote for the page: these, and the pages it wraps the page in
+        Set<String> others = new HashSet<>(f.getOutputNames());
+        if (!others.containsAll(dsts)) {
+          throw new IOException("The page " + f.getPath() + " was written to " + f.getOutputNames() + ", not " + dsts);
+        }
+        others.removeAll(dsts);
+        others.removeAll(wrapperPaths(f));
+        if (!others.isEmpty()) {
+          throw new IOException("The page " + f.getPath() + " was also written to " + others);
+        }
+        List<byte[]> before = new ArrayList<>();
+        for (String dst : dsts) {
+          if (!pf.allOutputs.remove(dst.toLowerCase())) {
+            throw new IOException("The page " + f.getPath() + " was not written to " + dst + " before");
+          }
+          File df = new File(dst);
+          before.add(df.isFile() ? FileUtilities.fileToBytes(df) : null);
+        }
+        int count = pf.allOutputs.size();
+        generateHtmlOutputs(f, false, null, null);
+        if (pf.allOutputs.size() != count + dsts.size()) {
+          throw new IOException("The page " + f.getPath() + " could not be written again");
+        }
+        if (pf.pagesWithCustomContent.contains(f)) {
+          throw new IOException("The page " + f.getPath() + " now has content that depends on the resources");
+        }
+        f.trim();
+        for (int i = 0; i < dsts.size(); i++) {
+          File df = new File(dsts.get(i));
+          if (!df.exists() || !Arrays.equals(before.get(i), FileUtilities.fileToBytes(df))) {
+            res.add(dsts.get(i));
+          }
+        }
+      }
+    } finally {
+      regeneratingPages = false;
+    }
+    return res;
+  }
+
+  /**
+   * The files in the temp folder that generateFileOutput() writes for a page that is copied there as it is: one for
+   * each output, and in a translated IG, one for each language as well
+   */
+  private List<String> pageOutputPaths(FetchedFile f) throws IOException {
+    List<String> res = new ArrayList<>();
+    for (FetchedFile.Output o : f.getOutputs()) {
+      if (writesLangOutputs(f)) {
+        for (String l : allLangs()) {
+          res.add(langOutputPath(o, l));
+        }
+      }
+      res.add(Utilities.path(pf.tempDir, o.getRelativePath()));
+    }
+    return res;
+  }
+
+  /** Whether generateFileOutput() writes the file again for each language (from its translation, if it has one) */
+  private boolean writesLangOutputs(FetchedFile f) {
+    return isNewML() && !f.getStatedPath().contains(File.separator+"template"+File.separator);
+  }
+
+  /** Where generateFileOutput() writes the output in language l */
+  private String langOutputPath(FetchedFile.Output o, String l) throws IOException {
+    if (o.getRelativePath().startsWith("_includes"+File.separator)) {
+      return Utilities.path(this.pf.tempDir, addLangFolderToFilename(o.getRelativePath(), l));
+    } else {
+      return Utilities.path(this.pf.tempDir, l, o.getRelativePath());
+    }
+  }
+
+  /**
+   * The part of the build that comes after everything has been written to the temp folder: Jekyll, the package, the
+   * html checks, the final zip. A page-only rebuild (replay != null) has put the temp folder back as it was when Jekyll
+   * ran (apart from the changed pages), and puts back what the package step wrote instead of running it again
+   */
+  interface PageRebuildStep {
+    void run() throws IOException;
+  }
+
+  /**
+   * Watch mode: keeps what a page rebuild after this build needs. If that fails, the build goes on: only a page rebuild
+   * can't follow it
+   */
+  void keepForPageRebuild(PageRebuildStep step) {
+    if (pageRebuild == null) {
+      return;
+    }
+    try {
+      step.run();
+    } catch (IOException | RuntimeException e) {
+      log("Unable to keep the state for a page rebuild: " + e);
+      pageRebuild.notReusable("its state couldn't be kept (" + e + ")");
+      pageRebuild.discard();
+      pageRebuild = null;
+    }
+  }
+
+  public void finishGenerate(PageRebuild replay) throws Exception {
+    finishGenerate(replay, null);
+  }
+
+  /**
+   * As finishGenerate(replay); changedTempFiles is the files the page rebuild wrote to the temp folder again (so a
+   * Jekyll that's still running can just render what depends on them)
+   */
+  public void finishGenerate(PageRebuild replay, List<String> changedTempFiles) throws Exception {
+    this.changedTempFiles = changedTempFiles;
+    if (replay == null) {
+      fixSearchForm();
+      if (!settings.isGenerationOff()) {
+        templateBeforeJekyll();
+      }
+      keepForPageRebuild(() -> pageRebuild.beforeJekyll());
     }
 
-    if (runTool()) {
+    boolean jekyllOk;
+    // the output files that are new since the last build or rebuild (null: all of them)
+    Set<String> fresh;
+    // where they come from (for the log)
+    StringBuilder freshFrom = null;
+    try {
+      if (replay != null) {
+        replay.keepCheckedPackageOutputs();
+      }
+      jekyllOk = runTool(replay);
+      fresh = jekyllWritten == null ? null : new HashSet<>(jekyllWritten);
+      freshFrom = fresh == null ? null : new StringBuilder(fresh.size() + " written by Jekyll");
+      if (jekyllOk && replay != null) {
+        if (pf.template != null && !settings.isGenerationOff()) {
+          // the template's check may look at the output: its findings are among the messages put back, so they must
+          // not have changed
+          replay.checkOnCheckMessages(pf.template.onCheckEvent(pf.context, pf.publishedIg));
+        }
+        putBackChecked(fresh);
+        replay.restorePackageOutputs();
+        if (fresh != null) {
+          fresh.addAll(replay.getPackageOutputs());
+          freshFrom.append(", ").append(replay.getPackageOutputs().size()).append(" put back from the package step");
+          // those the last html check left as they were before Jekyll ran are as it left them, and so not new
+          List<String> checked = replay.putBackCheckedPackageOutputs();
+          fresh.removeAll(checked);
+          freshFrom.append(" (").append(checked.size()).append(" of them as the html check left them)");
+        }
+      }
+    } finally {
+      dropCheckedStash();
+      if (replay != null) {
+        replay.dropCheckedPackageOutputs();
+      }
+    }
+    if (jekyllOk && replay == null) {
+      keepForPageRebuild(() -> pageRebuild.afterJekyll());
       if (!settings.isGenerationOff()) {
         templateOnCheck();
       }
@@ -582,6 +892,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         FileUtilities.bytesToFile(org.hl7.fhir.utilities.json.parser.JsonParser.composeBytes(json), Utilities.path(pf.outputDir, "sub-package-list.json"));
         generateZips(df);
       }
+      keepForPageRebuild(() -> pageRebuild.afterPackage());
     }
 
     log("Checking Output HTML");
@@ -613,12 +924,24 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       pf.ipsComparator.addOtherFiles(pf.inspector.getExceptions(), pf.outputDir);
     }
 
+    // watch mode: what the last build or rebuild kept of the steps below
+    PageRebuild kept = replay != null ? replay : pageRebuild;
+    HTMLInspector.OutputRewriter rewriter = files -> rewriteOutputs(replay, files);
     if (!settings.isGenerationOff()) {
-      AIProcessor ai = new AIProcessor(pf.inspector.getRootFolder());
+      AIProcessor.Cache aiCache = kept == null ? null : kept.getAiCache();
+      if (aiCache != null) {
+        aiCache.prepare(fresh, rewriter);
+      }
+      AIProcessor ai = new AIProcessor(pf.inspector.getRootFolder(), aiCache);
       if (isNewML()) {
         ai.processNewTemplates(allLangs());
       } else {
         ai.processOldTemplates();
+      }
+      if (aiCache != null && fresh != null) {
+        // the AI step's files are new, and so are the pages it had Jekyll write again
+        fresh.addAll(aiCache.getWritten());
+        freshFrom.append(", ").append(aiCache.getWritten().size()).append(" by the AI step");
       }
     }
 
@@ -638,7 +961,19 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     if (pf.ipsComparator != null && pf.ipsComparator.hasLast()) {
       pf.inspector.getComparisonFiles().add(pf.ipsComparator.getBaseFile());
     }
+    if (kept != null && !settings.isGenerationOff()) {
+      if (replay != null && fresh != null) {
+        log("Rapido Mode: the output files new since the last html check: " + freshFrom);
+      }
+      pf.inspector.recordChecks(replay != null ? replay.getHtmlRecords() : null, fresh, rewriter);
+    }
     List<ValidationMessage> linkmsgs = settings.isGenerationOff() ? new ArrayList<ValidationMessage>() : pf.inspector.check(statusMessage, statusMessages);
+    if (kept != null) {
+      kept.setHtmlRecords(settings.isGenerationOff() ? null : pf.inspector.getRecords());
+      if (!settings.isGenerationOff() && pf.inspector.getRecords() == null) {
+        log("Rapido Mode: the html checks can't be reused (" + pf.inspector.getRecordsNotUsable() + ")");
+      }
+    }
     int bl = 0;
     int lf = 0;
     for (ValidationMessage m : ValidationPresenter.filterMessages(null, linkmsgs, true, pf.suppressedMessages)) {
@@ -666,23 +1001,31 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       String fragment = pf.sourceIg.present()+" - Downloaded Version "+ pf.businessVersion +" See the <a href=\""+ pf.igpkp.getCanonical()+"/history.html\">Directory of published versions</a></p>";
       igvu.updateStatement(fragment, 0, null);
     }
-    if (settings.getThreads() > 0) {
-      // the same entries, compressed on the extra threads (-threads)
-      new ParallelFolderZip(settings.getThreads()).write(Utilities.path(pf.tempDir, "full-ig.zip"), pf.outputDir, "site/",
-          "index.html", REDIRECT_SOURCE.getBytes(StandardCharsets.UTF_8));
-    } else {
-      ZipGenerator zip = new ZipGenerator(Utilities.path(pf.tempDir, "full-ig.zip"));
-      zip.addFolder(pf.outputDir, "site/", false);
-      zip.addFileSource("index.html", REDIRECT_SOURCE, false);
-      zip.close();
+    if (fullIgZip == null || !fullIgZip.write(Utilities.path(pf.tempDir, "full-ig.zip"), pf.outputDir, "site/", "index.html",
+        REDIRECT_SOURCE.getBytes(StandardCharsets.UTF_8))) {
+      if (settings.getThreads() > 0) {
+        // the same entries, compressed on the extra threads (-threads)
+        new ParallelFolderZip(settings.getThreads()).write(Utilities.path(pf.tempDir, "full-ig.zip"), pf.outputDir, "site/",
+            "index.html", REDIRECT_SOURCE.getBytes(StandardCharsets.UTF_8));
+      } else {
+        ZipGenerator zip = new ZipGenerator(Utilities.path(pf.tempDir, "full-ig.zip"));
+        zip.addFolder(pf.outputDir, "site/", false);
+        zip.addFileSource("index.html", REDIRECT_SOURCE, false);
+        zip.close();
+      }
     }
     FileUtilities.copyFile(Utilities.path(pf.tempDir, "full-ig.zip"), Utilities.path(pf.outputDir, "full-ig.zip"));
     log("Final .zip built");
     if (!pf.txUnloadEarly) {
       // default path: terminology stayed loaded through HTML inspection (so conformance
       // statement rendering works); unload it now that the inspector is complete.
-      pf.context.unload();
-      System.gc();
+      if (pageRebuild != null && pageRebuild.mayBeReusable()) {
+        // a page rebuild that follows checks the html again with it (see PageRebuild.discard())
+        pageRebuild.unloadContextWhenDiscarded();
+      } else if (replay == null) {
+        pf.context.unload();
+        System.gc();
+      }
     }
   }
 
@@ -817,7 +1160,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
   }
 
-  private void generateHtmlOutputs(FetchedFile f, boolean regen, DBBuilder db, String lang) throws Exception {
+  void generateHtmlOutputs(FetchedFile f, boolean regen, DBBuilder db, String lang) throws Exception {
     if (this.settings.isGenerationOff()) {
       return;
     }
@@ -848,13 +1191,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           f.getOutputNames().add(dst);
           FileUtilities.createDirectory(dst);
         } else {
-          if (isNewML() && !f.getStatedPath().contains(File.separator+"template"+File.separator)) {
+          if (writesLangOutputs(f)) {
             for (String l : allLangs()) {
-              if (o.getRelativePath().startsWith("_includes"+File.separator)) {
-                dst = Utilities.path(this.pf.tempDir, addLangFolderToFilename(o.getRelativePath(), l));
-              } else {
-                dst = Utilities.path(this.pf.tempDir, l, o.getRelativePath());
-              }
+              dst = langOutputPath(o, l);
               byte[] src = loadTranslationSource(f, l);
               if (f.getPath().endsWith(".md")) {
                 checkMakeFile(processCustomLiquid(db, seatMarkdownPage(f, o, stripFrontMatter(src)), f, lang), dst, f.getOutputNames());
@@ -878,7 +1217,11 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         }
       } catch (IOException e) {
         log("Exception generating page "+dst+" for "+o.getRelativePath()+" in "+ this.pf.tempDir +": "+e.getMessage());
-
+        if (regeneratingPages) {
+          // a page rebuild can't leave the page as it was: it falls back to a build
+          // (in another language, dst is where its translation goes: that may be what couldn't be read)
+          throw new IOException("The page " + f.getPath() + " could not be made into " + dst + ": " + e.getMessage(), e);
+        }
       }
     } else if (o.getProcessMode() == FetchedFile.PROCESS_XSLT) {
       String dst = Utilities.path(this.pf.tempDir, o.getRelativePath());
@@ -887,13 +1230,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           f.getOutputNames().add(dst);
           FileUtilities.createDirectory(dst);
         } else {
-          if (isNewML() && !f.getStatedPath().contains(File.separator+"template"+File.separator)) {
+          if (writesLangOutputs(f)) {
             for (String l : allLangs()) {
-              if (o.getRelativePath().startsWith("_includes"+File.separator)) {
-                dst = Utilities.path(this.pf.tempDir, addLangFolderToFilename(o.getRelativePath(), l));
-              } else {
-                dst = Utilities.path(this.pf.tempDir, l, o.getRelativePath());
-              }
+              dst = langOutputPath(o, l);
               byte[] src = loadTranslationSource(f, l);
               checkMakeFile(processCustomLiquid(db, new XSLTransformer(this.settings.isDebug()).transform(src, o.getXslt()), f, lang), dst, f.getOutputNames());
             }
@@ -903,6 +1242,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         }
       } catch (Exception e) {
         log("Exception generating xslt page "+dst+" for "+o.getRelativePath()+" in "+ this.pf.tempDir +": "+e.getMessage());
+        if (regeneratingPages) {
+          throw new IOException("The page " + f.getPath() + " could not be made into " + dst + ": " + e.getMessage(), e);
+        }
       }
     }
   }
@@ -4305,7 +4647,8 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
   }
 
-  private boolean runTool() throws Exception {
+  private boolean runTool(PageRebuild replay) throws Exception {
+    jekyllWritten = null;
     if (settings.isSimplifierMode()) {
       return true;
     }
@@ -4315,7 +4658,200 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       FileUtils.copyDirectory(new File(pf.tempDir), out, f -> !f.getAbsoluteFile().equals(out));
       return true;
     }
+    if (jekyllDriver != null && jekyllDriver.getUnavailable() == null) {
+      String failed = runJekyllDriver(replay);
+      if (failed == null) {
+        return true;
+      }
+      // as it would be without the driver: `jekyll build` reports (and fails on) what's wrong with the site
+      boolean ok = runJekyll();
+      if (!"".equals(failed)) {
+        jekyllDriver.disable("it failed where jekyll build didn't: " + failed);
+        log("Jekyll won't be kept running from now on (" + jekyllDriver.getUnavailable() + ")");
+      }
+      return ok;
+    }
     return runJekyll();
+  }
+
+  /**
+   * Watch mode: runs Jekyll in the Jekyll that stays running between builds (see JekyllDriver). In a page rebuild, if
+   * it's still running for this site and the html checks after it can tell which files the last check changed, it
+   * renders just what depends on the pages written again (and, if the template has a check script that may look at
+   * the output - see Template.whyOnCheckMaySeeOutput() - writes again the files changed since Jekyll wrote them,
+   * keeping their html-checked versions aside: see stashChecked()). Returns null if it did; else Jekyll is to be run
+   * as usual, and the result is "" if the driver
+   * can't be used, or how it failed
+   */
+  private String runJekyllDriver(PageRebuild replay) {
+    TimeTracker.Session tts = pf.tt.start("jekyll");
+    String temp = new File(pf.tempDir).getAbsolutePath();
+    String out = new File(pf.outputDir).getAbsolutePath();
+    boolean update = replay != null && changedTempFiles != null && jekyllDriver.isRunningFor(temp, out)
+        && (settings.isGenerationOff() || replay.getHtmlRecords() != null);
+    // the template's check script runs next, and may look at the output: it must see what `jekyll build` would leave
+    String seesOutput = update && pf.template != null ? pf.template.whyOnCheckMaySeeOutput(out) : null;
+    boolean restore = seesOutput != null;
+    MyFilterHandler filter = new MyFilterHandler();
+    JekyllDriver.Result res;
+    try {
+      if (update) {
+        List<String> changed = new ArrayList<>();
+        for (String f : changedTempFiles) {
+          changed.add(JekyllDriver.sitePath(Paths.get(temp).relativize(Paths.get(f).toAbsolutePath())));
+        }
+        log("Run jekyll: render the pages that depend on " + changed.size() + " changed " + (changed.size() == 1 ? "file" : "files")
+            + " (Jekyll kept running, in folder " + pf.tempDir + ")");
+        res = jekyllDriver.update(temp, out, changed, pf.jekyllTimeout, filter::line);
+        List<String> restored = restore && res.isOk() && !res.isAllWritten() ? jekyllDriver.changedSinceWritten(temp, out) : null;
+        if (restored != null && !restored.isEmpty()) {
+          stashChecked(replay.getHtmlRecords(), out, restored);
+          JekyllDriver.Result again = jekyllDriver.rewrite(temp, out, restored, pf.jekyllTimeout, filter::line);
+          if (!again.isOk()) {
+            res = again;
+          } else {
+            // not the site's: Jekyll leaves them as they are
+            unstash(out, again.getUnknown());
+            if (!again.getWritten().isEmpty()) {
+              log("Jekyll: wrote " + again.getWritten().size() + " output files again that had changed since it wrote them, for the template's check (it may look at the output: " + seesOutput + ")");
+              List<String> all = new ArrayList<>(res.getWritten());
+              all.addAll(again.getWritten());
+              res = res.withWritten(all);
+            }
+          }
+        }
+      } else {
+        log("Run jekyll: " + settings.jekyllCommand + " build --destination \"" + pf.outputDir + "\" (kept running, in folder " + pf.tempDir + ")");
+        res = jekyllDriver.build(temp, out, pf.jekyllTimeout, filter::line);
+      }
+    } catch (IOException e) {
+      tts.end();
+      if (jekyllDriver.getUnavailable() != null) {
+        log("Jekyll can't be kept running (" + jekyllDriver.getUnavailable() + ")");
+        return "";
+      }
+      log("Jekyll (kept running) has failed (" + e.getMessage() + "), so running it as usual");
+      jekyllDriver.stop();
+      return String.valueOf(e.getMessage());
+    }
+    tts.end();
+    if (!res.isOk()) {
+      log("Jekyll (kept running) has failed (" + res.getError() + "), so running it as usual");
+      jekyllDriver.stop();
+      return String.valueOf(res.getError());
+    }
+    if (update && res.isFull()) {
+      log("Jekyll: rendered the whole site again (" + res.getReason() + ")"
+          + (res.isAllWritten() ? "" : "; " + res.getWritten().size() + " output files changed"));
+    }
+    if (!res.isAllWritten()) {
+      jekyllWritten = new HashSet<>();
+      for (String f : res.getWritten()) {
+        jekyllWritten.add(Paths.get(out, f).toString());
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Watch mode, before Jekyll writes these output files (relative to out) again for the template's check: moves aside
+   * the versions the last html check left, so that those the check leaves as Jekyll wrote them can be put back after
+   * it (see putBackChecked()), and what the html check found in them reused (a move keeps the modified time, which the
+   * html check's records go by)
+   */
+  private void stashChecked(HtmlCheckRecords records, String out, List<String> files) throws IOException {
+    dropCheckedStash();
+    for (String f : files) {
+      Path p = Paths.get(out, f);
+      if (records != null && records.files.containsKey(p.toString()) && Files.isRegularFile(p)) {
+        if (checkedStash == null) {
+          checkedStash = Files.createTempDirectory(Paths.get(out).getParent(), ".html-checked-");
+        }
+        Path to = checkedStash.resolve(f);
+        Files.createDirectories(to.getParent());
+        Files.move(p, to);
+        stashed.add(f);
+      }
+    }
+  }
+
+  /** Watch mode: puts back these files (relative to out) moved aside by stashChecked */
+  private void unstash(String out, Collection<String> files) throws IOException {
+    for (String f : files) {
+      if (stashed.remove(f)) {
+        Files.move(checkedStash.resolve(f), Paths.get(out, f), StandardCopyOption.REPLACE_EXISTING);
+      }
+    }
+  }
+
+  /**
+   * Watch mode, after the template's check: puts back the html-checked versions moved aside by stashChecked of the
+   * files the check left as Jekyll wrote them again; they're no longer new (fresh)
+   */
+  private void putBackChecked(Set<String> fresh) throws IOException {
+    if (stashed.isEmpty()) {
+      return;
+    }
+    String out = new File(pf.outputDir).getAbsolutePath();
+    int all = stashed.size();
+    List<String> back = new ArrayList<>();
+    for (String f : stashed) {
+      if (jekyllDriver.isAsWritten(out, f)) {
+        back.add(f);
+      }
+    }
+    unstash(out, back);
+    if (fresh != null) {
+      for (String f : back) {
+        fresh.remove(Paths.get(out, f).toString());
+      }
+    }
+    log("Jekyll: put back the html-checked versions of " + back.size() + " of the " + all + " files written again for the template's check");
+  }
+
+  /** Deletes what stashChecked() kept aside (never throws: it runs in a finally, and must not hide why that ran) */
+  private void dropCheckedStash() {
+    stashed.clear();
+    if (checkedStash != null) {
+      try {
+        FileUtils.deleteDirectory(checkedStash.toFile());
+      } catch (IOException e) {
+        log("Unable to delete " + checkedStash + ": " + e.getMessage());
+      }
+      checkedStash = null;
+    }
+  }
+
+  /**
+   * Watch mode: writes these output files (absolute paths) again as they were before the html checks changed them:
+   * the package step's files from the copies the page rebuild keeps, the others by Jekyll. Returns the ones that
+   * can't be written again
+   */
+  private Set<String> rewriteOutputs(PageRebuild replay, Collection<String> files) throws IOException {
+    Set<String> res = new HashSet<>();
+    String temp = new File(pf.tempDir).getAbsolutePath();
+    String out = new File(pf.outputDir).getAbsolutePath();
+    Map<String, String> byRelative = new HashMap<>();
+    for (String f : files) {
+      if (replay == null || !replay.restorePackageOutput(f)) {
+        byRelative.put(JekyllDriver.sitePath(Paths.get(out).relativize(Paths.get(f).toAbsolutePath())), f);
+      }
+    }
+    if (byRelative.isEmpty()) {
+      return res;
+    }
+    if (jekyllDriver == null || !jekyllDriver.isRunningFor(temp, out)) {
+      res.addAll(byRelative.values());
+      return res;
+    }
+    JekyllDriver.Result r = jekyllDriver.rewrite(temp, out, byRelative.keySet(), pf.jekyllTimeout, new MyFilterHandler()::line);
+    if (!r.isOk()) {
+      throw new IOException("Jekyll could not write output files again: " + r.getError());
+    }
+    for (String f : r.getUnknown()) {
+      res.add(byRelative.get(f));
+    }
+    return res;
   }
 
   public class MyFilterHandler extends OutputStream {
@@ -4330,6 +4866,13 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
     public String getBufferString() {
       return new String(this.buffer, 0, length);
+    }
+
+    /** A line of Jekyll's output, from a Jekyll that's kept running */
+    void line(String s) {
+      if (passJekyllFilter(s)) {
+        log("Jekyll: " + s.trim());
+      }
     }
 
     private boolean passJekyllFilter(String s) {
@@ -4438,6 +4981,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           log("Jekyll timeout exceeded: " + Long.toString(pf.jekyllTimeout /1000) + " seconds");
         }
         log("Jekyll claimed to succeed, but returned an error. Proceeding anyway");
+        if (pageRebuild != null) {
+          pageRebuild.notReusable("Jekyll returned an error");
+        }
       } else {
         log("Jekyll has failed. Complete output from running Jekyll: " + pumpHandler.getBufferString());
         if (watchdog.killedProcess()) {
@@ -4853,7 +5399,11 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
   private void templateOnCheck() throws IOException, FHIRException {
     if (pf.template != null) {
       TimeTracker.Session tts = pf.tt.start("template");
-      checkOutcomes(pf.template.onCheckEvent(pf.context, pf.publishedIg));
+      Map<String, List<ValidationMessage>> outcomes = pf.template.onCheckEvent(pf.context, pf.publishedIg);
+      if (pageRebuild != null) {
+        pageRebuild.setOnCheckMessages(outcomes);
+      }
+      checkOutcomes(outcomes);
       tts.end();
     }
   }
@@ -6553,6 +7103,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
 
     String src = new String(content);
+    if (!PageRebuild.isPlainContent(src)) {
+      pf.pagesWithCustomContent.add(f);
+    }
     try {
       scanForValidationFragments(f, src);
     } catch (Exception e) {
@@ -6563,7 +7116,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       String[] keywords = {"sql", "fragment", "json", "class-diagram", "uml", "multi-map", "lang-fragment", "dataset"};
       for (String keyword: Arrays.asList(keywords)) {
 
-        while (db != null && src.contains("{% " + keyword)) {
+        // a page rebuild has no database, but a lang-fragment doesn't use it: it's processed as it was in the build
+        boolean process = db != null || (regeneratingPages && pf.generatingDatabase && "lang-fragment".equals(keyword));
+        while (process && src.contains("{% " + keyword)) {
           int i = src.indexOf("{% " + keyword);
           String pfx = src.substring(0, i);
           src = src.substring(i + 3 + keyword.length());
@@ -7014,14 +7569,12 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       src = f.getSource();
     } else {
       File ff = null;
-      for (String ts : this.pf.translationSources) {
-        if (Utilities.endsWithInList(ts, "/"+l, "\\"+l, "-"+l)) {
-          File t = new File(Utilities.path(this.pf.rootDir, ts, f.getLoadPath()));
-          if (t.exists()) {
-            ff = t;
-            f.setTranslation(l, true);
-            break;
-          }
+      for (String ts : this.pf.translationSourcesFor(l)) {
+        File t = new File(Utilities.path(this.pf.rootDir, ts, f.getLoadPath()));
+        if (t.exists()) {
+          ff = t;
+          f.setTranslation(l, true);
+          break;
         }
       }
       if (ff != null) {

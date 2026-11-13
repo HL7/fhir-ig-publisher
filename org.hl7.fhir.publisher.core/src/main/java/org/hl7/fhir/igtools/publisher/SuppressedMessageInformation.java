@@ -155,6 +155,29 @@ public class SuppressedMessageInformation {
     return list;
   }
 
+  /** How often each message has been used so far, in a form that setUseCounts() takes */
+  public List<int[]> getUseCounts() {
+    List<int[]> res = new ArrayList<>();
+    for (Category c : categories) {
+      for (SuppressedMessage sm : c.messages) {
+        res.add(new int[] {sm.hintUseCount, sm.warningUseCount});
+      }
+    }
+    return res;
+  }
+
+  /** Puts back the use counts that getUseCounts() returned (no messages may have been added since) */
+  public void setUseCounts(List<int[]> counts) {
+    int i = 0;
+    for (Category c : categories) {
+      for (SuppressedMessage sm : c.messages) {
+        sm.hintUseCount = counts.get(i)[0];
+        sm.warningUseCount = counts.get(i)[1];
+        i++;
+      }
+    }
+  }
+
   public void add(String msg, String name) {
     if (msg == null || name == null) {
       return;

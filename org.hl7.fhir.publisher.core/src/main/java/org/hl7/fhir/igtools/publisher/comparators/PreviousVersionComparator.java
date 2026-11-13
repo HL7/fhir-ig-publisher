@@ -353,7 +353,11 @@ public class PreviousVersionComparator {
   public void addOtherFiles(Set<String> otherFilesRun, String outputDir, List<String> exemptHtmlPatterns) throws IOException {
     for (VersionInstance vi : versionList) {
       otherFilesRun.add(Utilities.path(outputDir, "comparison-v"+vi.version));
-      exemptHtmlPatterns.add("comparison-v"+vi.version.replace(".", "\\.")+".*");
+      String pattern = "comparison-v"+vi.version.replace(".", "\\.")+".*";
+      // called by each build (and twice in one), and the list is kept between builds in watch mode
+      if (!exemptHtmlPatterns.contains(pattern)) {
+        exemptHtmlPatterns.add(pattern);
+      }
     }
   }
   public String checkHtml() {

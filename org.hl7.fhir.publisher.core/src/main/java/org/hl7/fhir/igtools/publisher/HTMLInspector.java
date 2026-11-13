@@ -32,15 +32,19 @@ import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.TreeMap;
+import java.util.TreeSet;
 
 import javax.annotation.Nonnull;
 
@@ -234,6 +238,10 @@ public class HTMLInspector {
       return hasXhtml;
     }
 
+    public boolean isLangRedirect() {
+      return isLangRedirect;
+    }
+
     public String getNextId() {
       id++;
       return Integer.toString(id );
@@ -320,6 +328,23 @@ public class HTMLInspector {
   private ConformanceStatementHandler csHandler;
   private Set<String> comparisonFiles = new HashSet<>();
   @Getter @Setter private ImplementationGuide ig;
+  private List<String> langList;
+  private RendererFactory rendererFactory;
+
+  // watch mode (see recordChecks()): what the last check found, the files written since it (null: all of them), and
+  // how to write a file again as Jekyll wrote it
+  private HtmlCheckRecords lastRecords;
+  private Set<String> fresh;
+  private OutputRewriter rewriter;
+  // what this check finds, and the file it's checking
+  private HtmlCheckRecords records;
+  private HtmlCheckRecords.FileRecord current;
+
+  /** Writes output files again as Jekyll wrote them (watch mode: see recordChecks()) */
+  public interface OutputRewriter {
+    /** Writes these files (full paths) again as Jekyll wrote them; returns the ones that Jekyll doesn't write */
+    Set<String> rewrite(Collection<String> files) throws IOException;
+  }
 
   public HTMLInspector(IWorkerContext context, String rootFolder, List<SpecMapManager> specs, List<LinkedSpecification> linkSpecs, ILoggingService log,
                        String canonical, String packageId, String version, Map<String, List<String>> trackedFragments, List<FetchedFile> sources, IPublisherModule module, boolean isCIBuild,
@@ -341,7 +366,32 @@ public class HTMLInspector {
     this.version = version;
     requirePublishBox = Utilities.startsWithInList(packageId, "hl7.");
     this.context = context;
+    this.langList = langList;
+    this.rendererFactory = rendererFactory;
     this.csHandler = new ConformanceStatementHandler(this, context, log, langList, forHL7, rendererFactory);
+  }
+
+  /**
+   * A new inspector with the same set up as this one, and what was given to it before it checked anything (the links to
+   * check, the manual pages, the exceptions and comparison files so far), but nothing it found when checking: watch mode
+   * uses it to check the output again after a page-only change (see PageRebuild)
+   */
+  public HTMLInspector copyForRecheck() throws IOException {
+    HTMLInspector res = new HTMLInspector(context, rootFolder, specs, linkSpecs, log, canonical, packageId, version, trackedFragments, sources,
+        module, isCIBuild, fragmentUses, relatedIGs, noCIBuildIssues, langList, rendererFactory);
+    res.strict = strict;
+    res.otherlinks.addAll(otherlinks);
+    res.manual = new ArrayList<>(manual);
+    res.igs = igs;
+    res.pcm = pcm;
+    res.exemptHtmlPatterns = exemptHtmlPatterns;
+    res.pageHeadingLevel = pageHeadingLevel;
+    res.accessibilityChecks = accessibilityChecks;
+    res.accessibilityPanel = accessibilityPanel;
+    res.exceptions.addAll(exceptions);
+    res.comparisonFiles.addAll(comparisonFiles);
+    res.ig = ig;
+    return res;
   }
 
   public List<ValidationMessage> check(String statusMessageDef, Map<String, String> statusMessagesLang) throws IOException {
@@ -361,18 +411,23 @@ public class HTMLInspector {
     checkGoneFiles();
 
     log.logDebugMessage(ILoggingService.LogCategory.HTML, "Loading Files");
-    // load files
-    int i = 0;
-    int c = loadList.size() / 40;
-    for (String s : loadList) {
-      loadFile(s, rootFolder, messages);
-      if (i == c) {
-        System.out.print(".");
-        i = 0;
+    Map<String, HtmlCheckRecords.FileRecord> replayed = null;
+    if (records != null) {
+      replayed = loadRecorded(loadList, messages);
+    } else {
+      // load files
+      int i = 0;
+      int c = loadList.size() / 40;
+      for (String s : loadList) {
+        loadFile(s, rootFolder, messages);
+        if (i == c) {
+          System.out.print(".");
+          i = 0;
+        }
+        i++;
       }
-      i++;
+      System.out.println();
     }
-    System.out.println();
 
 
     log.logDebugMessage(ILoggingService.LogCategory.HTML, "Checking Resources");
@@ -388,8 +443,10 @@ public class HTMLInspector {
     links = 0;
     // check links
     boolean first = true;
-    i = 0;
-    c = cache.size() / 40;
+    int i = 0;
+    int c = cache.size() / 40;
+    LoadedFile lastXhtml = null;
+    boolean lastXhtmlReplayed = false;
     for (String s : sorted(cache.keySet())) {
       log.logDebugMessage(ILoggingService.LogCategory.HTML, "Check "+s);
       LoadedFile lf = cache.get(s);
@@ -423,73 +480,18 @@ public class HTMLInspector {
           first = false;
         }
       }
-      // read the page once for the fragment checks and the parse
-      String src = FileUtilities.fileToString(lf.filename);
-      checkFragmentIds(src);
-
+      HtmlCheckRecords.FileRecord r = replayed == null ? null : replayed.get(s);
       if (lf.isHasXhtml()) {
-        if (fragmentUses != null) {
-          checkFragmentMarkers(src);
-        }
-        XhtmlParser parser = new XhtmlParser().setMustBeWellFormed(strict);
-        XhtmlNode x = parser.parse(src, null);
-        // The parse is lenient so that a page with broken markup still gets link checked, heading
-        // checked and so on. But the markup IS broken - IG output is XHTML - so report whatever the
-        // parser had to fix up to get here, with the line and column it happened at.
-        for (String note : parser.getRecoveryNotes()) {
-          messages.add(new ValidationMessage(Source.HtmlChecker, IssueType.STRUCTURE, s,
-              "The html source is not well formed: "+note, IssueSeverity.WARNING).setMessageId("HTML_NOT_WELL_FORMED"));
-        }
-        BooleanHolder bh = new BooleanHolder(false);
-        csHandler.readConformanceClauses(lf, x, bh, new BooleanHolder(false), messages);
-        try {
-          processAsMarkdown(lf, x);
-        } catch (Exception e) {
-          messages.add(new ValidationMessage(Source.HtmlChecker, IssueType.INVALID, s, "Illegal HTML: "+e.getMessage(), IssueSeverity.WARNING));
-        }
-        referencesValidatorPack = false;
-        DuplicateAnchorTracker dat = new DuplicateAnchorTracker();
-        Stack<XhtmlNode> stack = new Stack<XhtmlNode>();
-        checkVisibleFragments(lf.path, stack, x);
-        checkLanguage(s, x, messages);
-        boolean headingsShifted = false;
-        if (!isBuildReportPage(lf.path)) {
-          // both of these run before checkLinks, which mutates the tree as it walks
-          if (accessibilityChecks) {
-            checkAccessibility(s, x, messages);
-          }
-          boolean singleRoot = checkHeadingStructure(s, x, messages);
-          if (singleRoot) {
-            headingsShifted = applyPageHeadingLevel(s, x, messages);
-          }
-        }
-        copyrightParent = null;
-        copyrightParentText = null;
-        copyrightUses = 0;
-        copyrightUsesAllRenderings = true;
-        boolean changed = checkLinks(lf, s, "", x, null, messages, false, dat, null) != NodeChangeType.NONE || bh.ok() || headingsShifted; // returns true if changed
-        // after all the checks, so the panel's own markup is never checked
-        if (accessibilityPanel && addAccessibilityPanel(lf, x)) {
-          changed = true;
-        }
-        if (changed) {
-          saveFile(lf, x);
-        }
-        if (dat.hasDuplicates()) {
-          messages.add(new ValidationMessage(Source.HtmlChecker, IssueType.BUSINESSRULE, s, "The html source has duplicate anchor Ids: "+dat.listDuplicates(), IssueSeverity.WARNING));
-        }
-        if (dat.hasDuplicateIds()) {
-          messages.add(new ValidationMessage(Source.HtmlChecker, IssueType.BUSINESSRULE, s,
-                  "The html source has duplicate element ids: "+dat.listDuplicateIds()+". An id must be unique in a page - a link to one of these is ambiguous, and it is invalid HTML",
-                  IssueSeverity.WARNING).setMessageId("HTML_DUPLICATE_ID"));
-        }
-        if (referencesValidatorPack) {
-          if (lf.getHl7State() != null && lf.getHl7State()) {
-            messages.add(new ValidationMessage(Source.HtmlChecker, IssueType.BUSINESSRULE, s, "The html source references validator.pack which is deprecated. Change the IG to describe the use of the package system instead", IssueSeverity.ERROR));
-          } else {
-            messages.add(new ValidationMessage(Source.HtmlChecker, IssueType.BUSINESSRULE, s, "The html source references validator.pack which is deprecated. Change the IG to describe the use of the package system instead", IssueSeverity.WARNING));
-          }
-        }
+        lastXhtml = lf;
+        lastXhtmlReplayed = r != null;
+      }
+      if (r != null) {
+        replay(r, messages);
+        records.files.put(s, r);
+      } else if (records != null) {
+        recordCheck(lf, s, messages);
+      } else {
+        checkFile(lf, s, messages);
       }
       if (i == c) {
         System.out.print(".");
@@ -505,6 +507,10 @@ public class HTMLInspector {
       checkResolveLink(sp.source, null, null, sp.link, sp.text, messages, null, new XhtmlNode(NodeType.Element, "p").tx(sp.text), null);
     }
 
+    if (lastXhtmlReplayed) {
+      // what's rendered from the clauses at the end is in the language of the last page whose clauses were read
+      csHandler.useLanguageOf(lastXhtml);
+    }
     log.logDebugMessage(ILoggingService.LogCategory.HTML, "Sorting Conformance Clauses");
     csHandler.renderConfHomes();
     csHandler.generateRequirementsInstance(messages);
@@ -521,7 +527,457 @@ public class HTMLInspector {
         }
       }
     }
+    if (records != null) {
+      for (HtmlCheckRecords.FileRecord r : records.files.values()) {
+        r.stamp();
+      }
+    }
     return messages;
+  }
+
+  /** The checks of one file (after the publish box check) */
+  private void checkFile(LoadedFile lf, String s, List<ValidationMessage> messages) throws IOException {
+    // read the page once for the fragment checks and the parse
+    String src = FileUtilities.fileToString(lf.filename);
+    checkFragmentIds(src);
+
+    if (lf.isHasXhtml()) {
+      if (fragmentUses != null) {
+        checkFragmentMarkers(src);
+      }
+      XhtmlParser parser = new XhtmlParser().setMustBeWellFormed(strict);
+      XhtmlNode x = parser.parse(src, null);
+      // The parse is lenient so that a page with broken markup still gets link checked, heading
+      // checked and so on. But the markup IS broken - IG output is XHTML - so report whatever the
+      // parser had to fix up to get here, with the line and column it happened at.
+      for (String note : parser.getRecoveryNotes()) {
+        messages.add(new ValidationMessage(Source.HtmlChecker, IssueType.STRUCTURE, s,
+            "The html source is not well formed: "+note, IssueSeverity.WARNING).setMessageId("HTML_NOT_WELL_FORMED"));
+      }
+      BooleanHolder bh = new BooleanHolder(false);
+      csHandler.readConformanceClauses(lf, x, bh, new BooleanHolder(false), messages);
+      try {
+        processAsMarkdown(lf, x);
+      } catch (Exception e) {
+        messages.add(new ValidationMessage(Source.HtmlChecker, IssueType.INVALID, s, "Illegal HTML: "+e.getMessage(), IssueSeverity.WARNING));
+      }
+      referencesValidatorPack = false;
+      DuplicateAnchorTracker dat = new DuplicateAnchorTracker();
+      Stack<XhtmlNode> stack = new Stack<XhtmlNode>();
+      checkVisibleFragments(lf.path, stack, x);
+      checkLanguage(s, x, messages);
+      boolean headingsShifted = false;
+      if (!isBuildReportPage(lf.path)) {
+        // both of these run before checkLinks, which mutates the tree as it walks
+        if (accessibilityChecks) {
+          checkAccessibility(s, x, messages);
+        }
+        boolean singleRoot = checkHeadingStructure(s, x, messages);
+        if (singleRoot) {
+          headingsShifted = applyPageHeadingLevel(s, x, messages);
+        }
+      }
+      copyrightParent = null;
+      copyrightParentText = null;
+      copyrightUses = 0;
+      copyrightUsesAllRenderings = true;
+      boolean changed = checkLinks(lf, s, "", x, null, messages, false, dat, null) != NodeChangeType.NONE || bh.ok() || headingsShifted; // returns true if changed
+      // after all the checks, so the panel's own markup is never checked
+      if (accessibilityPanel && addAccessibilityPanel(lf, x)) {
+        changed = true;
+      }
+      if (changed) {
+        saveFile(lf, x);
+        if (current != null) {
+          current.modified = true;
+        }
+      }
+      if (current != null && bh.ok()) {
+        records.notUsable(s + " has conformance clauses");
+      }
+      if (dat.hasDuplicates()) {
+        messages.add(new ValidationMessage(Source.HtmlChecker, IssueType.BUSINESSRULE, s, "The html source has duplicate anchor Ids: "+dat.listDuplicates(), IssueSeverity.WARNING));
+      }
+      if (dat.hasDuplicateIds()) {
+        messages.add(new ValidationMessage(Source.HtmlChecker, IssueType.BUSINESSRULE, s,
+                "The html source has duplicate element ids: "+dat.listDuplicateIds()+". An id must be unique in a page - a link to one of these is ambiguous, and it is invalid HTML",
+                IssueSeverity.WARNING).setMessageId("HTML_DUPLICATE_ID"));
+      }
+      if (referencesValidatorPack) {
+        if (lf.getHl7State() != null && lf.getHl7State()) {
+          messages.add(new ValidationMessage(Source.HtmlChecker, IssueType.BUSINESSRULE, s, "The html source references validator.pack which is deprecated. Change the IG to describe the use of the package system instead", IssueSeverity.ERROR));
+        } else {
+          messages.add(new ValidationMessage(Source.HtmlChecker, IssueType.BUSINESSRULE, s, "The html source references validator.pack which is deprecated. Change the IG to describe the use of the package system instead", IssueSeverity.WARNING));
+        }
+      }
+    }
+  }
+
+  // --- watch mode ----------------------------------------------------------------------------------------------------
+
+  /**
+   * Watch mode: makes check() record what it finds in each file (see getRecords()), and, if last is what the check of
+   * the same output found (with the same set up) and fresh is the files written to the output since (null: all of them),
+   * only check the files that are new, and the files whose checks looked at something that changed, and put back what
+   * the last check found for the others (see HtmlCheckRecords). The rewriter writes the files that the last check
+   * changed again as Jekyll wrote them, when they need to be checked again
+   */
+  public void recordChecks(HtmlCheckRecords last, Set<String> fresh, OutputRewriter rewriter) {
+    this.lastRecords = last;
+    this.fresh = fresh;
+    this.rewriter = rewriter;
+    this.records = new HtmlCheckRecords((String) null);
+  }
+
+  /** What the check found, for the next check (see recordChecks()), or null if it can't be used again */
+  public HtmlCheckRecords getRecords() {
+    return records == null || records.getNotUsable() != null ? null : records;
+  }
+
+  /** Why the records of the check can't be used again, if they can't */
+  public String getRecordsNotUsable() {
+    return records == null ? "not recorded" : records.getNotUsable();
+  }
+
+  /**
+   * What the checks of the files depend on apart from the files: if it's different, what was found before can't be put
+   * back. The resources and the specifications aren't compared, just whether they're the same objects (they are in a
+   * page rebuild)
+   */
+  private Map<String, String> recordSignature() {
+    Map<String, String> b = new LinkedHashMap<>();
+    b.put("rootFolder", rootFolder);
+    b.put("strict", String.valueOf(strict));
+    b.put("statusMessage", statusMessageDef);
+    b.put("statusMessages", String.valueOf(statusMessagesLang == null ? null : new TreeMap<>(statusMessagesLang)));
+    // what matters is whether any matches
+    b.put("exemptHtmlPatterns", String.valueOf(exemptHtmlPatterns == null ? null : new TreeSet<>(exemptHtmlPatterns)));
+    b.put("pageHeadingLevel", String.valueOf(pageHeadingLevel));
+    b.put("accessibilityChecks", String.valueOf(accessibilityChecks));
+    b.put("accessibilityPanel", String.valueOf(accessibilityPanel));
+    b.put("manual", String.valueOf(manual));
+    b.put("exceptions", String.valueOf(new TreeSet<>(exceptions)));
+    b.put("comparisonFiles", String.valueOf(new TreeSet<>(comparisonFiles)));
+    b.put("canonical", canonical);
+    b.put("packageId", packageId);
+    b.put("version", version);
+    b.put("isCIBuild", String.valueOf(isCIBuild));
+    b.put("noCIBuildIssues", String.valueOf(noCIBuildIssues));
+    b.put("forHL7", String.valueOf(forHL7));
+    b.put("requirePublishBox", String.valueOf(requirePublishBox));
+    b.put("tableUuid", HierarchicalTableGenerator.uuid);
+    b.put("langList", String.valueOf(langList));
+    String[] names = {"context", "specs", "linkSpecs", "sources", "module", "relatedIGs", "fragmentUses", "trackedFragments", "ig"};
+    Object[] objects = {context, specs, linkSpecs, sources, module, relatedIGs, fragmentUses, trackedFragments, ig};
+    for (int i = 0; i < names.length; i++) {
+      b.put(names[i], String.valueOf(System.identityHashCode(objects[i])));
+    }
+    return b;
+  }
+
+  /**
+   * Loads the files as check() does, apart from the ones whose checks can be put back from the last check (which are
+   * returned, with what was found in them); adds what loading found to messages, in the order of loadList
+   */
+  private Map<String, HtmlCheckRecords.FileRecord> loadRecorded(List<String> loadList, List<ValidationMessage> messages) throws IOException {
+    records = new HtmlCheckRecords(recordSignature());
+    HtmlCheckRecords last = lastRecords;
+    lastRecords = null;
+    if (fresh != null && (last == null || last.getNotUsable() != null)) {
+      // the files that weren't written since may still have what the last check changed in them
+      throw new IOException("It isn't known which output files the last html check changed");
+    }
+    // what the last check found can be put back if it was checked the same way (else the files it changed are
+    // written again as Jekyll wrote them, and everything is checked)
+    boolean replayable = last != null && fresh != null && last.getSignature().equals(records.getSignature());
+    Map<String, HtmlCheckRecords.FileRecord> candidates = new HashMap<>();
+    Map<String, List<ValidationMessage>> loaded = new HashMap<>();
+    List<String> mayRewrite = new ArrayList<>();
+    List<String> mustRewrite = new ArrayList<>();
+    List<String> toLoad = new ArrayList<>();
+    // why the others aren't reused (for the log)
+    int unrecorded = 0;
+    int written = 0;
+    String firstWritten = null;
+    int changedSince = 0;
+    int notReplayable = 0;
+    String whyNotReplayable = null;
+    for (String s : loadList) {
+      HtmlCheckRecords.FileRecord r = last == null || fresh == null ? null : last.files.get(s);
+      if (r == null || fresh.contains(s)) {
+        if (r == null) {
+          unrecorded++;
+        } else {
+          written++;
+          if (firstWritten == null || s.compareTo(firstWritten) < 0) {
+            firstWritten = s;
+          }
+        }
+        toLoad.add(s);
+      } else if (!replayable) {
+        if (!r.sameStamp()) {
+          mayRewrite.add(s);
+        } else if (r.modified) {
+          mustRewrite.add(s);
+        }
+        toLoad.add(s);
+      } else if (!r.sameStamp()) {
+        // changed since the check, but not by Jekyll
+        changedSince++;
+        mayRewrite.add(s);
+        toLoad.add(s);
+      } else if (r.notReplayable != null) {
+        notReplayable++;
+        if (whyNotReplayable == null) {
+          whyNotReplayable = r.notReplayable;
+        }
+        if (r.modified) {
+          mustRewrite.add(s);
+        }
+        toLoad.add(s);
+      } else {
+        candidates.put(s, r);
+      }
+    }
+    rewrite(mayRewrite, false);
+    rewrite(mustRewrite, true);
+    for (String s : toLoad) {
+      loadRecord(s, loaded);
+    }
+    for (Map.Entry<String, HtmlCheckRecords.FileRecord> e : candidates.entrySet()) {
+      e.getValue().loaded.setIteration(iteration);
+      cache.put(e.getKey(), e.getValue().loaded);
+    }
+
+    boolean[] links = new boolean[1];
+    Set<String> tree = HtmlCheckRecords.listTree(rootFolder, links);
+    if (accessibilityPanel) {
+      // written before the files are checked
+      tree.add(A11Y_CHECK_SCRIPT);
+      tree.add(A11Y_AXE_SCRIPT);
+    }
+    if (last != null) {
+      // the files whose checks looked at something that has changed are checked again; loading them again may change
+      // what other checks find
+      Map<String, Boolean> existsNow = new HashMap<>();
+      boolean sameTree = last.sameTree(tree, links[0]);
+      int lookedAt = 0;
+      String whatChanged = null;
+      while (true) {
+        List<String> again = new ArrayList<>();
+        for (String k : sorted(candidates.keySet())) {
+          String changed = lookedAtChanges(candidates.get(k), sameTree, existsNow);
+          if (changed != null) {
+            if (whatChanged == null) {
+              whatChanged = relative(k) + " " + changed;
+            }
+            again.add(k);
+          }
+        }
+        lookedAt += again.size();
+        if (again.isEmpty()) {
+          break;
+        }
+        List<String> rw = new ArrayList<>();
+        for (String s : again) {
+          if (candidates.remove(s).modified) {
+            rw.add(s);
+          }
+          cache.remove(s);
+        }
+        rewrite(rw, true);
+        for (String s : again) {
+          loadRecord(s, loaded);
+        }
+      }
+      List<String> why = new ArrayList<>();
+      if (fresh == null) {
+        why.add("Jekyll wrote all the files again");
+      } else if (!replayable) {
+        why.add("the check is set up differently (" + HtmlCheckRecords.differences(last.getSignatureParts(), records.getSignatureParts()) + ")");
+      }
+      if (written > 0) {
+        why.add(written + " written again (e.g. " + relative(firstWritten) + ")");
+      }
+      if (unrecorded > 0 && fresh != null) {
+        why.add(unrecorded + " new");
+      }
+      if (changedSince > 0) {
+        why.add(changedSince + " changed since they were checked");
+      }
+      if (notReplayable > 0) {
+        why.add(notReplayable + " can't be put back (" + whyNotReplayable + ")");
+      }
+      if (lookedAt > 0) {
+        why.add(lookedAt + " looked at something that changed (" + whatChanged + ")");
+      }
+      log.logMessage("Rapido Mode: the html checks of " + candidates.size() + " of " + loadList.size() + " files are reused"
+          + (why.isEmpty() ? "" : "; not the others: " + String.join(", ", why)));
+    }
+    records.setTree(tree, links[0]);
+
+    for (String s : loadList) {
+      HtmlCheckRecords.FileRecord r = candidates.get(s);
+      if (r != null) {
+        messages.addAll(HtmlCheckRecords.copies(r.loadMessages));
+        parseProblems.addAll(r.parseProblems);
+      } else {
+        messages.addAll(loaded.get(s));
+        parseProblems.addAll(records.files.get(s).parseProblems);
+      }
+    }
+    return candidates;
+  }
+
+  /** Loads a file, and starts its record (with what loading found, which is also kept in loaded) */
+  private void loadRecord(String s, Map<String, List<ValidationMessage>> loaded) {
+    List<ValidationMessage> lm = new ArrayList<>();
+    int pp = parseProblems.size();
+    loadFile(s, rootFolder, lm);
+    List<String> problems = new ArrayList<>(parseProblems.subList(pp, parseProblems.size()));
+    parseProblems.subList(pp, parseProblems.size()).clear();
+    LoadedFile lf = cache.get(s);
+    HtmlCheckRecords.FileRecord r = new HtmlCheckRecords.FileRecord(lf, HtmlCheckRecords.copies(lm), problems);
+    // loading puts in the publish box
+    r.modified = Boolean.TRUE.equals(lf.getHl7State());
+    records.files.put(s, r);
+    loaded.put(s, lm);
+  }
+
+  private void rewrite(List<String> files, boolean required) throws IOException {
+    if (files.isEmpty()) {
+      return;
+    }
+    Set<String> unknown = rewriter == null ? new HashSet<>(files) : rewriter.rewrite(files);
+    if (required && !unknown.isEmpty()) {
+      throw new IOException("The html checks changed " + unknown.iterator().next() + ", and Jekyll can't write it again");
+    }
+  }
+
+  /** What the check of a file looked at (see HtmlCheckRecords) that is different now, if anything (else null) */
+  private String lookedAtChanges(HtmlCheckRecords.FileRecord r, boolean sameTree, Map<String, Boolean> existsNow) throws IOException {
+    if (r.lookups != null) {
+      for (Map.Entry<String, HtmlCheckRecords.LookupUse> e : r.lookups.entrySet()) {
+        String difference = e.getValue().difference(cache.get(e.getKey()));
+        if (difference != null) {
+          return "looked up " + relative(e.getKey()) + ", which " + difference;
+        }
+      }
+    }
+    if (r.exists != null) {
+      for (Map.Entry<String, Boolean> e : r.exists.entrySet()) {
+        String path = e.getKey();
+        if (sameTree && path.startsWith(rootFolder + File.separator) && !path.contains("..")) {
+          continue;
+        }
+        Boolean now = existsNow.get(path);
+        if (now == null) {
+          now = new File(path).exists() || (accessibilityPanel && (path.equals(Utilities.path(rootFolder, A11Y_CHECK_SCRIPT))
+              || path.equals(Utilities.path(rootFolder, A11Y_AXE_SCRIPT))));
+          existsNow.put(path, now);
+        }
+        if (now.booleanValue() != e.getValue().booleanValue()) {
+          return "asked whether " + relative(path) + " exists, which " + (now ? "it does now" : "it no longer does");
+        }
+      }
+    }
+    return null;
+  }
+
+  /** A path in the output, relative to it, with '/' as in its URL (for the log, which is then the same on every system) */
+  private String relative(String path) {
+    return path.startsWith(rootFolder + File.separator) ? path.substring(rootFolder.length() + 1).replace(File.separatorChar, '/') : path;
+  }
+
+  /** Checks a file, recording what it finds */
+  private void recordCheck(LoadedFile lf, String s, List<ValidationMessage> messages) throws IOException {
+    HtmlCheckRecords.FileRecord r = records.files.get(s);
+    if (r == null || r.loaded != lf) {
+      throw new IOException("The html checks didn't load " + s);
+    }
+    int links0 = links;
+    String cs = csHandler.stateSignature();
+    current = r;
+    try {
+      checkFile(lf, s, new HtmlCheckRecords.RecordingList(messages, r, records));
+    } finally {
+      current = null;
+    }
+    r.links = links - links0;
+    if (!cs.equals(csHandler.stateSignature())) {
+      records.notUsable(s + " has conformance clauses");
+    }
+    if (r.externalRefs != null) {
+      for (HtmlCheckRecords.ExternalRef x : r.externalRefs) {
+        // what's compared when the reference is put back is the text the reference has when the check has finished
+        if (!java.util.Objects.equals(x.node.allText(), x.text)) {
+          r.notReplayable = "the text of an external reference changed while " + s + " was checked";
+        }
+      }
+    }
+  }
+
+  /** Puts back what the check of a file found (see HtmlCheckRecords), as checking it again would */
+  private void replay(HtmlCheckRecords.FileRecord r, List<ValidationMessage> messages) {
+    for (Object e : r.events) {
+      if (e instanceof HtmlCheckRecords.ScriptUse) {
+        HtmlCheckRecords.ScriptUse su = (HtmlCheckRecords.ScriptUse) e;
+        if (jsmsgs.containsKey(su.js)) {
+          jsmsgs.get(su.js).incCount();
+        } else if (su.message != null) {
+          ValidationMessage vm = HtmlCheckRecords.copy(su.message);
+          messages.add(vm);
+          jsmsgs.put(su.js, vm);
+        }
+      } else {
+        messages.add(HtmlCheckRecords.copy((ValidationMessage) e));
+      }
+    }
+    links += r.links;
+    if (r.foundFragments != null) {
+      foundFragments.addAll(r.foundFragments);
+    }
+    if (r.fragmentsUsed != null) {
+      for (String v : r.fragmentsUsed) {
+        fragmentUses.get(v).setUsed();
+      }
+    }
+    if (r.visibleFragments != null) {
+      for (String[] p : r.visibleFragments) {
+        visibleFragments.put(p[0], p[1]);
+      }
+    }
+    if (r.copyrights != null) {
+      for (String[] p : r.copyrights) {
+        copyrights.put(p[0], p[1]);
+      }
+    }
+    if (r.imageRefs != null) {
+      for (Object[] p : r.imageRefs) {
+        imageRefs.put((String) p[0], (XhtmlNode) p[1]);
+      }
+    }
+    if (r.externalRefs != null) {
+      for (HtmlCheckRecords.ExternalRef x : r.externalRefs) {
+        addExternalReference(x);
+      }
+    }
+  }
+
+  private boolean exists(String path) {
+    boolean res = new File(path).exists();
+    if (current != null) {
+      current.addExists(path, res);
+    }
+    return res;
+  }
+
+  private LoadedFile lookup(String page) {
+    LoadedFile res = cache.get(page);
+    if (current != null) {
+      current.addLookup(page, res);
+    }
+    return res;
   }
 
   private void processAsMarkdown(LoadedFile lf, XhtmlNode x) throws IOException {
@@ -545,6 +1001,9 @@ public class HTMLInspector {
       if (s != null && s.startsWith("$$")) {
         if (isVisible(stack)) {
           visibleFragments.put(s.replace("$", ""), pageName);
+          if (current != null) {
+            current.addVisibleFragment(s.replace("$", ""), pageName);
+          }
         }
       }
     } else {
@@ -578,6 +1037,9 @@ public class HTMLInspector {
           int j = v.indexOf("-->");
           v = v.substring(0, j).trim();
           fragmentUses.get(v).setUsed();
+          if (current != null) {
+            current.addFragmentUsed(v);
+          }
         }
       }
     }
@@ -653,6 +1115,9 @@ public class HTMLInspector {
       src = src.substring(s+TRACK_PREFIX.length());
       int e = src.indexOf(TRACK_SUFFIX);
       foundFragments.add(src.substring(0, e));
+      if (current != null) {
+        current.addFoundFragment(src.substring(0, e));
+      }
       s = src.indexOf(TRACK_PREFIX);
     }
   }
@@ -1696,11 +2161,18 @@ public class HTMLInspector {
     if (copyrightUses <= MAX_COPYRIGHT_USES_PER_PAGE) {
       String s = text != null ? text : copyrightParentText(parent);
       copyrights.put(s, src);
+      if (current != null) {
+        current.addCopyright(s, src);
+      }
       if (!IPViewRenderer.isRendering(s)) {
         copyrightUsesAllRenderings = false;
       }
     } else if (copyrightUses == MAX_COPYRIGHT_USES_PER_PAGE + 1 && !copyrightUsesAllRenderings) {
-      copyrights.put("More than "+MAX_COPYRIGHT_USES_PER_PAGE+" uses of \u00A9, \u00AE, (R), (TM) or (C) on "+src+": stopped looking for them there - check the page directly", src);
+      String s = "More than "+MAX_COPYRIGHT_USES_PER_PAGE+" uses of \u00A9, \u00AE, (R), (TM) or (C) on "+src+": stopped looking for them there - check the page directly";
+      copyrights.put(s, src);
+      if (current != null) {
+        current.addCopyright(s, src);
+      }
     }
   }
 
@@ -1724,26 +2196,41 @@ public class HTMLInspector {
       messages.add(new ValidationMessage(Source.HtmlChecker, IssueType.INVALID, filename+(loc == null ? "" : " at "+loc.toString()), "The <script> src '"+src+"' is illegal", IssueSeverity.FATAL));
     } else if (src == null && x.allText() != null && !x.allText().contains(HierarchicalTableGenerator.uuid)) {
       String js = x.allText();
-      if (jsmsgs.containsKey(js)) {
+      if (current != null) {
+        // what this does depends on the scripts found in the files checked before, so what it would add is recorded
+        ValidationMessage vm = scriptMessage(filename, loc, path, x);
+        current.events.add(new HtmlCheckRecords.ScriptUse(js, HtmlCheckRecords.copy(vm)));
+        if (jsmsgs.containsKey(js)) {
+          jsmsgs.get(js).incCount();
+        } else if (vm != null) {
+          ((HtmlCheckRecords.RecordingList) messages).addUnrecorded(vm);
+          jsmsgs.put(js, vm);
+        }
+      } else if (jsmsgs.containsKey(js)) {
         ValidationMessage vm = jsmsgs.get(js);
         vm.incCount();
       } else {
-        ValidationMessage vm;
-        if (isCIBuild) {
-          vm = new ValidationMessage(Source.HtmlChecker, IssueType.INVALID, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The <script> tag in the file '"+filename+"' containing the javascript '"+subset(x.allText())+"'... is illegal - put the script in a  .js file in a trusted template (if it is justified and needed)", IssueSeverity.FATAL);
-        } else if (forHL7) {
-          vm =  new ValidationMessage(Source.HtmlChecker, IssueType.INVALID, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The <script> containing the javascript '"+subset(x.allText())+"'... is illegal and not allowed on the HL7 ci-build - put the script in a  .js file in a trusted template (if it is justified and needed)", IssueSeverity.ERROR);
-        } else if (noCIBuildIssues) {
-          vm = null;
-        } else {
-          vm =  new ValidationMessage(Source.HtmlChecker, IssueType.INVALID, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The <script> containing the javascript '"+subset(x.allText())+"'... is illegal and not allowed on the HL7 ci-build - need to put the script in a  .js file in a trusted template if this IG is to build on the HL7 ci-build (if it is justified and needed)", IssueSeverity.WARNING);
-        }
+        ValidationMessage vm = scriptMessage(filename, loc, path, x);
         if (vm != null) {
           messages.add(vm);
           jsmsgs.put(js, vm);
         }
       }
     }
+  }
+
+  private ValidationMessage scriptMessage(String filename, Location loc, String path, XhtmlNode x) {
+    ValidationMessage vm;
+    if (isCIBuild) {
+      vm = new ValidationMessage(Source.HtmlChecker, IssueType.INVALID, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The <script> tag in the file '"+filename+"' containing the javascript '"+subset(x.allText())+"'... is illegal - put the script in a  .js file in a trusted template (if it is justified and needed)", IssueSeverity.FATAL);
+    } else if (forHL7) {
+      vm =  new ValidationMessage(Source.HtmlChecker, IssueType.INVALID, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The <script> containing the javascript '"+subset(x.allText())+"'... is illegal and not allowed on the HL7 ci-build - put the script in a  .js file in a trusted template (if it is justified and needed)", IssueSeverity.ERROR);
+    } else if (noCIBuildIssues) {
+      vm = null;
+    } else {
+      vm =  new ValidationMessage(Source.HtmlChecker, IssueType.INVALID, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The <script> containing the javascript '"+subset(x.allText())+"'... is illegal and not allowed on the HL7 ci-build - need to put the script in a  .js file in a trusted template if this IG is to build on the HL7 ci-build (if it is justified and needed)", IssueSeverity.WARNING);
+    }
+    return vm;
   }
 
   private String subset(String src) {
@@ -1884,7 +2371,7 @@ public class HTMLInspector {
     }
 
     if (Utilities.isAbsoluteFileName(ref)) {
-      if (new File(ref).exists()) {
+      if (exists(ref)) {
         addExternalReference(ExternalReferenceType.FILE, ref, parent == null ? x : parent, filename);
         return true;
       }
@@ -1908,7 +2395,7 @@ public class HTMLInspector {
     // a local file may have been created by some poorly tracked process, so we'll consider that as a possible
     if (!Utilities.isAbsoluteUrl(rref) && !rref.contains("..") && filename != null) { // .. is security check. Maybe there's some ways it could be valid, but we're not interested for now
       String fname = buildRef(new File(filename).getParent(), rref);
-      if (new File(fname).exists()) {
+      if (exists(fname)) {
         return true;
       }
     }
@@ -1989,14 +2476,21 @@ public class HTMLInspector {
         }
       }
       if (page != null) {
-        LoadedFile f = cache.get(page);
+        LoadedFile f = lookup(page);
         if (f != null) {
           if (Utilities.noString(name))
             return true;
-          else if (f.isLangRedirect) {
+          HtmlCheckRecords.LookupUse use = current == null ? null : current.addLookup(page, f);
+          if (use != null) {
+            use.usedLangRedirect();
+          }
+          if (f.isLangRedirect) {
             String fn = filename.replace(rootFolder, rootFolder+"/"+csHandler.getPrimaryLang());
             return checkTarget(fn, ref, rref, tgtList, bh, x, parent);
           } else if (f.targets.contains(name)) {
+            if (use != null) {
+              use.usedAnchor(name, true);
+            }
             return true;
           } else {
             // only needed for the message about the link that can't be resolved
@@ -2005,6 +2499,9 @@ public class HTMLInspector {
               if (s.equalsIgnoreCase(name)) {
                 tgtList.append(" - case is wrong ('"+s+"')");
               }
+            }
+            if (use != null) {
+              use.usedAnchor(name, false);
             }
             return false;
           }
@@ -2025,6 +2522,9 @@ public class HTMLInspector {
             ref.contains("snomed.org") || ref.contains("iana.org") || ref.contains("ietf.org") || ref.contains("w3.org") || ref.endsWith(".gov") || ref.contains(".gov/")) {
       return;
     }
+    if (current != null) {
+      current.addExternalRef(new HtmlCheckRecords.ExternalRef(type, ref, x, stripLeadSlash(source.replace(rootFolder, "")), x.allText()));
+    }
     List<ExternalReference> sameUrl = externalReferencesByUrl.computeIfAbsent(ref, k -> new ArrayList<>());
     for (ExternalReference exr : sameUrl) {
       if (exr.getType() == type && x.allText().equals(exr.getXhtml().allText())) {
@@ -2032,6 +2532,19 @@ public class HTMLInspector {
       }
     }
     ExternalReference exr = new ExternalReference(type, ref, x, stripLeadSlash(source.replace(rootFolder, "")));
+    externalReferences.add(exr);
+    sameUrl.add(exr);
+  }
+
+  /** Puts back a call to addExternalReference() that a check recorded (see replay()) */
+  private void addExternalReference(HtmlCheckRecords.ExternalRef r) {
+    List<ExternalReference> sameUrl = externalReferencesByUrl.computeIfAbsent(r.ref, k -> new ArrayList<>());
+    for (ExternalReference exr : sameUrl) {
+      if (exr.getType() == r.type && r.text.equals(exr.getXhtml().allText())) {
+        return;
+      }
+    }
+    ExternalReference exr = new ExternalReference(r.type, r.ref, r.node, r.source);
     externalReferences.add(exr);
     sameUrl.add(exr);
   }
@@ -2126,7 +2639,7 @@ public class HTMLInspector {
         try {
           String path = filename == null ? rootFolder : FileUtilities.getDirectoryForFile(filename);
           String page = PathBuilder.getPathBuilder().withRequiredTarget(rootFolder).buildPath(path, ref.replace("/", File.separator));
-          LoadedFile f = cache.get(page);
+          LoadedFile f = lookup(page);
           resolved = f != null;
         } catch (Exception e) {
           resolved = false;
@@ -2139,6 +2652,9 @@ public class HTMLInspector {
           addExternalReference(ExternalReferenceType.IMG, ref, src, filename);
         } else {
           imageRefs.put(ref, src);
+          if (current != null) {
+            current.addImageRef(ref, src);
+          }
         }
     }
     return resolved;

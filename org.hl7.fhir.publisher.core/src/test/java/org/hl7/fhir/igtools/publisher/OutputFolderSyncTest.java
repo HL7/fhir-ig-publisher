@@ -64,6 +64,54 @@ class OutputFolderSyncTest {
   }
 
   @Test
+  void keepsTheStagedFilesWhenAsked() throws IOException {
+    Path staged = staged();
+    writeOld(staged, "index.html", "home");
+    write(staged, "en/page.html", "new page");
+    write(staged, "en/same.html", "same");
+    write(target(), "en/page.html", "old page");
+    write(target(), "en/same.html", "same");
+    write(target(), "stale.html", "stale");
+    Object inode = Files.readAttributes(staged.resolve("en/page.html"), java.nio.file.attribute.BasicFileAttributes.class).fileKey();
+
+    OutputFolderSync.Result r = OutputFolderSync.sync(staged, target(), true);
+
+    // the output is synced as it is with a move
+    assertEquals(Set.of("index.html", "en/", "en/page.html", "en/same.html"), contents(target()));
+    assertEquals("new page", read(target(), "en/page.html"));
+    assertEquals(OLD, Files.getLastModifiedTime(target().resolve("index.html")));
+    assertEquals(2, r.getWritten());
+    assertEquals(1, r.getUnchanged());
+    assertEquals(1, r.getDeleted());
+    // and the staged files are all still there, as they were (the same file, with the same modified time)
+    assertEquals(Set.of("index.html", "en/", "en/page.html", "en/same.html"), contents(staged));
+    assertEquals("new page", read(staged, "en/page.html"));
+    assertEquals(OLD, Files.getLastModifiedTime(staged.resolve("index.html")));
+    if (inode != null) {
+      assertEquals(inode, Files.readAttributes(staged.resolve("en/page.html"), java.nio.file.attribute.BasicFileAttributes.class).fileKey());
+      assertFalse(inode.equals(Files.readAttributes(target().resolve("en/page.html"), java.nio.file.attribute.BasicFileAttributes.class).fileKey()));
+    }
+    // no copy is left next to the files
+    try (Stream<Path> st = Files.walk(target())) {
+      assertFalse(st.anyMatch(p -> p.getFileName().toString().startsWith(".sync-")));
+    }
+  }
+
+  @Test
+  void keepingTheStagedFilesReplacesAReadOnlyFile() throws IOException {
+    Path staged = staged();
+    write(staged, "page.html", "new");
+    write(target(), "page.html", "old");
+    assumeTrue(target().resolve("page.html").toFile().setWritable(false));
+
+    OutputFolderSync.Result r = OutputFolderSync.sync(staged, target(), true);
+
+    assertTrue(r.getFailures().isEmpty(), r.getFailures().toString());
+    assertEquals("new", read(target(), "page.html"));
+    assertEquals("new", read(staged, "page.html"));
+  }
+
+  @Test
   void createsTheTargetAndCopiesEverything() throws IOException {
     Path staged = staged();
     write(staged, "index.html", "home");

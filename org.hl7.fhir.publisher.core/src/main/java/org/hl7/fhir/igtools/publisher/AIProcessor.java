@@ -16,7 +16,16 @@ import org.hl7.fhir.utilities.xhtml.XhtmlToMarkdownConverter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.FileTime;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 /**
  * The AI generation code does this:
@@ -31,9 +40,253 @@ import java.util.*;
  */
 public class AIProcessor {
   private final String rootDir;
+  private final Cache cache;
+
+  /**
+   * Watch mode: what the last run worked out from the files that Jekyll hasn't written again since, which the output
+   * files no longer show (the html checks change them after this runs: see HTMLInspector.recordChecks())
+   */
+  public static class Cache {
+    private String packageStamp;
+    private NpmPackage npm;
+    private final Map<Boolean, List<LoadedResource>> resources = new HashMap<>();
+    // the title and markdown of a page
+    private final Map<String, String[]> pages = new HashMap<>();
+    // the markdown of a resource (they're from the package)
+    private final Map<String, String> resourceMarkdown = new HashMap<>();
+    // the zips the runs wrote: what each holds (a digest), and the file's stamp when it was written (see AiZip)
+    private final Map<String, String[]> zips = new HashMap<>();
+    private Set<String> fresh;
+    private HTMLInspector.OutputRewriter rewriter;
+    private final Set<String> written = new HashSet<>();
+
+    /**
+     * Before a run: the files in the output written since the last run (null: all of them), and how to write the
+     * others again as Jekyll wrote them, if the run needs to read one it didn't read last time
+     */
+    public void prepare(Set<String> fresh, HTMLInspector.OutputRewriter rewriter) {
+      this.fresh = fresh;
+      this.rewriter = rewriter;
+      written.clear();
+    }
+
+    /**
+     * The files the last run wrote, or wrote again as Jekyll wrote them (the files it makes are only written if what
+     * they hold is different)
+     */
+    public Set<String> getWritten() {
+      return written;
+    }
+
+    private boolean isFresh(File f) {
+      return fresh == null || fresh.contains(f.getAbsolutePath());
+    }
+
+    private void refresh(List<File> files) throws IOException {
+      if (files.isEmpty()) {
+        return;
+      }
+      List<String> paths = new ArrayList<>();
+      for (File f : files) {
+        paths.add(f.getAbsolutePath());
+      }
+      Set<String> unknown = rewriter == null ? new HashSet<>(paths) : rewriter.rewrite(paths);
+      if (!unknown.isEmpty()) {
+        throw new IOException("Jekyll can't write " + unknown.iterator().next() + " again");
+      }
+      fresh.addAll(paths);
+      written.addAll(paths);
+    }
+  }
 
   public AIProcessor(String rootDir) {
+    this(rootDir, null);
+  }
+
+  public AIProcessor(String rootDir, Cache cache) {
     this.rootDir = rootDir;
+    this.cache = cache;
+  }
+
+  private NpmPackage loadPackage() throws IOException {
+    File pf = new File(Utilities.path(rootDir, "package.tgz"));
+    if (cache == null) {
+      return readPackage(pf);
+    }
+    String stamp = pf.length() + ":" + pf.lastModified();
+    if (cache.npm == null || !stamp.equals(cache.packageStamp)) {
+      cache.npm = readPackage(pf);
+      cache.packageStamp = stamp;
+      cache.resources.clear();
+      cache.resourceMarkdown.clear();
+    }
+    return cache.npm;
+  }
+
+  private static NpmPackage readPackage(File f) throws IOException {
+    try (FileInputStream in = new FileInputStream(f)) {
+      return NpmPackage.fromPackage(in);
+    }
+  }
+
+  private void written(String path) {
+    if (cache != null) {
+      cache.written.add(new File(path).getAbsolutePath());
+    }
+  }
+
+  /**
+   * Writes a file the run makes; in watch mode only if what it holds is different, so that the steps after this only
+   * redo the files that changed
+   */
+  private void writeText(String content, String path) throws IOException {
+    if (deferred != null) {
+      deferred.put(path, content);
+      return;
+    }
+    if (cache != null) {
+      File f = new File(path);
+      byte[] bytes = content.getBytes(StandardCharsets.UTF_8);
+      if (f.isFile() && f.length() == bytes.length && Arrays.equals(Files.readAllBytes(f.toPath()), bytes)) {
+        return;
+      }
+    }
+    FileUtilities.stringToFile(content, path);
+    written(path);
+  }
+
+  // watch mode, old templates: the files to write at the end (an old template's resource page is taken for a page
+  // too, so its .md is written twice, and only the second is what's left)
+  private Map<String, String> deferred;
+
+  private void writeDeferred() throws IOException {
+    Map<String, String> files = deferred;
+    deferred = null;
+    for (Map.Entry<String, String> e : files.entrySet()) {
+      writeText(e.getValue(), e.getKey());
+    }
+  }
+
+  /**
+   * The ai.zip of a folder. In watch mode what goes in it is kept, and it's only written if that's different from
+   * what the last run wrote to it, or the file isn't as that run left it
+   */
+  private final class AiZip {
+    private final String path;
+    private final String target;
+    private final ZipGenerator zip;
+    private final List<Object[]> entries = new ArrayList<>();
+
+    /** The zip is written to path, and then renamed to target */
+    private AiZip(String path, String target) throws IOException {
+      this.path = path;
+      this.target = target;
+      this.zip = cache == null ? new ZipGenerator(path) : null;
+    }
+
+    private void addFileSource(String name, String content, boolean omitIfExists) throws IOException {
+      if (zip != null) {
+        zip.addFileSource(name, content, omitIfExists);
+      } else {
+        entries.add(new Object[] {name, content, omitIfExists});
+      }
+    }
+
+    private void close() throws IOException {
+      if (zip != null) {
+        zip.close();
+        try {
+          rename();
+        } catch (IOException e) {
+          // as before: the zip there is left as it is
+          System.out.println("Unable to replace " + target + " with " + path + ": " + e.getMessage());
+        }
+        return;
+      }
+      String digest = digest();
+      String[] last = cache.zips.remove(target);
+      if (last != null && last[0].equals(digest) && last[1].equals(stamp(target))) {
+        cache.zips.put(target, last);
+        return;
+      }
+      ZipGenerator z = new ZipGenerator(path);
+      for (Object[] e : entries) {
+        z.addFileSource((String) e[0], (String) e[1], (Boolean) e[2]);
+      }
+      z.close();
+      rename();
+      written(target);
+      String stamp = stamp(target);
+      if (stamp != null) {
+        cache.zips.put(target, new String[] {digest, stamp});
+      }
+    }
+
+    /** Moves the zip to target (replacing what is there: File.renameTo doesn't on Windows) */
+    private void rename() throws IOException {
+      if (!path.equals(target)) {
+        Files.move(Paths.get(path), Paths.get(target), StandardCopyOption.REPLACE_EXISTING);
+      }
+    }
+
+    private String digest() throws IOException {
+      try {
+        MessageDigest md = MessageDigest.getInstance("SHA-1");
+        for (Object[] e : entries) {
+          for (Object o : e) {
+            byte[] b = o.toString().getBytes(StandardCharsets.UTF_8);
+            md.update(ByteBuffer.allocate(4).putInt(b.length).array());
+            md.update(b);
+          }
+        }
+        return Base64.encodeBase64String(md.digest());
+      } catch (NoSuchAlgorithmException e) {
+        throw new IOException(e);
+      }
+    }
+  }
+
+  /** A file's size, times and inode, or null if it isn't there */
+  private static String stamp(String path) {
+    File f = new File(path);
+    if (!f.isFile()) {
+      return null;
+    }
+    String res = f.length() + ":" + f.lastModified();
+    try {
+      Map<String, Object> a = Files.readAttributes(f.toPath(), "unix:ino,ctime");
+      res = res + ":" + a.get("ino") + ":" + ((FileTime) a.get("ctime")).to(TimeUnit.NANOSECONDS);
+    } catch (IOException | UnsupportedOperationException | IllegalArgumentException e) {
+      // the size and modification time
+    }
+    return res;
+  }
+
+  /**
+   * Watch mode: makes sure that the pages the run reads that it can't take from the cache are as Jekyll wrote them
+   */
+  private void refreshPages(List<Page> pages, List<LoadedResource> resources) throws IOException {
+    if (cache == null || cache.fresh == null) {
+      return;
+    }
+    List<File> files = new ArrayList<>();
+    for (Page p : pages) {
+      if (!cache.isFresh(p.f) && (p.kind == PageKind.PAGE || p.f.getName().equals("index.html")) && !cache.pages.containsKey(p.f.getAbsolutePath())) {
+        files.add(p.f);
+      }
+    }
+    Map<String, Page> byName = byName(pages);
+    for (LoadedResource r : resources) {
+      Page p = byName.get(r.filename);
+      if (p != null && !cache.isFresh(p.f) && !files.contains(p.f) && !cache.resourceMarkdown.containsKey(resourceKey(r, p))) {
+        files.add(p.f);
+      }
+    }
+    cache.refresh(files);
+  }
+
+  private String resourceKey(LoadedResource r, Page p) {
+    return (p == null ? "" : p.f.getAbsolutePath()) + "|" + r.resource.asString("resourceType") + "|" + r.resource.asString("id");
   }
 
   /**
@@ -45,10 +298,7 @@ public class AIProcessor {
   public void processNewTemplates(List<String> langs) throws IOException {
     // processing new templates is different to old template because of the layout with regard to
     // languages, and because there's a specific .ai file
-    NpmPackage npm;
-    try (FileInputStream in = new FileInputStream(Utilities.path(rootDir, "package.tgz"))) {
-      npm = NpmPackage.fromPackage(in);
-    }
+    NpmPackage npm = loadPackage();
 
     for (String lang : langs) {
       processFolderNew(new File(Utilities.path(rootDir, lang)), npm, lang);
@@ -61,7 +311,7 @@ public class AIProcessor {
     if (!langs.isEmpty()) {
       String llms = FileUtilities.fileToString(Utilities.path(rootDir, langs.get(0), "llms.txt"));
       llms = llms.replace("](", "](" + langs.get(0) + "/");
-      FileUtilities.stringToFile(llms, Utilities.path(rootDir, "llms.txt"));
+      writeText(llms, Utilities.path(rootDir, "llms.txt"));
     }
   }
 
@@ -71,10 +321,7 @@ public class AIProcessor {
    * @throws IOException
    */
   public void processOldTemplates() throws IOException {
-    NpmPackage npm;
-    try (FileInputStream in = new FileInputStream(Utilities.path(rootDir, "package.tgz"))) {
-      npm = NpmPackage.fromPackage(in);
-    }
+    NpmPackage npm = loadPackage();
     processFolderOld(new File(rootDir), npm);
   }
 
@@ -88,8 +335,9 @@ public class AIProcessor {
     // now list all the pages in the IG, and decide whether they are a page, a resource, or an alternate view of a resource
     long oldSize = loadPages(dir, pages, resources);
     long newSize = 0;
+    refreshPages(pages, resources);
 
-    ZipGenerator zip = new ZipGenerator(Utilities.path(dir, "ai.zip"));
+    AiZip zip = new AiZip(Utilities.path(dir, "ai.zip"), Utilities.path(dir, "ai.zip"));
     StringBuilder llms = new StringBuilder();
     llms.append("# " + npm.vid() + ": " + npm.title() + "("+lang+")\r\n\r\n");
     llms.append("## Pages\r\n\r\n");
@@ -106,22 +354,28 @@ public class AIProcessor {
     llms.append("\r\n## Resources\r\n");
     resources.sort(new LoadedResourceSorter());
     String t = null;
+    Map<String, Page> byName = byName(pages);
     for (LoadedResource r : resources) {
-      Page p = getPageForResource(r, pages);
+      Page p = byName.get(r.filename);
       if (!r.type.equals(t)) {
         t = r.type;
         llms.append("\r\n### " + t.substring(1) + "\r\n\r\n");
       }
       String bn = r.filename;
       r.filename = r.filename.replace(".html", ".ai.html");
-      newSize += produceMDForResource(llms, r, p, dir, zip, true);
+      // in watch mode it's written where it ends up, if it's different
+      newSize += produceMDForResource(llms, r, p, dir, zip, true, cache == null ? null : file(dir, bn, ".md"));
       file(dir, r.filename).delete();
-      file(dir, r.filename, ".md").renameTo(file(dir, bn, ".md"));
+      if (cache == null) {
+        file(dir, r.filename, ".md").renameTo(file(dir, bn, ".md"));
+      } else {
+        file(dir, r.filename, ".md").delete();
+      }
     }
     zip.addFileSource("llms.txt", llms.toString(), false);
     zip.addFileSource("llms.md", llms.toString(), false);
     zip.close();
-    FileUtilities.stringToFile(llms.toString(), Utilities.path(dir, "llms.txt"));
+    writeText(llms.toString(), Utilities.path(dir, "llms.txt"));
     newSize += llms.toString().length();
     String pct = oldSize == 0 ? "n/a" : "" + (100 - ((newSize * 100) / oldSize));
     System.out.println("AI format for " + dir.getAbsolutePath() + " - % reduction = " + pct);
@@ -136,6 +390,7 @@ public class AIProcessor {
   }
 
   public void processFolderOld(File dir, NpmPackage npm) throws IOException {
+    deferred = cache == null ? null : new LinkedHashMap<>();
     List<LoadedResource> resources = new ArrayList<>();
     List<Page> pages = new ArrayList<>();
 
@@ -144,8 +399,9 @@ public class AIProcessor {
     // now list all the pages in the IG, and decide whether they are a page, a resource, or an alternate view of a resource
     long oldSize = loadPages(dir, pages, resources);
     long newSize = 0;
+    refreshPages(pages, resources);
 
-    ZipGenerator zip = new ZipGenerator(Utilities.path(dir, "ai-prep.zip"));
+    AiZip zip = new AiZip(Utilities.path(dir, "ai-prep.zip"), Utilities.path(dir, "ai.zip"));
     StringBuilder llms = new StringBuilder();
     llms.append("# " + npm.vid() + ": " + npm.title() + "\r\n\r\n");
     llms.append("## Pages\r\n\r\n");
@@ -162,35 +418,55 @@ public class AIProcessor {
     llms.append("\r\n## Resources\r\n");
     resources.sort(new LoadedResourceSorter());
     String t = null;
+    Map<String, Page> byName = byName(pages);
     for (LoadedResource r : resources) {
-      Page p = getPageForResource(r, pages);
+      Page p = byName.get(r.filename);
       if (!r.type.equals(t)) {
         t = r.type;
         llms.append("\r\n### " + t.substring(1) + "\r\n\r\n");
       }
-      newSize += produceMDForResource(llms, r, p, dir, zip, false);
+      newSize += produceMDForResource(llms, r, p, dir, zip, false, null);
     }
     zip.addFileSource("llms.txt", llms.toString(), false);
     zip.addFileSource("llms.md", llms.toString(), false);
     zip.close();
-    new File(Utilities.path(dir, "ai-prep.zip")).renameTo(new File(Utilities.path(dir, "ai.zip")));
-    FileUtilities.stringToFile(llms.toString(), Utilities.path(dir, "llms.txt"));
+    writeText(llms.toString(), Utilities.path(dir, "llms.txt"));
+    if (deferred != null) {
+      writeDeferred();
+    }
     newSize += llms.toString().length();
     String pct = oldSize == 0 ? "n/a" : "" + (100 - ((newSize * 100) / oldSize));
     System.out.println("Processed " + dir.getAbsolutePath() + " - % reduction = " + pct + " (" + oldSize + " ==> " + newSize + ")");
   }
 
 
-  private Page getPageForResource(LoadedResource r, List<Page> pages) {
+  /** The pages by their file names (the first one, if two have the same name): the page of a resource */
+  private Map<String, Page> byName(List<Page> pages) {
+    Map<String, Page> res = new HashMap<>();
     for (Page p : pages) {
-      if (p.f.getName().equals(r.filename)) {
-        return p;
-      }
+      res.putIfAbsent(p.f.getName(), p);
     }
-    return null;
+    return res;
   }
 
   private NpmPackage loadResources(File dir, List<LoadedResource> resources, NpmPackage npm, boolean newML) throws IOException {
+    if (cache != null) {
+      List<LoadedResource> list = cache.resources.get(newML);
+      if (list == null) {
+        list = new ArrayList<>();
+        readResources(list, npm, newML);
+        cache.resources.put(newML, list);
+      }
+      for (LoadedResource lr : list) {
+        resources.add(lr.copy());
+      }
+      return npm;
+    }
+    readResources(resources, npm, newML);
+    return npm;
+  }
+
+  private void readResources(List<LoadedResource> resources, NpmPackage npm, boolean newML) throws IOException {
     SpecMapManager spm = new SpecMapManager(FileUtilities.streamToBytes(npm.load("other", "spec.internals")), npm.vid(), npm.fhirVersion());
     Set<String> ids = new HashSet<>();
     for (NpmPackage.PackagedResourceFile p : npm.listAllResources()) {
@@ -254,23 +530,29 @@ public class AIProcessor {
         }
       }
     }
-    return npm;
   }
 
   private String tail(String rt) {
     return rt.contains("/") ? rt.substring(rt.lastIndexOf('/') + 1) : rt;
   }
 
-  private int produceMDForPage(StringBuilder llms, Page p, ZipGenerator zip, NpmPackage npm) throws IOException {
+  private int produceMDForPage(StringBuilder llms, Page p, AiZip zip, NpmPackage npm) throws IOException {
 //    System.out.println("Processing "+p.f.getAbsolutePath());
     try {
-      XhtmlNode xhtml = new XhtmlParser().setMustBeWellFormed(false).parse(p.f, "html");
-      XhtmlNode x = xhtml.firstNamedDescendent("head");
-      x = x == null ? x : x.firstNamedDescendent("title");
-      String title = x == null ? "Untitled" : x.allText();
-      XhtmlToMarkdownConverter conv = new XhtmlToMarkdownConverter(false);
-      conv.configureForIGs(true);
-      String md = conv.convert(xhtml);
+      String[] tm = cache == null || cache.isFresh(p.f) ? null : cache.pages.get(p.f.getAbsolutePath());
+      if (tm == null) {
+        XhtmlNode xhtml = new XhtmlParser().setMustBeWellFormed(false).parse(p.f, "html");
+        XhtmlNode x = xhtml.firstNamedDescendent("head");
+        x = x == null ? x : x.firstNamedDescendent("title");
+        XhtmlToMarkdownConverter conv = new XhtmlToMarkdownConverter(false);
+        conv.configureForIGs(true);
+        tm = new String[] {x == null ? "Untitled" : x.allText(), conv.convert(xhtml)};
+        if (cache != null) {
+          cache.pages.put(p.f.getAbsolutePath(), tm);
+        }
+      }
+      String title = tm[0];
+      String md = tm[1];
       String dest = FileUtilities.changeFileExt(p.f.getName(), ".md");
 
       if (npm.title() != null) {
@@ -290,7 +572,11 @@ public class AIProcessor {
         title = title.substring(0, title.length() - 1).trim();
       }
       llms.append("* [" + title + "](" + dest + ")\r\n");
-      FileUtilities.stringToFileIfDifferent(md, Utilities.path(FileUtilities.getDirectoryForFile(p.f), dest));
+      if (cache == null) {
+        FileUtilities.stringToFileIfDifferent(md, Utilities.path(FileUtilities.getDirectoryForFile(p.f), dest));
+      } else {
+        writeText(md, Utilities.path(FileUtilities.getDirectoryForFile(p.f), dest));
+      }
       zip.addFileSource(dest, md, false);
       return md.length();
     } catch (Exception e) {
@@ -298,50 +584,17 @@ public class AIProcessor {
     }
   }
 
-  private int produceMDForResource(StringBuilder llms, LoadedResource r, Page p, File dir, ZipGenerator zip, boolean newML) throws IOException {
+  /** target: where the markdown is written, if it isn't next to the resource's page */
+  private int produceMDForResource(StringBuilder llms, LoadedResource r, Page p, File dir, AiZip zip, boolean newML, File target) throws IOException {
 //    System.out.println("Processing "+p.f.getAbsolutePath());
     try {
-      String md;
-      if (p != null) {
-        XhtmlNode xhtml = new XhtmlParser().setMustBeWellFormed(false).parse(p.f, "html");
-        switch (r.resource.asString("resourceType")) {
-          case "CodeSystem":
-            stripDiv(xhtml, "defines the following code");
-            break;
-          case "ValueSet":
-            stripDiv(xhtml, "Include these");
-            stripDiv(xhtml, "Expansion performed internally based on");
-            stripDiv(xhtml, "Expansion based on");
-            break;
-          case "StructureDefinition":
-            stripDiv(xhtml, "Differential Table");
-          default:
-            stripDiv(xhtml, "Generated Narrative: ");
-            break;
+      String key = cache == null ? null : resourceKey(r, p);
+      String md = key == null || (p != null && cache.isFresh(p.f)) ? null : cache.resourceMarkdown.get(key);
+      if (md == null) {
+        md = resourceMarkdown(r, p);
+        if (key != null) {
+          cache.resourceMarkdown.put(key, md);
         }
-        XhtmlToMarkdownConverter conv = new XhtmlToMarkdownConverter(false);
-        conv.configureForIGs(true);
-        md = conv.convert(xhtml);
-      } else {
-        md = "# Resource " + r.name + "\r\n\r\n";
-      }
-      if ("Binary".equals(r.resource.asString("resourceType"))) {
-        if (isText(r.resource.asString("contentType"))) {
-          md = md + "\r\n\r\n## Resource Binary Content\r\n\r\n" +
-                  r.resource.asString("contentType") + ":\r\n\r\n```\r\n" +
-                  Base64.decodeBase64(r.resource.asString("data")) +
-                  "\r\n```\r\n";
-        } else {
-          md = md + "\r\n\r\n## Resource Binary Content\r\n\r\n" +
-                  r.resource.asString("contentType") + ":\r\n\r\n```\r\n" +
-                  "{snip}" +
-                  "\r\n```\r\n";
-        }
-
-      } else {
-        md = md + "\r\n\r\n## Resource Content\r\n\r\n```json\r\n" +
-                JsonParser.compose(r.resource, true) +
-                "\r\n```\r\n";
       }
       if (r.filename == null) {
         r.filename = tail(r.resource.asString("resourceType")) + "-" + r.resource.asString("id") + ".html";
@@ -352,7 +605,7 @@ public class AIProcessor {
       } else {
         llms.append("* [" + r.name + "](" + dest + ")\r\n");
       }
-      FileUtilities.stringToFile(md, Utilities.path(dir, dest));
+      writeText(md, target == null ? Utilities.path(dir, dest) : target.getAbsolutePath());
       zip.addFileSource(dest, md, true);
       return md.length();
     } catch (Exception e) {
@@ -362,6 +615,52 @@ public class AIProcessor {
         throw new FHIRException("Unable to process resource " + r.filename, e);
       }
     }
+  }
+
+  private String resourceMarkdown(LoadedResource r, Page p) throws IOException {
+    String md;
+    if (p != null) {
+      XhtmlNode xhtml = new XhtmlParser().setMustBeWellFormed(false).parse(p.f, "html");
+      switch (r.resource.asString("resourceType")) {
+        case "CodeSystem":
+          stripDiv(xhtml, "defines the following code");
+          break;
+        case "ValueSet":
+          stripDiv(xhtml, "Include these");
+          stripDiv(xhtml, "Expansion performed internally based on");
+          stripDiv(xhtml, "Expansion based on");
+          break;
+        case "StructureDefinition":
+          stripDiv(xhtml, "Differential Table");
+        default:
+          stripDiv(xhtml, "Generated Narrative: ");
+          break;
+      }
+      XhtmlToMarkdownConverter conv = new XhtmlToMarkdownConverter(false);
+      conv.configureForIGs(true);
+      md = conv.convert(xhtml);
+    } else {
+      md = "# Resource " + r.name + "\r\n\r\n";
+    }
+    if ("Binary".equals(r.resource.asString("resourceType"))) {
+      if (isText(r.resource.asString("contentType"))) {
+        md = md + "\r\n\r\n## Resource Binary Content\r\n\r\n" +
+                r.resource.asString("contentType") + ":\r\n\r\n```\r\n" +
+                Base64.decodeBase64(r.resource.asString("data")) +
+                "\r\n```\r\n";
+      } else {
+        md = md + "\r\n\r\n## Resource Binary Content\r\n\r\n" +
+                r.resource.asString("contentType") + ":\r\n\r\n```\r\n" +
+                "{snip}" +
+                "\r\n```\r\n";
+      }
+
+    } else {
+      md = md + "\r\n\r\n## Resource Content\r\n\r\n```json\r\n" +
+              JsonParser.compose(r.resource, true) +
+              "\r\n```\r\n";
+    }
+    return md;
   }
 
   private boolean isText(String contentType) {
@@ -402,7 +701,10 @@ public class AIProcessor {
         resourceFiles.add(lr.filename);
       }
     }
-    for (File f : dir.listFiles()) {
+    // in name order: the lists of pages and the zip don't depend on the order the file system lists them in
+    File[] files = dir.listFiles();
+    Arrays.sort(files);
+    for (File f : files) {
       if ((f.getName().endsWith(".html") || f.getName().endsWith(".json") || f.getName().endsWith(".xml")) && !f.getName().startsWith("qa")) {
         res += f.length();
       }
@@ -492,6 +794,17 @@ public class AIProcessor {
     private boolean example;
     private boolean listed;
     private String filename;
+
+    private LoadedResource copy() {
+      LoadedResource res = new LoadedResource();
+      res.resource = resource;
+      res.name = name;
+      res.type = type;
+      res.example = example;
+      res.listed = listed;
+      res.filename = filename;
+      return res;
+    }
   }
 
   private class Page {

@@ -325,6 +325,8 @@ public class PublisherFields {
     LanguageSubtagRegistry registry;
 
     public Map<String, PublisherBase.FragmentUseRecord> fragmentUses = new HashMap<>();
+    // the files whose content made processCustomLiquid() do more than copy it (see PageRebuild)
+    public Set<FetchedFile> pagesWithCustomContent = new HashSet<>();
 
     LanguageUtils langUtils;
 
@@ -399,6 +401,20 @@ public class PublisherFields {
         return prefix + ig.getPackageId();
     }
     
+    /**
+     * The translation sources that hold the translations into lang, in the order a page's translation is looked for in
+     * them (see PublisherGenerator.loadTranslationSource())
+     */
+    public List<String> translationSourcesFor(String lang) {
+        List<String> res = new ArrayList<>();
+        for (String ts : translationSources) {
+            if (Utilities.endsWithInList(ts, "/"+lang, "\\"+lang, "-"+lang)) {
+                res.add(ts);
+            }
+        }
+        return res;
+    }
+
     public String basePackageId() {
         var ig = publishedIg == null ? sourceIg : publishedIg;
         return ig.getPackageId();

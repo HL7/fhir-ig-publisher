@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -16,6 +17,7 @@ import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.hl7.fhir.utilities.xhtml.XhtmlParser;
 import org.hl7.fhir.validation.BaseValidator.BooleanHolder;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -64,6 +66,21 @@ class ConformanceClauseSkipTest {
     if (!page.contains("§")) {
       assertTrue(noMarkers.contains(skipping));
       assertFalse(allClauses.ok());
+    }
+  }
+
+  @Test
+  void theExpectationsOfThePagesLanguage() throws IOException {
+    HTMLInspector inspector = new HTMLInspector(null, "root", new ArrayList<>(), new ArrayList<>(), null, "http://example.org/ig",
+      "example.ig", "0.1.0", null, new ArrayList<>(), null, false, null, new ArrayList<>(), false, new ArrayList<>(), null);
+    ConformanceStatementHandler handler = new ConformanceStatementHandler(inspector, null, null, new ArrayList<>(), false, null);
+    handler.useLanguageOf(inspector.new LoadedFile("/ig/output/en/page.html", "page.html", 0, 0, null, false, true));
+    String[][] cases = {{"Systems SHALL do this", "SHALL"}, {"Systems SHALL NOT do this", "SHALLNOT"},
+      {"Systems SHOULD do this", "SHOULD"}, {"Systems SHOULD NOT do this", "SHOULD-NOT"}, {"Systems MAY do this", "MAY"}};
+    for (String[] c : cases) {
+      List<String> expectations = new ArrayList<>();
+      handler.extractExpectations(expectations, c[0]);
+      assertTrue(expectations.contains(c[1]), c[0] + ": " + expectations);
     }
   }
 }
