@@ -189,14 +189,25 @@ class PublisherRapidoWatchTest {
     assertEquals(dirty, pf.rapido.listRenderDirty());
     finish(pf);
     assertTrue(page("artifacts.html").contains("<li>Patient A, renamed: The first patient, edited again</li>"), page("artifacts.html"));
+  }
 
-    // the name the IG gives the file, which a profile's list of examples shows, counts too
-    ig.aFileTitle = "Patient A's file";
-    pf = build("a", ig);
-    assertFalse(pf.rapido.isCompleteBuild(), pf.rapido.getReason());
-    assertEquals(dirty, pf.rapido.listRenderDirty());
+  /**
+   * The loader gives a file the name of its first entry, and a profile's list of examples shows it for each resource in
+   * the file: renaming Patient/b lists Patient/b2, whose own entry is unchanged, under the new name
+   */
+  @Test
+  void aFilesNameIsShownForItsOtherResources() throws Exception {
+    Ig ig = new Ig();
+    ig.twoInB = true;
+    ig.b2StatesP = true;
+    finish(build("a", ig));
+
+    ig.bName = "Patient B, renamed";
+    PublisherFields pf = build("a", ig);
+    assertTrue(pf.rapido.listRenderDirty().contains("StructureDefinition-p.json (something that refers to it changed; render only)"),
+        pf.rapido.listRenderDirty().toString());
     finish(pf);
-    assertEquals("<li>Patient A's file</li>", page("StructureDefinition-p.html"));
+    assertEquals("<li>Patient A</li><li>Patient B, renamed</li>", page("StructureDefinition-p.html"));
   }
 
   /**
@@ -502,7 +513,8 @@ class PublisherRapidoWatchTest {
     String b2Name = "Patient B2";
     String aName = "Patient A";
     String aDescription = "The first patient";
-    String aFileTitle = null;
+    /** Patient/b2 states profile p */
+    boolean b2StatesP = false;
     boolean aNameExtension = false;
     String missingName = "Not loaded";
     String status = "draft";
@@ -710,18 +722,24 @@ class PublisherRapidoWatchTest {
     FetchedFile patient = file("Patient-a.json", patientContent, a);
     if (igContent != null) {
       // the loader gives the file its entry's name
-      patient.setTitle(igContent.aFileTitle != null ? igContent.aFileTitle : igContent.aName);
+      patient.setTitle(igContent.aName);
     }
     FetchedResource b = resource("Patient", "b");
     FetchedResource b2 = resource("Patient", "b2");
     if (igContent != null) {
       when(b.getResourceName()).thenReturn(igContent.bName);
       when(b2.getResourceName()).thenReturn(igContent.b2Name);
+      if (igContent.b2StatesP) {
+        when(b2.getProfiles(false)).thenReturn(List.of(P_URL));
+      }
       if (igContent.bExampleOfP) {
         when(b.getExampleUri()).thenReturn(P_URL);
       }
     }
     FetchedFile other = igContent != null && igContent.twoInB ? file("Patient-b.json", "b", b, b2) : file("Patient-b.json", "b", b);
+    if (igContent != null) {
+      other.setTitle(igContent.bName); // its first entry's
+    }
     FetchedFile observation = file("Observation-o.json", "o", resource("Observation", "o", primitive("Patient/a")));
     FetchedFile page = file("page.md", "# page");
     page.setProcessMode(FetchedFile.PROCESS_NONE);
