@@ -179,8 +179,7 @@ class PublisherRapidoWatchTest {
     assertEquals(dirty, pf.rapido.listRenderDirty());
     finish(pf);
     // the pages that show the entry's text have the new text
-    assertTrue(page("artifacts.html").contains("Patient A, renamed"), page("artifacts.html"));
-    assertTrue(page("artifacts.html").contains("The first patient, edited"), page("artifacts.html"));
+    assertTrue(page("artifacts.html").contains("<li>Patient A, renamed: The first patient, edited</li>"), page("artifacts.html"));
     assertEquals("<li>Patient A, renamed</li>", page("StructureDefinition-p.html"));
 
     // the description alone
@@ -189,7 +188,7 @@ class PublisherRapidoWatchTest {
     assertFalse(pf.rapido.isCompleteBuild(), pf.rapido.getReason());
     assertEquals(dirty, pf.rapido.listRenderDirty());
     finish(pf);
-    assertTrue(page("artifacts.html").contains("The first patient, edited again"), page("artifacts.html"));
+    assertTrue(page("artifacts.html").contains("<li>Patient A, renamed: The first patient, edited again</li>"), page("artifacts.html"));
 
     // the name the IG gives the file, which a profile's list of examples shows, counts too
     ig.aFileTitle = "Patient A's file";
@@ -621,8 +620,15 @@ class PublisherRapidoWatchTest {
         page(f, f.getLoadPath().replace(".json", ".html"), "<p>" + f.getLoadPath() + "</p>");
       }
       if (f.getLoadPath().equals("ig.json")) {
-        // the artifacts page lists the IG's entries by name and description
-        page(f, "artifacts.html", new String(f.getSource(), StandardCharsets.UTF_8));
+        // the IG's rendering and the summaries list the loaded resources by the name and description the loader copied
+        // to them from their entries: the artifacts page
+        StringBuilder b = new StringBuilder();
+        for (FetchedFile e : pf.fileList) {
+          for (FetchedResource r : e.getResources()) {
+            b.append("<li>").append(r.getResourceName()).append(": ").append(r.getResourceDescription()).append("</li>");
+          }
+        }
+        page(f, "artifacts.html", b.toString());
       }
       if (f.getLoadPath().equals("StructureDefinition-p.json")) {
         // the profile's page lists the examples that state it, by name
