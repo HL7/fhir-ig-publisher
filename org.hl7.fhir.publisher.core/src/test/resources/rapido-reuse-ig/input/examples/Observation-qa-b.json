@@ -1,0 +1,9 @@
+{
+  "resourceType": "Observation",
+  "id": "qa-b",
+  "meta": {"profile": ["http://hl7.org/fhir/se/rapidoqa/StructureDefinition/qa-observation"]},
+  "status": "final",
+  "code": {"coding": [{"system": "http://loinc.org", "code": "8480-6"}]},
+  "valueCodeableConcept": {"coding": [{"system": "http://example.org/fhir/no-such-cs", "code": "vb"}]},
+  "note": [{"text": "note b"}]
+}
