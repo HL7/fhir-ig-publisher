@@ -195,6 +195,8 @@ class PublisherRapidoWatchTest {
     pf = build("a", ig);
     assertFalse(pf.rapido.isCompleteBuild(), pf.rapido.getReason());
     assertEquals(dirty, pf.rapido.listRenderDirty());
+    finish(pf);
+    assertEquals("<li>Patient A's file</li>", page("StructureDefinition-p.html"));
   }
 
   /**
@@ -596,8 +598,8 @@ class PublisherRapidoWatchTest {
 
   /**
    * What the rest of a build does for -rapido: each file's html and spreadsheet phases are reused if they can be, and
-   * recorded if not (each patient writes a page in the temp folder), what the files wrote in the temp folder is
-   * recorded, and the state is saved
+   * recorded if not (each patient, the IG and profile p write pages in the temp folder), what the files wrote in the
+   * temp folder is recorded, and the state is saved
    */
   private RapidoOutputs.Change finish(PublisherFields pf) throws Exception {
     return finish(pf, null);
@@ -620,23 +622,23 @@ class PublisherRapidoWatchTest {
         page(f, f.getLoadPath().replace(".json", ".html"), "<p>" + f.getLoadPath() + "</p>");
       }
       if (f.getLoadPath().equals("ig.json")) {
-        // the IG's rendering and the summaries list the loaded resources by the name and description the loader copied
-        // to them from their entries: the artifacts page
+        // the artifacts page: the template lists the IG's entries by name and description, from the IG
         StringBuilder b = new StringBuilder();
-        for (FetchedFile e : pf.fileList) {
-          for (FetchedResource r : e.getResources()) {
-            b.append("<li>").append(r.getResourceName()).append(": ").append(r.getResourceDescription()).append("</li>");
+        JsonObject json = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(f.getSource());
+        if (json.hasObject("definition")) {
+          for (JsonObject rg : json.getJsonObject("definition").forceArray("resource").asJsonObjects()) {
+            b.append("<li>").append(rg.asString("name")).append(": ").append(rg.asString("description")).append("</li>");
           }
         }
         page(f, "artifacts.html", b.toString());
       }
       if (f.getLoadPath().equals("StructureDefinition-p.json")) {
-        // the profile's page lists the examples that state it, by name
+        // the profile's list of examples: the files that state it, by the name the IG gives them
         StringBuilder b = new StringBuilder();
         for (FetchedFile e : pf.fileList) {
           for (FetchedResource r : e.getResources()) {
             if (r.getProfiles(false).contains(P_URL)) {
-              b.append("<li>").append(r.getResourceName()).append("</li>");
+              b.append("<li>").append(e.getTitle()).append("</li>");
             }
           }
         }
@@ -706,8 +708,9 @@ class PublisherRapidoWatchTest {
       }
     }
     FetchedFile patient = file("Patient-a.json", patientContent, a);
-    if (igContent != null && igContent.aFileTitle != null) {
-      patient.setTitle(igContent.aFileTitle);
+    if (igContent != null) {
+      // the loader gives the file its entry's name
+      patient.setTitle(igContent.aFileTitle != null ? igContent.aFileTitle : igContent.aName);
     }
     FetchedResource b = resource("Patient", "b");
     FetchedResource b2 = resource("Patient", "b2");
