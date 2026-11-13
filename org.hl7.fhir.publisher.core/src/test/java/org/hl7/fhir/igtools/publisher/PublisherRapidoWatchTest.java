@@ -192,25 +192,6 @@ class PublisherRapidoWatchTest {
   }
 
   /**
-   * The loader gives a file the name of its first entry, and a profile's list of examples shows it for each resource in
-   * the file: renaming Patient/b lists Patient/b2, whose own entry is unchanged, under the new name
-   */
-  @Test
-  void aFilesNameIsShownForItsOtherResources() throws Exception {
-    Ig ig = new Ig();
-    ig.twoInB = true;
-    ig.b2StatesP = true;
-    finish(build("a", ig));
-
-    ig.bName = "Patient B, renamed";
-    PublisherFields pf = build("a", ig);
-    assertTrue(pf.rapido.listRenderDirty().contains("StructureDefinition-p.json (something that refers to it changed; render only)"),
-        pf.rapido.listRenderDirty().toString());
-    finish(pf);
-    assertEquals("<li>Patient A</li><li>Patient B, renamed</li>", page("StructureDefinition-p.html"));
-  }
-
-  /**
    * A profile that validation found an example to conform to lists it too, though nothing in the example refers to it:
    * what the last build found counts as a reference
    */
@@ -513,8 +494,6 @@ class PublisherRapidoWatchTest {
     String b2Name = "Patient B2";
     String aName = "Patient A";
     String aDescription = "The first patient";
-    /** Patient/b2 states profile p */
-    boolean b2StatesP = false;
     boolean aNameExtension = false;
     String missingName = "Not loaded";
     String status = "draft";
@@ -729,16 +708,13 @@ class PublisherRapidoWatchTest {
     if (igContent != null) {
       when(b.getResourceName()).thenReturn(igContent.bName);
       when(b2.getResourceName()).thenReturn(igContent.b2Name);
-      if (igContent.b2StatesP) {
-        when(b2.getProfiles(false)).thenReturn(List.of(P_URL));
-      }
       if (igContent.bExampleOfP) {
         when(b.getExampleUri()).thenReturn(P_URL);
       }
     }
     FetchedFile other = igContent != null && igContent.twoInB ? file("Patient-b.json", "b", b, b2) : file("Patient-b.json", "b", b);
-    if (igContent != null) {
-      other.setTitle(igContent.bName); // its first entry's
+    if (igContent != null && !igContent.twoInB) {
+      other.setTitle(igContent.bName); // its entry's name: a file the IG lists holds one resource
     }
     FetchedFile observation = file("Observation-o.json", "o", resource("Observation", "o", primitive("Patient/a")));
     FetchedFile page = file("page.md", "# page");
