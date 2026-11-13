@@ -1,0 +1,29 @@
+{
+  "resourceType": "StructureDefinition",
+  "id": "qa-address",
+  "url": "http://example.org/fhir/rapido-qa/StructureDefinition/qa-address",
+  "version": "0.1.0",
+  "name": "QAAddress",
+  "title": "QAAddress",
+  "status": "active",
+  "description": "A data type profile that no example uses.",
+  "fhirVersion": "5.0.0",
+  "kind": "complex-type",
+  "abstract": false,
+  "type": "Address",
+  "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Address",
+  "derivation": "constraint",
+  "differential": {
+    "element": [
+      {
+        "id": "Address",
+        "path": "Address"
+      },
+      {
+        "id": "Address.city",
+        "path": "Address.city",
+        "min": 1
+      }
+    ]
+  }
+}

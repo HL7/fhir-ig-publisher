@@ -1,0 +1,18 @@
+{
+  "resourceType": "ValueSet",
+  "id": "qa-valueset",
+  "url": "http://example.org/fhir/rapido-qa/ValueSet/qa-valueset",
+  "version": "0.1.0",
+  "name": "QAValueSet",
+  "title": "QA ValueSet",
+  "status": "active",
+  "experimental": true,
+  "description": "All the QA codes.",
+  "compose": {
+    "include": [
+      {
+        "system": "http://example.org/fhir/rapido-qa/CodeSystem/qa-codes"
+      }
+    ]
+  }
+}

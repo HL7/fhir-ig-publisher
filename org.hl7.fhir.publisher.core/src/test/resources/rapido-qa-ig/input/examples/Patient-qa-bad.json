@@ -1,0 +1,27 @@
+{
+  "resourceType": "Patient",
+  "id": "qa-bad",
+  "meta": {
+    "profile": [
+      "http://example.org/fhir/rapido-qa/StructureDefinition/qa-patient"
+    ]
+  },
+  "name": [
+    {
+      "family": "Bad",
+      "given": [
+        "QA"
+      ]
+    }
+  ],
+  "gender": "qa-bad",
+  "maritalStatus": {
+    "coding": [
+      {
+        "system": "http://example.org/fhir/rapido-qa/CodeSystem/qa-codes",
+        "code": "b",
+        "display": "Code b"
+      }
+    ]
+  }
+}
