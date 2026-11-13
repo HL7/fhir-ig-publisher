@@ -30,13 +30,13 @@ import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -620,9 +620,9 @@ public class RapidoTracker {
     Map<String, File> igUpdated = new TreeMap<>();
     File[] tf = new File(Utilities.path(pf.rootDir, "template")).listFiles();
     for (File f : tf == null ? new File[0] : tf) {
-      if (f.isFile() && IG_WORKING.matcher(f.getName()).matches()) {
+      if (f.isFile() && isIgWorking(f.getName())) {
         igCopies.add(canonical(f.getAbsolutePath()));
-      } else if (f.isFile() && IG_UPDATED.matcher(f.getName()).matches()) {
+      } else if (f.isFile() && isIgUpdated(f.getName())) {
         igCopies.add(canonical(f.getAbsolutePath()));
         igUpdated.put(f.getName(), f);
       }
@@ -641,9 +641,50 @@ public class RapidoTracker {
     global.put("other-files", hashOtherFiles(otherFiles));
   }
 
-  /** what the build writes for a script, and what the base template's scripts make of it ([target]-ig-working.1.xml...) */
-  private static final Pattern IG_WORKING = Pattern.compile(".+-ig-working(\\.[0-9]+)?\\.(json|xml)", Pattern.CASE_INSENSITIVE);
-  private static final Pattern IG_UPDATED = Pattern.compile(".+-ig-updated\\.(json|xml)", Pattern.CASE_INSENSITIVE);
+  /**
+   * what the build writes for a script, [target]-ig-working.json/xml, and what the base template's scripts make of it
+   * ([target]-ig-working.1.xml...)
+   */
+  static boolean isIgWorking(String name) {
+    String n = withoutJsonOrXml(name);
+    if (n == null) {
+      return false;
+    }
+    int dot = n.lastIndexOf('.');
+    if (dot >= 0 && isDigits(n.substring(dot + 1))) {
+      n = n.substring(0, dot);
+    }
+    return n.length() > "-ig-working".length() && n.endsWith("-ig-working");
+  }
+
+  /** what a script gives back: [target]-ig-updated.json/xml */
+  static boolean isIgUpdated(String name) {
+    String n = withoutJsonOrXml(name);
+    return n != null && n.length() > "-ig-updated".length() && n.endsWith("-ig-updated");
+  }
+
+  /** the name in lower case without its .json or .xml, or null if it has neither */
+  private static String withoutJsonOrXml(String name) {
+    String n = name.toLowerCase(Locale.ROOT);
+    for (String ext : new String[] {".json", ".xml"}) {
+      if (n.endsWith(ext)) {
+        return n.substring(0, n.length() - ext.length());
+      }
+    }
+    return null;
+  }
+
+  private static boolean isDigits(String s) {
+    if (s.isEmpty()) {
+      return false;
+    }
+    for (char c : s.toCharArray()) {
+      if (c < '0' || c > '9') {
+        return false;
+      }
+    }
+    return true;
+  }
 
   /**
    * The IG's source, as it goes into the global hash. The loader copies the name and description of each

@@ -453,4 +453,22 @@ class RapidoDependencyAnalyserTest {
       assertTrue(java.util.Arrays.equals(b, RapidoTracker.igSourceForHash(b, Set.of("Patient/ex1"))), s);
     }
   }
+
+  /** the IG a template script is given and gives back, by name */
+  @Test
+  void igWorkingAndUpdatedNames() {
+    for (String n : new String[] {"onLoad-ig-working.json", "onLoad-ig-working.xml", "onLoad-IG-Working.XML", "x-ig-working.1.xml", "x-ig-working.12.json"}) {
+      assertTrue(RapidoTracker.isIgWorking(n), n);
+      assertFalse(RapidoTracker.isIgUpdated(n), n);
+    }
+    for (String n : new String[] {"onLoad-ig-updated.json", "onLoad-ig-updated.xml", "x-IG-Updated.Json"}) {
+      assertTrue(RapidoTracker.isIgUpdated(n), n);
+      assertFalse(RapidoTracker.isIgWorking(n), n);
+    }
+    for (String n : new String[] {"-ig-working.json", "-ig-updated.json", "x-ig-working.txt", "x-ig-updated.txt", "x-ig-working", "x-ig-working..json",
+        "x-ig-working.a.json", "x-ig-working.1.2.json", "x-ig-working.1", "x-ig-working.json.bak", "x-ig-updated.1.json", "x-ig-workingx.json", "x.ig-working.json"}) {
+      assertFalse(RapidoTracker.isIgWorking(n), n);
+      assertFalse(RapidoTracker.isIgUpdated(n), n);
+    }
+  }
 }
