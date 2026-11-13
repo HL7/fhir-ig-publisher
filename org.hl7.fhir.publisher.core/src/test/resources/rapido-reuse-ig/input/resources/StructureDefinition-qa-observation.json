@@ -1,0 +1,19 @@
+{
+  "resourceType": "StructureDefinition",
+  "id": "qa-observation",
+  "url": "http://hl7.org/fhir/se/rapidoqa/StructureDefinition/qa-observation",
+  "version": "0.1.0",
+  "name": "QAObservation",
+  "status": "draft",
+  "description": "An observation profile.",
+  "fhirVersion": "5.0.0",
+  "kind": "resource",
+  "abstract": false,
+  "type": "Observation",
+  "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Observation",
+  "derivation": "constraint",
+  "differential": {"element": [
+    {"id": "Observation", "path": "Observation"},
+    {"id": "Observation.subject", "path": "Observation.subject", "min": 0}
+  ]}
+}
