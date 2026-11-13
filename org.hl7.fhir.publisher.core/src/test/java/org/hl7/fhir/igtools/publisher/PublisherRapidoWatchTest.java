@@ -714,7 +714,8 @@ class PublisherRapidoWatchTest {
     }
     FetchedFile other = igContent != null && igContent.twoInB ? file("Patient-b.json", "b", b, b2) : file("Patient-b.json", "b", b);
     if (igContent != null && !igContent.twoInB) {
-      other.setTitle(igContent.bName); // its entry's name: a file the IG lists holds one resource
+      // its entry's name: a file the IG lists holds one resource
+      other.setTitle(igContent.bName);
     }
     FetchedFile observation = file("Observation-o.json", "o", resource("Observation", "o", primitive("Patient/a")));
     FetchedFile page = file("page.md", "# page");
