@@ -178,6 +178,10 @@ class PublisherRapidoWatchTest {
     assertFalse(pf.rapido.isCompleteBuild(), pf.rapido.getReason());
     assertEquals(dirty, pf.rapido.listRenderDirty());
     finish(pf);
+    // the pages that show the entry's text have the new text
+    assertTrue(page("artifacts.html").contains("Patient A, renamed"), page("artifacts.html"));
+    assertTrue(page("artifacts.html").contains("The first patient, edited"), page("artifacts.html"));
+    assertEquals("<li>Patient A, renamed</li>", page("StructureDefinition-p.html"));
 
     // the description alone
     ig.aDescription = "The first patient, edited again";
@@ -185,6 +189,7 @@ class PublisherRapidoWatchTest {
     assertFalse(pf.rapido.isCompleteBuild(), pf.rapido.getReason());
     assertEquals(dirty, pf.rapido.listRenderDirty());
     finish(pf);
+    assertTrue(page("artifacts.html").contains("The first patient, edited again"), page("artifacts.html"));
 
     // the name the IG gives the file, which a profile's list of examples shows, counts too
     ig.aFileTitle = "Patient A's file";
@@ -613,10 +618,23 @@ class PublisherRapidoWatchTest {
       }
       pf.rapido.startRecording(f, RapidoTracker.PHASE_HTML);
       if (f.getLoadPath().startsWith("Patient-")) {
-        Path page = dir.resolve("temp").resolve(f.getLoadPath().replace(".json", ".html"));
-        Files.createDirectories(page.getParent());
-        Files.writeString(page, "<p>" + f.getLoadPath() + "</p>");
-        f.getOutputNames().add(page.toString());
+        page(f, f.getLoadPath().replace(".json", ".html"), "<p>" + f.getLoadPath() + "</p>");
+      }
+      if (f.getLoadPath().equals("ig.json")) {
+        // the artifacts page lists the IG's entries by name and description
+        page(f, "artifacts.html", new String(f.getSource(), StandardCharsets.UTF_8));
+      }
+      if (f.getLoadPath().equals("StructureDefinition-p.json")) {
+        // the profile's page lists the examples that state it, by name
+        StringBuilder b = new StringBuilder();
+        for (FetchedFile e : pf.fileList) {
+          for (FetchedResource r : e.getResources()) {
+            if (r.getProfiles(false).contains(P_URL)) {
+              b.append("<li>").append(r.getResourceName()).append("</li>");
+            }
+          }
+        }
+        page(f, "StructureDefinition-p.html", b.toString());
       }
       if (f.getLoadPath().equals(failing)) {
         f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, "Patient", "Error Rendering Resource: disk full", IssueSeverity.ERROR));
@@ -631,6 +649,18 @@ class PublisherRapidoWatchTest {
     buildTracker.setBooleanProperty("status", "complete", true, null);
     buildTracker.save();
     return change;
+  }
+
+  /** f writes the page in the temp folder */
+  private void page(FetchedFile f, String name, String content) throws Exception {
+    Path page = dir.resolve("temp").resolve(name);
+    Files.createDirectories(page.getParent());
+    Files.writeString(page, content);
+    f.getOutputNames().add(page.toString());
+  }
+
+  private String page(String name) throws Exception {
+    return Files.readString(dir.resolve("temp").resolve(name));
   }
 
   /** checkDependencies on new files, as a watch rebuild loads them, with the given content for Patient/a */
