@@ -139,6 +139,9 @@ public class DependentIGFinder {
   private void analyse() {
     try {
       Set<String> plist = getDependentPackages();
+      if (plist.isEmpty()) {
+        errors.add("No packages that depend on "+id+" were found on the package servers ("+PackageServer.primaryServer().getUrl()+", "+PackageServer.secondaryServer().getUrl()+")");
+      }
       JsonObject json = JsonParser.parseObjectFromUrl("https://fhir.github.io/ig-registry/fhir-ig-list.json");
       
       for (String pid : plist) {
@@ -157,9 +160,13 @@ public class DependentIGFinder {
     }
   }
 
+  /**
+   * Ask both package servers, and use what either knows: not all of them answer the dependency query
+   * (packages.fhir.org returns an empty list), and which one is primary has changed before
+   */
   private Set<String> getDependentPackages() {
     Set<String> list = new HashSet<>();
-//    getDependentPackages(list, PackageClient.PRIMARY_SERVER);
+    getDependentPackages(list, PackageServer.primaryServer());
     getDependentPackages(list, PackageServer.secondaryServer());
     return list;
   }
