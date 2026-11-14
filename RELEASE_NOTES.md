@@ -1,0 +1,2 @@
+* Validator: quantities with different but comparable UCUM units are compared after conversion, as in the validator (e.g. `rng-2` on a Range from 1 mg to 2 g); the publisher context had no UCUM service
+* Loader: .adl files are read as ADL 1.4 and .adls as ADL 2 (ADL 2 content in .adl files will no longer be loaded)

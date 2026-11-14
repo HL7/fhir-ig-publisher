@@ -10,7 +10,6 @@ import org.hl7.fhir.igtools.openehr.ArchetypeImporter.ProcessedArchetype;
 import org.hl7.fhir.model.ModelContext;
 import org.hl7.fhir.model.utilities.formats.OutputStyle;
 import org.hl7.fhir.model.core.formats.JsonParser;
-import org.hl7.fhir.model.core.Bundle;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.xml.sax.SAXException;
 
@@ -26,7 +25,7 @@ public class OpenEHRTest {
     ArchetypeImporter ai = new ArchetypeImporter(null, "http://openehr.org/fhir/uv/test");
     ProcessedArchetype pa;
     try (FileInputStream in = new FileInputStream("/Users/grahamegrieve/Downloads/openEHR-EHR-OBSERVATION.blood_pressure.v2.adl")) {
-      pa = ai.importArchetype(in, "openEHR-EHR-OBSERVATION.blood_pressure.v2.adl");
+      pa = ai.importArchetype(in, "openEHR-EHR-OBSERVATION.blood_pressure.v2.adl", "adl");
     }
     System.out.println();
     String json = new JsonParser(ModelContext.fullCoreContext()).setOutputStyle(OutputStyle.PRETTY).composeString(pa.getBnd());

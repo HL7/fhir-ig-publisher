@@ -1,0 +1,820 @@
+archetype (adl_version=2.0.6; rm_release=1.0.3; generated)
+	openEHR-EHR-EVALUATION.problem_diagnosis.v1.0.0
+
+language
+	original_language = <[ISO_639-1::en]>
+	translations = <
+		["de"] = <
+			language = <[ISO_639-1::de]>
+			author = <
+				["name"] = <"Jasmin Buck, Sebastian Garde">
+				["organisation"] = <"University of Heidelberg, Central Queensland University">
+			>
+		>
+		["ar-sy"] = <
+			language = <[ISO_639-1::ar-sy]>
+			author = <
+				["name"] = <"Mona Saleh">
+			>
+		>
+		["es-ar"] = <
+			language = <[ISO_639-1::es-ar]>
+			author = <
+				["name"] = <"Alan March">
+				["organisation"] = <"Hospital Universitario Austral, Buenos Aires, Argentina">
+			>
+		>
+		["pt-br"] = <
+			language = <[ISO_639-1::pt-br]>
+			author = <
+				["name"] = <"Marco Borges">
+				["organisation"] = <"P2D">
+				["email"] = <"marco.borges@p2d.com.br">
+			>
+			accreditation = <"P2D Health Advisor Council">
+		>
+	>
+
+description
+	lifecycle_state = <"unmanaged">
+	original_author = <
+		["name"] = <"Ian McNicoll">
+		["organisation"] = <"Ocean Informatics, UK">
+		["email"] = <"ian.mcnicoll@oceaninformatics.com">
+		["date"] = <"2013-03-06">
+	>
+	copyright = <"© openEHR Foundation">
+	details = <
+		["pt-br"] = <
+			language = <[ISO_639-1::pt-br]>
+			purpose = <"Para registrar detalhes sobre um caso ou obstáculo que tenha impactos sobre o bem estar físico, mental e/ou social de um indivíduo.">
+			use = <"Usado para registrar qualquer informação sobre qualquer problema relacionado a saúde em geral.
+O Arquétipo contém múltiplas datas, então pode registrar problemas presentes e/ou passados.
+Um problema pode ser determinado tanto pelo próprio indivíduo como pelo profissional de saúde.
+Alguns exemplos:
+- Uma coleção de sintomas que estão sob investigação, mas pré-diagnose
+- Desejo de perder peso, sem diagnóstico formal de Obesidade
+- Desejo de parar de fumar pelo indivíduo
+- Problemas de relacionamento com membro familiar">
+			keywords = <"caso", "circunstância", "problema", "obstáculo">
+			misuse = <"Não deve ser usado para registro de diagnósticos formais - usar a especialização deste arquétipo, EVALUATION.problem-diagnosis.">
+		>
+		["es-ar"] = <
+			language = <[ISO_639-1::es-ar]>
+			purpose = <"Para el registro de datos acerca de un asunto u obstáculo que incide sobre el bienestar físico, psíquico o social de un individuo.">
+			use = <"Úsese para registrar cualquier tipo de información acerca de problemas generales relativos a la salud.
+El arquetipo contiene múltiples fechas, por lo cual puede registrar problemas actuales y/o pasados.
+Un problema puede ser determinado tanto por el individuo mismo como por un proveedor de servicios de salud.
+Algunos ejemplos:
+-Un rango de síntomas que se encuentran bajo investigación, en estado pre-diagnóstico.
+-El deseo de disminuir de peso, sin el diagnóstico formal de Obesidad.
+-El deseo de dejar de fumar por parte del individuo.
+-Problema de relación con un miembro de la familia.">
+			keywords = <"asunto", "condición", "problema", "obstáculo">
+			misuse = <"No utilizar para registrar Diagnósticos formales - utilizar la especialización de este arquetipo, EVALUATION.problem-diagnosis.">
+		>
+		["de"] = <
+			language = <[ISO_639-1::de]>
+			purpose = <"Zur Dokumentation eines Problems, eines Zustandes oder eines Sachverhalts mit anhaltender Bedeutung für die Gesundheit der Person">
+			use = <"Zur Dokumentation eines ehemaligen oder aktuellen Problems - also zur Dokumentation ehemaliger Entwicklungen, sowie derzeitiger Probleme.  Mit wechselndem 'Subjekt der Daten' zur Dokumentation von Problemen Verwandter, und somit für die Familienanamnese.">
+			keywords = <"Sachverhalt", "Zustand">
+			misuse = <"Spezialisierungen 'openEHR-EHR-EVALUATION.problem-diagnosis' für medizinische Diagnosen und 'openEHR-EHR-EVALUATION.problem-diagnosis-histological' für histologische Diagnosen benutzen.">
+		>
+		["en"] = <
+			language = <[ISO_639-1::en]>
+			purpose = <"For recording details about an issue or obstacle that impacts on the physical, mental and/or social well-being of an individual, including a formal medical diagnosis, nursing diagnosis or problem.">
+			use = <"Use for recording any information about general health-related problems, diagnoses and nursing diagnoses.
+The archetype contains multiple dates, so can record present and/or past problems. 
+A problem can be determined by either the individual themselves or a healthcare provider. 
+Some examples: 
+- A range of symptoms that are under investigation but pre-diagnosis
+- Desire to lose weight, without formal diagnosis of Obesity
+- Desire to quit smoking by individual
+- Relationship problem with family member.">
+			keywords = <"issue", "condition", "problem", "obstacle", "diagnosis", "nursing diagnosis">
+			misuse = <"">
+		>
+		["ar-sy"] = <
+			language = <[ISO_639-1::ar-sy]>
+			purpose = <"لتسجيل تفاصيل حول قضية أو عقبة تؤثر على السلامة البدنية, العقلية و/أو الاجتماعية لشخص ما">
+			use = <"يستخدم لتسجيل المعلومات العامة حول المشكلات المتعلقة بالصحة.
+يحتوي النموذج على معلومات متعددة,و يمكن استخدامه في تسجيل المشكلات الحاضرة و السابقة.
+و يمكن تحديد المشكلة بواسطة المريض نفسه أو من يقوم بتقديم الرعاية الصحية.
+بعض الأمثلة تتضمن ما يلي:
+- بعض الأعراض التي لا تزال تحت الملاحظة و لكنها تمثل تشخيصات مبدأية
+- الرغبة لفقد الوزن دون تشخيص مؤكد بالسمنة
+- الرغبة بالإقلاع عن التدخين بواسطة الشخص
+- مشكلة في العلاقة مع أحد أفراد العائلة">
+			keywords = <"القضية", "الظرف الصحي", "المشكلة", "العقبة">
+			misuse = <"لا يستخدم لتسجيل التشخيصات المؤكدة. استخدم بدلا من ذلك النموذج المخصص من هذا النموذج, تقييم.المشكلة - التشخيص">
+		>
+	>
+	other_contributors = <"Koray Atalag, University of Auckland, New Zealand", "Steve Bentley, NHS CfH, United Kingdom", "Ian Bull, ACT Health, Australia", "Sergio Carmona, Chile", "Rong Chen, Cambio Healthcare Systems, Sweden", "Stephen Chu, NeHTA, Australia", "Ed Conley, Cardiff University", "Paul Donaldson, Nursing Informatics Australia, Australia", "Anneke Goossen, Results 4 Care, Netherlands", "Heather Grain, Llewelyn Grain Informatics, Australia", "Sam Heard, Ocean Informatics, Australia", "Evelyn Hovenga, EJSH Consulting, Australia", "Eugene Igras, IRIS Systems, Inc., Canada", "Eizen Kimura, Ehime Univ., Japan", "Shinji Kobayashi, Ehime University, Japan", "Heather Leslie, Ocean Informatics, Australia (Editor)", "Rohan Martin, Ambulance Victoria, Australia", "Ian McNicoll, Ocean Informatics, United Kingdom (Editor)", "Jörg Niggemann, compugroup, Germany", "Andrej Orel, Marand d.o.o., Slovenia">
+	other_details = <
+		["MD5-CAM-1.0.1"] = <"2CD426CD82409C217348260593A062A2">
+	>
+
+definition
+	EVALUATION[id1] matches {	-- Problem/Diagnosis
+		data matches {
+			ITEM_TREE[id2] matches {
+				items cardinality matches {1..*; ordered} matches {
+					ELEMENT[id3] matches {	-- Problem/Diagnosis
+						value matches {
+							DV_TEXT[id48] 
+						}
+					}
+					ELEMENT[id10] occurrences matches {0..1} matches {	-- Description
+						value matches {
+							DV_TEXT[id49] 
+						}
+					}
+					ELEMENT[id6] occurrences matches {0..1} matches {	-- Severity
+						value matches {
+							DV_CODED_TEXT[id50] 
+						}
+					}
+					ELEMENT[id4] occurrences matches {0..1} matches {	-- Date of Onset
+						value matches {
+							DV_DATE_TIME[id51] matches {
+								value matches {yyyy-mm-ddTHH:MM:SS}
+							}
+						}
+					}
+					ELEMENT[id5] occurrences matches {0..1} matches {	-- Age at Onset
+						value matches {
+							DV_DURATION[id52] 
+						}
+					}
+					ELEMENT[id13] occurrences matches {0..1} matches {	-- Body Site
+						value matches {
+							DV_TEXT[id53] 
+						}
+					}
+					allow_archetype CLUSTER[id40] occurrences matches {0..1} matches {	-- Body Site Details
+						include
+							archetype_id/value matches {/openEHR-EHR-CLUSTER\.anatomical_location(-[a-zA-Z0-9_]+)*\.v1/}
+					}
+					CLUSTER[id19] occurrences matches {0..1} matches {	-- Previous Occurrences
+						items matches {
+							ELEMENT[id20] occurrences matches {0..1} matches {	-- Frequency
+								value matches {
+									DV_QUANTITY[id54] matches {
+										property matches {[at43]}
+										[magnitude, units] matches {
+											[{|>=0.0|}, {"/min"}],
+											[{|>=0.0|}, {"/h"}],
+											[{|>=0.0|}, {"/d"}],
+											[{|>=0.0|}, {"/wk"}],
+											[{|>=0.0|}, {"/mo"}],
+											[{|>=0.0|}, {"/yr"}]
+										}
+									}
+								}
+							}
+							ELEMENT[id21] occurrences matches {0..1} matches {	-- Date of last Occurrence
+								value matches {
+									DV_DATE_TIME[id55] matches {
+										value matches {yyyy-mm-ddTHH:MM:SS}
+									}
+								}
+							}
+							ELEMENT[id26] occurrences matches {0..1} matches {	-- Number
+								value matches {
+									DV_COUNT[id56] matches {
+										magnitude matches {|>=1|}
+									}
+								}
+							}
+							ELEMENT[id23] occurrences matches {0..1} matches {	-- Description
+								value matches {
+									DV_TEXT[id57] 
+								}
+							}
+						}
+					}
+					CLUSTER[id28] matches {	-- Related Item
+						items matches {
+							ELEMENT[id30] occurrences matches {0..1} matches {	-- Relationship Type
+								value matches {
+									DV_CODED_TEXT[id58] matches {
+										defining_code matches {[ac1]}		-- Relationship Type (synthesised)
+									}
+								}
+							}
+							ELEMENT[id29] occurrences matches {0..1} matches {	-- Item
+								value matches {
+									DV_TEXT[id59] 
+									DV_URI[id60] 
+								}
+							}
+							ELEMENT[id45] occurrences matches {0..1} matches {	-- Description
+								value matches {
+									DV_TEXT[id61] 
+								}
+							}
+						}
+					}
+					ELEMENT[id31] occurrences matches {0..1} matches {	-- Date of Resolution
+						value matches {
+							DV_DATE[id62] 
+						}
+					}
+					ELEMENT[id32] occurrences matches {0..1} matches {	-- Age at Resolution
+						value matches {
+							DV_DURATION[id63] 
+						}
+					}
+					allow_archetype CLUSTER[id43] occurrences matches {0..1} matches {	-- Diagnostic Criteria
+						include
+							archetype_id/value matches {/.*/}
+					}
+					allow_archetype CLUSTER[id44] matches {	-- Clinical Stage/Grade
+						include
+							archetype_id/value matches {/.*/}
+					}
+				}
+			}
+		}
+		protocol matches {
+			ITEM_TREE[id33] matches {
+				items matches {
+					ELEMENT[id36] matches {	-- Supporting clinical evidence
+						value matches {
+							DV_EHR_URI[id64] 
+						}
+					}
+					allow_archetype CLUSTER[id47] matches {	-- Status
+						include
+							archetype_id/value matches {/.*/}
+					}
+				}
+			}
+		}
+	}
+
+terminology
+	term_definitions = <
+		["ar-sy"] = <
+			["id1"] = <
+				text = <"المشكلة">
+				description = <"قضية أو عقبة تؤثر سلبيا على السلامة البدنية, العقلية و / أو الاجتماعية لشخص ما.
+و قد تم جعل التعريف للمشكلة فضفاضا بشكل متعمد ليتم من خلالها تسجيل أي مخاوف حقيقية أو متصورة قد تؤثر سلبيا على سلامة الشخص بأي درجة.">
+			>
+			["id3"] = <
+				text = <"المشكلة">
+				description = <"تعريف مَنْسَب المشكلة">
+			>
+			["id4"] = <
+				text = <"تاريخ بداية الحدوث">
+				description = <"التاريخ الذي بدأت فيه المشكلة في التسبب في الأعراض أو العلامات">
+			>
+			["id5"] = <
+				text = <"العمر لدى بداية الحدوث">
+				description = <"العمر لدى بداية التعرف على المشكلة بواسطة الشخص">
+			>
+			["id6"] = <
+				text = <"الحدة">
+				description = <"الحدة الإجمالية التي تم تقييم المشكلة بها">
+			>
+			["id10"] = <
+				text = <"الوصف السريري">
+				description = <"وصف الجوانب/المظاهر السريرية للمشكلة">
+			>
+			["id13"] = <
+				text = <"المكان من الجسم">
+				description = <"المكان المتأثر من الجسم ">
+			>
+			["id19"] = <
+				text = <"مرات الحدوث أو السَّوْرات">
+				description = <"تجيمع للمعلومات حول مرات الحدوث أو السَّوْرات كل على حدة">
+			>
+			["id20"] = <
+				text = <"تكرار مرات الحدوث">
+				description = <"تكرار مرات حدوث المشكلة">
+			>
+			["id21"] = <
+				text = <"تاريخ آخر مرة حدوث">
+				description = <"تاريخ آخر مرة للحدوث أو السَّوْرات">
+			>
+			["id23"] = <
+				text = <"الوصف السريري">
+				description = <"وصف للمرة من الحدوث أو السَّوْرة">
+			>
+			["id26"] = <
+				text = <"عدد مرات الحدوث">
+				description = <"عدد المرات التي حدثت أو ظهرت فيها هذه المشكلة">
+			>
+			["id28"] = <
+				text = <"المشكلة المتعلقة">
+				description = <"مجموعة من الصفات/الخصائص للمشكلة و التي تزيد من مضاعفات الظرف المَنْسَب في هذا النموذج">
+			>
+			["id29"] = <
+				text = <"المشكلة المتعلقة">
+				description = <"تعريف للمشكلة المتعلقة على هيئة نص, نص مُرْمَز أو رابط في داخل السجل الطبي الإلكتروني">
+			>
+			["id30"] = <
+				text = <"الوصف السريري">
+				description = <"وصف للمشكلة التي تسببت في المضاعفات">
+			>
+			["id31"] = <
+				text = <"تاريخ الانتهاء">
+				description = <"تاريخ انتهاء المشكلة أو هَدَأتِها">
+			>
+			["id32"] = <
+				text = <"العمر عند الانتهاء">
+				description = <"العمر الذي حدث عنده انتهاء لحدوث المشكلة">
+			>
+			["id36"] = <
+				text = <"رابط شبكي">
+				description = <"معلومات مفيدة على الشبكة العنكبوتية حول هذا الظرف الصحي">
+			>
+			["id40"] = <
+				text = <"*Cluster(en)">
+				description = <"**(en)">
+			>
+			["at41"] = <
+				text = <"*Caused by(en)">
+				description = <"*This concept identifies the direct cause or causative agent of a Problem/Diagnosis. The concept includes the idea of ‘complications’, ‘causative agent’ and ‘due to’. Note: Where no causality or sequence of events is known, this relationship type should be left blank.(en)">
+			>
+			["at42"] = <
+				text = <"*Following(en)">
+				description = <"*his value identifies the sequence of events between the related items, but does not assert causality. This can be used for sequelae or late effects. Note: Where no causality or sequence of events is known, this relationship type should be left blank.(en)">
+			>
+			["id43"] = <
+				text = <"*Cluster(en)">
+				description = <"**(en)">
+			>
+			["id44"] = <
+				text = <"*Cluster(en)">
+				description = <"**(en)">
+			>
+			["id45"] = <
+				text = <"*New element(en)">
+				description = <"**(en)">
+			>
+			["id47"] = <
+				text = <"*Cluster(en)">
+				description = <"**(en)">
+			>
+			["at43"] = <
+				text = <"*Frequency (en)">
+				description = <"*Frequency (en)">
+			>
+			["ac1"] = <
+				text = <"الوصف السريري (synthesised)">
+				description = <"وصف للمشكلة التي تسببت في المضاعفات (synthesised)">
+			>
+		>
+		["en"] = <
+			["id1"] = <
+				text = <"Problem/Diagnosis">
+				description = <"An issue or obstacle which adversely impacts on the physical, mental and/or social well-being of an individual. The definition of a problem is deliberately kept rather loose and inclusive of a formal biomedical diagnosis so as to capture any real or perceived concerns that may adversely affect an individual's wellbeing to any degree.">
+			>
+			["id3"] = <
+				text = <"Problem/Diagnosis">
+				description = <"Identification of the index problem, issue or diagnosis.">
+			>
+			["id4"] = <
+				text = <"Date of Onset">
+				description = <"The date / time when the problem was first identified by the individual.">
+			>
+			["id5"] = <
+				text = <"Age at Onset">
+				description = <"The age of the individual when the problem was first identified by the individual.">
+			>
+			["id6"] = <
+				text = <"Severity">
+				description = <"The assessed overall severity of the index problem.">
+			>
+			["id10"] = <
+				text = <"Description">
+				description = <"A narrative description of the  issue, problem or diagnosis.">
+			>
+			["id13"] = <
+				text = <"Body Site">
+				description = <"The body site affected.">
+			>
+			["id19"] = <
+				text = <"Previous Occurrences">
+				description = <"Grouping of information about individual occurrences or exacerbations.">
+			>
+			["id20"] = <
+				text = <"Frequency">
+				description = <"The frequency of individual occurrences of the problem.">
+			>
+			["id21"] = <
+				text = <"Date of last Occurrence">
+				description = <"The date / time of the last occurrence of the problem.">
+			>
+			["id23"] = <
+				text = <"Description">
+				description = <"A description of the exacerbation or occurrence.">
+			>
+			["id26"] = <
+				text = <"Number">
+				description = <"Number of times this problem has occurred or been apparent.">
+			>
+			["id28"] = <
+				text = <"Related Item">
+				description = <"A group of characteristics of the problem complicating the index problem.">
+			>
+			["id29"] = <
+				text = <"Item">
+				description = <"Identification of a related problem as text,coded text or link within the EHR.">
+			>
+			["id30"] = <
+				text = <"Relationship Type">
+				description = <"The type of relationship that this problem/diagnosis has to the related item.">
+			>
+			["id31"] = <
+				text = <"Date of Resolution">
+				description = <"The date that the problem resolved or went into remission.">
+			>
+			["id32"] = <
+				text = <"Age at Resolution">
+				description = <"The age of the person at the resolution of the problem.">
+			>
+			["id36"] = <
+				text = <"Supporting clinical evidence">
+				description = <"Useful information on the internet about this condition.">
+			>
+			["id40"] = <
+				text = <"Body Site Details">
+				description = <"Details of the body site concerned.">
+			>
+			["at41"] = <
+				text = <"Caused by">
+				description = <"This concept identifies the direct cause or causative agent of a Problem/Diagnosis. The concept includes the idea of ‘complications’, ‘causative agent’ and ‘due to’. Note: Where no causality or sequence of events is known, this relationship type should be left blank.">
+			>
+			["at42"] = <
+				text = <"Following">
+				description = <"This value identifies the sequence of events between the related items, but does not assert causality. This can be used for sequelae or late effects. Note: Where no causality or sequence of events is known, this relationship type should be left blank.">
+			>
+			["id43"] = <
+				text = <"Diagnostic Criteria">
+				description = <"The criteria on which the problem/diagnosis is based.">
+			>
+			["id44"] = <
+				text = <"Clinical Stage/Grade">
+				description = <"Clinical stage or grade of a problem/diagnosis. Note: May include formal severity assessments.">
+			>
+			["id45"] = <
+				text = <"Description">
+				description = <"A narrative description of the related item.">
+			>
+			["id47"] = <
+				text = <"Status">
+				description = <"Descriptor for context- or use-case specific label or workflow-related aspect of the diagnostic process which may not be safe to exchange between systems or use in a shared environment. Examples include: active/inactive; primary/secondary; preliminary/provisional/working/final.">
+			>
+			["at43"] = <
+				text = <"Frequency">
+				description = <"Frequency">
+			>
+			["ac1"] = <
+				text = <"Relationship Type (synthesised)">
+				description = <"The type of relationship that this problem/diagnosis has to the related item. (synthesised)">
+			>
+		>
+		["de"] = <
+			["id1"] = <
+				text = <"*Problem(en)">
+				description = <"*An issue or obstacle which adversely impacts on the physical, mental and/or social well-being of an individual. The definition of a problem is deliberately kept rather loose so as to capture any real or perceived concerns that may adversely affect an individual's wellbeing to any degree.  (en)">
+			>
+			["id3"] = <
+				text = <"*Problem(en)">
+				description = <"*Identification of the index problem.(en)">
+			>
+			["id4"] = <
+				text = <"*Date of initial onset(en)">
+				description = <"*The date when the problem was first identified by the individual.(en)">
+			>
+			["id5"] = <
+				text = <"*Age at initial onset(en)">
+				description = <"*The age of the individual when the problem was first identified by the individual.(en)">
+			>
+			["id6"] = <
+				text = <"*Severity(en)">
+				description = <"*The assessed overall severity of the index problem.(en)">
+			>
+			["id10"] = <
+				text = <"*Clinical description(en)">
+				description = <"*Description of the clinical aspects of the problem.(en)">
+			>
+			["id13"] = <
+				text = <"*Body site(en)">
+				description = <"*The body site affected.(en)">
+			>
+			["id19"] = <
+				text = <"*Occurrences or exacerbations(en)">
+				description = <"*Grouping of information about individual occurrences or exacerbations.(en)">
+			>
+			["id20"] = <
+				text = <"*Frequency of reccurrence(en)">
+				description = <"*The frequency of individual occurrences of the problem.(en)">
+			>
+			["id21"] = <
+				text = <"*Date of last occurrence(en)">
+				description = <"*The date of the last occurrence of the problem.(en)">
+			>
+			["id23"] = <
+				text = <"*Clinical description(en)">
+				description = <"*A description of the exacerbation or occurrence.(en)">
+			>
+			["id26"] = <
+				text = <"*Number of occurrences(en)">
+				description = <"*Number of times this problem has occurred or been apparent.(en)">
+			>
+			["id28"] = <
+				text = <"*Related problem(en)">
+				description = <"*A group of characteristics of the problem complicating the index problem.(en)">
+			>
+			["id29"] = <
+				text = <"*Related problem(en)">
+				description = <"*Identification of a related problem as text,coded text or link within the EHR.(en)">
+			>
+			["id30"] = <
+				text = <"*Clinical description(en)">
+				description = <"*Decription of the related problem.(en)">
+			>
+			["id31"] = <
+				text = <"*Date of resolution(en)">
+				description = <"*The date that the problem resolved or went into remission.(en)">
+			>
+			["id32"] = <
+				text = <"*Age at resolution(en)">
+				description = <"*The age of the person at the resolution of the problem.(en)">
+			>
+			["id36"] = <
+				text = <"*Web link(en)">
+				description = <"*Useful information on the internet about this condition.(en)">
+			>
+			["id40"] = <
+				text = <"*Cluster(en)">
+				description = <"**(en)">
+			>
+			["at41"] = <
+				text = <"*Caused by(en)">
+				description = <"*This concept identifies the direct cause or causative agent of a Problem/Diagnosis. The concept includes the idea of ‘complications’, ‘causative agent’ and ‘due to’. Note: Where no causality or sequence of events is known, this relationship type should be left blank.(en)">
+			>
+			["at42"] = <
+				text = <"*Following(en)">
+				description = <"*his value identifies the sequence of events between the related items, but does not assert causality. This can be used for sequelae or late effects. Note: Where no causality or sequence of events is known, this relationship type should be left blank.(en)">
+			>
+			["id43"] = <
+				text = <"*Cluster(en)">
+				description = <"**(en)">
+			>
+			["id44"] = <
+				text = <"*Cluster(en)">
+				description = <"**(en)">
+			>
+			["id45"] = <
+				text = <"*New element(en)">
+				description = <"**(en)">
+			>
+			["id47"] = <
+				text = <"*Cluster(en)">
+				description = <"**(en)">
+			>
+			["at43"] = <
+				text = <"*Frequency (en)">
+				description = <"*Frequency (en)">
+			>
+			["ac1"] = <
+				text = <"*Clinical description(en) (synthesised)">
+				description = <"*Decription of the related problem.(en) (synthesised)">
+			>
+		>
+		["pt-br"] = <
+			["id1"] = <
+				text = <"Problema">
+				description = <"Um caso ou obstáculo que tenha impactos sobre o bem estar físico, mental e/ou social de um indivíduo">
+			>
+			["id3"] = <
+				text = <"Problema">
+				description = <"Identificação dos indicadores do problema">
+			>
+			["id4"] = <
+				text = <"Data de começo inicial">
+				description = <"A data de quando o problema foi identificado pela primeira vez pelo indivíduo.">
+			>
+			["id5"] = <
+				text = <"A idade de começo inicial">
+				description = <"A idade do indivíduo quando o problema foi identificado pela primeira vez pelo indivíduo.">
+			>
+			["id6"] = <
+				text = <"Gravidade">
+				description = <"A avaliação global da gravidade dos indicadores problema.">
+			>
+			["id10"] = <
+				text = <"Descrição Clinica">
+				description = <"Descrição dos aspectos clínicos do problema.">
+			>
+			["id13"] = <
+				text = <"Local do corpo">
+				description = <"O local do corpo afetado.">
+			>
+			["id19"] = <
+				text = <"Ocorrências ou exacerbações">
+				description = <"Agrupamento de informações sobre ocorrências individuais ou exacerbações.">
+			>
+			["id20"] = <
+				text = <"Frequência de recorrência">
+				description = <"A frequência de ocorrências individuais do problema.">
+			>
+			["id21"] = <
+				text = <"Data da última ocorrência">
+				description = <"A data da última ocorrência do problema.">
+			>
+			["id23"] = <
+				text = <"Descrição clínica">
+				description = <"Uma descrição da exacerbação ou ocorrência.">
+			>
+			["id26"] = <
+				text = <"Número de ocorrências">
+				description = <"Número de vezes que este problema ocorreu ou foi aparente.">
+			>
+			["id28"] = <
+				text = <"Problema relacionado">
+				description = <"Um grupo de características do problema complicando os indicadores do problema.">
+			>
+			["id29"] = <
+				text = <"Problema relacionado">
+				description = <"dentificação textual de um problema relacionado, texto codificado ou link dentro do RES.">
+			>
+			["id30"] = <
+				text = <"Descrição clínica">
+				description = <"Decription do problema relacionado.">
+			>
+			["id31"] = <
+				text = <"Data da resolução">
+				description = <"A data em que o problema resolvido ou entrou em remissão.">
+			>
+			["id32"] = <
+				text = <"Idade na resolução">
+				description = <"A idade da pessoa com a resolução do problema.">
+			>
+			["id36"] = <
+				text = <"Web link">
+				description = <"Informações úteis na internet sobre essa condição.">
+			>
+			["id40"] = <
+				text = <"*Cluster(en)">
+				description = <"**(en)">
+			>
+			["at41"] = <
+				text = <"*Caused by(en)">
+				description = <"*This concept identifies the direct cause or causative agent of a Problem/Diagnosis. The concept includes the idea of ‘complications’, ‘causative agent’ and ‘due to’. Note: Where no causality or sequence of events is known, this relationship type should be left blank.(en)">
+			>
+			["at42"] = <
+				text = <"*Following(en)">
+				description = <"*his value identifies the sequence of events between the related items, but does not assert causality. This can be used for sequelae or late effects. Note: Where no causality or sequence of events is known, this relationship type should be left blank.(en)">
+			>
+			["id43"] = <
+				text = <"*Cluster(en)">
+				description = <"**(en)">
+			>
+			["id44"] = <
+				text = <"*Cluster(en)">
+				description = <"**(en)">
+			>
+			["id45"] = <
+				text = <"*New element(en)">
+				description = <"**(en)">
+			>
+			["id47"] = <
+				text = <"*Cluster(en)">
+				description = <"**(en)">
+			>
+			["at43"] = <
+				text = <"*Frequency (en)">
+				description = <"*Frequency (en)">
+			>
+			["ac1"] = <
+				text = <"Descrição clínica (synthesised)">
+				description = <"Decription do problema relacionado. (synthesised)">
+			>
+		>
+		["es-ar"] = <
+			["id1"] = <
+				text = <"Problema">
+				description = <"Un asunto u obstáculo que incide en forma adversa sobre el bienestar físico, psíquico o social de un individuo. La definición de un problema se mantiene débilmente definida en forma deliberada a fin de permitir la detección de cualquier preocupación real o percibida que pueda afectar, en forma adversa y en cualquier grado, el bienestar del individuo.">
+			>
+			["id3"] = <
+				text = <"Problema">
+				description = <"Identificación del problema índice.">
+			>
+			["id4"] = <
+				text = <"Fecha de aparición inicial">
+				description = <"La fecha en la cual el problema fue identificado por primera vez por el individuo.">
+			>
+			["id5"] = <
+				text = <"Edad de aparición inicial">
+				description = <"La edad del individuo cuando el problema fué identificado por primera vez.">
+			>
+			["id6"] = <
+				text = <"Severidad">
+				description = <"La severidad general evaluada para el problema índice.">
+			>
+			["id10"] = <
+				text = <"Descripción clínica">
+				description = <"Descripción de los aspectos clínicos del problema.">
+			>
+			["id13"] = <
+				text = <"Sitio Corporal">
+				description = <"El sitio del cuerpo afectado.">
+			>
+			["id19"] = <
+				text = <"Ocurrencias o exacerbaciones">
+				description = <"Agrupamiento de información acerca de ocurrencias o exacerbaciones individuales.">
+			>
+			["id20"] = <
+				text = <"Frecuencia de recurrencia">
+				description = <"La frecuencia de las ocurrencias individuales del problema.">
+			>
+			["id21"] = <
+				text = <"Fecha de la última ocurrencia">
+				description = <"La fecha de la última ocurrencia del problema.">
+			>
+			["id23"] = <
+				text = <"Descripción clínica">
+				description = <"La descripción de la exacerbación u ocurrencia.">
+			>
+			["id26"] = <
+				text = <"Número de ocurrencias">
+				description = <"Número de veces que este problema ha ocurrido o se tornó aparente.">
+			>
+			["id28"] = <
+				text = <"Problema relacionado">
+				description = <"El grupo de características del problema que complica al problema índice.">
+			>
+			["id29"] = <
+				text = <"Problema relacionado">
+				description = <"Identificación del problema relacionado como texto, texto codificado o enlace dentro del Registro Electrónico de Salud.">
+			>
+			["id30"] = <
+				text = <"Descripción clínica">
+				description = <"Descripción del problema relacionado.">
+			>
+			["id31"] = <
+				text = <"Fecha de resolución">
+				description = <"La fecha en la cual el problema se resolvió o remitió.">
+			>
+			["id32"] = <
+				text = <"Edad de la resolución">
+				description = <"La edad de la persona al momento de la resolución del problema.">
+			>
+			["id36"] = <
+				text = <"Enlace web">
+				description = <"Información util acerca de esta condición disponible en internet.">
+			>
+			["id40"] = <
+				text = <"*Cluster(en)">
+				description = <"**(en)">
+			>
+			["at41"] = <
+				text = <"*Caused by(en)">
+				description = <"*This concept identifies the direct cause or causative agent of a Problem/Diagnosis. The concept includes the idea of ‘complications’, ‘causative agent’ and ‘due to’. Note: Where no causality or sequence of events is known, this relationship type should be left blank.(en)">
+			>
+			["at42"] = <
+				text = <"*Following(en)">
+				description = <"*his value identifies the sequence of events between the related items, but does not assert causality. This can be used for sequelae or late effects. Note: Where no causality or sequence of events is known, this relationship type should be left blank.(en)">
+			>
+			["id43"] = <
+				text = <"*Cluster(en)">
+				description = <"**(en)">
+			>
+			["id44"] = <
+				text = <"*Cluster(en)">
+				description = <"**(en)">
+			>
+			["id45"] = <
+				text = <"*New element(en)">
+				description = <"**(en)">
+			>
+			["id47"] = <
+				text = <"*Cluster(en)">
+				description = <"**(en)">
+			>
+			["at43"] = <
+				text = <"*Frequency (en)">
+				description = <"*Frequency (en)">
+			>
+			["ac1"] = <
+				text = <"Descripción clínica (synthesised)">
+				description = <"Descripción del problema relacionado. (synthesised)">
+			>
+		>
+	>
+	term_bindings = <
+		["openehr"] = <
+			["at43"] = <http://openehr.org/id/382>
+		>
+	>
+	value_sets = <
+		["ac1"] = <
+			id = <"ac1">
+			members = <"at41", "at42">
+		>
+	>
