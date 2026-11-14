@@ -283,7 +283,7 @@ public class TemplateManager {
             // nah, if you overwrite an xml ant script, you're doing active content
             scriptReason = "Template contains a registered ant script";
           } else if (!Utilities.existsInList(s,
-              ".html", ".css", ".png", ".gif", ".oet", ".json", ".xml", ".ico", ".jpg", ".md", ".ini",
+              ".html", ".css", ".png", ".gif", ".oet", ".json", ".xml", ".ico", ".jpg", ".md", ".ini", ".po",
               ".eot", ".otf", ".svg", ".ttf", ".woff", ".woff2", ".txt", ".yml", ".yaml", ".liquid", ".gitignore")) {
             // we don't track what other scripts are potentially active, so we only allow a whitelist of files.
             // this is safe if the base templates don't call out to scripts with weird file extensions (the template authors know about this rule)
