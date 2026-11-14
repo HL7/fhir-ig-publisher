@@ -43,6 +43,32 @@ public class PublisherUtils {
     }
   }
 
+  /**
+   * IG parameter 'instance-hyperlinks': whether the HTML renderings of instances in XML, JSON and Turtle
+   * link element names, types and references to their definitions. The links make the pages much
+   * bigger (#1382).
+   */
+  public enum InstanceHyperlinksMode {
+    YES, NO, EXAMPLES_ONLY;
+
+    public static InstanceHyperlinksMode fromCode(String value) {
+      if (Utilities.noString(value)) {
+        return YES;
+      } else switch (value.toLowerCase()) {
+      case "yes" :
+      case "true" :
+        return YES;
+      case "no" :
+      case "false" :
+        return NO;
+      case "examples-only" :
+        return EXAMPLES_ONLY;
+      default:
+        throw new FHIRException("Unknown value for 'instance-hyperlinks' of '"+value+"': it must be yes, no or examples-only");
+      }
+    }
+  }
+
   public enum PinningPolicy {NO_ACTION, FIX, WHEN_MULTIPLE_CHOICES}
 
   public enum IGBuildMode { MANUAL, AUTOBUILD, WEBSERVER, PUBLICATION }

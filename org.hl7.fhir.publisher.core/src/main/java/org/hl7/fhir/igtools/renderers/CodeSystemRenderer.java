@@ -160,6 +160,10 @@ public class CodeSystemRenderer extends CanonicalRenderer {
     return b.toString() +pr+ changeSummary();
   }
 
+  /**
+   * The identifiers for this code system found in NamingSystem resources (uniqueId, preferred, period, comment) -
+   * the nsinfo fragment (#455). Empty if no NamingSystem names this code system
+   */
   public String nsInfo() throws FHIRException {
     List<NamingSystem> nsl = new ArrayList<>();
     for (NamingSystem t : context.fetchResourcesByType(NamingSystem.class)) {
@@ -169,47 +173,11 @@ public class CodeSystemRenderer extends CanonicalRenderer {
     }
     if (nsl.isEmpty()) {
       return "";
-    } else {
-      NamingSystemRenderer nsr = new NamingSystemRenderer(gen);
-      XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
-      nsr.renderList(x, nsl);
     }
-
-    StringBuilder b = new StringBuilder();
-    boolean first = true;
-    b.append("\r\n");
-    List<String> vsurls = new ArrayList<String>();
-    for (CanonicalResource vs : scanAllLocalResources(ValueSet.class, "ValueSet")) {
-      vsurls.add(vs.getUrl());
-    }
-    Collections.sort(vsurls);
-
-    Set<String> processed = new HashSet<String>();
-    for (String url : vsurls) {
-      ValueSet vc = context.findTxResource(ValueSet.class, url, VersionResolutionRules.defaultRule());
-      if (cs.getContent() != CodeSystemContentMode.SUPPLEMENT) {
-        for (ConceptSetComponent ed : vc.getCompose().getIncludeList()) {
-          first = addLink(b, first, vc, ed, processed);
-        }
-        for (ConceptSetComponent ed : vc.getCompose().getExcludeList()) {
-          first = addLink(b, first, vc, ed, processed);
-        }
-      } else {
-        for (Extension ex : vc.getExtensionsByUrl(ExtensionDefinitions.EXT_VS_CS_SUPPL_NEEDED)) {
-          first = addLink(b, first, vc, ex, processed);
-        }
-      }
-    }
-    if (first) {
-      if (cs.getContent() == CodeSystemContentMode.SUPPLEMENT) {
-        b.append("<ul><li>" + (gen.formatPhrase(RenderingContext.CODE_SYS_SUPP_CODE_NOT_HERE)) + "</li></ul>\r\n");
-      } else {
-        b.append("<ul><li>" + (gen.formatPhrase(RenderingContext.CODE_SYS_CODE_NOT_HERE)) + "</li></ul>\r\n");
-      }
-    } else {
-      b.append("</ul>\r\n");
-    }
-    return b.toString() + changeSummary();
+    NamingSystemRenderer nsr = new NamingSystemRenderer(gen);
+    XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
+    nsr.renderList(x, nsl);
+    return new XhtmlComposer(XhtmlComposer.HTML).compose(x);
   }
 
   private boolean isNSforCS(NamingSystem t) {

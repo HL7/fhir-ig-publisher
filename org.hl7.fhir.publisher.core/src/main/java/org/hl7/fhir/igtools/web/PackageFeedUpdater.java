@@ -1,5 +1,6 @@
 package org.hl7.fhir.igtools.web;
 
+import org.hl7.fhir.utilities.npm.NpmPackageSigner;
 import org.hl7.fhir.utilities.xml.XMLUtil;
 import org.w3c.dom.*;
 import org.xml.sax.SAXException;
@@ -351,6 +352,14 @@ public class PackageFeedUpdater {
     kind.setTextContent("IG");
     item.appendChild(kind);
     item.appendChild(doc.createTextNode("\n      "));
+
+    // fhir:signature - the package's signature, when it was signed (see NpmPackageSigner)
+    if (new File(pkg.filePath + NpmPackageSigner.SIGNATURE_SUFFIX).exists()) {
+      Element signature = doc.createElementNS("http://hl7.org/fhir/feed", "fhir:signature");
+      signature.setTextContent(url + NpmPackageSigner.SIGNATURE_SUFFIX);
+      item.appendChild(signature);
+      item.appendChild(doc.createTextNode("\n      "));
+    }
 
     // PubDate
     Element pubDate = doc.createElement("pubDate");

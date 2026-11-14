@@ -168,31 +168,34 @@ public class ValueSetRenderer extends CanonicalRenderer {
   }
 
   public boolean checkReferencesVS(StringBuilder b, boolean first, ValueSet vc) {
-    for (ConceptSetComponent t : vc.getCompose().getIncludeList()) {
-      for (UriType ed : t.getValueSetList()) {
-        if (Utilities.existsInList(ed.getValueAsString(), vs.getUrl(), vs.getVersionedUrl())) {
-          if (first) {
-            first = false;
-            b.append("<ul>\r\n");
-          }
-          b.append(" <li>"+ (gen.formatPhrase(RenderingContext.VALUE_SET_INCLUDED_INTO)+" ")+"<a href=\""+vc.getWebPath()+"\">"+Utilities.escapeXml(gen.getTranslated(vc.getTitleElement(), vc.getNameElement()))+"</a></li>\r\n");
-          break;
-        }
+    // a value set is listed once for including this value set and once for excluding it, however many
+    // include / exclude entries name it (#1296)
+    if (composeReferencesVS(vc.getCompose().getIncludeList())) {
+      if (first) {
+        first = false;
+        b.append("<ul>\r\n");
       }
+      b.append(" <li>"+ (gen.formatPhrase(RenderingContext.VALUE_SET_INCLUDED_INTO)+" ")+"<a href=\""+vc.getWebPath()+"\">"+Utilities.escapeXml(gen.getTranslated(vc.getTitleElement(), vc.getNameElement()))+"</a></li>\r\n");
     }
-    for (ConceptSetComponent t : vc.getCompose().getExcludeList()) {
-      for (UriType ed : t.getValueSetList()) {
-        if (Utilities.existsInList(ed.getValueAsString(), vs.getUrl(), vs.getVersionedUrl())) {
-          if (first) {
-            first = false;
-            b.append("<ul>\r\n");
-          }
-          b.append(" <li>"+ (gen.formatPhrase(RenderingContext.VALUE_SET_EXCLUDED_FROM)+" ")+"<a href=\""+vc.getWebPath()+"\">"+Utilities.escapeXml(gen.getTranslated(vc.getTitleElement(), vc.getNameElement()))+"</a></li>\r\n");
-          break;
-        }
+    if (composeReferencesVS(vc.getCompose().getExcludeList())) {
+      if (first) {
+        first = false;
+        b.append("<ul>\r\n");
       }
+      b.append(" <li>"+ (gen.formatPhrase(RenderingContext.VALUE_SET_EXCLUDED_FROM)+" ")+"<a href=\""+vc.getWebPath()+"\">"+Utilities.escapeXml(gen.getTranslated(vc.getTitleElement(), vc.getNameElement()))+"</a></li>\r\n");
     }
     return first;
+  }
+
+  private boolean composeReferencesVS(List<ConceptSetComponent> list) {
+    for (ConceptSetComponent t : list) {
+      for (UriType ed : t.getValueSetList()) {
+        if (Utilities.existsInList(ed.getValueAsString(), vs.getUrl(), vs.getVersionedUrl())) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   public boolean checkReferencesVS(StringBuilder b, boolean first, StructureDefinition sd) {

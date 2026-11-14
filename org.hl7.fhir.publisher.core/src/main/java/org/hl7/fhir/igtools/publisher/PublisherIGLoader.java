@@ -24,7 +24,7 @@ import org.hl7.fhir.igtools.publisher.realm.RealmBusinessRules;
 import org.hl7.fhir.igtools.publisher.realm.USRealmBusinessRules;
 import org.hl7.fhir.igtools.renderers.ValidationPresenter;
 import org.hl7.fhir.igtools.spreadsheets.IgSpreadsheetParser;
-import org.hl7.fhir.igtools.spreadsheets.MappingSpace;
+import org.hl7.fhir.utilities.MappingSpace;
 import org.hl7.fhir.igtools.templates.TemplateManager;
 import org.hl7.fhir.model.Base;
 import org.hl7.fhir.model.ModelContext;
@@ -845,6 +845,9 @@ public class PublisherIGLoader extends PublisherBase {
           if (pf.pageHeadingLevel < 1 || pf.pageHeadingLevel > 6) {
             throw new FHIRException("Unknown value for 'page-heading-level' of '"+p.getValue()+"': it must be a heading level from 1 to 6");
           }
+          break;
+        case "instance-hyperlinks":
+          pf.instanceHyperlinks = PublisherUtils.InstanceHyperlinksMode.fromCode(p.getValue());
           break;
         case "accessibility-checks":
           if (!Utilities.existsInList(p.getValue(), "true", "false")) {
@@ -2693,6 +2696,7 @@ public class PublisherIGLoader extends PublisherBase {
 
     pf.rc = new RenderingContext(pf.context, pf.rendererFactory, pf.markdownEngine, ValidationOptions.defaults(), checkAppendSlash(pf.specPath), "", locale, RenderingContext.ResourceRendererMode.TECHNICAL, RenderingContext.GenerationRules.IG_PUBLISHER);
     pf.rc.setTemplateProvider(pf.templateProvider);
+    pf.rc.getMappingSpaces().putAll(pf.mappingSpaces);
     pf.rc.setServices(pf.validator.getExternalHostServices());
     pf.rc.setDestDir(Utilities.path(pf.tempDir));
     pf.rc.setProfileUtilities(new ProfileUtilities(pf.context, new ArrayList<ValidationMessage>(), pf.igpkp));
@@ -3504,28 +3508,9 @@ public class PublisherIGLoader extends PublisherBase {
 
 
   private void loadMappingSpaces(byte[] source) throws Exception {
-    ByteArrayInputStream is = null;
-    try {
-      DocumentBuilderFactory factory = XMLUtil.newXXEProtectedDocumentBuilderFactory();
-      factory.setNamespaceAware(true);
-      DocumentBuilder builder = factory.newDocumentBuilder();
-      is = new ByteArrayInputStream(source);
-      Document doc = builder.parse(is);
-      org.w3c.dom.Element e = XMLUtil.getFirstChild(doc.getDocumentElement());
-      while (e != null) {
-        MappingSpace m = new MappingSpace(XMLUtil.getNamedChild(e, "columnName").getTextContent(), XMLUtil.getNamedChild(e, "title").getTextContent(),
-                XMLUtil.getNamedChild(e, "id").getTextContent(), Integer.parseInt(XMLUtil.getNamedChild(e, "sort").getTextContent()), true, false, false, XMLUtil.getNamedChild(e, "link") != null ? XMLUtil.getNamedChild(e, "link").getTextContent(): XMLUtil.getNamedChild(e, "url").getTextContent());
-        pf.mappingSpaces.put(XMLUtil.getNamedChild(e, "url").getTextContent(), m);
-        org.w3c.dom.Element p = XMLUtil.getNamedChild(e, "preamble");
-        if (p != null) {
-          m.setPreamble(new XhtmlParser().parseHtmlNode(p).setName("div"));
-        }
-        e = XMLUtil.getNextSibling(e);
-      }
-    } catch (Exception e) {
-      throw new Exception("Error processing mappingSpaces.details: "+e.getMessage(), e);
-    }
+    pf.mappingSpaces.putAll(MappingSpace.loadMappingSpaces(source));
   }
+
 
   public ImplementationGuide.SPDXLicense licenseAsEnum() throws Exception {
     return ImplementationGuide.SPDXLicense.fromCode(license());
