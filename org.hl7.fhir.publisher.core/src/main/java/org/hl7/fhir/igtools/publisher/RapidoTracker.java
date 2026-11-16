@@ -37,6 +37,7 @@ import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
@@ -99,7 +100,7 @@ public class RapidoTracker {
   public static final String PHASE_HTML = "html";
   public static final String PHASE_SHEETS = "sheets";
 
-  private static final int STATE_VERSION = 6;
+  private static final int STATE_VERSION = 7;
 
   private final PublisherFields pf;
   private final String stateFile;
@@ -209,7 +210,7 @@ public class RapidoTracker {
         if (!res.getRenderHash().equals(of.asString("rh"))) {
           why.put(f, "something that refers to it changed");
         } else if (!journalUsable(of.getJsonObject(PHASE_HTML)) || !journalUsable(of.getJsonObject(PHASE_SHEETS))) {
-          why.put(f, "outputs from the last build are missing");
+          why.put(f, anchorsUnwatchable ? "the rendering context's anchor set can't be watched" : "outputs from the last build are missing");
         } else {
           renderClean.add(f);
         }
@@ -1560,6 +1561,8 @@ public class RapidoTracker {
     private final Map<String, Set<String>> anchorsBefore = new HashMap<>();
     /** the anchors the phase found in the build's anchor sets before it, by language (see AnchorSet) */
     private final Map<String, Set<String>> anchorsTaken = new ConcurrentHashMap<>();
+    /** the anchors the phase found free in the build's anchor sets, by language (see AnchorSet) */
+    private final Map<String, Set<String>> anchorsFree = new ConcurrentHashMap<>();
     /** whether all the build's anchor sets tell the tracker which anchors are found taken */
     private boolean anchorsWatched = true;
 
@@ -1631,21 +1634,37 @@ public class RapidoTracker {
         AnchorSet as = new AnchorSet(set);
         fld.set(rc, as);
         if (rc.getAnchors() != as) {
+          unwatchable("the field was set but the context returns another set");
           return set;
         }
         set = as;
       } catch (Exception e) {
+        unwatchable(e.toString());
         return set;
       }
     }
-    ((AnchorSet) set).listener = a -> anchorFound(lang, a);
+    ((AnchorSet) set).listener = (a, taken) -> anchorFound(lang, a, taken);
     return set;
   }
 
-  /** a renderer found the anchor in the set for the language */
-  private void anchorFound(String lang, String anchor) {
+  /** set when a context's anchor set can't be swapped: it depends on the core's classes, so it holds for the session */
+  private static volatile boolean anchorsUnwatchable;
+
+  private static void unwatchable(String why) {
+    if (!anchorsUnwatchable) {
+      anchorsUnwatchable = true;
+      System.out.println("Rapido: can't watch the rendering context's anchor set, so html isn't replayed: "+why);
+    }
+  }
+
+  /** a renderer found the anchor in the set for the language, or found it free */
+  private void anchorFound(String lang, String anchor, boolean taken) {
     Recording rec = recording;
     if (rec != null) {
+      if (!taken) {
+        rec.anchorsFree.computeIfAbsent(lang, k -> ConcurrentHashMap.newKeySet()).add(anchor);
+        return;
+      }
       Set<String> before = rec.anchorsBefore.get(lang);
       // one it added itself doesn't count: the file's own rendering puts it back
       if (before != null && before.contains(anchor)) {
@@ -1655,12 +1674,13 @@ public class RapidoTracker {
   }
 
   /**
-   * A build's anchor set (see anchorSets) that tells the tracker which anchors a renderer found in it: the core's
-   * renderers ask contains (hasAnchor, stripAnchorsByName) before they put an anchor in a page
+   * A build's anchor set (see anchorSets) that tells the tracker which anchors a renderer looked for in it, and whether
+   * they were there: the core's renderers ask contains (hasAnchor, stripAnchorsByName) before they put an anchor in a
+   * page, and stripAnchorsByName leaves an anchor that's free in the page without adding it to the set
    */
   static class AnchorSet extends HashSet<String> {
     private static final long serialVersionUID = 1L;
-    private transient Consumer<String> listener;
+    private transient BiConsumer<String, Boolean> listener;
 
     AnchorSet(Collection<String> anchors) {
       super(anchors);
@@ -1669,9 +1689,9 @@ public class RapidoTracker {
     @Override
     public boolean contains(Object o) {
       boolean res = super.contains(o);
-      Consumer<String> l = listener;
-      if (res && l != null && o instanceof String s) {
-        l.accept(s);
+      BiConsumer<String, Boolean> l = listener;
+      if (l != null && o instanceof String s) {
+        l.accept(s, res);
       }
       return res;
     }
@@ -1685,12 +1705,16 @@ public class RapidoTracker {
     Map<String, Set<String>> sets = anchorSets();
     JsonObject added = j.getJsonObject("anchors");
     JsonObject taken = j.getJsonObject("anchorsTaken");
-    if (added == null || taken == null) {
+    JsonObject free = j.getJsonObject("anchorsFree");
+    if (added == null || taken == null || free == null) {
       return "no record of its anchors";
     }
     String problem = anchorMismatch(sets, added, false, "an anchor it put in its pages is taken: ");
     if (problem == null) {
       problem = anchorMismatch(sets, taken, true, "an anchor it found taken is free: ");
+    }
+    if (problem == null) {
+      problem = anchorMismatch(sets, free, false, "an anchor it found free is taken: ");
     }
     return problem;
   }
@@ -1823,6 +1847,20 @@ public class RapidoTracker {
       JsonArray a = at.forceArray(e.getKey());
       for (String s : new TreeSet<>(e.getValue())) {
         a.add(s);
+      }
+    }
+    // the ones it added afterwards are in "anchors"
+    JsonObject af = j.forceObject("anchorsFree");
+    Map<String, Set<String>> sets = anchorSets();
+    for (Map.Entry<String, Set<String>> e : new TreeMap<>(rec.anchorsFree).entrySet()) {
+      Set<String> now = new HashSet<>(sets.getOrDefault(e.getKey(), Set.of())); // a copy: an AnchorSet's contains is listened to
+      Set<String> free = new TreeSet<>(e.getValue());
+      free.removeIf(now::contains);
+      if (!free.isEmpty()) {
+        JsonArray a = af.forceArray(e.getKey());
+        for (String s : free) {
+          a.add(s);
+        }
       }
     }
     newFile(f).set(rec.phase, j);

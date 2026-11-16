@@ -55,7 +55,9 @@ import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
 import org.hl7.fhir.utilities.validation.ValidationOptions;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator;
+import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
+import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.hl7.fhir.validation.BaseValidator;
 import org.hl7.fhir.validation.instance.InstanceValidator;
 import org.junit.jupiter.api.AfterEach;
@@ -407,6 +409,62 @@ class PublisherRapidoWatchTest {
 
     assertEquals(List.of(), replayed);
     assertFalse(second.contains("name=\"x\""), second);
+  }
+
+  /**
+   * A Bundle's entries keep their own narrative, and the renderer strips the anchors in it that are in the build's
+   * anchor set (stripAnchorsByName), but leaves a free one in the page without adding it. When a code system before it
+   * now has that id, a complete build strips the anchor, so the Bundle's html isn't replayed
+   */
+  @Test
+  void aFileIsntReplayedWhenAnAnchorItFoundFreeIsTaken() throws Exception {
+    context = r5();
+    String first = strippingBuild("a", codeSystem("y")).get("Patient-b.json");
+    assertTrue(first.contains("name=\"x\""), first);
+
+    String second = strippingBuild("a2", codeSystem("x")).get("Patient-b.json");
+
+    assertEquals(List.of(), replayed);
+    assertFalse(second.contains("name=\"x\""), second);
+  }
+
+  /** a Bundle-like file that found an anchor free, and still does, is replayed */
+  @Test
+  void aFileThatFindsAnAnchorStillFreeIsReplayed() throws Exception {
+    context = r5();
+    strippingBuild("a", codeSystem("y"));
+
+    strippingBuild("a2", codeSystem("z"));
+
+    assertEquals(List.of("Patient-b.json"), replayed);
+  }
+
+  /**
+   * a build where Patient-a.json renders the code system, and Patient-b.json strips the anchors in the build's set from
+   * a narrative with an anchor x, as BundleRenderer does with an entry's narrative
+   */
+  private Map<String, String> strippingBuild(String patientContent, CodeSystem cs) throws Exception {
+    Map<String, String> pages = new HashMap<>();
+    PublisherFields pf = build(patientContent);
+    pf.rc = renderingContext(context);
+    rendering = f -> {
+      if (f.getLoadPath().equals("Patient-a.json")) {
+        render(pf, f, pages, Map.of("Patient-a.json", cs));
+      } else if (f.getLoadPath().equals("Patient-b.json")) {
+        RenderingContext lrc = pf.rc.copy(true);
+        XhtmlNode div = new XhtmlNode(NodeType.Element, "div");
+        div.addTag("a").setAttribute("name", "x");
+        div.addText("entry");
+        div.stripAnchorsByName(lrc.getAnchors());
+        try {
+          pages.put(f.getLoadPath(), new XhtmlComposer(XhtmlComposer.HTML).compose(div));
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
+      }
+    };
+    finish(pf);
+    return pages;
   }
 
   /** a file that found an anchor taken, and still does, is replayed */
