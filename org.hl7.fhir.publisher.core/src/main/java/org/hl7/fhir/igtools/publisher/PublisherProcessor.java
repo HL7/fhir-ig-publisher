@@ -545,6 +545,9 @@ public class PublisherProcessor extends PublisherBase  {
     }
     if (pf.rapido != null) {
       pf.rapido.finishValidation();
+      if (!pf.rapido.isCompleteBuild()) {
+        log("Rapido Mode: " + pf.rapido.validationSummary());
+      }
     }
     logDebugMessage(LogCategory.PROGRESS, " .. check Profile Examples");
     logDebugMessage(LogCategory.PROGRESS, "gen narratives");

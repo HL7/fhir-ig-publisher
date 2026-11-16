@@ -1,0 +1,57 @@
+{
+  "resourceType": "StructureDefinition",
+  "id": "qa-patient",
+  "url": "http://example.org/fhir/rapido-qa/StructureDefinition/qa-patient",
+  "version": "0.1.0",
+  "name": "QAPatient",
+  "title": "QAPatient",
+  "status": "active",
+  "description": "A patient profile.",
+  "fhirVersion": "5.0.0",
+  "kind": "resource",
+  "abstract": false,
+  "type": "Patient",
+  "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Patient",
+  "derivation": "constraint",
+  "differential": {
+    "element": [
+      {
+        "id": "Patient",
+        "path": "Patient"
+      },
+      {
+        "id": "Patient.name",
+        "path": "Patient.name",
+        "type": [
+          {
+            "code": "HumanName",
+            "profile": [
+              "http://example.org/fhir/rapido-qa/StructureDefinition/qa-humanname"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "Patient.address",
+        "path": "Patient.address",
+        "type": [
+          {
+            "code": "Address",
+            "profile": [
+              "http://example.org/fhir/rapido-qa/StructureDefinition/qa-address"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "Patient.maritalStatus",
+        "path": "Patient.maritalStatus",
+        "min": 1,
+        "binding": {
+          "strength": "required",
+          "valueSet": "http://example.org/fhir/rapido-qa/ValueSet/qa-valueset"
+        }
+      }
+    ]
+  }
+}

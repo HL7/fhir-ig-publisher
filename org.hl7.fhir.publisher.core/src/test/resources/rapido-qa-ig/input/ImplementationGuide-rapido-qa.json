@@ -1,0 +1,65 @@
+{
+  "resourceType": "ImplementationGuide",
+  "id": "rapido-qa",
+  "url": "http://example.org/fhir/rapido-qa/ImplementationGuide/rapido-qa",
+  "version": "0.1.0",
+  "name": "RapidoQA",
+  "title": "Rapido QA test IG",
+  "status": "draft",
+  "publisher": "Example",
+  "contact": [
+    {
+      "name": "Example",
+      "telecom": [
+        {
+          "system": "url",
+          "value": "http://example.org"
+        }
+      ]
+    }
+  ],
+  "description": "A tiny IG whose QA messages a differential build must report as a complete build does.",
+  "packageId": "example.rapido.qa",
+  "license": "CC0-1.0",
+  "fhirVersion": [
+    "5.0.0"
+  ],
+  "definition": {
+    "page": {
+      "sourceUrl": "toc.html",
+      "name": "toc.html",
+      "title": "Table of Contents",
+      "generation": "html",
+      "page": [
+        {
+          "sourceUrl": "index.html",
+          "name": "index.html",
+          "title": "Home",
+          "generation": "markdown"
+        },
+        {
+          "sourceUrl": "other.html",
+          "name": "other.html",
+          "title": "Other",
+          "generation": "markdown"
+        }
+      ]
+    },
+    "parameter": [
+      {
+        "code": {
+          "system": "http://hl7.org/fhir/tools/CodeSystem/ig-parameters",
+          "code": "path-resource"
+        },
+        "value": "input/resources"
+      },
+      {
+        "code": {
+          "system": "http://hl7.org/fhir/tools/CodeSystem/ig-parameters",
+          "code": "path-resource"
+        },
+        "value": "input/examples"
+      }
+    ]
+  }
+}
