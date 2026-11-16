@@ -973,6 +973,9 @@ public class CqlSubSystem {
     // should work until that new translator release is available.
     Library coreLibrary = (Library)VersionConvertorFactory_50_N.convertResource(moduleDefinitionLibrary);
 
+    // TODO: Workaround for a fix that is coming in the translator: https://github.com/cqframework/clinical_quality_language/pull/1929
+    fixupAnalysisExceptions(coreLibrary);
+
     return coreLibrary.getDataRequirementList();
   }
 
@@ -1099,7 +1102,7 @@ public class CqlSubSystem {
     if (!isValid.get()) {
       // Issue a warning that the parameter type is not supported
       addError(IssueType.NOTSUPPORTED,
-              String.format("Parameter type %s of parameter %s is not supported; reported as FHIR.Any", dataType.toLabel(), parameterName),
+              String.format("Parameter type %s of parameter %s is not supported; reported as FHIR.Base", dataType.toLabel(), parameterName),
               IssueSeverity.WARNING
       );
     }
@@ -1130,7 +1133,8 @@ public class CqlSubSystem {
         case "System.String": return "string";
         case "System.Quantity": return "Quantity";
         case "System.Ratio": return "Ratio";
-        case "System.Any": return "Any";
+        // TODO: This should be "Base", but there is no "Base" code in R4, so setting it to base fails the conversion
+        case "System.Any": return "Resource";
         case "System.Code": return "Coding";
         case "System.Concept": return "CodeableConcept";
       }
@@ -1151,7 +1155,8 @@ public class CqlSubSystem {
     }
 
     isValid.set(false);
-    return "Any";
+    // TODO: This should be "Base", but there is no "Base" code in R4, so setting it to base fails the conversion
+    return "Resource";
   }
 
   private org.hl7.fhir.model.core.DataRequirement toDataRequirement(Retrieve retrieve, CompiledLibrary library, LibraryManager libraryManager) {
@@ -1676,9 +1681,45 @@ public class CqlSubSystem {
         annotationsEnabled
     ));
 
+    // TODO: Workaround for a fix that is coming in the translator: https://github.com/cqframework/clinical_quality_language/pull/1929
+    fixupAnalysisExceptions(moduleDefinitionLibrary);
     fixupFHIRReferences(f, moduleDefinitionLibrary, compiledLibrary);
 
     return moduleDefinitionLibrary;
+  }
+
+  private void fixupAnalysisExceptions(Library library) {
+    for (var dr : library.getDataRequirementList()) {
+      for (var cfc : dr.getCodeFilterList()) {
+        for (var cfcc : cfc.getCodeList()) {
+          for (var ext : cfcc.getExtensionList()) {
+            fixupAnalysisException(ext);
+          }
+        }
+      }
+
+      for (var dfc : dr.getDateFilterList()) {
+        if (dfc.hasValue()) {
+          for (var ext : dfc.getExtension()) {
+            fixupAnalysisException(ext);
+          }
+        }
+      }
+
+      for (var vf : dr.getExtensionsByUrl("http://hl7.org/fhir/StructureDefinition/cqf-valueFilter")) {
+        for (var vfv : vf.getExtensionsByUrl("value")) {
+          for (var ext : vfv.getExtension()) {
+            fixupAnalysisException(ext);
+          }
+        }
+      }
+    }
+  }
+
+  private void fixupAnalysisException(Extension ext) {
+    if (ext.hasUrl() && ext.getUrl().equals("http://hl7.org/fhir/uv/crmi-analysisException")) {
+      ext.setUrl("http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-analysisException");
+    }
   }
 
   private boolean isExpressionIdentifier(org.hl7.fhir.model.core.Expression expression) {
