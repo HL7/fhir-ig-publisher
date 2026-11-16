@@ -1,0 +1,9 @@
+{
+  "resourceType": "Observation",
+  "id": "qa-a",
+  "meta": {"profile": ["http://hl7.org/fhir/se/rapidoqa/StructureDefinition/qa-observation"]},
+  "status": "final",
+  "code": {"coding": [{"system": "http://snomed.info/sct", "code": "271649006"}]},
+  "valueCodeableConcept": {"coding": [{"system": "http://example.org/fhir/no-such-cs", "code": "va"}]},
+  "note": [{"text": "note a"}]
+}

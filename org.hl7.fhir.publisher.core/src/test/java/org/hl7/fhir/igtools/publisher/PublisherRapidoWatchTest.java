@@ -2,8 +2,13 @@ package org.hl7.fhir.igtools.publisher;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Field;
@@ -12,10 +17,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 import org.hl7.fhir.igtools.templates.Template;
+import org.hl7.fhir.model.core.StructureDefinition;
 import org.hl7.fhir.services.elementmodel.Element;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.NamedItemList;
@@ -25,6 +32,8 @@ import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator;
+import org.hl7.fhir.validation.BaseValidator;
+import org.hl7.fhir.validation.instance.InstanceValidator;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -149,6 +158,101 @@ class PublisherRapidoWatchTest {
     FetchedFile b = file(pf, "Patient-b.json");
     assertTrue(pf.rapido.canReplay(b, RapidoTracker.PHASE_HTML));
     assertEquals(java.util.Set.of(0), pf.rapido.replay(b, RapidoTracker.PHASE_HTML).umlGenerated);
+  }
+
+  /** what validating a resource attached to its elements (the qa page's signposts) comes back when it's reused */
+  @Test
+  void aReusedValidationPutsBackItsSignposts() throws Exception {
+    PublisherFields pf = build("a");
+    ValidationMessage sp = validateB(pf);
+    finish(pf);
+
+    pf = build("a2");
+    validator(pf);
+    FetchedResource b = withRealElement(file(pf, "Patient-b.json"));
+    List<ValidationMessage> reused = pf.rapido.reuseValidation(file(pf, "Patient-b.json"), b);
+    assertEquals(1, reused == null ? -1 : reused.size());
+    assertEquals("reused 1 of 1 validations", pf.rapido.validationSummary());
+    Element name = b.getElement().getChildList().get(0);
+    assertEquals(1, name.getMessages().size());
+    assertEquals(sp.getMessage(), name.getMessages().get(0).getMessage());
+    // the reported message comes back as the same object, as qa matches and counts it once
+    assertSame(reused.get(0), name.getMessages().get(0));
+    assertFalse(b.getElement().hasMessages());
+  }
+
+  /** a validation saved where a signpost can't be put back (another element tree) is done again */
+  @Test
+  void aValidationWhoseSignpostsCantComeBackIsDoneAgain() throws Exception {
+    PublisherFields pf = build("a");
+    FetchedFile profile = profile(pf);
+    validateB(pf, PROFILE);
+    pf.fileList.remove(profile);
+    finish(pf);
+
+    pf = build("a2");
+    profile = profile(pf);
+    validator(pf);
+    FetchedResource b = withRealElement(file(pf, "Patient-b.json"));
+    b.getElement().getChildList().clear();
+    assertNull(pf.rapido.reuseValidation(file(pf, "Patient-b.json"), b));
+    // and nothing it would have done is done, as validating it again does that
+    assertTrue(b.getFoundProfiles().isEmpty());
+    verify(profile.getResources().get(0), never()).addFoundExample(any());
+  }
+
+  private static final String PROFILE = "http://example.org/ig/StructureDefinition/p";
+
+  /** a profile in the IG, which Patient/b is found to conform to when it's validated */
+  private FetchedFile profile(PublisherFields pf) {
+    FetchedResource r = mock(FetchedResource.class);
+    when(r.getResource()).thenReturn(new StructureDefinition().setUrl(PROFILE));
+    FetchedFile f = file("StructureDefinition-p.json", "p", r);
+    pf.fileList.add(f);
+    return f;
+  }
+
+  /** validates Patient/b as the processor does: its name element gets a signpost, which is also reported */
+  private ValidationMessage validateB(PublisherFields pf) throws Exception {
+    return validateB(pf, null);
+  }
+
+  /** ... and is found to conform to the profile, if one is given */
+  private ValidationMessage validateB(PublisherFields pf, String profile) throws Exception {
+    validator(pf);
+    FetchedFile f = file(pf, "Patient-b.json");
+    FetchedResource b = withRealElement(f);
+    assertNull(pf.rapido.reuseValidation(f, b));
+    ValidationMessage sp = new ValidationMessage(Source.InstanceValidator, IssueType.INFORMATIONAL, "Patient.name[0]",
+        "Validate resource against profile http://x/p", IssueSeverity.INFORMATION);
+    sp.setSignpost(true);
+    b.getElement().getChildList().get(0).addMessage(sp);
+    if (profile != null) {
+      b.getFoundProfiles().add(profile);
+    }
+    pf.rapido.recordValidation(f, b, new ArrayList<>(List.of(sp)));
+    return sp;
+  }
+
+  /** a validator whose record of what it has mentioned (statusWarnings) Rapido can read, as in a build */
+  private static void validator(PublisherFields pf) throws Exception {
+    pf.validator = mock(InstanceValidator.class);
+    Field sw = BaseValidator.class.getDeclaredField("statusWarnings");
+    sw.setAccessible(true);
+    sw.set(pf.validator, new HashSet<String>());
+  }
+
+  /** Patient/b in the file, with a real element tree (Patient with a name), as loading it again gives */
+  private static FetchedResource withRealElement(FetchedFile f) {
+    Element root = new Element("Patient");
+    root.setPath("Patient");
+    Element name = new Element("name");
+    name.setPath("Patient.name[0]");
+    root.getChildList().add(name);
+    FetchedResource r = f.getResources().get(0);
+    when(r.getElement()).thenReturn(root);
+    when(r.getFoundProfiles()).thenReturn(new ArrayList<>());
+    return r;
   }
 
   /**

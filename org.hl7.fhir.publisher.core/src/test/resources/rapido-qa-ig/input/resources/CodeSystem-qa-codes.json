@@ -1,0 +1,23 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "qa-codes",
+  "url": "http://example.org/fhir/rapido-qa/CodeSystem/qa-codes",
+  "version": "0.1.0",
+  "name": "QACodes",
+  "title": "QA Codes",
+  "status": "active",
+  "experimental": true,
+  "description": "Codes for the QA test.",
+  "caseSensitive": true,
+  "content": "complete",
+  "concept": [
+    {
+      "code": "a",
+      "display": "Code a"
+    },
+    {
+      "code": "b",
+      "display": "Code b"
+    }
+  ]
+}
