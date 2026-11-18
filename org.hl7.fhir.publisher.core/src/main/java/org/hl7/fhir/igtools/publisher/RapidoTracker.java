@@ -407,6 +407,22 @@ public class RapidoTracker {
     this.uuid = uuid;
   }
 
+  /**
+   * Whether the file's outputs from the build whose state this build loaded still stand, as far as is known now: it
+   * isn't a file that is always processed, the file, what it depends on and what refers to it are as they were then,
+   * and that build's validation and journals for it can be used. Always false in a complete build; canReplay() can
+   * turn it false later in the build.
+   */
+  public boolean isRenderClean(FetchedFile f) {
+    return renderClean.contains(f);
+  }
+
+  /** this build's hash of the file, what it depends on and what refers to it, or null if that wasn't worked out */
+  public String renderHash(FetchedFile f) {
+    FileResult res = results.get(keys.get(f));
+    return res == null ? null : res.getRenderHash();
+  }
+
   public int countValidationDirty() {
     return pf.fileList.size() - validationClean.size();
   }
