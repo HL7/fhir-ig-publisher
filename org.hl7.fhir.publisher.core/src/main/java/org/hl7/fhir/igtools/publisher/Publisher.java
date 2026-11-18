@@ -171,6 +171,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   private PublisherGenerator generator;
   // watch mode: what the last build kept for a page-only rebuild (see PageRebuild), or null
   private PageRebuild pageRebuild;
+  private WatchSession watchSession;
 
   public Publisher() {
     super();
@@ -226,6 +227,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         PackageListFetcher.rememberFetches();
       }
       loader.setWatchSession(session);
+      watchSession = session;
 
       boolean first = true;
       do {
@@ -719,7 +721,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), pf.realmRules, pf.previousVersionComparator, pf.ipaComparator, pf.ipsComparator,
         new DependencyRenderer(pf.pcm, pf.outputDir, pf.npmName, pf.templateManager, pf.dependencyList, pf.context, pf.markdownEngine, pf.rc, pf.specMaps, pf.effectiveBaseIg).setFetchedPackageLists(pf.fetchedPackageLists).render(pf.getEffectiveBaseIg(), true, false, false), new HTAAnalysisRenderer(pf.context, pf.outputDir, pf.markdownEngine).render(pf.packageId(), pf.fileList, pf.publishedIg.present()),
         new PublicationChecker(pf.repoRoot, pf.historyPage, pf.markdownEngine, findReleaseLabelString(), pf.getEffectiveBaseIg(), pf.relatedIGs).setOutputFolder(stagedPath(Utilities.path(pf.repoRoot, "output"))).check(), renderGlobals(), pf.copyrightYear, pf.context, scanForR5Extensions(), pf.modifierExtensions,
-        generateDraftDependencies(), pf.noNarrativeResources, pf.noValidateResources, settings.isValidationOff(), settings.isGenerationOff(), pf.dependentIgFinder, pf.context.getTxClientManager(),
+        draftDependencies(pageRebuilt), pf.noNarrativeResources, pf.noValidateResources, settings.isValidationOff(), settings.isGenerationOff(), pf.dependentIgFinder, pf.context.getTxClientManager(),
         fragments, makeLangInfo(), pf.relatedIGs);
     val.setValidationFlags(pf.hintAboutNonMustSupport, pf.anyExtensionsAllowed, pf.checkAggregation, pf.autoLoad, pf.showReferenceMessages, pf.noExperimentalContent, pf.displayWarnings);
     FileUtilities.stringToFile(new IPViewRenderer(uncsList, pf.inspector.getExternalReferences(), pf.inspector.getImageRefs(), pf.inspector.getCopyrights(),
@@ -936,6 +938,17 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     } else {
       return "";
     }
+  }
+
+  /**
+   * The draft dependencies for qa.html. They come from the resources and what their references resolve to in the
+   * context, and a page rebuild goes on with both as the last build left them, so it uses what that build found
+   */
+  String draftDependencies(boolean pageRebuilt) throws IOException {
+    if (!pageRebuilt || pf.draftDependencies == null) {
+      pf.draftDependencies = generateDraftDependencies();
+    }
+    return pf.draftDependencies;
   }
 
   private String generateDraftDependencies() throws IOException {
@@ -2217,21 +2230,27 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   }
 
 
+  /**
+   * The latest release of the IG publisher, for qa.html. A watch session asks once, for all its builds: the answer
+   * isn't going to differ between them, and each build would wait for it again (or for it to fail)
+   */
   private String fetchCurrentIGPubVersion() {
     if (pf.currVer == null) {
-      try {
-        // This calls the GitHub api, to fetch the info on the latest release. As part of our release process, we name
-        // all tagged releases as the version number. ex: "1.1.2".
-        // This value can be grabbed from the "tag_name" field, or the "name" field of the returned JSON.
-        JsonObject json = org.hl7.fhir.utilities.json.parser.JsonParser.parseObjectFromUrl("https://api.github.com/repos/HL7/fhir-ig-publisher/releases/latest");
-        pf.currVer = json.asString("name").toString();
-      } catch (IOException e) {
-        pf.currVer = null;
-      } catch (FHIRException e) {
-        pf.currVer = null;
-      }
+      pf.currVer = watchSession != null ? watchSession.currentPublisherVersion(Publisher::lookupCurrentIGPubVersion) : lookupCurrentIGPubVersion();
     }
     return pf.currVer;
+  }
+
+  private static String lookupCurrentIGPubVersion() {
+    try {
+      // This calls the GitHub api, to fetch the info on the latest release. As part of our release process, we name
+      // all tagged releases as the version number. ex: "1.1.2".
+      // This value can be grabbed from the "tag_name" field, or the "name" field of the returned JSON.
+      JsonObject json = org.hl7.fhir.utilities.json.parser.JsonParser.parseObjectFromUrl("https://api.github.com/repos/HL7/fhir-ig-publisher/releases/latest");
+      return json.asString("name").toString();
+    } catch (IOException | FHIRException e) {
+      return null;
+    }
   }
 
   @Override
