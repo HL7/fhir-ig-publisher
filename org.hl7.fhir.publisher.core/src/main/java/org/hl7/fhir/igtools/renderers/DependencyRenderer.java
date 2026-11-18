@@ -835,7 +835,8 @@ public class DependencyRenderer {
         row.getCells().get(2).addStyle("background-color: #ffcccc");
       }
     } else if (hasDesc) {   
-      row.getCells().add(gen.new Cell(null, null, desc, null, null));
+      // the reason (dependsOn.reason, or the dependency-comment extension) is markdown (#655)
+      row.getCells().add(gen.new Cell().addMarkdown(desc));
     }
     return row;
   }

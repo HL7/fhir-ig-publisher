@@ -1528,6 +1528,8 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       new PublicationProcess().publish(CliParams.getNamedParam(args, "-source"), CliParams.getNamedParam(args, "-web"), CliParams.getNamedParam(args, "-date"),
               CliParams.getNamedParam(args, "-registry"), CliParams.getNamedParam(args, "-history"), CliParams.getNamedParam(args, "-templates"),
               CliParams.getNamedParam(args, "-temp"), CliParams.getNamedParam(args, "-zips"), args);
+    } else if (CliParams.hasNamedParam(args, "-sign-packages")) {
+      PackageSigningUpdater.execute(args, "FHIR IG Publisher " + IGVersionUtil.getVersion());
     } else if (CliParams.hasNamedParam(args, "-generate-package-registry")) {
       new PackageRegistryBuilder(CliParams.getNamedParam(args, "-generate-package-registry")).build();
     } else if (CliParams.hasNamedParam(args, "-xig")) {

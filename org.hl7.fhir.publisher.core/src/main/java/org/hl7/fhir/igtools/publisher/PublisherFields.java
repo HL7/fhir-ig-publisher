@@ -12,7 +12,7 @@ import org.hl7.fhir.igtools.publisher.modules.IPublisherModule;
 import org.hl7.fhir.igtools.publisher.realm.RealmBusinessRules;
 import org.hl7.fhir.igtools.renderers.BaseRenderer;
 import org.hl7.fhir.igtools.renderers.ValidationPresenter;
-import org.hl7.fhir.igtools.spreadsheets.MappingSpace;
+import org.hl7.fhir.utilities.MappingSpace;
 import org.hl7.fhir.igtools.templates.Template;
 import org.hl7.fhir.igtools.templates.TemplateManager;
 import org.hl7.fhir.igtools.web.PublisherConsoleLogger;
@@ -296,6 +296,11 @@ public class PublisherFields {
      * (headings, page language).
      */
     boolean accessibilityChecks = false;
+    /**
+     * Whether the XML, JSON and Turtle HTML renderings of instances have hyperlinks, from the IG parameter
+     * 'instance-hyperlinks' (yes | no | examples-only). Defaults to yes, as before the parameter existed.
+     */
+    PublisherUtils.InstanceHyperlinksMode instanceHyperlinks = PublisherUtils.InstanceHyperlinksMode.YES;
     long maxMemory = 0;
     String oidRoot;
     IniFile oidIni;

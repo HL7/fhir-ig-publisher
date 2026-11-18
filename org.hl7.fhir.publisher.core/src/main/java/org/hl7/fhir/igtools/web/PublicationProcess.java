@@ -29,6 +29,7 @@ import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.model.JsonProperty;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.hl7.fhir.utilities.npm.NpmPackageSigner;
 import org.hl7.fhir.utilities.npm.PackageGenerator.PackageType;
 import org.hl7.fhir.utilities.npm.PackageList;
 import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
@@ -679,6 +680,11 @@ public class PublicationProcess {
       FileUtilities.createDirectory(destVer);
       if (pl.isCurrentOnly()) {
         FileUtilities.copyFile(new File(Utilities.path(temp.getAbsolutePath(), "output", "package.tgz")), new File(Utilities.path(destVer, "package.tgz")));
+        // and its signature, if the build signed it
+        File sig = new File(Utilities.path(temp.getAbsolutePath(), "output", "package.tgz" + NpmPackageSigner.SIGNATURE_SUFFIX));
+        if (sig.exists()) {
+          FileUtilities.copyFile(sig, new File(Utilities.path(destVer, "package.tgz" + NpmPackageSigner.SIGNATURE_SUFFIX)));
+        }
       } else {
         FileUtils.copyDirectory(new File(Utilities.path(temp.getAbsolutePath(), "output")), new File(destVer));
       }
@@ -1401,6 +1407,11 @@ public class PublicationProcess {
 
     FileUtilities.createDirectory(destVer);
     FileUtilities.bytesToFile(npm, Utilities.path(destVer, "package.tgz"));
+    // signed like any other package, if this publisher signs (see NpmPackageSigner)
+    NpmPackageSigner signer = NpmPackageSigner.fromSettings();
+    if (signer != null) {
+      signer.sign(new File(Utilities.path(destVer, "package.tgz")), "FHIR IG Publisher " + IGVersionUtil.getVersionString());
+    }
 
     String withdrawalPage = makeWithdrawalPage(pl, prSrc, templateSrc, version);
     

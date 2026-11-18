@@ -18,6 +18,7 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.comparators.PreviousVersionComparator;
 import org.hl7.fhir.igtools.renderers.*;
 import org.hl7.fhir.igtools.renderers.CodeSystemRenderer;
+import org.hl7.fhir.igtools.renderers.NamingSystemRenderer;
 import org.hl7.fhir.igtools.renderers.ExampleScenarioRenderer;
 import org.hl7.fhir.igtools.renderers.OperationDefinitionRenderer;
 import org.hl7.fhir.igtools.renderers.QuestionnaireRenderer;
@@ -81,6 +82,7 @@ import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.model.JsonProperty;
 import org.hl7.fhir.utilities.json.model.JsonString;
 import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.hl7.fhir.utilities.npm.NpmPackageSigner;
 import org.hl7.fhir.utilities.npm.ToolsVersion;
 import org.hl7.fhir.utilities.settings.FhirSettings;
 import org.hl7.fhir.utilities.turtle.Turtle;
@@ -660,6 +662,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       throw new FHIRException("The auto-build infrastructure does not publish IGs unless the publish-box is present ("+ pf.inspector.getPublishboxParsingSummary()+"). For further information, see note at http://wiki.hl7.org/index.php?title=FHIR_Implementation_Guide_Publishing_Requirements#HL7_HTML_Standards_considerations");
     }
     generateFragmentUsage();
+    signPackages();
     log("Build final .zip");
     if (settings.getMode() == PublisherUtils.IGBuildMode.PUBLICATION) {
       IGReleaseVersionUpdater igvu = new IGReleaseVersionUpdater(pf.outputDir, null, null, new ArrayList<>(), new ArrayList<>(), null, pf.outputDir);
@@ -707,6 +710,36 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
    */
   private void ensureCorePackageDependency(NPMPackageGenerator gen) throws IOException {
     patchMissingCoreDependency(gen.getPackageJ(), gen.filename(), pf.errors);
+  }
+
+  /**
+   * Signs each package in the output with the key in fhir-settings.json (packageSigningKey), if one
+   * is configured, writing {package}.tgz.sigstore.json next to it (see NpmPackageSigner). Done once
+   * every package is finished, since a signature is over the package's final bytes. A key that is
+   * configured but can't be used stops the build: a pipeline that is meant to sign must not quietly
+   * publish unsigned packages. Signatures left in the output by an earlier build are removed first.
+   */
+  private void signPackages() throws IOException {
+    File[] stale = new File(pf.outputDir).listFiles((d, n) -> n.endsWith(".tgz" + NpmPackageSigner.SIGNATURE_SUFFIX));
+    if (stale != null) {
+      for (File f : stale) {
+        f.delete();
+      }
+    }
+    NpmPackageSigner signer = NpmPackageSigner.fromSettings();
+    if (signer == null) {
+      return;
+    }
+    File[] packages = new File(pf.outputDir).listFiles((d, n) -> n.endsWith(".tgz"));
+    if (packages == null || packages.length == 0) {
+      return;
+    }
+    Arrays.sort(packages);
+    for (File f : packages) {
+      File sig = signer.sign(f, "FHIR IG Publisher " + IGVersionUtil.getVersion());
+      pf.otherFilesRun.add(sig.getAbsolutePath());
+    }
+    log("Signed " + packages.length + " " + checkPlural("package", packages.length) + " with key " + signer.getKeyId());
   }
 
   private void genCombinedPackage() throws IOException {
@@ -1301,7 +1334,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       long start = System.currentTimeMillis();
       XmlXHtmlRenderer x = new XmlXHtmlRenderer();
       x.setPrism(prism);
-      xp.setLinkResolver(this.pf.igpkp);
+      xp.setLinkResolver(instanceLinkResolver(r));
       xp.setShowDecorations(false);
       if (suppressId(f, r)) {
         xp.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
@@ -1314,7 +1347,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       JsonXhtmlRenderer j = new JsonXhtmlRenderer();
       j.setPrism(prism);
       org.hl7.fhir.services.elementmodel.JsonParser jp = new org.hl7.fhir.services.elementmodel.JsonParser(this.pf.context);
-      jp.setLinkResolver(this.pf.igpkp);
+      jp.setLinkResolver(instanceLinkResolver(r));
       jp.setAllowComments(true);
       if (suppressId(f, r)) {
         jp.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
@@ -1326,7 +1359,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     if (wantGen(r, "ttl-html")) {
       long start = System.currentTimeMillis();
       org.hl7.fhir.services.elementmodel.TurtleParser ttl = new org.hl7.fhir.services.elementmodel.TurtleParser(this.pf.context);
-      ttl.setLinkResolver(this.pf.igpkp);
+      ttl.setLinkResolver(instanceLinkResolver(r));
       Turtle rdf = new Turtle();
       if (suppressId(f, r)) {
         ttl.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
@@ -1403,7 +1436,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
               xmlXHtmlRenderer.setPrism(true);
               xmlParser.setElideElements(true);
               xmlXHtmlRenderer.setAutoNamespaces(true);
-              xmlParser.setLinkResolver(this.pf.igpkp);
+              xmlParser.setLinkResolver(instanceLinkResolver(rX));
               xmlParser.setShowDecorations(false);
               if (suppressId(f, rX)) {
                 xmlParser.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
@@ -1414,7 +1447,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
               JsonXhtmlRenderer jsonXhtmlRenderer = new JsonXhtmlRenderer();
               jsonXhtmlRenderer.setPrism(true);
               org.hl7.fhir.services.elementmodel.JsonParser jsonParser = new org.hl7.fhir.services.elementmodel.JsonParser(this.pf.context);
-              jsonParser.setLinkResolver(this.pf.igpkp);
+              jsonParser.setLinkResolver(instanceLinkResolver(rX));
               jsonParser.setAllowComments(true);
               jsonParser.setElideElements(true);
               if (suppressId(f, rX)) {
@@ -2054,6 +2087,101 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
   }
 
+  /**
+   * StructureDefinition-{id}-mappings.csv (#1171): 
+   * 
+   * * a column for each mapping declared on the structure (that isn't suppressed), headed by the mapping identity, 
+   *   followed by a column for the comments on the mappings, if any element has a comment for that mapping
+   * * the second row has the comment on the mapping declaration itself
+   * * then a row for every snapshot element, identified by element id, whether or not it has mappings, so tools can 
+   *   fill in the missing values
+   *   
+   * The values are as they are in the definitions - no splitting, and line breaks are retained
+   */
+  private void generateMappingsCsv(StructureDefinition sd, String path) throws IOException {
+    List<StructureDefinition.StructureDefinitionMappingComponent> maps = new ArrayList<>();
+    for (StructureDefinition.StructureDefinitionMappingComponent m : sd.getMappingList()) {
+      if (m.hasIdentity() && !ExtensionUtilities.readBoolExtension(m, ExtensionDefinitions.EXT_ED_SUPPRESS)) {
+        maps.add(m);
+      }
+    }
+    List<ElementDefinition> elements = sd.hasSnapshot() ? sd.getSnapshot().getElementList() : sd.getDifferential().getElementList();
+    Set<String> commented = new HashSet<>();
+    for (ElementDefinition ed : elements) {
+      for (ElementDefinition.ElementDefinitionMappingComponent em : ed.getMappingList()) {
+        if (em.hasIdentity() && em.hasComment()) {
+          commented.add(em.getIdentity());
+        }
+      }
+    }
+
+    StringBuilder b = new StringBuilder();
+    List<String> cells = new ArrayList<>();
+    cells.add("Id");
+    for (StructureDefinition.StructureDefinitionMappingComponent m : maps) {
+      cells.add(m.getIdentity());
+      if (commented.contains(m.getIdentity())) {
+        cells.add(m.getIdentity()+" comments");
+      }
+    }
+    addCsvRow(b, cells);
+
+    cells.clear();
+    cells.add("");
+    for (StructureDefinition.StructureDefinitionMappingComponent m : maps) {
+      cells.add(m.getComment());
+      if (commented.contains(m.getIdentity())) {
+        cells.add("");
+      }
+    }
+    addCsvRow(b, cells);
+
+    for (ElementDefinition ed : elements) {
+      cells.clear();
+      cells.add(ed.hasId() ? ed.getId() : ed.getPath());
+      for (StructureDefinition.StructureDefinitionMappingComponent m : maps) {
+        CommaSeparatedStringBuilder mb = new CommaSeparatedStringBuilder("\r\n");
+        CommaSeparatedStringBuilder cb = new CommaSeparatedStringBuilder("\r\n");
+        for (ElementDefinition.ElementDefinitionMappingComponent em : ed.getMappingList()) {
+          if (m.getIdentity().equals(em.getIdentity())) {
+            if (em.hasMap()) {
+              mb.append(em.getMap());
+            }
+            if (em.hasComment()) {
+              cb.append(em.getComment());
+            }
+          }
+        }
+        cells.add(mb.toString());
+        if (commented.contains(m.getIdentity())) {
+          cells.add(cb.toString());
+        }
+      }
+      addCsvRow(b, cells);
+    }
+    FileUtilities.stringToFile(b.toString(), path);
+  }
+
+  /**
+   * every cell is quoted, so that commas and line breaks in the values are kept as they are
+   */
+  private void addCsvRow(StringBuilder b, List<String> cells) {
+    boolean first = true;
+    for (String c : cells) {
+      if (first) {
+        first = false;
+      } else {
+        b.append(",");
+      }
+      b.append("\"");
+      if (c != null) {
+        b.append(c.replace("\"", "\"\""));
+      }
+      b.append("\"");
+    }
+    b.append("\r\n");
+  }
+
   private void generateSpreadsheetsStructureDefinition(FetchedFile f, FetchedResource r, StructureDefinition sd, Map<String, String> vars, boolean regen, String prefixForContainer) throws Exception {
     String sdPrefix = this.pf.newIg ? "StructureDefinition-" : "";
     if (wantGen(r, "csv")) {
@@ -2064,6 +2192,11 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         pu.generateCsv(out, sd, true);
       }
       addToAllProfilesCsv(pu, sd);
+      if (sd.getDerivation() == StructureDefinition.TypeDerivationRule.CONSTRAINT || sd.getKind() == StructureDefinition.StructureDefinitionKind.LOGICAL) {
+        String mpath = Utilities.path(this.pf.tempDir, sdPrefix + r.getId()+"-mappings.csv");
+        f.getOutputNames().add(mpath);
+        generateMappingsCsv(sd, mpath);
+      }
     }
     if (wantGen(r, "xlsx")) {
       lapsed(null);
@@ -2455,6 +2588,22 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       long start = System.currentTimeMillis();
          fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-maps", sdr.mappings(this.pf.igpkp.getDefinitionsName(r), this.pf.otherFilesRun), f.getOutputNames(), r, vars, null, start, "maps", "StructureDefinition", lang);
     }
+    if (wantGen(r, "maps-classic")) {
+      long start = System.currentTimeMillis();
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-maps-classic", sdr.mappingsClassic(false, false), f.getOutputNames(), r, vars, null, start, "maps-classic", "StructureDefinition", lang);
+    }
+    if (wantGen(r, "maps-classic-all")) {
+      long start = System.currentTimeMillis();
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-maps-classic-all", sdr.mappingsClassic(true, false), f.getOutputNames(), r, vars, null, start, "maps-classic-all", "StructureDefinition", lang);
+    }
+    if (wantGen(r, "maps-classic-diff")) {
+      long start = System.currentTimeMillis();
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-maps-classic-diff", sdr.mappingsClassic(false, true), f.getOutputNames(), r, vars, null, start, "maps-classic-diff", "StructureDefinition", lang);
+    }
+    if (wantGen(r, "maps-classic-diff-all")) {
+      long start = System.currentTimeMillis();
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-maps-classic-diff-all", sdr.mappingsClassic(true, true), f.getOutputNames(), r, vars, null, start, "maps-classic-diff-all", "StructureDefinition", lang);
+    }
     if (wantGen(r, "xref")) {
       long start = System.currentTimeMillis();
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-sd-xref", sdr.references(lang, lrc), f.getOutputNames(), r, vars, null, start, "xref", "StructureDefinition", lang);
@@ -2554,6 +2703,18 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
   }
 
+  /**
+   * The link resolver for the XML, JSON and Turtle HTML renderings of an instance, or null when the
+   * IG parameter 'instance-hyperlinks' says the rendering of this instance has no links
+   */
+  private ParserBase.ILinkResolver instanceLinkResolver(FetchedResource r) {
+    switch (pf.instanceHyperlinks) {
+    case NO: return null;
+    case EXAMPLES_ONLY: return r.isExample() ? pf.igpkp : null;
+    default: return pf.igpkp;
+    }
+  }
+
   private boolean wantGen(FetchedResource r, String code) {
     if (pf.wantGenParams.containsKey(code)) {
       Boolean genParam = pf.wantGenParams.get(code);
@@ -2621,6 +2782,15 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       long start = System.currentTimeMillis();
       fragment(cr.fhirType()+"-"+prefixForContainer+cr.getId()+"-summary-table", smr.summaryTable(r, wantGen(r, "xml"), wantGen(r, "json"), wantGen(r, "ttl"), this.pf.igpkp.summaryRows()), f.getOutputNames(), r, vars, null, start, "summary-table", "Canonical", lang);
     }
+  }
+
+  private void generateOutputsNamingSystem(FetchedFile f, FetchedResource r, NamingSystem ns, Map<String,String> vars, String prefixForContainer, RenderingContext lrc, String lang) throws Exception {
+    generateOutputsCanonical(f, r, ns, vars, prefixForContainer, lrc, lang);
+    NamingSystemRenderer nsr = new NamingSystemRenderer(this.pf.context, this.pf.specPath, ns, this.pf.igpkp, this.pf.specMaps, pageTargets(), this.pf.markdownEngine, this.pf.packge, lrc, this.pf.versionToAnnotate, this.pf.relatedIGs, this);
+    nsr.setFileList(this.pf.fileList);
+    // always generated (empty unless kind = codesystem), so templates can include it unconditionally (#1187)
+    long start = System.currentTimeMillis();
+    fragment("NamingSystem-"+prefixForContainer+ns.getId()+"-xref", nsr.xref(), f.getOutputNames(), r, vars, null, start, "xref", "NamingSystem", lang);
   }
 
   private void generateOutputsLibrary(FetchedFile f, FetchedResource r, Library lib, Map<String,String> vars, String prefixForContainer, RenderingContext lrc, String lang) throws Exception {
@@ -5234,7 +5404,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       if (info.getFmm() != null) {
         jo.add("fmm", info.getFmm());
       }
-      if (info.getSstatusSupport() != null) {
+      if (info.getFmmSupport() != null) {
         jo.add("fmm-support", info.getFmmSupport());
       }
       if (info.getStatus() != null && !jo.has("status")) {
@@ -5732,6 +5902,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           break;
         case "ExampleScenario":
           generateOutputsExampleScenario(f, r, (ExampleScenario) res, vars, prefixForContainer, lrc, lang);
+          break;
+        case "NamingSystem":
+          generateOutputsNamingSystem(f, r, (NamingSystem) res, vars, prefixForContainer, lrc, lang);
           break;
         default:
           if (res instanceof CanonicalResource) {
@@ -7588,7 +7761,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     if (info.getFmm() != null) {
       jo.add("fmm", info.getFmm());
     }
-    if (info.getSstatusSupport() != null) {
+    if (info.getFmmSupport() != null) {
       jo.add("fmm-support", info.getFmmSupport());
     }
     if (info.getStatus() != null && !jo.has("status")) {
