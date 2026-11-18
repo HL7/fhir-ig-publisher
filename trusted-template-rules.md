@@ -41,10 +41,20 @@ A template on the trusted list can run code on the ci-build: its ant scripts and
 
 11. **No Jekyll plugins.** `_plugins/`, `plugins` and `whitelist` in `_config.yml`, and a `Gemfile` or `gems.rb` are all ignored or refused. Jekyll runs with `--safe` and a fixed `--source`, and doesn't follow symlinks.
 
+## Pages built with Liquid
+
+12. **Escape what you put into HTML.** Your layouts and includes build pages from values that come from the IG: titles, names, descriptions, ids, links and the data files in `_data`. If a value is written into the page as it is, any HTML or script in it becomes part of the page. Anyone who reads it then runs that script on build.fhir.org or hl7.org (this is called cross-site scripting). So escape every value for where it goes:
+    - Text in the page or in an attribute: `{{ value | escape }}`. Always quote attributes, e.g. `title="{{ value | escape }}"`.
+    - Part of a URL: `{{ value | url_encode }}`. A whole link the IG supplies should only be used if it starts with `http://`, `https://` or a relative path, never `javascript:`.
+    - For a script: put the value in an escaped `data-` attribute (`data-name="{{ value | escape }}"`) and read it from the script. Don't paste it into the script text, even with `jsonify`, which doesn't stop a value ending the `<script>` block early.
+    - Never use a value to choose what to include (`{% include {{ value }} %}`).
+
+    Leave a value unescaped only if it is meant to be HTML that the publisher has already produced (such as a rendered narrative or fragment), and say so in a comment beside it.
+
 ## Network
 
-12. **Use `<get>` only with fixed URLs,** or URLs built from fixed parts, and honour `ig.networkprohibited`.
+13. **Use `<get>` only with fixed URLs,** or URLs built from fixed parts, and honour `ig.networkprohibited`.
 
 ## Changes
 
-13. **Have changes reviewed before release.** Any change to a trusted template's `scripts/` or `config.json` is reviewed before it's released. Adding a template to the trusted list is agreed with the FHIR Product Director first.
+14. **Have changes reviewed before release.** Any change to a trusted template's `scripts/` or `config.json` is reviewed before it's released. Adding a template to the trusted list is agreed with the FHIR Product Director first.
