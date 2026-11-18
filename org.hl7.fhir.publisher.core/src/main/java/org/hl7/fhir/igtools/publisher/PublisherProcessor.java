@@ -2001,8 +2001,14 @@ public class PublisherProcessor extends PublisherBase  {
     for (FetchedFile f : pf.changeList) {
       f.start("translate");
       try {
-        for (FetchedResource r : f.getResources()) {
-          pt.translate(f, r);
+        if (pf.rapido == null || !pf.rapido.reuseTranslations(f)) {
+          List<String> written = new ArrayList<>();
+          for (FetchedResource r : f.getResources()) {
+            written.addAll(pt.translate(f, r));
+          }
+          if (pf.rapido != null) {
+            pf.rapido.recordTranslations(f, written);
+          }
         }
       } finally {
         f.finish("translate");
