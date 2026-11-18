@@ -88,6 +88,8 @@ public class Template {
   public static final int IG_ANY = 1;
   public static final int IG_NO_RESOURCE = 2;
   private static final boolean USE_R5_IG_FORMAT = false;
+  /** see whyNoPageRebuild() */
+  static final String SCRIPT_INPUTS = "script-inputs";
   
   private NpmPackage pack;
   private JsonObject configuration;
@@ -746,6 +748,43 @@ public class Template {
       return messages;
     } else
       return null;
+  }
+
+  /**
+   * Why the template's scripts may read what a watch mode page rebuild changes (see PageRebuild), or null if they
+   * can't. A page rebuild doesn't run the onLoad, onGenerate and onJekyll scripts again, so a template that has scripts
+   * must declare which files and folders of the IG they read, as paths from the IG's folder:
+   * <pre>"script-inputs": ["input/includes/menu.xml", "input/data"]</pre>
+   * (an empty list if they read none). A template that doesn't gets a complete build. The onJekyll script runs on the
+   * temp folder, which has the pages in it, so a template that has one gets a complete build too. (The onCheck script
+   * runs again in a page rebuild)
+   */
+  public String whyNoPageRebuild() {
+    if (script == null) {
+      return null;
+    }
+    if (targetOnJekyll != null) {
+      return "the template runs a script before Jekyll";
+    }
+    if (!declaresScriptInputs()) {
+      return "the template doesn't declare what its scripts read (" + SCRIPT_INPUTS + " in its config.json)";
+    }
+    return null;
+  }
+
+  /** The files and folders that the template declares its scripts read (see whyNoPageRebuild()) */
+  public List<String> getScriptInputs() throws IOException {
+    List<String> res = new ArrayList<>();
+    if (declaresScriptInputs()) {
+      for (String s : configuration.getStrings(SCRIPT_INPUTS)) {
+        res.add(Utilities.path(root, s));
+      }
+    }
+    return res;
+  }
+
+  private boolean declaresScriptInputs() {
+    return configuration.has(SCRIPT_INPUTS) && configuration.get(SCRIPT_INPUTS).isJsonArray();
   }
 
   public Map<String, List<ValidationMessage>> onCheckEvent(IWorkerContext context, ImplementationGuide ig) throws IOException, FHIRException {

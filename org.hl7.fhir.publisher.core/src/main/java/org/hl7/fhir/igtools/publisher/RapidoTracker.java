@@ -894,7 +894,7 @@ public class RapidoTracker {
     state.add("version", STATE_VERSION);
     File sf = new File(stateFile);
     FileUtilities.createDirectory(sf.getParent());
-    int txFailures = txFailures();
+    int txFailures = txFailures(pf);
     if (txFailures > 0) {
       // what the build made from those calls isn't what the server would have said, so none of it can be reused
       state.add("txFailures", txFailures);
@@ -949,7 +949,7 @@ public class RapidoTracker {
   }
 
   /** the terminology calls of this build that got no answer, including the ones that ask the registry which server to use */
-  private int txFailures() {
+  static int txFailures(PublisherFields pf) {
     int res = pf.txFailures == null ? 0 : pf.txFailures.count();
     if (pf.context != null && pf.context.getTxClientManager() != null) {
       for (TerminologyClientManager.InternalLogEvent e : pf.context.getTxClientManager().getInternalLog()) {

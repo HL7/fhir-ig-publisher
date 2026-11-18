@@ -64,6 +64,7 @@ public class TemplateManager {
   private Map<String, String> templateOverrides = new LinkedHashMap<>(); // template id (name#version, or just name) -> local folder
   private boolean usedOverride;
   private final List<String> localFolders = new ArrayList<>(); // the local folders the last template was loaded from
+  private boolean scriptInputsDropped; // like configs, for the one template a manager loads
 
   private static final String ACCESSIBLE_MARKER = "[%accessibility-routines%]";
   private static final String JS_ROUTINE_NAME_REGEX = "[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)*";
@@ -301,7 +302,8 @@ public class TemplateManager {
     if (scriptReason != null) {
       checkTemplateId(template, npm.name(), scriptReason);
     }
-    if (level==0 && configs.size() > 1) {
+    dropUndeclaredScriptInputs(config, scriptReason, templateDir, files);
+    if (level==0 && (configs.size() > 1 || scriptInputsDropped)) {
       config = configs.get(0);
       for (int i=1;i<configs.size(); i++) {
         applyConfigChanges(config, configs.get(i));
@@ -354,6 +356,40 @@ public class TemplateManager {
     FileUtilities.stringToFile(src, path);
   }
   
+  /**
+   * script-inputs declare what the scripts of a template and the templates before it read (see
+   * Template.whyNoPageRebuild()); the merged config lists the declarations of all the templates. A template with
+   * active content (a script, targets, an overwritten ant script, files that could be scripts) or other scripts that
+   * doesn't declare makes the declarations before it incomplete, so they are dropped
+   */
+  private void dropUndeclaredScriptInputs(JsonObject config, String scriptReason, String templateDir, List<String> files) {
+    if (configs.stream().noneMatch(c -> c.has(Template.SCRIPT_INPUTS)) || (config != null && config.has(Template.SCRIPT_INPUTS))) {
+      return; // no declaration to drop, or this template declares
+    }
+    if (scriptReason != null || (config != null && config.has("otherScripts")) || overwritesAntScript(templateDir, files)) {
+      for (JsonObject c : configs) {
+        if (c.has(Template.SCRIPT_INPUTS)) {
+          c.remove(Template.SCRIPT_INPUTS);
+          scriptInputsDropped = true;
+        }
+      }
+    }
+  }
+
+  /** the scan for active content compares paths with the platform's separator, so on Windows it misses this */
+  private boolean overwritesAntScript(String templateDir, List<String> files) {
+    for (String fn : files) {
+      if (isAntScript(antScripts, FileUtilities.getRelativePath(templateDir, fn))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  static boolean isAntScript(Set<String> antScripts, String relativePath) {
+    return antScripts.contains(relativePath.replace('\\', '/'));
+  }
+
   private void applyConfigChanges(JsonObject baseConfig, JsonObject deltaConfig) throws FHIRException {
     for (JsonProperty p : deltaConfig.getProperties()) {
       if (baseConfig.has(p.getName())) {
