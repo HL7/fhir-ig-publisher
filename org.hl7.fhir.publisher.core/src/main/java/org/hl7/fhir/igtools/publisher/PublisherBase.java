@@ -327,6 +327,15 @@ public class PublisherBase implements ILoggingService {
     return false;
   }
 
+  /** Writes the file, unless it holds exactly this already: then it's left alone, and keeps its modified time */
+  static void writeIfChanged(byte[] bs, String path) throws IOException {
+    File f = new File(path);
+    if (f.isFile() && f.length() == bs.length && Arrays.equals(bs, FileUtilities.fileToBytes(path))) {
+      return;
+    }
+    FileUtilities.bytesToFile(bs, path);
+  }
+
   protected String str(JsonObject obj, String name) throws Exception {
     if (!obj.has(name))
       throw new Exception("Property '"+name+"' not found");
