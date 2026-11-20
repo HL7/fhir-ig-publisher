@@ -342,7 +342,10 @@ public class PublisherProcessor extends PublisherBase  {
       if (!inTargetCore(tnpm, valueSet)) {
         if (!npm.hasFile(NPMPackageGenerator.Category.RESOURCE, valueSet.fhirType()+"-"+valueSet.getIdBase()+".json")) {
           noteOtherVersionAddedFile(tctxt.getFHIRVersion(), "ValueSet", valueSet.getIdBase());
-          npm.addFile(NPMPackageGenerator.Category.RESOURCE, valueSet.fhirType()+"-"+valueSet.getIdBase()+".json", convVersion(valueSet, tctxt.getFHIRVersion()));
+          // a copy: the pins are changed for the target version, and convVersion changes what it's given
+          ValueSet copy = valueSet.copy(Base.COPY_DATA);
+          repinToTarget(copy, new TargetCoreLookup(tctxt, tnpm));
+          npm.addFile(NPMPackageGenerator.Category.RESOURCE, valueSet.fhirType()+"-"+valueSet.getIdBase()+".json", convVersion(copy, tctxt.getFHIRVersion()));
         }
       }
     }
@@ -368,6 +371,83 @@ public class PublisherProcessor extends PublisherBase  {
         if (!npm.hasFile(NPMPackageGenerator.Category.RESOURCE, cs.fhirType()+"-"+cs.getIdBase()+".json")) {
           noteOtherVersionAddedFile(tctxt.getFHIRVersion(), "CodeSystem", cs.getIdBase());
           npm.addFile(NPMPackageGenerator.Category.RESOURCE, cs.fhirType()+"-"+cs.getIdBase()+".json", convVersion(cs, tctxt.getFHIRVersion()));
+        }
+      }
+    }
+  }
+
+  /**
+   * What a value set copied into another version's package can depend on: whether a code system or
+   * value set it refers to is copied into that package too (checkForCoreDependenciesCS/VS), and if
+   * not, the version the target version's core has of it (null if it doesn't have it)
+   */
+  interface ITargetLookup {
+    boolean isCopied(String type, String url, String version);
+    String targetVersion(String type, String url);
+  }
+
+  private class TargetCoreLookup implements ITargetLookup {
+    private final SimpleWorkerContext tctxt;
+    private final NpmPackage tnpm;
+
+    TargetCoreLookup(SimpleWorkerContext tctxt, NpmPackage tnpm) {
+      this.tctxt = tctxt;
+      this.tnpm = tnpm;
+    }
+
+    @Override
+    public boolean isCopied(String type, String url, String version) {
+      CanonicalResource cr = "CodeSystem".equals(type)
+          ? pf.context.fetchResource(CodeSystem.class, url, VersionResolutionRules.defaultRule(), version)
+          : pf.context.fetchResource(ValueSet.class, url, VersionResolutionRules.defaultRule(), version);
+      try {
+        return cr != null && isCoreResource(cr) && !inTargetCore(tnpm, cr);
+      } catch (IOException e) {
+        return false;
+      }
+    }
+
+    @Override
+    public String targetVersion(String type, String url) {
+      CanonicalResource cr = "CodeSystem".equals(type) ? tctxt.fetchResource(CodeSystem.class, url, VersionResolutionRules.defaultRule()) : tctxt.fetchResource(ValueSet.class, url, VersionResolutionRules.defaultRule());
+      return cr != null && cr.hasVersion() ? cr.getVersion() : null;
+    }
+  }
+
+  /**
+   * A core value set copied into another version's package (because that version's core doesn't
+   * have it) can be pinned to the source version of a code system or value set that the package
+   * doesn't have: R5's value-filter-comparator, copied into the R4 package of the extensions IG,
+   * pinned search-comparator|5.0.0, and R4 has search-comparator (4.0.1), so it isn't copied.
+   * When the target version's core has it, that's what applies there: the pin is changed to the
+   * target's version. A pin to something that is copied across is left as it is
+   */
+  static void repinToTarget(ValueSet vs, ITargetLookup lookup) {
+    for (ValueSet.ConceptSetComponent inc : vs.getCompose().getIncludeList()) {
+      repinToTarget(inc, lookup);
+    }
+    for (ValueSet.ConceptSetComponent inc : vs.getCompose().getExcludeList()) {
+      repinToTarget(inc, lookup);
+    }
+  }
+
+  private static void repinToTarget(ValueSet.ConceptSetComponent inc, ITargetLookup lookup) {
+    if (inc.hasSystem() && inc.hasVersion() && !lookup.isCopied("CodeSystem", inc.getSystem(), inc.getVersion())) {
+      String tv = lookup.targetVersion("CodeSystem", inc.getSystem());
+      if (tv != null) {
+        inc.setVersion(tv);
+      }
+    }
+    for (CanonicalType ct : inc.getValueSetList()) {
+      String v = ct.getValue();
+      if (v != null && v.contains("|")) {
+        String url = v.substring(0, v.indexOf("|"));
+        String version = v.substring(v.indexOf("|") + 1);
+        if (!lookup.isCopied("ValueSet", url, version)) {
+          String tv = lookup.targetVersion("ValueSet", url);
+          if (tv != null) {
+            ct.setValue(url + "|" + tv);
+          }
         }
       }
     }
