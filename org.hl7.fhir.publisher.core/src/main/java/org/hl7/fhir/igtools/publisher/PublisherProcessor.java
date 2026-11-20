@@ -631,6 +631,11 @@ public class PublisherProcessor extends PublisherBase  {
     }
     logDebugMessage(LogCategory.PROGRESS, " .. check Profile Examples");
     logDebugMessage(LogCategory.PROGRESS, "gen narratives");
+    validateSDs();
+  }
+
+  void validateSDs() {
+    extensionUsages = null;
     for (FetchedFile f : pf.fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.fhirType().equals("StructureDefinition")) {
@@ -638,6 +643,7 @@ public class PublisherProcessor extends PublisherBase  {
         }
       }
     }
+    extensionUsages = null;
   }
 
   private void validate(FetchedFile f, FetchedResource r, Binary bin, List<ValidationMessage> errs, FhirFormat fmt, List<StructureDefinition> profiles) {
@@ -1917,27 +1923,33 @@ public class PublisherProcessor extends PublisherBase  {
   }
 
 
+  /** extension url -> times used in the IG; counted in one walk when validateSDs first needs it */
+  private Map<String, Integer> extensionUsages;
+
   private int countUsages(String fixedUrl) {
-    int res = 0;
-    for (FetchedFile f : pf.fileList) {
-      for (FetchedResource r : f.getResources()) {
-        res = res + countExtensionUsage(r.getElement(), fixedUrl);
+    if (extensionUsages == null) {
+      extensionUsages = new HashMap<>();
+      for (FetchedFile f : pf.fileList) {
+        for (FetchedResource r : f.getResources()) {
+          countExtensionUsages(r.getElement(), extensionUsages);
+        }
       }
     }
-    return res;
+    return extensionUsages.getOrDefault(fixedUrl, 0);
   }
 
 
 
-  private int countExtensionUsage(Element element, String url) {
-    int res = 0;
-    if (element.fhirType().equals("Extension") && url.equals(element.getChildValue("url"))) {
-      res = res + 1;
+  private void countExtensionUsages(Element element, Map<String, Integer> counts) {
+    if (element.fhirType().equals("Extension")) {
+      String url = element.getChildValue("url");
+      if (url != null) {
+        counts.merge(url, 1, Integer::sum);
+      }
     }
     for (Element child : element.getChildList()) {
-      res = res + countExtensionUsage(child, url);
+      countExtensionUsages(child, counts);
     }
-    return res;
   }
 
 
