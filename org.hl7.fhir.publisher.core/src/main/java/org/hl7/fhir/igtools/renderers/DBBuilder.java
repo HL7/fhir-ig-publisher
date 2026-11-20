@@ -47,6 +47,9 @@ import org.hl7.fhir.utilities.json.model.JsonString;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
+import org.sqlite.ProgressHandler;
+import org.sqlite.SQLiteConnection;
+import org.sqlite.SQLiteLimits;
 
 public class DBBuilder {
 
@@ -1079,7 +1082,64 @@ public class DBBuilder {
     return i;
   }
 
+  /** how long the SQL in a page can run (seconds) */
+  public static final int MAX_QUERY_SECONDS = 60;
+  /** the longest string or blob the SQL in a page can make (bytes) */
+  public static final int MAX_QUERY_VALUE_LENGTH = 100_000_000;
+  /** SQLite's own default for SQLITE_LIMIT_LENGTH, which is what the build itself runs with */
+  private static final int SQLITE_DEFAULT_LENGTH = 1_000_000_000;
+
+  /**
+   * The SQL in a page comes from the IG, and SQLite has no limit on how long a query runs (a recursive CTE needn't
+   * ever stop) or on how big the strings it makes are (printf and zeroblob make them in native memory, outside the
+   * Java heap). setQueryTimeout doesn't help: in the sqlite-jdbc driver it only covers waiting for locks. So while a
+   * page's SQL runs, a progress handler stops it after MAX_QUERY_SECONDS, and longer values than MAX_QUERY_VALUE_LENGTH
+   * are refused. Both are put back afterwards, for the build's own use of the database
+   */
+  private int maxQuerySeconds = MAX_QUERY_SECONDS;
+
+  /** for tests */
+  void setMaxQuerySeconds(int maxQuerySeconds) {
+    this.maxQuerySeconds = maxQuerySeconds;
+  }
+
+  private void startPageQuery() throws SQLException {
+    con.unwrap(SQLiteConnection.class).setLimit(SQLiteLimits.SQLITE_LIMIT_LENGTH, MAX_QUERY_VALUE_LENGTH);
+    final long deadline = System.currentTimeMillis() + maxQuerySeconds * 1000L;
+    ProgressHandler.setHandler(con, 10000, new ProgressHandler() {
+      @Override
+      protected int progress() {
+        return System.currentTimeMillis() > deadline ? 1 : 0;
+      }
+    });
+  }
+
+  private void endPageQuery() {
+    try {
+      ProgressHandler.clearHandler(con);
+      con.unwrap(SQLiteConnection.class).setLimit(SQLiteLimits.SQLITE_LIMIT_LENGTH, SQLITE_DEFAULT_LENGTH);
+    } catch (SQLException e) {
+      // the connection is gone
+    }
+  }
+
   public synchronized String processSQL(String sql) {
+    if (con == null) {
+      return "<span style=\"color: maroon\">Error processing SQL: SQL is not set up properly</span>";
+    }
+    try {
+      startPageQuery();
+    } catch (SQLException e) {
+      return "<span style=\"color: maroon\">Error processing SQL: "+Utilities.escapeXml(e.getMessage())+"</span>";
+    }
+    try {
+      return processSQLInner(sql);
+    } finally {
+      endPageQuery();
+    }
+  }
+
+  private String processSQLInner(String sql) {
     long start = System.currentTimeMillis();
     if (con == null) {
       return "<span style=\"color: maroon\">Error processing SQL: SQL is not set up properly</span>";
@@ -1280,6 +1340,18 @@ public class DBBuilder {
   }
 
   public synchronized String executeQueryToJson(String sql) throws SQLException {
+    if (con == null) {
+      throw new IllegalStateException("No database connection available.");
+    }
+    startPageQuery();
+    try {
+      return executeQueryToJsonInner(sql);
+    } finally {
+      endPageQuery();
+    }
+  }
+
+  private String executeQueryToJsonInner(String sql) throws SQLException {
     if (con == null) {
       throw new IllegalStateException("No database connection available.");
     }

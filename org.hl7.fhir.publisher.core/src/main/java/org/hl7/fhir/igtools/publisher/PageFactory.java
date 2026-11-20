@@ -208,7 +208,7 @@ public class PageFactory {
   private void checks(String repoSource, ImplementationGuide ig) throws IOException {
     checkFileExists("source-file", Utilities.path(repoSource, sourceFile()));
     checkFileExists("page folder", dir);
-    FileUtilities.clearDirectory(dir);
+    PublisherUtils.clearFolder(dir);
     FileUtilities.createDirectory(Utilities.path(dir, "_includes"));
   }
 

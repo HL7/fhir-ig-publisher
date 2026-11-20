@@ -352,7 +352,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       }
     }
     if (pf.templateLoaded && new File(rootDir).exists()) {
-      FileUtilities.clearDirectory(Utilities.path(rootDir, "template"));
+      PublisherUtils.clearFolder(Utilities.path(rootDir, "template"));
     }
     if (pf.folderToDelete != null) {
       try {
@@ -483,8 +483,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     qaJson.add("version", Constants.VERSION);
     qaJson.add("tool", Constants.VERSION+" ("+ToolsVersion.TOOLS_VERSION+")");
     try {
-      File od = new File(pf.outputDir);
-      FileUtils.cleanDirectory(od);
+      PublisherUtils.clearFolder(pf.outputDir);
       pf.npm = new NPMPackageGenerator(Utilities.path(pf.outputDir, "package.tgz"), pf.templateInfo, pf.getExecTime().getTime(), !settings.isPublishing());
       pf.npm.loadFiles(pf.rootDir, ".npmignore", new File(pf.rootDir), ".git", "output", "package", "temp");
       pf.npm.finish();
@@ -1764,6 +1763,9 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       }
       if (CliParams.hasNamedParam(args, "-trust-template")) {
         self.settings.setTrustTemplate(CliParams.getNamedParam(args, "-trust-template"));
+      }
+      if (CliParams.hasNamedParam(args, ExternalLinkPermission.PARAMETER)) {
+        self.settings.setAllowExternalLinks(true);
       }
       if (CliParams.hasNamedParam(args, "-jekyll")) {
         self.settings.setJekyllCommand(CliParams.getNamedParam(args, "-jekyll"));

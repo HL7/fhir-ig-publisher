@@ -88,7 +88,7 @@ public class FSHRunner {
         // npm takes its configuration (.npmrc, including the registry it installs from) and the packages it runs
         // (node_modules) from the folder it's run in and the folders above it, so it isn't run in the IG's folder, or
         // anywhere below it: it's run in an empty folder of its own, with a random name, and told where the IG is
-        File workDir = Files.createTempDirectory("sushi-").toFile();
+        File workDir = makeWorkFolder();
         exec.setWorkingDirectory(workDir);
         ExecuteWatchdog watchdog = new ExecuteWatchdog(fshTimeout);
         exec.setWatchdog(watchdog);
@@ -140,6 +140,17 @@ public class FSHRunner {
                 throw new FHIRException("Sushi can't be run: the IG has its own copy of sushi ("+new File(new File(f, "node_modules"), "fsh-sushi").getAbsolutePath()+"). Remove it");
             }
         }
+    }
+
+    /**
+     * The empty folder npm is run in. npm also looks in the folders above it (on a shared machine, another user can put
+     * a node_modules/fsh-sushi or an .npmrc in /tmp), unless the folder has a package.json of its own: then npm stops
+     * there
+     */
+    static File makeWorkFolder() throws IOException {
+        File workDir = Files.createTempDirectory("sushi-").toFile();
+        Files.write(new File(workDir, "package.json").toPath(), "{}".getBytes(StandardCharsets.UTF_8));
+        return workDir;
     }
 
     private static void deleteQuietly(File dir) {

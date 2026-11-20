@@ -43,6 +43,7 @@ import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+import org.hl7.fhir.igtools.publisher.PublisherUtils;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.IniFile;
@@ -137,7 +138,7 @@ public class TemplateManager {
     boolean inPlace = template.equals("#template");
     if (!inPlace) {
       FileUtilities.createDirectory(templateDir);
-      FileUtilities.clearDirectory(templateDir);
+      PublisherUtils.clearFolder(templateDir);
     };
     List<String> scriptTemplates = new ArrayList<String>();
     
@@ -641,9 +642,11 @@ public class TemplateManager {
         URL url = URI.create(zipUrl(template)).toURL();
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         connection.setRequestMethod("GET");
+        connection.setConnectTimeout(PublisherUtils.DOWNLOAD_CONNECT_TIMEOUT);
+        connection.setReadTimeout(PublisherUtils.DOWNLOAD_READ_TIMEOUT);
         byte[] zip;
         try (InputStream in = connection.getInputStream()) {
-          zip = in.readAllBytes();
+          zip = PublisherUtils.readLimited(in, MAX_TEMPLATE_DOWNLOAD, "The template "+template);
         }
         checkZipEntryNames(zip, url.toString());
         return NpmPackage.fromZip(new ByteArrayInputStream(zip), true, url.toString()); 
@@ -660,6 +663,9 @@ public class TemplateManager {
    * content/../scripts/ant.xml is written over scripts/ant.xml (a trusted base template's script), but the list of the
    * files unpacked - which is what the active content check looks at - still says content/../scripts/ant.xml
    */
+  /** the largest template zip that will be downloaded from github (bytes) */
+  public static final long MAX_TEMPLATE_DOWNLOAD = 200L * 1024 * 1024;
+
   static void checkZipEntryNames(byte[] zip, String source) throws IOException {
     try (ZipInputStream zin = new ZipInputStream(new ByteArrayInputStream(zip))) {
       ZipEntry ze;

@@ -323,6 +323,7 @@ public class PublisherIGLoader extends PublisherBase {
       log("Root directory: " + pf.rootDir);
     }
     pf.fetcher.setRootDir(pf.rootDir);
+    checkNoLinksOut();
     pf.killFile = new File(Utilities.path(pf.rootDir, "ig-publisher.kill"));
     // ok, first we load the template
     String templateName = ini.getStringProperty("IG", "template");
@@ -1007,21 +1008,34 @@ public class PublisherIGLoader extends PublisherBase {
       }
     }
     if (ini.hasProperty("IG", "jekyll-timeout")) { //todo: consider adding this to ImplementationGuideDefinitionParameterComponent
-      pf.jekyllTimeout = ini.getLongProperty("IG", "jekyll-timeout") * 1000;
+      pf.jekyllTimeout = jekyllTimeout(ini.getLongProperty("IG", "jekyll-timeout") * 1000, settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD);
+      if (pf.jekyllTimeout < ini.getLongProperty("IG", "jekyll-timeout") * 1000) {
+        log("jekyll-timeout in ig.ini is "+ini.getLongProperty("IG", "jekyll-timeout")+" seconds, but the ci-build allows Jekyll at most "+(MAX_CI_JEKYLL_TIMEOUT/1000)+" seconds");
+      }
     }
 
+    // before either is cleared or written to
+    if (settings.getMode() != PublisherUtils.IGBuildMode.WEBSERVER) {
+      checkInsideRoot(pf.tempDir, "temp");
+      checkInsideRoot(pf.outputDir, "output");
+    }
     if (pf.template.isDevMode() && !settings.isRapidoMode()) {
       // (Rapido hashes the template, and clears the temp folder itself when it changes: clearing it here would throw
       // away what Rapido reuses, in every build with a local template)
-      FileUtilities.clearDirectory(pf.tempDir);
+      PublisherUtils.clearFolder(pf.tempDir);
     } else {
       File fTempDir = new File(pf.tempDir);
       if (fTempDir.exists()) {
         {
           for (File ff : fTempDir.listFiles()) {
-            if (ff.getName().startsWith("comparison-") && ff.isDirectory()) {
-              FileUtilities.clearDirectory(ff.getAbsolutePath());
-              ff.delete();
+            if (ff.getName().startsWith("comparison-")) {
+              if (Files.isSymbolicLink(ff.toPath())) {
+                // the link, not what it links to
+                ff.delete();
+              } else if (ff.isDirectory()) {
+                PublisherUtils.clearFolder(ff.getAbsolutePath());
+                ff.delete();
+              }
             }
           }
         }
@@ -1089,7 +1103,7 @@ public class PublisherIGLoader extends PublisherBase {
     logDebugMessage(LogCategory.INIT, "Output: "+ pf.outputDir);
     forceDir(pf.outputDir);
     setUpWatchOutput();
-    FileUtilities.clearDirectory(pf.outputDir);
+    PublisherUtils.clearFolder(pf.outputDir);
     if (pf.qaDir != null) {
       logDebugMessage(LogCategory.INIT, "QA Dir: "+ pf.qaDir);
       forceDir(pf.qaDir);
@@ -1106,10 +1120,10 @@ public class PublisherIGLoader extends PublisherBase {
     FileUtilities.createDirectory(pf.vsCache);
     if (settings.getCacheOption() == PublisherUtils.CacheOption.CLEAR_ALL) {
       log("Terminology Cache is at "+ pf.vsCache +". Clearing now");
-      FileUtilities.clearDirectory(pf.vsCache);
+      PublisherUtils.clearFolder(pf.vsCache);
     } else if (settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD) {
       log("Terminology Cache is at "+ pf.vsCache +". Trimming now");
-      FileUtilities.clearDirectory(pf.vsCache, "snomed.cache", "loinc.cache", "ucum.cache");
+      PublisherUtils.clearFolder(pf.vsCache, "snomed.cache", "loinc.cache", "ucum.cache");
     } else if (settings.getCacheOption() == PublisherUtils.CacheOption.CLEAR_ERRORS) {
       log("Terminology Cache is at "+ pf.vsCache +". Clearing Errors now");
       logDebugMessage(LogCategory.INIT, "Deleted "+Integer.toString(clearErrors(pf.vsCache))+" files");
@@ -1497,7 +1511,7 @@ public class PublisherIGLoader extends PublisherBase {
         }
       }
     } else {
-      FileUtilities.clearDirectory(pf.tempDir);
+      PublisherUtils.clearFolder(pf.tempDir);
     }
     forceDir(pf.tempDir);
     forceDir(Utilities.path(pf.tempDir, "_includes"));
@@ -1522,6 +1536,7 @@ public class PublisherIGLoader extends PublisherBase {
     pf.rootDir = settings.getConfigFile();
     pf.outputDir = Utilities.path(pf.rootDir, "output");
     pf.tempDir = Utilities.path(pf.rootDir, "temp");
+    checkNoLinksOut();
     checkInsideRoot(pf.outputDir, "output");
     checkInsideRoot(pf.tempDir, "temp");
     checkTrustedTemplateSource(pf.templateInfo.asString("name"), true);
@@ -2203,6 +2218,14 @@ public class PublisherIGLoader extends PublisherBase {
     return dep;
   }
 
+  /** the longest the ci-build lets Jekyll run (ms), whatever ig.ini says: the ci-build kills the whole build at 10 hours */
+  public static final long MAX_CI_JEKYLL_TIMEOUT = 60 * 60 * 1000;
+
+  /** the Jekyll timeout the IG asks for (ms), but no more than MAX_CI_JEKYLL_TIMEOUT on the ci-build */
+  static long jekyllTimeout(long requested, boolean ciBuild) {
+    return ciBuild ? Math.min(requested, MAX_CI_JEKYLL_TIMEOUT) : requested;
+  }
+
   /**
    * The folder path-tx-cache names (relative to the IG root, or absolute), or null if it isn't inside the IG's folder
    * (the folder ig.ini is in). Symbolic links are followed, as far as the path exists, since a repository can have one
@@ -2218,19 +2241,21 @@ public class PublisherIGLoader extends PublisherBase {
    * the IG's source folders, and writes to (and clears) temp and output, so none of them can be somewhere else
    */
   static boolean isInside(String root, String path) {
-    try {
-      Path r = Paths.get(root).toAbsolutePath().normalize();
-      r = Files.exists(r) ? r.toRealPath() : r;
-      Path p = Paths.get(path).toAbsolutePath().normalize();
-      Path existing = p;
-      while (existing != null && !Files.exists(existing, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
-        existing = existing.getParent();
-      }
-      Path real = existing == null ? p : existing.toRealPath().resolve(existing.relativize(p)).normalize();
-      return real.startsWith(r);
-    } catch (Exception e) {
-      return false;
-    }
+    return PublisherUtils.isInside(root, path);
+  }
+
+  /**
+   * Symbolic links that lead out of the IG's folder (or nowhere): whatever they link to would be read as IG content and
+   * published (a page linked to /proc/self/environ), or emptied when the publisher clears a folder (temp, template), or
+   * written into. Refused on the ci-build; locally, only if the user allows them (see ExternalLinkPermission). Checked
+   * before anything in the IG's folder is read, cleared or written
+   */
+  private void checkNoLinksOut() throws IOException {
+    ExternalLinkPermission.check(PublisherUtils.linksOut(pf.rootDir), pf.rootDir, settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD,
+        settings.isAllowExternalLinks(), FhirSettings.getFilePath(), msg -> {
+          log("Warning: "+msg);
+          pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.SECURITY, "ImplementationGuide", msg, ValidationMessage.IssueSeverity.WARNING));
+        });
   }
 
   private void checkInsideRoot(String dir, String what) throws IOException {
@@ -2285,7 +2310,7 @@ public class PublisherIGLoader extends PublisherBase {
         String source = Utilities.pathURL(e.path(), "package.tgz");
         byte[] tgz;
         try (InputStream src = fetchFromSource(pl.pid()+"-"+igver, source)) {
-          tgz = src.readAllBytes();
+          tgz = PublisherUtils.readLimited(src, MAX_DEPENDENCY_DOWNLOAD, "The package "+pl.pid()+"#"+igver+" from "+source);
         }
         // read once to check it, and then again by the cache (which has no way to check it first)
         checkDependencyIsNotATemplate(pl.pid(), igver, tgz, source);
@@ -2437,10 +2462,15 @@ public class PublisherIGLoader extends PublisherBase {
     return map;
   }
 
+  /** the largest dependency package that will be downloaded from where the IG says it is (bytes) */
+  public static final long MAX_DEPENDENCY_DOWNLOAD = 1024L * 1024 * 1024;
+
   private InputStream fetchFromSource(String id, String source) throws IOException {
     logDebugMessage(LogCategory.INIT, "Fetch "+id+" package from "+source);
     URL url = URI.create(source+"?nocache=" + System.currentTimeMillis()).toURL();
     URLConnection c = url.openConnection();
+    c.setConnectTimeout(PublisherUtils.DOWNLOAD_CONNECT_TIMEOUT);
+    c.setReadTimeout(PublisherUtils.DOWNLOAD_READ_TIMEOUT);
     return c.getInputStream();
   }
 
@@ -2607,7 +2637,7 @@ public class PublisherIGLoader extends PublisherBase {
 
     loadConformance1(true);
     for (String s : pf.resourceFactoryDirs) {
-      FileUtilities.clearDirectory(s);
+      PublisherUtils.clearFolder(s);
     }
     if (!pf.testDataFactories.isEmpty()) {
       processFactories(pf.testDataFactories);
