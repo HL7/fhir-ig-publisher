@@ -65,7 +65,7 @@ public class PublisherFields {
     Map<String, String> countryCodeFor2Letter = null;
     Map<String, String> shortCountryCode = null;
     Map<String, String> stateNameForCode = null;
-    Map<String, Map<String, ElementDefinition>> sdMapCache = new HashMap<String, Map<String, ElementDefinition>>();
+    RapidoTracker.ElementMapCache sdMapCache = new RapidoTracker.ElementMapCache();
     // see StructureDefinitionRenderer.setUsageCache(); only set while the html outputs are generated
     Map<org.hl7.fhir.services.elementmodel.Element, Set<String>> sdUsageCache;
     List<String> ignoreFlags = null;

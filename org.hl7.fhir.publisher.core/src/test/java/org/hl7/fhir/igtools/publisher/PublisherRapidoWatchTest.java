@@ -2,9 +2,12 @@ package org.hl7.fhir.igtools.publisher;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -17,21 +20,44 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 
+import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.templates.Template;
+import org.hl7.fhir.model.ModelContext;
+import org.hl7.fhir.model.core.CodeSystem;
+import org.hl7.fhir.model.core.DomainResource;
+import org.hl7.fhir.model.core.ElementDefinition;
+import org.hl7.fhir.model.core.Enumerations;
 import org.hl7.fhir.model.core.StructureDefinition;
+import org.hl7.fhir.model.core.StructureDefinition.TypeDerivationRule;
+import org.hl7.fhir.model.core.ValueSet;
 import org.hl7.fhir.services.elementmodel.Element;
+import org.hl7.fhir.services.renderers.RendererFactory;
+import org.hl7.fhir.services.renderers.utils.RenderingContext;
+import org.hl7.fhir.services.renderers.utils.ResourceWrapper;
+import org.hl7.fhir.standalone.context.SimpleWorkerContext;
 import org.hl7.fhir.utilities.IniFile;
+import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.NamedItemList;
+import org.hl7.fhir.utilities.UserDataNames;
 import org.hl7.fhir.utilities.logging.ILoggingService;
+import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
+import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
+import org.hl7.fhir.utilities.validation.ValidationOptions;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator;
+import org.hl7.fhir.utilities.xhtml.NodeType;
+import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
+import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.hl7.fhir.validation.BaseValidator;
 import org.hl7.fhir.validation.instance.InstanceValidator;
 import org.junit.jupiter.api.AfterEach;
@@ -203,6 +229,361 @@ class PublisherRapidoWatchTest {
 
   private static final String PROFILE = "http://example.org/ig/StructureDefinition/p";
 
+  private static final String BASE = "http://example.org/dep/StructureDefinition/base";
+  private static final String RELATIVE = "Also see the [Location](location.html#) resource.";
+
+  /**
+   * Rendering a profile looks up the profile it's based on in the element map cache the build shares, and the first
+   * look up makes the relative links in that profile's snapshot absolute, in the context: the combined package has
+   * them so. A file whose html is replayed does the look ups its rendering did, so that the profile comes out as it
+   * does from a complete build
+   */
+  @Test
+  void aReplayedFileDoesTheLookUpsItsRenderingDid() throws Exception {
+    context = r5();
+    PublisherFields pf = build("a");
+    StructureDefinition base = base(context, pf);
+    rendering = f -> {
+      if (f.getLoadPath().equals("Patient-b.json")) {
+        lookUp(pf, BASE);
+      }
+    };
+    finish(pf);
+    String complete = comment(base);
+    assertNotEquals(RELATIVE, complete);
+
+    PublisherFields pf2 = build("a2");
+    base = base(context, pf2); // loaded again, as each build does
+    FetchedFile b = file(pf2, "Patient-b.json");
+    assertTrue(pf2.rapido.canReplay(b, RapidoTracker.PHASE_HTML));
+    PublisherGenerator generator = new PublisherGenerator(new PublisherSettings());
+    generator.setPf(pf2);
+    generator.replayGeneration(b, RapidoTracker.PHASE_HTML);
+
+    assertEquals(complete, comment(base));
+  }
+
+  /**
+   * A file that finds a profile already in the cache records the look up too: the file that put it there may be
+   * rendered again and not use it, and then only the replayed file's look up updates it
+   */
+  @Test
+  void aLookUpThatFindsTheProfileInTheCacheIsRecorded() throws Exception {
+    context = r5();
+    PublisherFields pf = build("a");
+    StructureDefinition base = base(context, pf);
+    rendering = f -> {
+      if (f.getLoadPath().startsWith("Patient-")) {
+        lookUp(pf, BASE); // Patient/a puts it in the cache, Patient/b finds it there
+      }
+    };
+    finish(pf);
+    String complete = comment(base);
+
+    PublisherFields pf2 = build("a2"); // Patient/a changed, and its rendering doesn't use the profile now
+    base = base(context, pf2);
+    FetchedFile b = file(pf2, "Patient-b.json");
+    assertTrue(pf2.rapido.canReplay(b, RapidoTracker.PHASE_HTML));
+    assertEquals(List.of(BASE), pf2.rapido.replay(b, RapidoTracker.PHASE_HTML).elementMaps);
+    generator(pf2).replayGeneration(b, RapidoTracker.PHASE_HTML);
+
+    assertEquals(complete, comment(base));
+  }
+
+  /** a look up that doesn't find the profile changes nothing, and the renderer may expect it to fail: it's not recorded */
+  @Test
+  void aLookUpThatDoesNotFindTheProfileIsNotRecorded() throws Exception {
+    context = r5();
+    PublisherFields pf = build("a");
+    base(context, pf);
+    rendering = f -> {
+      if (f.getLoadPath().equals("Patient-b.json")) {
+        lookUp(pf, BASE);
+        // as the renderer looks up the root element of a logical model's elements
+        assertThrows(FHIRException.class, () -> lookUp(pf, "http://example.org/dep/StructureDefinition/missing"));
+      }
+    };
+    finish(pf);
+
+    PublisherFields pf2 = build("a2");
+    assertEquals(List.of(BASE), pf2.rapido.replay(file(pf2, "Patient-b.json"), RapidoTracker.PHASE_HTML).elementMaps);
+  }
+
+  /** the look ups a replayed file redoes found their profiles when it was rendered: if they fail now, it's reported */
+  @Test
+  void aLookUpThatFailsWhenItsRedoneIsReported() throws Exception {
+    context = r5();
+    PublisherFields pf = build("a");
+    base(context, pf);
+    rendering = f -> {
+      if (f.getLoadPath().equals("Patient-b.json")) {
+        lookUp(pf, BASE);
+      }
+    };
+    finish(pf);
+
+    PublisherFields pf2 = build("a2");
+    context.dropResource(base(context, pf2)); // not there this time
+    FetchedFile b = file(pf2, "Patient-b.json");
+    generator(pf2).replayGeneration(b, RapidoTracker.PHASE_HTML);
+
+    assertEquals(1, b.getErrors().size());
+    ValidationMessage vm = b.getErrors().get(0);
+    assertEquals(IssueType.EXCEPTION, vm.getType());
+    assertEquals(IssueSeverity.ERROR, vm.getLevel());
+    assertTrue(vm.getMessage().contains(BASE), vm.getMessage());
+  }
+
+  /** any exception, not just a profile that isn't found: it's reported against the file, as rendering it reports it */
+  @Test
+  void anExceptionInALookUpThatsRedoneIsReported() throws Exception {
+    context = r5();
+    PublisherFields pf = build("a");
+    base(context, pf);
+    rendering = f -> {
+      if (f.getLoadPath().equals("Patient-b.json")) {
+        lookUp(pf, BASE);
+      }
+    };
+    finish(pf);
+
+    PublisherFields pf2 = build("a2");
+    StructureDefinition base = base(context, pf2);
+    base.getSnapshot().getElementFirstRep().addType().setCode("Patient").addProfileElement(); // a profile with no value
+    FetchedFile b = file(pf2, "Patient-b.json");
+    generator(pf2).replayGeneration(b, RapidoTracker.PHASE_HTML);
+
+    assertEquals(1, b.getErrors().size());
+    assertEquals(IssueType.EXCEPTION, b.getErrors().get(0).getType());
+    assertTrue(b.getErrors().get(0).getMessage().contains(BASE), b.getErrors().get(0).getMessage());
+  }
+
+  /**
+   * A file's html is rendered with the build's anchor set, and a renderer doesn't put an anchor that's in it in a page:
+   * a value set rendered after a code system with the same id has no anchors for the id. When the code system's file
+   * is replayed, the value set's page comes out as it does from a complete build, without them
+   */
+  @Test
+  void aReplayedFilePutsItsAnchorsInTheBuildsAnchorSet() throws Exception {
+    context = r5();
+    String complete = renderingBuild("a", Map.of("Patient-b.json", codeSystem("x"), "Observation-o.json", valueSet("x")))
+        .get("Observation-o.json");
+    assertFalse(complete.contains("name=\"x\""), complete);
+
+    String differential = renderingBuild("a2", Map.of("Patient-b.json", codeSystem("x"), "Observation-o.json", valueSet("x")))
+        .get("Observation-o.json");
+
+    assertEquals(List.of("Patient-b.json"), replayed);
+    assertEquals(complete, differential);
+  }
+
+  /**
+   * Anchors are plain ids, so they clash across types and unrelated files: a value set rendered after a code system
+   * with its id has no anchors for it. When the code system gets another id, a complete build gives the value set's
+   * page the anchors, so its html isn't replayed
+   */
+  @Test
+  void aFileIsntReplayedWhenAnAnchorItFoundTakenIsFree() throws Exception {
+    context = r5();
+    String first = renderingBuild("a", Map.of("Patient-a.json", codeSystem("x"), "Patient-b.json", valueSet("x"))).get("Patient-b.json");
+    assertFalse(first.contains("name=\"x\""), first);
+
+    String second = renderingBuild("a2", Map.of("Patient-a.json", codeSystem("y"), "Patient-b.json", valueSet("x"))).get("Patient-b.json");
+
+    assertEquals(List.of(), replayed);
+    assertTrue(second.contains("name=\"x\""), second);
+    assertTrue(second.contains("name=\"hcx\""), second);
+  }
+
+  /**
+   * The reverse: the value set put the anchors in its page, and the code system before it now has its id. A complete
+   * build gives the anchors to the code system only, so the value set's html isn't replayed
+   */
+  @Test
+  void aFileIsntReplayedWhenAnAnchorItAddedIsTaken() throws Exception {
+    context = r5();
+    String first = renderingBuild("a", Map.of("Patient-a.json", codeSystem("y"), "Patient-b.json", valueSet("x"))).get("Patient-b.json");
+    assertTrue(first.contains("name=\"x\""), first);
+
+    String second = renderingBuild("a2", Map.of("Patient-a.json", codeSystem("x"), "Patient-b.json", valueSet("x"))).get("Patient-b.json");
+
+    assertEquals(List.of(), replayed);
+    assertFalse(second.contains("name=\"x\""), second);
+  }
+
+  /**
+   * A Bundle's entries keep their own narrative, and the renderer strips the anchors in it that are in the build's
+   * anchor set (stripAnchorsByName), but leaves a free one in the page without adding it. When a code system before it
+   * now has that id, a complete build strips the anchor, so the Bundle's html isn't replayed
+   */
+  @Test
+  void aFileIsntReplayedWhenAnAnchorItFoundFreeIsTaken() throws Exception {
+    context = r5();
+    String first = strippingBuild("a", codeSystem("y")).get("Patient-b.json");
+    assertTrue(first.contains("name=\"x\""), first);
+
+    String second = strippingBuild("a2", codeSystem("x")).get("Patient-b.json");
+
+    assertEquals(List.of(), replayed);
+    assertFalse(second.contains("name=\"x\""), second);
+  }
+
+  /** a Bundle-like file that found an anchor free, and still does, is replayed */
+  @Test
+  void aFileThatFindsAnAnchorStillFreeIsReplayed() throws Exception {
+    context = r5();
+    strippingBuild("a", codeSystem("y"));
+
+    strippingBuild("a2", codeSystem("z"));
+
+    assertEquals(List.of("Patient-b.json"), replayed);
+  }
+
+  /**
+   * a build where Patient-a.json renders the code system, and Patient-b.json strips the anchors in the build's set from
+   * a narrative with an anchor x, as BundleRenderer does with an entry's narrative
+   */
+  private Map<String, String> strippingBuild(String patientContent, CodeSystem cs) throws Exception {
+    Map<String, String> pages = new HashMap<>();
+    PublisherFields pf = build(patientContent);
+    pf.rc = renderingContext(context);
+    rendering = f -> {
+      if (f.getLoadPath().equals("Patient-a.json")) {
+        render(pf, f, pages, Map.of("Patient-a.json", cs));
+      } else if (f.getLoadPath().equals("Patient-b.json")) {
+        RenderingContext lrc = pf.rc.copy(true);
+        XhtmlNode div = new XhtmlNode(NodeType.Element, "div");
+        div.addTag("a").setAttribute("name", "x");
+        div.addText("entry");
+        div.stripAnchorsByName(lrc.getAnchors());
+        try {
+          pages.put(f.getLoadPath(), new XhtmlComposer(XhtmlComposer.HTML).compose(div));
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
+      }
+    };
+    finish(pf);
+    return pages;
+  }
+
+  /** a file that found an anchor taken, and still does, is replayed */
+  @Test
+  void aFileThatFindsTheAnchorsAsTheyWereIsReplayed() throws Exception {
+    context = r5();
+    renderingBuild("a", Map.of("Patient-a.json", codeSystem("x"), "Patient-b.json", valueSet("x")));
+
+    renderingBuild("a2", Map.of("Patient-a.json", codeSystem("x"), "Patient-b.json", valueSet("x")));
+
+    assertEquals(List.of("Patient-b.json"), replayed);
+  }
+
+  /** a build whose files render the resources given for them, and the pages those that weren't replayed rendered */
+  private Map<String, String> renderingBuild(String patientContent, Map<String, DomainResource> resources) throws Exception {
+    Map<String, String> pages = new HashMap<>();
+    PublisherFields pf = build(patientContent);
+    pf.rc = renderingContext(context);
+    rendering = f -> render(pf, f, pages, resources);
+    finish(pf);
+    return pages;
+  }
+
+  /** renders the resource given for the file, if any, as generateHtmlOutputsInner renders a file */
+  private static void render(PublisherFields pf, FetchedFile f, Map<String, String> pages, Map<String, DomainResource> resources) {
+    DomainResource res = resources.get(f.getLoadPath());
+    if (res == null) {
+      return;
+    }
+    RenderingContext lrc = pf.rc.copy(true);
+    try {
+      lrc.getRendererFactory().factory(res, lrc).renderOrError(ResourceWrapper.forResource(lrc, res));
+      pages.put(f.getLoadPath(), new XhtmlComposer(XhtmlComposer.HTML).compose(res.getText().getDiv()));
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private static CodeSystem codeSystem(String id) {
+    CodeSystem cs = new CodeSystem();
+    cs.setId(id);
+    cs.setUrl("http://example.org/ig/CodeSystem/"+id);
+    cs.setContent(Enumerations.CodeSystemContentMode.COMPLETE);
+    cs.addConcept().setCode("a");
+    return cs;
+  }
+
+  private static ValueSet valueSet(String id) {
+    ValueSet vs = new ValueSet();
+    vs.setId(id);
+    vs.setUrl("http://example.org/ig/ValueSet/"+id);
+    vs.getCompose().addInclude().setSystem("http://example.org/ig/CodeSystem/"+id);
+    return vs;
+  }
+
+  private static RenderingContext renderingContext(SimpleWorkerContext context) {
+    return new RenderingContext(context, new RendererFactory(), new MarkDownProcessor(MarkDownProcessor.Dialect.COMMON_MARK),
+        ValidationOptions.defaults(), "http://hl7.org/fhir/R5/", "", null, RenderingContext.ResourceRendererMode.TECHNICAL,
+        RenderingContext.GenerationRules.IG_PUBLISHER);
+  }
+
+  private static PublisherGenerator generator(PublisherFields pf) {
+    PublisherGenerator generator = new PublisherGenerator(new PublisherSettings());
+    generator.setPf(pf);
+    return generator;
+  }
+
+  private static SimpleWorkerContext r5;
+  /** the context the builds use, if any */
+  private SimpleWorkerContext context;
+
+  private static SimpleWorkerContext r5() throws Exception {
+    if (r5 == null) {
+      NpmPackage npm;
+      try {
+        npm = new FilesystemPackageCacheManager.Builder().build().loadPackage("hl7.fhir.r5.core", "5.0.0");
+      } catch (Exception e) {
+        npm = null;
+      }
+      assumeTrue(npm != null, "hl7.fhir.r5.core#5.0.0 can't be fetched");
+      r5 = new SimpleWorkerContext.SimpleWorkerContextBuilder(ModelContext.fullCoreContext()).withAllowLoadingDuplicates(true).fromPackage(npm);
+    }
+    return r5;
+  }
+
+  /** a profile from a dependency, as the loader leaves it: a relative link in its snapshot, and where its pages are */
+  private static StructureDefinition base(SimpleWorkerContext context, PublisherFields pf) {
+    StructureDefinition old = context.fetchResource(StructureDefinition.class, BASE);
+    if (old != null) {
+      context.dropResource(old);
+    }
+    StructureDefinition sd = new StructureDefinition();
+    sd.setId("base");
+    sd.setUrl(BASE);
+    sd.setName("Base");
+    sd.setType("Patient");
+    sd.setDerivation(TypeDerivationRule.CONSTRAINT);
+    sd.setBaseDefinition("http://hl7.org/fhir/StructureDefinition/Patient");
+    ElementDefinition ed = sd.getSnapshot().addElement();
+    ed.setId("Patient");
+    ed.setPath("Patient");
+    ed.setComment(RELATIVE);
+    sd.setUserData(UserDataNames.render_webroot, "http://example.org/dep/");
+    context.cacheResource(sd);
+    pf.rc = renderingContext(context);
+    return sd;
+  }
+
+  /** what the core's StructureDefinitionRenderer does for an element of a profile based on the url */
+  private static void lookUp(PublisherFields pf, String url) {
+    org.hl7.fhir.services.renderers.StructureDefinitionRenderer sdr = new org.hl7.fhir.services.renderers.StructureDefinitionRenderer(pf.rc);
+    sdr.setSdMapCache(pf.sdMapCache);
+    sdr.getElementById(url, "Patient", null);
+  }
+
+  private static String comment(StructureDefinition sd) {
+    return sd.getSnapshot().getElementFirstRep().getComment();
+  }
+
   /** a profile in the IG, which Patient/b is found to conform to when it's validated */
   private FetchedFile profile(PublisherFields pf) {
     FetchedResource r = mock(FetchedResource.class);
@@ -311,6 +692,8 @@ class PublisherRapidoWatchTest {
 
   /** the files whose html the last finish reused */
   private final List<String> replayed = new ArrayList<>();
+  /** what rendering a file does, besides writing its page */
+  private Consumer<FetchedFile> rendering;
 
   /**
    * What the rest of a build does for -rapido: each file's html and spreadsheet phases are reused if they can be, and
@@ -327,13 +710,19 @@ class PublisherRapidoWatchTest {
     replayed.clear();
     for (FetchedFile f : pf.fileList) {
       if (pf.rapido.canReplay(f, RapidoTracker.PHASE_HTML) && pf.rapido.canReplay(f, RapidoTracker.PHASE_SHEETS)) {
-        // as replayGeneration does
         replayed.add(f.getLoadPath());
-        f.getOutputNames().addAll(pf.rapido.replay(f, RapidoTracker.PHASE_HTML).outputs);
+        if (context != null) {
+          generator(pf).replayGeneration(f, RapidoTracker.PHASE_HTML);
+        } else { // as replayGeneration does
+          f.getOutputNames().addAll(pf.rapido.replay(f, RapidoTracker.PHASE_HTML).outputs);
+        }
         f.getOutputNames().addAll(pf.rapido.replay(f, RapidoTracker.PHASE_SHEETS).outputs);
         continue;
       }
       pf.rapido.startRecording(f, RapidoTracker.PHASE_HTML);
+      if (rendering != null) {
+        rendering.accept(f);
+      }
       if (f.getLoadPath().startsWith("Patient-")) {
         Path page = dir.resolve("temp").resolve(f.getLoadPath().replace(".json", ".html"));
         Files.createDirectories(page.getParent());
@@ -380,6 +769,10 @@ class PublisherRapidoWatchTest {
     pf.igpkp = mock(IGKnowledgeProvider.class);
     when(pf.igpkp.getCanonical()).thenReturn("http://example.org/ig");
     pf.template = mock(Template.class);
+    if (context != null) {
+      pf.context = context;
+      pf.pcm = new FilesystemPackageCacheManager.Builder().build(); // where the packages it loaded are
+    }
     pf.getExecTime().add(Calendar.DATE, daysLater);
     pf.fileList.addAll(List.of(ig, patient, other, observation, page));
     pf.changeList.addAll(pf.fileList); // as the loader leaves it

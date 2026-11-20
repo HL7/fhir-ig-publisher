@@ -321,11 +321,13 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       logMessage("Generate HTML Outputs");
       // the resources don't change while the html is generated, so what they use only needs to be worked out once
       pf.sdUsageCache = new IdentityHashMap<>();
+      int htmlReplayed = 0;
       try {
         for (FetchedFile f : pf.changeList) {
           f.start("generate2");
           try {
             if (pf.rapido != null && !settings.isGenerationOff() && pf.rapido.canReplay(f, RapidoTracker.PHASE_HTML)) {
+              htmlReplayed++;
               replayGeneration(f, RapidoTracker.PHASE_HTML);
               convertForRendering(f);
               redoRenderingChanges(f);
@@ -344,6 +346,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         }
       } finally {
         pf.sdUsageCache = null;
+      }
+      if (pf.rapido != null && !pf.rapido.isCompleteBuild()) {
+        log("Rapido Mode: reused the html of "+htmlReplayed+" of "+pf.changeList.size()+" files");
       }
 
       logMessage("Generate Spreadsheets");
@@ -2266,7 +2271,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
    * Rapido: the file's outputs from the last build are still in the temp folder. Do what generating them would have
    * done to the rest of the build
    */
-  private void replayGeneration(FetchedFile f, String phase) throws IOException {
+  void replayGeneration(FetchedFile f, String phase) throws IOException {
     RapidoTracker.Journal j = pf.rapido.replay(f, phase);
     f.getOutputNames().addAll(j.outputs);
     for (String s : j.allOutputs) {
@@ -2301,6 +2306,40 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         pf.fragmentUses.put(j.fragUseKeys.get(i), frag);
       }
       frag.record(j.fragUseNumbers.get(i)[0], j.fragUseNumbers.get(i)[1]);
+    }
+    redoElementMaps(f, j.elementMaps);
+    pf.rapido.redoAnchors(j);
+  }
+
+  /**
+   * Rapido: the first look up of a profile in the shared element map cache updates the urls in the markdown of that
+   * profile's snapshot elements (see RapidoTracker.ElementMapCache). Do the look ups the file's rendering did, so that
+   * the profiles it used come out as they do from a complete build: the combined package has them. Only look ups
+   * that found the profile are recorded, so one that fails now didn't fail when the file was rendered: it's reported
+   * against the file, as rendering it would report it
+   */
+  private void redoElementMaps(FetchedFile f, List<String> urls) {
+    StructureDefinition src = null;
+    for (FetchedResource r : f.getResources()) {
+      if (r.getResource() instanceof StructureDefinition sd) {
+        src = sd;
+        break;
+      }
+    }
+    org.hl7.fhir.services.renderers.StructureDefinitionRenderer sdr = null;
+    for (String url : urls) {
+      if (!pf.sdMapCache.containsKey(url)) {
+        if (sdr == null) {
+          sdr = new org.hl7.fhir.services.renderers.StructureDefinitionRenderer(pf.rc.copy(true));
+          sdr.setSdMapCache(pf.sdMapCache);
+        }
+        try {
+          sdr.getElementById(url, "", src);
+        } catch (Exception e) {
+          log("Exception looking up the profile "+url+" for "+f.getName()+": "+e.getMessage());
+          f.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.EXCEPTION, "StructureDefinition", "Error Rendering Resource: looking up the profile "+url+": "+e.getMessage(), ValidationMessage.IssueSeverity.ERROR));
+        }
+      }
     }
   }
 
