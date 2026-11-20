@@ -8,7 +8,9 @@ import java.io.File;
 import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.List;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -22,10 +24,21 @@ class DBBuilderQueryLimitsTest {
   @TempDir
   Path dir;
 
+  private final List<DBBuilder> opened = new ArrayList<>();
+
   private DBBuilder db() {
     DBBuilder db = new DBBuilder(new File(dir.toFile(), "package.db").getAbsolutePath(), null, null, null, new ArrayList<>());
     db.setMaxQuerySeconds(2);
+    opened.add(db);
     return db;
+  }
+
+  /** before the temp folder is deleted: Windows won't delete a database that is still open */
+  @AfterEach
+  void close() {
+    for (DBBuilder db : opened) {
+      db.closeUp();
+    }
   }
 
   private static final String FOREVER = "WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM c) SELECT count(*) AS n FROM c";

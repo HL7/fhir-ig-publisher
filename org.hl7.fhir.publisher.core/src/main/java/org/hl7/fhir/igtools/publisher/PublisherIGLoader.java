@@ -65,6 +65,7 @@ import org.hl7.fhir.utilities.UserDataNames;
 import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.filesystem.CSFile;
 import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
+import org.hl7.fhir.utilities.http.HTTPResult;
 import org.hl7.fhir.utilities.http.ManagedWebAccess;
 import org.hl7.fhir.utilities.i18n.*;
 import org.hl7.fhir.utilities.json.JsonException;
@@ -2466,13 +2467,18 @@ public class PublisherIGLoader extends PublisherBase {
   /** the largest dependency package that will be downloaded from where the IG says it is (bytes) */
   public static final long MAX_DEPENDENCY_DOWNLOAD = 1024L * 1024 * 1024;
 
+  /**
+   * Through ManagedWebAccess, like every other fetch of a URL an IG chooses: the package-list.json that names this
+   * package is the IG's to write, so it can name any URL, and only public https servers are reached (SSRF protection)
+   */
   private InputStream fetchFromSource(String id, String source) throws IOException {
     logDebugMessage(LogCategory.INIT, "Fetch "+id+" package from "+source);
-    URL url = URI.create(source+"?nocache=" + System.currentTimeMillis()).toURL();
-    URLConnection c = url.openConnection();
-    c.setConnectTimeout(PublisherUtils.DOWNLOAD_CONNECT_TIMEOUT);
-    c.setReadTimeout(PublisherUtils.DOWNLOAD_READ_TIMEOUT);
-    return c.getInputStream();
+    HTTPResult res = ManagedWebAccess.get(Arrays.asList("web"), source+"?nocache=" + System.currentTimeMillis());
+    res.checkThrowException();
+    if (res.getContent() == null) {
+      throw new IOException("No content fetching "+source);
+    }
+    return new ByteArrayInputStream(res.getContent());
   }
 
 

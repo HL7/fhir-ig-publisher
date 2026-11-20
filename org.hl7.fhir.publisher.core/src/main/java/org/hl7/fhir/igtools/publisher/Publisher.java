@@ -1872,6 +1872,22 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         ManagedWebAccess.setSsrfProtectionEnabled(false);
       }
     }
+    forceSsrfProtectionOnCiBuild(args);
+  }
+
+  /**
+   * The ci-build builds IGs that anyone can write, and an IG chooses URLs (dependencies, canonicals, references): only
+   * public https servers are reached, whatever fhir-settings.json or the command line says. A server that
+   * fhir-settings.json names with allowPrivateNetwork or allowHttp is still allowed: that's the builder's own choice,
+   * for that server
+   */
+  static void forceSsrfProtectionOnCiBuild(String[] args) {
+    if (CliParams.hasNamedParam(args, "-auto-ig-build")) {
+      if (!ManagedWebAccess.isSsrfProtectionEnabled()) {
+        System.out.println("SSRF protection is always on for the ci-build (-auto-ig-build): the setting that turned it off is ignored");
+      }
+      ManagedWebAccess.setSsrfProtectionEnabled(true);
+    }
   }
 
   private static void setLogbackConfiguration(String[] args) {
