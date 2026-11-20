@@ -1,6 +1,7 @@
 package org.hl7.fhir.igtools.publisher;
 
 import java.io.BufferedWriter;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -29,6 +30,7 @@ import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -36,6 +38,12 @@ import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
+
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
 
 import org.hl7.fhir.igtools.publisher.RapidoDependencyAnalyser.FileNode;
 import org.hl7.fhir.igtools.publisher.RapidoDependencyAnalyser.FileResult;
@@ -69,6 +77,9 @@ import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
+import org.hl7.fhir.utilities.xml.XMLUtil;
+import org.w3c.dom.Document;
+import org.w3c.dom.Node;
 
 /**
  * The state that Rapido keeps between builds, and the decisions made from it.
@@ -127,6 +138,15 @@ public class RapidoTracker {
   private int validationsDone;
   /** the date the loader puts on canonical resources that have none; it differs every build */
   private final String buildDate;
+  /** the IG's own file */
+  private FetchedFile igFile;
+  /** the state the last build saved, or null */
+  private JsonObject lastState;
+  /**
+   * "Type/id" of the resources loaded from the IG's files: the loader copies the name and description of their
+   * definition.resource entries to them (see igSourceForHash)
+   */
+  private final Set<String> loaded = new HashSet<>();
 
   public RapidoTracker(PublisherFields pf) throws IOException {
     this.pf = pf;
@@ -152,6 +172,7 @@ public class RapidoTracker {
       }
       keys.put(f, key);
     }
+    igFile = igf;
     computeGlobal(igf);
     Hasher fs = new Hasher();
     for (String k : new TreeSet<>(keys.values())) {
@@ -159,9 +180,10 @@ public class RapidoTracker {
     }
     fileSetHash = fs.finish();
 
+    JsonObject old = loadState();
+    lastState = old;
     String noAnalysis = analyseDependencies();
 
-    JsonObject old = loadState();
     reason = failure;
     if (reason == null) {
       reason = noAnalysis;
@@ -359,10 +381,40 @@ public class RapidoTracker {
       h.add(o.getRelativePath()).add(Integer.toString(o.getProcessMode())).add(o.getXslt());
     }
     FileNode fn = new FileNode(keys.get(f), h.finish());
-    for (FetchedResource r : f.getResources()) {
-      fn.addResource(resourceNode(r));
+    for (int i = 0; i < f.getResources().size(); i++) {
+      ResourceNode n = resourceNode(f, f.getResources().get(i));
+      // the profiles it was found to conform to when it was last validated: not known until it's validated again, and
+      // their example lists show it
+      for (String url : lastFoundProfiles(f, i, f.getResources().get(i))) {
+        n.addReference(url);
+      }
+      fn.addResource(n);
     }
     return fn;
+  }
+
+  /**
+   * the profileUsages the last build recorded for the file's resource r, at index i unless the resources were
+   * reordered (see recordValidation). Empty if there's no record of r: then it's validated again, and recordValidation
+   * makes the profiles it's found to conform to dirty
+   */
+  private List<String> lastFoundProfiles(FetchedFile f, int i, FetchedResource r) {
+    JsonObject of = lastState == null || !lastState.hasObject("files") ? null : lastState.getJsonObject("files").getJsonObject(keys.get(f));
+    JsonObject v = of == null || !of.hasObject("validation") ? null : of.getJsonObject("validation");
+    JsonObject rv = v == null || !v.hasObject(Integer.toString(i)) ? null : v.getJsonObject(Integer.toString(i));
+    String key = r.fhirType()+"/"+r.getId();
+    if ((rv == null || !key.equals(rv.asString("key"))) && v != null) {
+      rv = null; // the file's resources were reordered
+      for (String n : v.getNames()) {
+        if (v.hasObject(n) && key.equals(v.getJsonObject(n).asString("key"))) {
+          rv = v.getJsonObject(n);
+        }
+      }
+    }
+    if (rv == null || !rv.hasArray("profileUsages")) {
+      return Collections.emptyList();
+    }
+    return rv.getJsonArray("profileUsages").asStrings();
   }
 
   /**
@@ -388,11 +440,22 @@ public class RapidoTracker {
   }
 
   ResourceNode resourceNode(FetchedResource r) {
+    return resourceNode(null, r);
+  }
+
+  ResourceNode resourceNode(FetchedFile f, FetchedResource r) {
     ResourceNode n = new ResourceNode(r.fhirType(), r.getId());
     Element e = r.getElement();
     Hasher h = new Hasher();
     h.add(r.fhirType()).add(r.getId()).add(r.getTitle()).add(r.getResourceName()).add(r.getResourceDescription())
       .add(Boolean.toString(r.isExample())).add(r.getExampleUri()).add(r.getPath()).add(r.getLocalRef());
+    if (f != null) {
+      // the loader gives the file its entry's name, and the profile's example list shows it
+      h.add("file title").add(f.getTitle());
+    }
+    // the IG's entries' names and descriptions are in the hashes of the resources they're copied to (see
+    // igSourceForHash). Left in the IG's hash, they'd change the render hash of every resource the IG lists
+    Set<Element> skip = f != null && f == igFile && e != null ? igEntryText(e) : Collections.emptySet();
     for (String s : r.getProfiles(false)) {
       h.add("profile").add(s);
       n.addReference(s);
@@ -419,13 +482,51 @@ public class RapidoTracker {
           // stamped by the loader because the source has no date: the same input every build, so hash it as such
           h.add("(build date)");
         } else {
-          scan(c, h, n);
+          scan(c, h, n, skip);
         }
       }
       h.add(")");
     }
     n.setContentHash(h.finish());
     return n;
+  }
+
+  /**
+   * The name and description elements of the IG's definition.resource entries for the loaded resources: what the
+   * loader copies to them. Only the values: a name or description with extensions counts as it is
+   */
+  private Set<Element> igEntryText(Element ig) {
+    Set<Element> res = Collections.newSetFromMap(new IdentityHashMap<>());
+    for (Element def : children(ig, "definition")) {
+      for (Element rg : children(def, "resource")) {
+        boolean isLoaded = false;
+        for (Element ref : children(rg, "reference")) {
+          for (Element s : children(ref, "reference")) {
+            isLoaded = isLoaded || loaded.contains(s.getValue());
+          }
+        }
+        if (isLoaded) {
+          for (Element c : rg.getChildList()) {
+            if (("name".equals(c.getName()) || "description".equals(c.getName())) && !c.hasChildren()) {
+              res.add(c);
+            }
+          }
+        }
+      }
+    }
+    return res;
+  }
+
+  private static List<Element> children(Element e, String name) {
+    List<Element> res = new ArrayList<>();
+    if (e.getChildList() != null) {
+      for (Element c : e.getChildList()) {
+        if (name.equals(c.getName())) {
+          res.add(c);
+        }
+      }
+    }
+    return res;
   }
 
   // a canonical resource's url, version, name and title are single primitives; other resources can repeat them (Device.name)
@@ -437,7 +538,10 @@ public class RapidoTracker {
     return l.size() == 1 && l.get(0).isPrimitive() ? l.get(0).getValue() : null;
   }
 
-  private void scan(Element e, Hasher h, ResourceNode n) {
+  private void scan(Element e, Hasher h, ResourceNode n, Set<Element> skip) {
+    if (skip.contains(e)) {
+      h = new Hasher(); // still read for references, but not hashed
+    }
     h.add("(").add(e.getName()).add(e.fhirType());
     if (e.isXhtml()) {
       String x = e.getXhtml() == null ? e.getValue() : new XhtmlComposer(XhtmlComposer.XML).compose(e.getXhtml());
@@ -452,7 +556,7 @@ public class RapidoTracker {
     }
     if (e.hasChildren()) {
       for (Element c : e.getChildList()) {
-        scan(c, h, n);
+        scan(c, h, n, skip);
       }
     }
     h.add(")");
@@ -474,7 +578,15 @@ public class RapidoTracker {
       jar.add(Long.toString(System.nanoTime())); // can't tell what the publisher is, so assume it changed
     }
     global.put("publisher", jar.finish());
-    global.put("ig", new Hasher().add(igf.getPath()).add(igf.getSource()).finish());
+    if (pf.igMode) {
+      // only an IG loaded from an ig.ini has its entries' names and descriptions copied to the resources
+      for (FetchedFile f : pf.fileList) {
+        for (FetchedResource r : f.getResources()) {
+          loaded.add(r.fhirType()+"/"+r.getId());
+        }
+      }
+    }
+    global.put("ig", new Hasher().add(igf.getPath()).add(igSourceForHash(igf.getSource(), loaded)).finish());
     // the loader stamps the build date on canonicals that have none, and pages show it ("Draft as of ..."); FHIRPath
     // today() and now() see it too. A page replayed on a later day would show the day it was first rendered
     global.put("date", buildDay(pf.getExecTime()));
@@ -505,7 +617,24 @@ public class RapidoTracker {
     }
     Hasher tmpl = new Hasher();
     boolean[] templateUsesFshIndex = new boolean[1];
-    hashTree(new File(Utilities.path(pf.rootDir, "template")), tmpl, Collections.emptySet(), templateUsesFshIndex);
+    // a template script that gets the IG gets it as [target]-ig-working.json/xml, written by the build from the IG (see
+    // Template.scriptOutputs()); what it gives back, [target]-ig-updated.json/xml, is what the build goes on with, so
+    // it counts as the IG does
+    Set<String> igCopies = new HashSet<>();
+    Map<String, File> igUpdated = new TreeMap<>();
+    File[] tf = new File(Utilities.path(pf.rootDir, "template")).listFiles();
+    for (File f : tf == null ? new File[0] : tf) {
+      if (f.isFile() && isIgWorking(f.getName())) {
+        igCopies.add(canonical(f.getAbsolutePath()));
+      } else if (f.isFile() && isIgUpdated(f.getName())) {
+        igCopies.add(canonical(f.getAbsolutePath()));
+        igUpdated.put(f.getName(), f);
+      }
+    }
+    hashTree(new File(Utilities.path(pf.rootDir, "template")), tmpl, igCopies, templateUsesFshIndex);
+    for (File f : igUpdated.values()) {
+      tmpl.add(f.getAbsolutePath()).add(igSourceForHash(read(f), loaded));
+    }
     global.put("template", tmpl.finish());
     if (!templateUsesFshIndex[0]) {
       // written by sushi on every run, and not read by the publisher or the template
@@ -514,6 +643,142 @@ public class RapidoTracker {
     }
     otherFiles.putAll(scanOtherFiles());
     global.put("other-files", hashOtherFiles(otherFiles));
+  }
+
+  /**
+   * what the build writes for a script, [target]-ig-working.json/xml, and what the base template's scripts make of it
+   * ([target]-ig-working.1.xml...)
+   */
+  static boolean isIgWorking(String name) {
+    String n = withoutJsonOrXml(name);
+    if (n == null) {
+      return false;
+    }
+    int dot = n.lastIndexOf('.');
+    if (dot >= 0 && isDigits(n.substring(dot + 1))) {
+      n = n.substring(0, dot);
+    }
+    return n.length() > "-ig-working".length() && n.endsWith("-ig-working");
+  }
+
+  /** what a script gives back: [target]-ig-updated.json/xml */
+  static boolean isIgUpdated(String name) {
+    String n = withoutJsonOrXml(name);
+    return n != null && n.length() > "-ig-updated".length() && n.endsWith("-ig-updated");
+  }
+
+  /** the name in lower case without its .json or .xml, or null if it has neither */
+  private static String withoutJsonOrXml(String name) {
+    String n = name.toLowerCase(Locale.ROOT);
+    for (String ext : new String[] {".json", ".xml"}) {
+      if (n.endsWith(ext)) {
+        return n.substring(0, n.length() - ext.length());
+      }
+    }
+    return null;
+  }
+
+  private static boolean isDigits(String s) {
+    if (s.isEmpty()) {
+      return false;
+    }
+    for (char c : s.toCharArray()) {
+      if (c < '0' || c > '9') {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * The IG's source, as it goes into the global hash. The loader copies the name and description of each
+   * definition.resource entry to the resource it loads for it (FetchedResource.getResourceName() and
+   * getResourceDescription()), and those are in that resource's own hash, so a change to them makes that resource, and
+   * what depends on it, dirty. They're left out here, so that a change to them alone isn't a complete build: SUSHI
+   * copies an instance's Title and Description, and an extension's title, into its entry. Everything else in the IG
+   * (and the entries for anything that wasn't loaded, and a name or description with extensions) still counts; an IG
+   * that can't be read counts as it is.
+   *
+   * @param loaded "type/id" of the resources loaded from the IG's files
+   */
+  static byte[] igSourceForHash(byte[] source, Set<String> loaded) {
+    if (source == null || loaded.isEmpty()) {
+      return source;
+    }
+    int i = 0;
+    while (i < source.length && (Character.isWhitespace(source[i]) || (source[i] & 0xFF) == 0xEF || (source[i] & 0xFF) == 0xBB || (source[i] & 0xFF) == 0xBF)) {
+      i++; // whitespace and a byte order mark
+    }
+    try {
+      if (i < source.length && source[i] == '<') {
+        return igXmlForHash(source, loaded);
+      }
+      JsonObject ig = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(source);
+      if (ig == null || !"ImplementationGuide".equals(ig.asString("resourceType")) || !ig.hasObject("definition")
+          || !ig.getJsonObject("definition").hasArray("resource")) {
+        return source;
+      }
+      for (JsonObject rg : ig.getJsonObject("definition").forceArray("resource").asJsonObjects()) {
+        JsonObject ref = rg.getJsonObject("reference");
+        if (ref != null && loaded.contains(ref.asString("reference"))) {
+          for (String name : new String[] {"name", "description"}) {
+            if (!rg.has("_"+name)) { // one with extensions stays
+              rg.remove(name);
+            }
+          }
+        }
+      }
+      return org.hl7.fhir.utilities.json.parser.JsonParser.compose(ig, false).getBytes(StandardCharsets.UTF_8);
+    } catch (Exception e) {
+      return source;
+    }
+  }
+
+  private static byte[] igXmlForHash(byte[] source, Set<String> loaded) throws Exception {
+    DocumentBuilderFactory factory = XMLUtil.newXXEProtectedDocumentBuilderFactory();
+    factory.setNamespaceAware(true);
+    javax.xml.parsers.DocumentBuilder builder = factory.newDocumentBuilder();
+    builder.setErrorHandler(new org.xml.sax.helpers.DefaultHandler()); // an IG that can't be read counts as it is, quietly
+    Document doc = builder.parse(new ByteArrayInputStream(source));
+    org.w3c.dom.Element root = doc.getDocumentElement();
+    if (!"ImplementationGuide".equals(root.getLocalName())) {
+      return source;
+    }
+    for (org.w3c.dom.Element def : xmlChildren(root, "definition")) {
+      for (org.w3c.dom.Element rg : xmlChildren(def, "resource")) {
+        boolean isLoaded = false;
+        for (org.w3c.dom.Element ref : xmlChildren(rg, "reference")) {
+          for (org.w3c.dom.Element r : xmlChildren(ref, "reference")) {
+            isLoaded = isLoaded || loaded.contains(r.getAttribute("value"));
+          }
+        }
+        if (isLoaded) {
+          for (String name : new String[] {"name", "description"}) {
+            for (org.w3c.dom.Element c : xmlChildren(rg, name)) {
+              if (xmlChildren(c, null).isEmpty()) { // one with extensions stays
+                rg.removeChild(c);
+              }
+            }
+          }
+        }
+      }
+    }
+    Transformer t = XMLUtil.newXXEProtectedTransformerFactory().newTransformer();
+    t.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
+    ByteArrayOutputStream res = new ByteArrayOutputStream();
+    t.transform(new DOMSource(doc), new StreamResult(res));
+    return res.toByteArray();
+  }
+
+  /** the child elements with the name (any, if null) */
+  private static List<org.w3c.dom.Element> xmlChildren(org.w3c.dom.Element e, String name) {
+    List<org.w3c.dom.Element> res = new ArrayList<>();
+    for (Node n = e.getFirstChild(); n != null; n = n.getNextSibling()) {
+      if (n instanceof org.w3c.dom.Element && (name == null || name.equals(n.getLocalName()))) {
+        res.add((org.w3c.dom.Element) n);
+      }
+    }
+    return res;
   }
 
   /**
@@ -1089,25 +1354,45 @@ public class RapidoTracker {
   /** records the messages from validating a resource, before the publisher adds them to the file */
   public void recordValidation(FetchedFile f, FetchedResource r, List<ValidationMessage> errs) {
     validationsDone++;
-    Set<String> sw = statusWarnings();
-    if (!keys.containsKey(f) || sw == null || statusBefore == null) {
-      return; // without knowing what the validator had seen, the result can't be reused
+    List<String> found = r.getFoundProfiles().subList(Math.min(profilesBefore, r.getFoundProfiles().size()), r.getFoundProfiles().size());
+    if (!keys.containsKey(f)) {
+      return;
     }
+    if (!renderClean.isEmpty()) {
+      // the profiles' example lists show it, but the edges to them are the ones it was found to conform to last time
+      List<String> last = lastFoundProfiles(f, f.getResources().indexOf(r), r);
+      for (String url : found) {
+        if (!last.contains(url)) {
+          renderProfileAgain(url);
+        }
+      }
+      for (String url : last) {
+        if (!found.contains(url)) {
+          renderProfileAgain(url);
+        }
+      }
+    }
+    // what it was found to conform to is kept for the next build's edges (lastFoundProfiles) even when the rest can't
+    // be: without statusBefore, savedValidation doesn't reuse it
     JsonObject rv = new JsonObject();
     rv.add("key", r.fhirType()+"/"+r.getId());
-    rv.add("statusBefore", statusHash(statusBefore));
+    JsonArray usages = rv.forceArray("profileUsages");
+    for (String url : found) {
+      usages.add(url);
+    }
+    newFile(f).forceObject("validation").set(Integer.toString(f.getResources().indexOf(r)), rv);
+    Set<String> sw = statusWarnings();
+    if (sw == null || statusBefore == null) {
+      return; // without knowing what the validator had seen, the result can't be reused
+    }
+    if (profileSources(pf.fileList, usages) == null) {
+      return;
+    }
     JsonArray added = rv.forceArray("statusAdded");
     for (String s : new TreeSet<>(sw)) {
       if (!statusBefore.contains(s)) {
         added.add(s);
       }
-    }
-    JsonArray usages = rv.forceArray("profileUsages");
-    for (String url : r.getFoundProfiles().subList(Math.min(profilesBefore, r.getFoundProfiles().size()), r.getFoundProfiles().size())) {
-      usages.add(url);
-    }
-    if (profileSources(pf.fileList, usages) == null) {
-      return;
     }
     JsonArray msgs = rv.forceArray("messages");
     for (ValidationMessage vm : errs) {
@@ -1122,7 +1407,7 @@ public class RapidoTracker {
       return;
     }
     rv.add("signposts", signposts);
-    newFile(f).forceObject("validation").set(Integer.toString(f.getResources().indexOf(r)), rv);
+    rv.add("statusBefore", statusHash(statusBefore));
   }
 
   /**
@@ -1259,6 +1544,17 @@ public class RapidoTracker {
       res.add(source);
     }
     return res;
+  }
+
+  /** the file of the IG's profile with the url is rendered again */
+  private void renderProfileAgain(String url) {
+    for (FetchedFile f : pf.fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.getResource() instanceof StructureDefinition && url.equals(((StructureDefinition) r.getResource()).getUrl()) && renderClean.remove(f)) {
+          why.put(f, "the examples found to conform to it changed");
+        }
+      }
+    }
   }
 
   /** a file with no resources to validate still needs a record, so the next build knows it can be reused */

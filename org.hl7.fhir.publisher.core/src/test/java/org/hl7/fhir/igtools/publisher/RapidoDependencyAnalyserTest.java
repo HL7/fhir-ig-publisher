@@ -401,4 +401,74 @@ class RapidoDependencyAnalyserTest {
     Files.writeString(dir.resolve("input/x.txt"), "two");
     assertNotEquals(a.get("input/x.txt"), RapidoTracker.scanTree(dir.toFile(), skip).get("input/x.txt"));
   }
+
+  private static String igJson(String exName, String exDescription, String otherName, String status) {
+    return "{\"resourceType\":\"ImplementationGuide\",\"id\":\"ig\",\"status\":\""+status+"\",\"definition\":{\"resource\":["
+      + "{\"reference\":{\"reference\":\"Patient/ex1\"},\"name\":\""+exName+"\",\"description\":\""+exDescription+"\",\"exampleBoolean\":true},"
+      + "{\"reference\":{\"reference\":\"Patient/missing\"},\"name\":\""+otherName+"\"}]}}";
+  }
+
+  private static String igXml(String exName, String exDescription, String otherName, String status) {
+    return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ImplementationGuide xmlns=\"http://hl7.org/fhir\"><id value=\"ig\"/><status value=\""+status+"\"/>"
+      + "<definition><resource><reference><reference value=\"Patient/ex1\"/></reference><name value=\""+exName+"\"/><description value=\""+exDescription+"\"/>"
+      + "<exampleBoolean value=\"true\"/></resource><resource><reference><reference value=\"Patient/missing\"/></reference><name value=\""+otherName+"\"/></resource>"
+      + "</definition></ImplementationGuide>";
+  }
+
+  private static String igHash(String source) {
+    byte[] b = RapidoTracker.igSourceForHash(source.getBytes(java.nio.charset.StandardCharsets.UTF_8), Set.of("Patient/ex1", "ImplementationGuide/ig"));
+    return new RapidoDependencyAnalyser.Hasher().add(b).finish();
+  }
+
+  /** the loader copies a loaded resource's entry's name and description to it, whose own hash has them */
+  @Test
+  void igEntryNameAndDescriptionOfALoadedResourceAreLeftOutOfTheIgHash() {
+    for (boolean xml : new boolean[] {false, true}) {
+      java.util.function.Function<String[], String> ig = a -> igHash(xml ? igXml(a[0], a[1], a[2], a[3]) : igJson(a[0], a[1], a[2], a[3]));
+      String base = ig.apply(new String[] {"Example 1", "First example", "Other", "draft"});
+      assertEquals(base, ig.apply(new String[] {"Example 1 renamed", "First example, edited", "Other", "draft"}), "xml: "+xml);
+      // the entry of a resource that wasn't loaded still counts, and so does the rest of the IG
+      assertNotEquals(base, ig.apply(new String[] {"Example 1", "First example", "Other renamed", "draft"}), "xml: "+xml);
+      assertNotEquals(base, ig.apply(new String[] {"Example 1", "First example", "Other", "active"}), "xml: "+xml);
+    }
+    String json = igJson("Example 1", "First example", "Other", "draft");
+    assertNotEquals(igHash(json), igHash(json.replace("\"exampleBoolean\":true", "\"exampleBoolean\":false")));
+  }
+
+  /** a name or description with extensions on it (a translation, say) counts as it is */
+  @Test
+  void igEntryNameWithExtensionsCounts() {
+    String json = igJson("Example 1", "First example", "Other", "draft").replace("\"exampleBoolean\"", "\"_name\":{\"extension\":[{\"url\":\"http://example.org/x\",\"valueString\":\"x\"}]},\"exampleBoolean\"");
+    assertNotEquals(igHash(json), igHash(json.replace("Example 1", "Example 1 renamed")));
+    String xml = igXml("Example 1", "First example", "Other", "draft").replace("<name value=\"Example 1\"/>", "<name value=\"Example 1\"><extension url=\"http://example.org/x\"><valueString value=\"x\"/></extension></name>");
+    assertNotEquals(igHash(xml), igHash(xml.replace("Example 1", "Example 1 renamed")));
+  }
+
+  @Test
+  void igThatCantBeReadCountsAsItIs() {
+    for (String s : new String[] {"<ImplementationGuide", "{\"resourceType\":", "<Patient xmlns=\"http://hl7.org/fhir\"><id value=\"x\"/></Patient>", "{\"resourceType\":\"Patient\"}",
+        // an entry that isn't in an array
+        "{\"resourceType\":\"ImplementationGuide\",\"definition\":{\"resource\":{\"reference\":{\"reference\":\"Patient/ex1\"},\"name\":\"x\"}}}"}) {
+      byte[] b = s.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+      assertTrue(java.util.Arrays.equals(b, RapidoTracker.igSourceForHash(b, Set.of("Patient/ex1"))), s);
+    }
+  }
+
+  /** the IG a template script is given and gives back, by name */
+  @Test
+  void igWorkingAndUpdatedNames() {
+    for (String n : new String[] {"onLoad-ig-working.json", "onLoad-ig-working.xml", "onLoad-IG-Working.XML", "x-ig-working.1.xml", "x-ig-working.12.json"}) {
+      assertTrue(RapidoTracker.isIgWorking(n), n);
+      assertFalse(RapidoTracker.isIgUpdated(n), n);
+    }
+    for (String n : new String[] {"onLoad-ig-updated.json", "onLoad-ig-updated.xml", "x-IG-Updated.Json"}) {
+      assertTrue(RapidoTracker.isIgUpdated(n), n);
+      assertFalse(RapidoTracker.isIgWorking(n), n);
+    }
+    for (String n : new String[] {"-ig-working.json", "-ig-updated.json", "x-ig-working.txt", "x-ig-updated.txt", "x-ig-working", "x-ig-working..json",
+        "x-ig-working.a.json", "x-ig-working.1.2.json", "x-ig-working.1", "x-ig-working.json.bak", "x-ig-updated.1.json", "x-ig-workingx.json", "x.ig-working.json"}) {
+      assertFalse(RapidoTracker.isIgWorking(n), n);
+      assertFalse(RapidoTracker.isIgUpdated(n), n);
+    }
+  }
 }
