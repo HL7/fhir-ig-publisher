@@ -230,7 +230,7 @@ public class Template {
   }
 
   private void processTranslationFile(String tf, File fl, List<String> langCodes) throws JsonException, IOException {
-    String base = FileUtilities.fileTitle(fl.getName());
+    String base = FileUtilities.fileTitle(fl.getAbsolutePath());
     Map<String, POSource> translations = new HashMap<>();
 
     // load the base file

@@ -1,0 +1,30 @@
+package org.hl7.fhir.igtools.publisher;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+
+class RemovePasswordTest {
+
+  @ParameterizedTest
+  @CsvSource({
+    "-repo, https://user:ghp_secret@github.com/org/repo.git, https://github.com/org/repo.git",
+    "-repo, https://ghp_secret@github.com/org/repo, https://github.com/org/repo",
+    "-repo, HTTP://u:p@example.org/x, HTTP://example.org/x",
+    "-repo, https://github.com/org/repo, https://github.com/org/repo",
+    "-repo, git@github.com:org/repo.git, git@github.com:org/repo.git",
+    "-ig, /work/my@ig/ig.ini, /work/my@ig/ig.ini",
+    "-target, https://build.fhir.org/ig/org/repo/branches/a@b, https://build.fhir.org/ig/org/repo/branches/a@b",
+    "-proxy-password, secret, XXXXXX",
+  })
+  void masksCredentials(String name, String value, String expected) {
+    assertEquals(expected, Publisher.removePassword(new String[] {name, value}, 1));
+  }
+
+  @ParameterizedTest
+  @CsvSource({"-ig", "https://u:p@example.org"})
+  void firstArgument(String value) {
+    assertEquals(value.replace("u:p@", ""), Publisher.removePassword(new String[] {value}, 0));
+  }
+}

@@ -1378,7 +1378,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     prop(b, "source", source);
     prop(b, "user.dir", System.getProperty("user.home"));
     prop(b, "tx.server", tx);
-    prop(b, "tx.cache", Utilities.path(System.getProperty("user.home"), "fhircache"));
+    prop(b, "tx.cache", Utilities.path(System.getProperty("user.home"), ".fhir", "tx-cache"));
     prop(b, "system.type", System.getProperty("sun.arch.data.model"));
     prop(b, "system.cores", Integer.toString(Runtime.getRuntime().availableProcessors()));   
     prop(b, "system.mem.free", Long.toString(Runtime.getRuntime().freeMemory()));   
@@ -1662,7 +1662,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       if (CliParams.hasNamedParam(args, "-auto-ig-build")) {
         self.settings.setMode(PublisherUtils.IGBuildMode.AUTOBUILD);
         self.settings.setTargetOutput(CliParams.getNamedParam(args, "-target"));
-        self.settings.setRepoSource(CliParams.getNamedParam(args, "-repo"));
+        self.setRepoSource(CliParams.getNamedParam(args, "-repo"));
       } else if (CliParams.hasNamedParam(args, "-rapido") || CliParams.hasNamedParam(args, "-cascais")) {
         self.settings.setRapidoMode(true);
         if (CliParams.hasNamedParam(args, "-watch")) {
@@ -1930,17 +1930,15 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     }
   }
 
-  private static String removePassword(String[] args, int i) {
-    if (i == 0 || !args[i-1].toLowerCase().contains("password")) {
-      return args[i];
-    } else {
+  /**
+   * Make a command line argument safe to log: mask the value after any parameter named *password*, and strip
+   * user info (e.g. a token in https://user:token@github.com/...) from any URL in the argument
+   */
+  static String removePassword(String[] args, int i) {
+    if (i > 0 && args[i-1].toLowerCase().contains("password")) {
       return "XXXXXX";
     }
-  }
-
-  private static String removePassword(String string) {
-    // TODO Auto-generated method stub
-    return null;
+    return args[i] == null ? null : args[i].replaceAll("(?i)\\b([a-z][a-z0-9+.-]*://)[^/@\\s]*@", "$1");
   }
 
   /** reads -threads into the settings and, if it was given, says how many extra threads the run may use */

@@ -19,8 +19,7 @@ import java.util.List;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
-// core-tem-unwind import org.hl7.fhir.utilities.npm.NpmPackageSigner;
-// core-tem-unwind import org.hl7.fhir.utilities.npm.NpmPackageSigner.SigningKey;
+import org.hl7.fhir.utilities.npm.NpmPackageSigner;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -109,9 +108,6 @@ class PackageSigningUpdaterTest {
 //    assertTrue(log.contains("Signed 2, already signed 0, not packages 1, failed 0"), log);
 //    assertTrue(log.contains("other/1.0.0/package.tgz is not under"), log);
 //
-//    List<SigningKey> keys = List.of(new SigningKey(signer.getKeyId(), signer.getPublicKey()));
-//    assertEquals("example.a", NpmPackageSigner.verify(web.resolve("a/1.0.0/package.tgz").toFile(), web.resolve("a/1.0.0/package.tgz.sigstore.json").toFile(), keys).getName());
-//    assertEquals("example.b.r4", NpmPackageSigner.verify(web.resolve("b/2.0.0/example.b.r4.tgz").toFile(), web.resolve("b/2.0.0/example.b.r4.tgz.sigstore.json").toFile(), keys).getName());
 //    assertFalse(web.resolve("old/igpack.tgz.sigstore.json").toFile().exists());
 //
 //    String expected = feed("\n")
@@ -141,8 +137,6 @@ class PackageSigningUpdaterTest {
 //    NpmPackageSigner other = newSigner();
 //    String log = run(other, false);
 //    assertTrue(log.contains("Signed 2, already signed 0"), log);
-//    List<SigningKey> keys = List.of(new SigningKey(other.getKeyId(), other.getPublicKey()));
-//    NpmPackageSigner.verify(web.resolve("a/1.0.0/package.tgz").toFile(), web.resolve("a/1.0.0/package.tgz.sigstore.json").toFile(), keys);
 //  }
 //
 //  @Test
