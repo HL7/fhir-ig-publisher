@@ -1004,6 +1004,81 @@ public class DBBuilder {
   }
 
 
+  /**
+   * The SQL in a page ({% sql %}) comes from the IG, and runs against the build's database. It can only be a query: a
+   * single statement that starts with SELECT or WITH (after any comments). SQLite runs a statement before the driver
+   * finds that it isn't a query, and some statements write files wherever they are told to (ATTACH DATABASE creates
+   * the file it names, and so does VACUUM INTO)
+   */
+  static void checkQuery(String sql) {
+    if (sql == null) {
+      throw new FHIRException("No SQL query");
+    }
+    int i = skipSpaceAndComments(sql, 0);
+    int e = i;
+    while (e < sql.length() && (Character.isLetterOrDigit(sql.charAt(e)) || sql.charAt(e) == '_')) {
+      e++;
+    }
+    String word = sql.substring(i, e);
+    if (!word.equalsIgnoreCase("select") && !word.equalsIgnoreCase("with")) {
+      throw new FHIRException("Only a query (SELECT, or WITH ... SELECT) can be run, not '"+(word.isEmpty() ? sql.trim() : word)+"'");
+    }
+    // one statement: a ; can only be followed by spaces and comments
+    while (i < sql.length()) {
+      char c = sql.charAt(i);
+      if (c == '\'' || c == '"' || c == '`') {
+        i = skipQuoted(sql, i, c);
+      } else if (c == '[') {
+        int end = sql.indexOf(']', i + 1);
+        i = end < 0 ? sql.length() : end + 1;
+      } else if (sql.startsWith("--", i) || sql.startsWith("/*", i)) {
+        i = skipSpaceAndComments(sql, i);
+      } else if (c == ';') {
+        if (skipSpaceAndComments(sql, i + 1) < sql.length()) {
+          throw new FHIRException("Only one SQL statement can be run");
+        }
+        return;
+      } else {
+        i++;
+      }
+    }
+  }
+
+  /** a quoted string or name: the quote character doubled is the quote character itself */
+  private static int skipQuoted(String sql, int i, char q) {
+    i++;
+    while (i < sql.length()) {
+      if (sql.charAt(i) == q) {
+        if (i + 1 < sql.length() && sql.charAt(i + 1) == q) {
+          i = i + 2;
+        } else {
+          return i + 1;
+        }
+      } else {
+        i++;
+      }
+    }
+    return i;
+  }
+
+  /** past spaces, -- comments (to the end of the line) and /* comments (to the end of the text, if they aren't closed, as SQLite does) */
+  private static int skipSpaceAndComments(String sql, int i) {
+    while (i < sql.length()) {
+      if (Character.isWhitespace(sql.charAt(i))) {
+        i++;
+      } else if (sql.startsWith("--", i)) {
+        int end = sql.indexOf('\n', i);
+        i = end < 0 ? sql.length() : end + 1;
+      } else if (sql.startsWith("/*", i)) {
+        int end = sql.indexOf("*/", i + 2);
+        i = end < 0 ? sql.length() : end + 2;
+      } else {
+        return i;
+      }
+    }
+    return i;
+  }
+
   public synchronized String processSQL(String sql) {
     long start = System.currentTimeMillis();
     if (con == null) {
@@ -1070,6 +1145,7 @@ public class DBBuilder {
         ctrl.setTitles(true);
       }
       
+      checkQuery(ctrl.getQuery());
       Statement stmt = con.createStatement();
       ResultSet rs = stmt.executeQuery(ctrl.getQuery());
       ResultSetMetaData rsmd = rs.getMetaData();
@@ -1212,6 +1288,7 @@ public class DBBuilder {
       throw new IllegalArgumentException("Param sql cannot be null.");
     }
 
+    checkQuery(sql);
     Statement stmt = con.createStatement();
     ResultSet rs = stmt.executeQuery(sql);
     ResultSetMetaData rsmd = rs.getMetaData();
