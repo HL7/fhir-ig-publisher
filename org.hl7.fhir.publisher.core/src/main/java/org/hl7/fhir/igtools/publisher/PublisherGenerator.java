@@ -4591,6 +4591,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         log("");
         log("cd "+ pf.tempDir);
         log("set JEKYLL_NO_BUNDLER_REQUIRE=true");
+        log("set NoDefaultCurrentDirectoryInExePath=1");
         log(settings.jekyllCommand +" "+jekyllArgs);
         log("");
         log("and then investigate why Jekyll has failed");
@@ -4611,7 +4612,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
                 .addArgument("\"" + configFiles + "\"")
                 .addArgument("--destination")
                 .addArgument(enclosedOutputDir);
-        exec.execute(commandLine, env);
+        exec.execute(commandLine, PublisherUtils.noCurrentFolderLookup(env));
       } else if (FhirSettings.hasRubyPath()) {
         Map<String, String> vars = new HashMap<>(env);
         String path = FhirSettings.getRubyPath()+":"+env.get("PATH");

@@ -21,6 +21,7 @@ package org.hl7.fhir.igtools.templates;
  */
 
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -39,6 +40,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.utilities.FileUtilities;
@@ -312,7 +315,7 @@ public class TemplateManager {
    * @param id the template, for messages
    * @return null if the template has no active content
    */
-  private String activeContentReason(String templateDir, List<String> files, JsonObject config, String id) {
+  String activeContentReason(String templateDir, List<String> files, JsonObject config, String id) {
     Set<String> ext = new HashSet<>();
     String scriptReason = null;
     if (config != null) {
@@ -329,7 +332,7 @@ public class TemplateManager {
         }
       }
       if (config.has("script")) {
-        antScripts.add(config.asString("script"));
+        antScripts.add(scriptPath(config.asString("script")));
         
         // the ant script might call other ant scripts. No way we can introspect the ant script to see what it calls, 
         // so the template has to declare what other any scripts it can call out to, so we can track to see if any template
@@ -343,7 +346,7 @@ public class TemplateManager {
           }
         } else {
           for (String s : config.getStrings("otherScripts")) {
-            antScripts.add(s);
+            antScripts.add(scriptPath(s));
           }
         }
       }
@@ -352,7 +355,12 @@ public class TemplateManager {
     // if we have't already found that it's considered a script, we'll look through the content
     if (scriptReason == null) {
       for (String fn : files) {
-        String n = FileUtilities.getRelativePath(templateDir, fn);
+        // where the file actually is: the name it was unpacked with could have . or .. in it
+        String n = templatePath(templateDir, fn);
+        if (n == null) {
+          scriptReason = "Template has a file outside the template folder ("+fn+")";
+          break;
+        }
         String lower = n.toLowerCase();
 
         if (!Utilities.existsInList(lower, "license", "readme")) {
@@ -391,7 +399,7 @@ public class TemplateManager {
             break;
           }
           String s = extension(n);
-          if (antScripts.contains(n)) {
+          if (antScripts.contains(lower)) {
             // nah, if you overwrite an xml ant script, you're doing active content
             scriptReason = "Template contains a registered ant script";
           } else if (!Utilities.existsInList(s,
@@ -502,6 +510,34 @@ public class TemplateManager {
     }
   }
 
+  /**
+   * A file's path relative to the template folder, normalised (no . or .. segments, / as the separator), or null if
+   * it isn't inside the template folder. The active content checks are made on this, since it's where the file is
+   */
+  static String templatePath(String templateDir, String file) {
+    Path root = Paths.get(templateDir).toAbsolutePath().normalize();
+    Path f = Paths.get(file).toAbsolutePath().normalize();
+    if (!f.startsWith(root) || f.equals(root)) {
+      return null;
+    }
+    return root.relativize(f).toString().replace('\\', '/');
+  }
+
+  /**
+   * An ant script named in config.json (script, otherScripts), in the form templatePath() gives, in lower case: what
+   * matters is which file it is, and some file systems ignore case
+   */
+  static String scriptPath(String script) {
+    return Paths.get(script.replace('\\', '/')).normalize().toString().replace('\\', '/').toLowerCase();
+  }
+
+  /**
+   * A template can be loaded by URL only from a repository on github.com (not any host whose name starts with github.)
+   */
+  static boolean isGitHubUrl(String template) {
+    return template.startsWith("https://github.com/") || template.startsWith("http://github.com/");
+  }
+
   private String extension(String n) {
     if (!n.contains(".")) {
       return "";
@@ -597,7 +633,7 @@ public class TemplateManager {
           }
         }
       }
-      if (template.startsWith("https://github.") || template.startsWith("http://github.")) {
+      if (isGitHubUrl(template)) {
         if (template.startsWith("http://")) {
           template = template.replace("http://", "https://");
         }
@@ -605,8 +641,12 @@ public class TemplateManager {
         URL url = URI.create(zipUrl(template)).toURL();
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         connection.setRequestMethod("GET");
-        InputStream zip = connection.getInputStream();
-        return NpmPackage.fromZip(zip, true, url.toString()); 
+        byte[] zip;
+        try (InputStream in = connection.getInputStream()) {
+          zip = in.readAllBytes();
+        }
+        checkZipEntryNames(zip, url.toString());
+        return NpmPackage.fromZip(new ByteArrayInputStream(zip), true, url.toString()); 
       }
       throw new FHIRException("Unable to load template source from "+template+". Use a github URL, a local directory, or #[folder] for a contained template");
     } catch (Exception e) {
@@ -615,8 +655,24 @@ public class TemplateManager {
     }
   }
 
+  /**
+   * No entry in a template zip can have ".." in its name. NpmPackage.fromZip (core 7.0.6) doesn't check: unpacked,
+   * content/../scripts/ant.xml is written over scripts/ant.xml (a trusted base template's script), but the list of the
+   * files unpacked - which is what the active content check looks at - still says content/../scripts/ant.xml
+   */
+  static void checkZipEntryNames(byte[] zip, String source) throws IOException {
+    try (ZipInputStream zin = new ZipInputStream(new ByteArrayInputStream(zip))) {
+      ZipEntry ze;
+      while ((ze = zin.getNextEntry()) != null) {
+        if (ze.getName().contains("..")) {
+          throw new FHIRException("The template "+source+" has an entry with an illegal name: "+ze.getName());
+        }
+      }
+    }
+  }
+
   private String zipUrl(String template) {
-    if (!template.startsWith("https://github.")) {
+    if (!template.startsWith("https://github.com/")) {
       throw new FHIRException("Cannot refer to a template by URL unless referring to a github repository: "+template);
     } else if (Utilities.charCount(template, '/') == 4) {
       return Utilities.pathURL(template, "archive", "master.zip");      

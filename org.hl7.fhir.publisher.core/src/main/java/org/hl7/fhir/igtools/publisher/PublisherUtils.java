@@ -22,6 +22,17 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class PublisherUtils {
+
+  /**
+   * On Windows, cmd looks for a command (jekyll, sushi, npx) in the current folder before the PATH, so a jekyll.bat in
+   * the folder a command runs in would be run instead. With NoDefaultCurrentDirectoryInExePath set (to anything), cmd
+   * doesn't look in the current folder. Returns the environment to run cmd with
+   */
+  public static Map<String, String> noCurrentFolderLookup(Map<String, String> env) {
+    Map<String, String> res = new HashMap<>(env);
+    res.put("NoDefaultCurrentDirectoryInExePath", "1");
+    return res;
+  }
   public enum UMLGenerationMode {
     NONE, SOURCED, ALL;
 

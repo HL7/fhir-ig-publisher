@@ -212,7 +212,7 @@ public class PublisherIGLoader extends PublisherBase {
     }
     try {
       prescanSushiConfig(focusDir());
-      new FSHRunner(this).runFsh(new File(FileUtilities.getDirectoryForFile(fsh.getAbsolutePath())), settings.getMode());
+      new FSHRunner(this).runFsh(new File(FileUtilities.getDirectoryForFile(fsh.getAbsolutePath())), new File(focusDir()), settings.getMode());
     } catch (Exception | Error e) {
       if (watchSession != null) {
         try {
@@ -512,7 +512,16 @@ public class PublisherIGLoader extends PublisherBase {
           pf.qaDir = Utilities.path(pf.rootDir, p.getValue());
           break;
         case "path-tx-cache":
-          pf.vsCache = Paths.get(p.getValue()).isAbsolute() ? p.getValue() : Utilities.path(pf.rootDir, p.getValue());
+          String txCache = txCachePath(pf.repoRoot, pf.rootDir, p.getValue());
+          if (txCache != null) {
+            pf.vsCache = txCache;
+          } else {
+            // the publisher deletes files in the cache folder (all but three of them on the ci-build), so it has to be the IG's own
+            pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher,
+                ValidationMessage.IssueType.BUSINESSRULE, "ImplementationGuide.definition.parameter[path-tx-cache]",
+                "The path-tx-cache '"+p.getValue()+"' is outside the IG's folder, so it has been ignored: the terminology cache is "+pf.vsCache,
+                ValidationMessage.IssueSeverity.ERROR));
+          }
           break;
         case "path-liquid":
           liquid1.add(p.getValue());
@@ -525,15 +534,13 @@ public class PublisherIGLoader extends PublisherBase {
           break;
         case "path-temp":
           pf.tempDir = Utilities.path(pf.rootDir, p.getValue());
-          if (!pf.tempDir.startsWith(pf.rootDir))
-            throw new Exception("Temp directory must be a sub-folder of the base directory");
+          checkInsideRoot(pf.tempDir, "temp");
           break;
         case "path-output":
           if (settings.getMode() != PublisherUtils.IGBuildMode.WEBSERVER) {
             // Can't override outputDir if building using webserver
             pf.outputDir = Utilities.path(pf.rootDir, p.getValue());
-            if (!pf.outputDir.startsWith(pf.rootDir))
-              throw new Exception("Output directory must be a sub-folder of the base directory");
+            checkInsideRoot(pf.outputDir, "output");
           }
           break;
         case "path-history":
@@ -813,6 +820,7 @@ public class PublisherIGLoader extends PublisherBase {
           break;
         case "page-factory":
           dir = Utilities.path(pf.rootDir, "temp", "factory-pages", "factory"+ pf.pageFactories.size());
+          checkInsideRoot(dir, "page factory");
           FileUtilities.createDirectory(dir);
           pf.pageFactories.add(new PageFactory(Utilities.path(pf.rootDir, p.getValue()), dir));
           pf.pagesDirs.add(dir);
@@ -1076,6 +1084,7 @@ public class PublisherIGLoader extends PublisherBase {
     }
     pf.pagesDirs.removeAll(missingDirs);
     checkPageResourceDirOverlap();
+    checkFoldersInsideRoot();
 
     logDebugMessage(LogCategory.INIT, "Output: "+ pf.outputDir);
     forceDir(pf.outputDir);
@@ -1513,6 +1522,8 @@ public class PublisherIGLoader extends PublisherBase {
     pf.rootDir = settings.getConfigFile();
     pf.outputDir = Utilities.path(pf.rootDir, "output");
     pf.tempDir = Utilities.path(pf.rootDir, "temp");
+    checkInsideRoot(pf.outputDir, "output");
+    checkInsideRoot(pf.tempDir, "temp");
     checkTrustedTemplateSource(pf.templateInfo.asString("name"), true);
   }
 
@@ -2192,6 +2203,72 @@ public class PublisherIGLoader extends PublisherBase {
     return dep;
   }
 
+  /**
+   * The folder path-tx-cache names (relative to the IG root, or absolute), or null if it isn't inside the IG's folder
+   * (the folder ig.ini is in). Symbolic links are followed, as far as the path exists, since a repository can have one
+   */
+  static String txCachePath(String repoRoot, String rootDir, String value) {
+    Path path = Paths.get(rootDir).toAbsolutePath().resolve(value).normalize();
+    return isInside(repoRoot, path.toString()) ? path.toString() : null;
+  }
+
+  /**
+   * Whether path is inside root, where they really are: symbolic links are followed (as far as the path exists - the
+   * rest of it is created later, as folders), since a repository can contain a link to anywhere. The publisher reads
+   * the IG's source folders, and writes to (and clears) temp and output, so none of them can be somewhere else
+   */
+  static boolean isInside(String root, String path) {
+    try {
+      Path r = Paths.get(root).toAbsolutePath().normalize();
+      r = Files.exists(r) ? r.toRealPath() : r;
+      Path p = Paths.get(path).toAbsolutePath().normalize();
+      Path existing = p;
+      while (existing != null && !Files.exists(existing, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+        existing = existing.getParent();
+      }
+      Path real = existing == null ? p : existing.toRealPath().resolve(existing.relativize(p)).normalize();
+      return real.startsWith(r);
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private void checkInsideRoot(String dir, String what) throws IOException {
+    String d = dir.endsWith("*") ? dir.substring(0, dir.length() - 1) : dir;
+    if (!isInside(pf.rootDir, d)) {
+      throw new IOException("The "+what+" folder "+dir+" must be inside the IG's folder ("+pf.rootDir+"), and it, or a folder on its path, is outside it or a link to somewhere else");
+    }
+  }
+
+  private void checkFoldersInsideRoot() throws IOException {
+    // a program that runs the publisher as a web server sets temp and output itself (setTempDir, setOutputDir)
+    if (settings.getMode() != PublisherUtils.IGBuildMode.WEBSERVER) {
+      checkInsideRoot(pf.tempDir, "temp");
+      checkInsideRoot(pf.outputDir, "output");
+    }
+    if (pf.qaDir != null) {
+      checkInsideRoot(pf.qaDir, "qa");
+    }
+    for (String s : pf.resourceDirs) {
+      checkInsideRoot(s, "resource");
+    }
+    for (String s : pf.resourceFactoryDirs) {
+      checkInsideRoot(s, "factory");
+    }
+    for (String s : pf.pagesDirs) {
+      checkInsideRoot(s, "pages");
+    }
+    for (String s : pf.testDirs) {
+      checkInsideRoot(s, "test");
+    }
+    for (String s : pf.dataDirs) {
+      checkInsideRoot(s, "data");
+    }
+    for (String s : pf.otherDirs) {
+      checkInsideRoot(s, "other");
+    }
+  }
+
   private NpmPackage resolveDependency(String canonical, String packageId, String igver) throws Exception {
     PackageList pl;
     logDebugMessage(LogCategory.INIT, "Fetch Package history from "+Utilities.pathURL(canonical, "package-list.json"));
@@ -2205,11 +2282,36 @@ public class PublisherIGLoader extends PublisherBase {
       throw new Exception("Canonical mismatch fetching package list for "+canonical+"#"+igver+", package-list.json says "+pl.canonical());
     for (PackageList.PackageListEntry e : pl.versions()) {
       if (igver.equals(e.version())) {
-        InputStream src = fetchFromSource(pl.pid()+"-"+igver, Utilities.pathURL(e.path(), "package.tgz"));
-        return pf.pcm.addPackageToCache(pl.pid(), igver, src, Utilities.pathURL(e.path(), "package.tgz"));
+        String source = Utilities.pathURL(e.path(), "package.tgz");
+        byte[] tgz;
+        try (InputStream src = fetchFromSource(pl.pid()+"-"+igver, source)) {
+          tgz = src.readAllBytes();
+        }
+        // read once to check it, and then again by the cache (which has no way to check it first)
+        checkDependencyIsNotATemplate(pl.pid(), igver, tgz, source);
+        return pf.pcm.addPackageToCache(pl.pid(), igver, new ByteArrayInputStream(tgz), source);
       }
     }
     return null;
+  }
+
+  /**
+   * A dependency found through its canonical (not on a package server) is put in the package cache under the id its
+   * package-list.json gives, which other builds that share the cache then use. A dependency is never a template, so
+   * nothing that is a template, or has the id of a trusted template - as package-list.json says, or as its own
+   * package.json says - is put there: a later build would run it as that template
+   */
+  static void checkDependencyIsNotATemplate(String pid, String version, byte[] tgz, String source) throws IOException {
+    if (TrustedTemplates.isTrusted(pid)) {
+      throw new FHIRException("The dependency "+pid+"#"+version+" from "+source+" claims the id of a trusted template: a dependency can't be a template");
+    }
+    NpmPackage npm = NpmPackage.fromPackage(new ByteArrayInputStream(tgz), source);
+    if (TrustedTemplates.isTrusted(npm.name())) {
+      throw new FHIRException("The dependency "+pid+"#"+version+" from "+source+" is the trusted template "+npm.name()+": a dependency can't be a template");
+    }
+    if (npm.isType(PackageGenerator.PackageType.IG_TEMPLATE)) {
+      throw new FHIRException("The dependency "+pid+"#"+version+" from "+source+" is a template ("+npm.name()+"): a dependency can't be a template");
+    }
   }
 
 

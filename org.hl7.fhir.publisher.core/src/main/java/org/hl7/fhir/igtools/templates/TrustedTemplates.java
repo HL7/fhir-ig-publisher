@@ -23,7 +23,7 @@ public class TrustedTemplates {
 
   static {
     // TEMPLATES.put("fhir.test.template", null); not currently in use
-    // TEMPLATES.put("fhir.base.template", "HL7/ig-template-base"); // no longer trusted: GG decision, 19-11-2026
+    TEMPLATES.put("fhir.base.template", "HL7/ig-template-base"); // no longer trusted: GG decision, 19-11-2026
     // TEMPLATES.put("fhir.base.template.a", null); // this was a transient template that is no longer supported
     TEMPLATES.put("fhir2.base.template", "HL7/ig-template-base2"); // Lloyd
     TEMPLATES.put("hl7.base.template", "HL7/ig-template-hl7"); // Lloyd

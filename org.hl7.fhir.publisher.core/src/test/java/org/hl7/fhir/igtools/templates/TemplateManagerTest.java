@@ -283,4 +283,90 @@ class TemplateManagerTest {
     assertBrokenJson(assertThrows(Exception.class, () -> tm.loadTemplate("my.template#1.0.0", dir.toString(), "x.y", false, false, false)));
     assertEquals(Collections.singletonList(folder("override")), tm.getLocalFolders());
   }
+
+  private static byte[] zip(String... names) throws IOException {
+    java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+    try (java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(bytes)) {
+      for (String n : names) {
+        zip.putNextEntry(new java.util.zip.ZipEntry(n));
+        zip.write("x".getBytes(StandardCharsets.UTF_8));
+        zip.closeEntry();
+      }
+    }
+    return bytes.toByteArray();
+  }
+
+  /** a template zip (from github) with ".." in an entry name is refused before anything is unpacked */
+  @ParameterizedTest
+  @ValueSource(strings = {"repo-main/package/content/../scripts/ant.xml", "repo-main/../evil.txt", "repo-main/package/a..b"})
+  void aTemplateZipWithDotDotInANameIsRefused(String name) throws IOException {
+    byte[] zip = zip("repo-main/package/package.json", name);
+    FHIRException e = assertThrows(FHIRException.class, () -> TemplateManager.checkZipEntryNames(zip, "test"));
+    assertTrue(e.getMessage().contains(name));
+  }
+
+  @Test
+  void aTemplateZipWithOrdinaryNamesIsFine() throws IOException {
+    TemplateManager.checkZipEntryNames(zip("repo-main/package/package.json", "repo-main/package/content/assets/x.css", "repo-main/package/.github/CODEOWNERS"), "test");
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "scripts/ant.xml, scripts/ant.xml",
+    "content/../scripts/ant.xml, scripts/ant.xml",
+    "./content/./x.html, content/x.html",
+    "content/../../outside.txt, ",
+    "../outside.txt, "
+  })
+  void filesAreCheckedWhereTheyAre(String name, String expected) {
+    assertEquals(expected, TemplateManager.templatePath(dir.toString(), dir.toString() + "/" + name));
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "scripts/ant.xml, scripts/ant.xml",
+    "./scripts/ant.xml, scripts/ant.xml",
+    "scripts\\Ant-HL7.xml, scripts/ant-hl7.xml",
+    "scripts/x/../ant.xml, scripts/ant.xml"
+  })
+  void scriptNamesAreNormalised(String name, String expected) {
+    assertEquals(expected, TemplateManager.scriptPath(name));
+  }
+
+  /** a file unpacked under a name with .. in it is checked as the file it actually is */
+  @Test
+  void aFileInScriptsUnderAnotherNameIsActiveContent() {
+    String reason = manager().activeContentReason(dir.toString(), Collections.singletonList(dir + "/content/../scripts/ant.xml"), null, "test");
+    assertTrue(reason != null && reason.contains("scripts/ant.xml"), reason);
+  }
+
+  /** a registered ant script outside scripts/ is found however either name is written */
+  @Test
+  void overwritingARegisteredScriptIsActiveContentHoweverItIsNamed() {
+    TemplateManager tm = manager();
+    org.hl7.fhir.utilities.json.model.JsonObject base = new org.hl7.fhir.utilities.json.model.JsonObject();
+    base.add("script", "./build.xml");
+    base.add("otherScripts", new org.hl7.fhir.utilities.json.model.JsonArray());
+    tm.activeContentReason(dir.toString(), Collections.emptyList(), base, "base");
+    assertEquals("Template contains a registered ant script",
+        tm.activeContentReason(dir.toString(), Collections.singletonList(dir + "/content/../BUILD.xml"), null, "child"));
+  }
+
+  @Test
+  void aFileOutsideTheTemplateFolderIsActiveContent() {
+    String reason = manager().activeContentReason(dir.toString(), Collections.singletonList(dir + "/content/../../outside.txt"), null, "test");
+    assertTrue(reason != null && reason.contains("outside the template folder"), reason);
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "https://github.com/HL7/ig-template-base, true",
+    "http://github.com/HL7/ig-template-base, true",
+    "https://github.attacker.example/HL7/ig-template-base, false",
+    "https://github.com.attacker.example/HL7/ig-template-base, false",
+    "https://raw.githubusercontent.com/HL7/x, false"
+  })
+  void templatesCanOnlyBeLoadedFromGitHubDotCom(String url, boolean ok) {
+    assertEquals(ok, TemplateManager.isGitHubUrl(url));
+  }
 }
