@@ -2,6 +2,7 @@ package org.hl7.fhir.igtools.templates;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
@@ -17,6 +18,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.model.core.ImplementationGuide;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledOnOs;
@@ -100,6 +102,40 @@ class TemplateScriptTest {
     assertTrue(Files.notExists(dir.resolve("template/onGenerate-ig-updated.xml")));
   }
 
+  /**
+   * Ant runs the tasks that are outside any target while it parses the build file. The script of a template that
+   * isn't trusted is never parsed, so they don't run (the trusted case shows that the test would notice if they did)
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void topLevelTasksRunOnlyForATrustedTemplate(boolean trusted) throws Exception {
+    Path marker = dir.resolve("marker.txt");
+
+    template("onLoad", "<echo message=\"onLoad\"/>", "<touch file=\"" + marker + "\"/>", trusted);
+
+    assertEquals(trusted, Files.exists(marker));
+  }
+
+  @Test
+  void anUntrustedTemplateSaysWhyItsOnLoadScriptCantRun() throws Exception {
+    Template template = template("onLoad", "<echo message=\"onLoad\"/>", "", false);
+
+    FHIRException e = assertThrows(FHIRException.class, () -> template.onLoadEvent(ig(), new HashMap<>()));
+
+    assertTrue(e.getMessage().contains("is not trusted (reason: test reason)"), e.getMessage());
+  }
+
+  @Test
+  void anUntrustedTemplateSaysWhyItsOnGenerateScriptCantRun() throws Exception {
+    Template template = template("onGenerate", "<echo message=\"onGenerate\"/>", "", false);
+    String temp = Files.createDirectory(dir.resolve("temp")).toString();
+
+    FHIRException e = assertThrows(FHIRException.class,
+        () -> template.beforeGenerateEvent(null, ig(), temp, new HashSet<>(), new ArrayList<>(), List.of()));
+
+    assertTrue(e.getMessage().contains("is not trusted (reason: test reason)"), e.getMessage());
+  }
+
   private ImplementationGuide runOnLoad(String format) throws Exception {
     Template template = template("onLoad", "<copy file=\"${onLoad.ig.source}" + format + "\" tofile=\"${onLoad.ig.dest}" + format + "\"/>");
     ImplementationGuide updated = template.onLoadEvent(ig(), new HashMap<>());
@@ -111,16 +147,26 @@ class TemplateScriptTest {
    * A template whose script has a single target, named after the event it runs on.
    */
   private Template template(String event, String tasks) throws IOException {
+    return template(event, tasks, "", true);
+  }
+
+  /**
+   * As above, with topLevel tasks outside the target, for a template that is or isn't trusted
+   */
+  private Template template(String event, String tasks, String topLevel, boolean trusted) throws IOException {
     Path templateDir = Files.createDirectories(dir.resolve("template"));
     Files.writeString(templateDir.resolve("config.json"), "{\"script\": \"scripts/ant.xml\", \"targets\": {\"" + event + "\": \"" + event + "\"}}");
     Files.createDirectory(templateDir.resolve("scripts"));
     Files.writeString(templateDir.resolve("scripts/ant.xml"),
         "<project name=\"test\">\n"
+        + topLevel + "\n"
         + "  <target name=\"" + event + "\">\n"
         + tasks + "\n"
         + "  </target>\n"
         + "</project>\n");
-    return new Template(dir.toString(), true, null, null, false, false, false);
+    return trusted
+        ? new Template(dir.toString(), true, null, null, false, false, false)
+        : new Template(dir.toString(), false, "test.template#1.0.0", "test reason", false, false, false);
   }
 
   private static ImplementationGuide ig() {

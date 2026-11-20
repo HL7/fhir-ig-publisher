@@ -17,6 +17,7 @@ import org.apache.commons.exec.ExecuteWatchdog;
 import org.apache.commons.exec.PumpStreamHandler;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
+import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.logging.ILoggingService;
@@ -116,11 +117,17 @@ public class FSHRunner {
 
     @Nonnull
     protected CommandLine getNpmPathCommandLine(String fshVersion, PublisherUtils.IGBuildMode mode) {
-        // bash -c takes a single script argument: anything after it becomes $0, $1... and is ignored.
-        // So the whole sushi command must be one argument, passed unquoted
-        return new CommandLine("bash")
+        // bash is only here so that sushi/npx is found on the PATH set from the npm path. The arguments go to bash
+        // separately - "$0" is the command and "$@" the rest - never as part of the script, so the shell doesn't read
+        // anything in them (the sushi version comes from the IG's fsh.ini)
+        CommandLine commandLine = new CommandLine("bash")
           .addArgument("-c")
-          .addArgument(getSushiCommandString(fshVersion, mode) + " . -o .", false);
+          .addArgument("exec \"$0\" \"$@\"", false);
+        for (String argument : getSushiCommandList(fshVersion, mode)) {
+            commandLine.addArgument(argument, false);
+        }
+        commandLine.addArgument(".", false).addArgument("-o", false).addArgument(".", false);
+        return commandLine;
     }
 
     @Nonnull
@@ -133,7 +140,19 @@ public class FSHRunner {
         return commandLine;
     }
 
+    /**
+     * The sushi version comes from the IG's fsh.ini, and goes to npx as fsh-sushi@{version}. npm reads far more than a
+     * version there (another package - npm:name -, a git repository, a tarball URL...), and on Windows the command
+     * goes through cmd, so anything but a plain version number would let the IG choose what is run
+     */
+    public static boolean isValidSushiVersion(String version) {
+        return version != null && version.matches("[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9]+(\\.[A-Za-z0-9]+)*)?");
+    }
+
     protected List<String> getSushiCommandList(String fshVersion, PublisherUtils.IGBuildMode mode) {
+        if (fshVersion != null && !isValidSushiVersion(fshVersion)) {
+            throw new FHIRException("The sushi-version in fsh.ini must be a version number (e.g. 3.16.0), not '"+fshVersion+"'");
+        }
         final List<String> cmd = fshVersion == null ? List.of("sushi"): List.of("npx", "fsh-sushi@"+fshVersion);
         if (mode == PublisherUtils.IGBuildMode.PUBLICATION || mode == PublisherUtils.IGBuildMode.AUTOBUILD) {
             return new ImmutableList.Builder<String>().addAll(cmd).add("--require-latest").build();

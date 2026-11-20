@@ -28,6 +28,9 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -35,6 +38,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.utilities.FileUtilities;
@@ -49,6 +53,7 @@ import org.hl7.fhir.utilities.logging.ILoggingService;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.PackageGenerator.PackageType;
+import org.hl7.fhir.utilities.settings.FhirSettings;
 
 public class TemplateManager {
 
@@ -64,6 +69,8 @@ public class TemplateManager {
   private Map<String, String> templateOverrides = new LinkedHashMap<>(); // template id (name#version, or just name) -> local folder
   private boolean usedOverride;
   private final List<String> localFolders = new ArrayList<>(); // the local folders the last template was loaded from
+  private String trustTemplate; // -trust-template: a template id, or "all"
+  private String settingsPath; // fhir-settings.json: null = FhirSettings.getFilePath()
 
   private static final String ACCESSIBLE_MARKER = "[%accessibility-routines%]";
   private static final String JS_ROUTINE_NAME_REGEX = "[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)*";
@@ -138,15 +145,75 @@ public class TemplateManager {
     } else {
       // the IG's own template folder is the template, as it is: a change to it needs a rebuild
       localFolders.add(new File(templateDir).getAbsolutePath());
+      checkInPlaceTemplate(template, templateDir);
     }
     
-    if (!autoMode) {
-      canExecute = true; // nah, we don't care. locally, we'll build whatever people give us
+    if (!autoMode && !canExecute) {
+      // locally, we'll build whatever people give us - once they've said they trust it
+      checkLocalTrust();
+      canExecute = true;
     }
     if (!canExecute) {
       logger.logMessage("IG template '"+templateThatCantExecute+"' is not trusted.  No scripts will be executed");
     }
     return new Template(rootFolder, canExecute, templateThatCantExecute, templateReason, wantLog, rapidoMode, usedOverride || isDevMode(template));
+  }
+
+  /**
+   * The -trust-template parameter: the id of a template that isn't trusted (see trustId()), or "all", that the user
+   * says can run locally. It's recorded in fhir-settings.json, so it only needs to be said once
+   */
+  public void setTrustTemplate(String trustTemplate) {
+    this.trustTemplate = Utilities.noString(trustTemplate) ? null : trustTemplate.trim();
+  }
+
+  /**
+   * The fhir-settings.json file that records which templates the user trusts. By default, the one FhirSettings uses
+   */
+  public void setSettingsPath(String settingsPath) {
+    this.settingsPath = settingsPath;
+  }
+
+  private String getSettingsPath() {
+    return settingsPath != null ? settingsPath : FhirSettings.getFilePath();
+  }
+
+  /**
+   * The id that a template is trusted by locally: what the IG (or the template that uses it as its base) names it by,
+   * without a version - a package id, a github URL, a folder, or #folder for a template in the IG's own folders
+   */
+  static String trustId(String template) {
+    if (template.startsWith("#") || !template.contains("#")) {
+      return template;
+    }
+    return template.substring(0, template.indexOf("#"));
+  }
+
+  /**
+   * Run locally, a template that has active content and isn't trusted can run, but only once the user has said they
+   * trust it: by listing its id (or "all") in trustedTemplates in fhir-settings.json, or by running with
+   * -trust-template, which adds it there. Otherwise the run stops, saying why and what to do
+   */
+  private void checkLocalTrust() throws IOException {
+    String id = trustId(templateThatCantExecute);
+    String settings = getSettingsPath();
+    if (settings != null && LocalTemplateTrust.isTrusted(settings, id)) {
+      return;
+    }
+    if (trustTemplate != null && (LocalTemplateTrust.ALL.equals(trustTemplate) || trustTemplate.equals(id))) {
+      if (settings != null) {
+        LocalTemplateTrust.addTrust(settings, trustTemplate);
+        logger.logMessage("Template '"+id+"' is trusted, as you said ("+(LocalTemplateTrust.ALL.equals(trustTemplate) ? "all templates" : "this template")+"): recorded in "+settings+", so you won't be asked again");
+      } else {
+        logger.logMessage("Template '"+id+"' is trusted for this run, as you said. It couldn't be recorded, because the FHIR settings file isn't known");
+      }
+      return;
+    }
+    throw new FHIRException("The template '"+templateThatCantExecute+"' runs scripts, and it is not a trusted template ("+templateReason+"). "
+        + "A template's scripts can do anything you can do on this computer, so be sure that this template is trustworthy before you run it. "
+        + "If you are sure, run the IG Publisher again with '-trust-template "+id+"' to trust this template, or '-trust-template all' to trust all templates. "
+        + (settings != null ? "That will be recorded in "+settings+", and you won't be asked again." : "")
+        + (trustTemplate != null ? " (-trust-template '"+trustTemplate+"' doesn't name this template.)" : ""));
   }
 
   /**
@@ -202,12 +269,7 @@ public class TemplateManager {
     
     List<String> files = new ArrayList<>();
     npm.unPackWithAppend(templateDir, files);
-    Set<String> ext = new HashSet<>();
-    String scriptReason = null;
     JsonObject config = null;
-    
-    // if scriptReason != null, then the template has active content, and scriptReason contains the reason why we decided that there's active content
-    
     if (npm.hasFile(Utilities.path("package", "$root"), "config.json")) {
       // we found a config file
       try {
@@ -217,10 +279,54 @@ public class TemplateManager {
         throw new FHIRException("Error parsing "+npm.name()+"#"+npm.version()+"#"+Utilities.path("package", "$root", "config.json")+": "+e.getMessage(), e);
       }
       configs.add(config);
-      
+    }
+    // if scriptReason != null, then the template has active content, and scriptReason contains the reason why we decided that there's active content
+    String scriptReason = activeContentReason(templateDir, files, config, npm.name()+"#"+npm.version());
+
+    // if it has active content, then we check to see if it's trusted. Locally: always trusted. auto-build: only some trusted
+    if (scriptReason != null) {
+      checkTemplateId(template, npm.name(), scriptReason);
+    }
+    if (level==0 && configs.size() > 1) {
+      config = configs.get(0);
+      for (int i=1;i<configs.size(); i++) {
+        applyConfigChanges(config, configs.get(i));
+      }
+      String configString = JsonParser.compose(config, true);
+      String configPath = Utilities.path(templateDir, "config.json");
+      FileUtilities.stringToFile(configString, configPath);
+    }
+    if (level==0 && !configs.isEmpty()) {
+      generateMakeAccessible(templateDir, configs.get(0));
+    }
+  }
+
+  /**
+   * Whether a template has active content, and if it does, why: it nominates an ant script or targets, it overwrites a
+   * registered ant script, or it has a file that isn't on the list of harmless ones. These rules apply to every template,
+   * however it was loaded (see installTemplate() and checkInPlaceTemplate())
+   *
+   * @param templateDir the folder the template content is in
+   * @param files the files of this template (absolute, or with the same prefix as templateDir)
+   * @param config the template's config.json, if it has one
+   * @param id the template, for messages
+   * @return null if the template has no active content
+   */
+  private String activeContentReason(String templateDir, List<String> files, JsonObject config, String id) {
+    Set<String> ext = new HashSet<>();
+    String scriptReason = null;
+    if (config != null) {
       // check to see if it defines an active script
       if (config.has("script") || config.has("targets")) {
         scriptReason = "Template nominates an ant script or targets";
+      }
+      // a pre-process transform is an xslt that the publisher runs over the IG's pages: that's code too
+      if (scriptReason == null && config.has("pre-process") && config.get("pre-process").isJsonArray()) {
+        for (JsonElement e : config.getJsonArray("pre-process")) {
+          if (e.isJsonObject() && ((JsonObject) e).has("transform")) {
+            scriptReason = "Template nominates a pre-process transform";
+          }
+        }
       }
       if (config.has("script")) {
         antScripts.add(config.asString("script"));
@@ -231,9 +337,9 @@ public class TemplateManager {
         // if it doesn't declare the list - even if it's empty - we refuse to run at all- templates have to do this
         if (!config.has("otherScripts")) {
           if (autoMode) {
-            throw new Error("Template "+npm.name()+"#"+npm.version()+" names a script, but is not explicit about all ant scripts - this is no longer allowed");  
+            throw new Error("Template "+id+" names a script, but is not explicit about all ant scripts - this is no longer allowed");  
           } else {
-            System.out.println("Template "+npm.name()+"#"+npm.version()+" names a script, but is not explicit about all ant scripts. Note that this means that this template no longer works with the ci-build infrastructure");
+            System.out.println("Template "+id+" names a script, but is not explicit about all ant scripts. Note that this means that this template no longer works with the ci-build infrastructure");
           }
         } else {
           for (String s : config.getStrings("otherScripts")) {
@@ -241,8 +347,8 @@ public class TemplateManager {
           }
         }
       }
-    }  
-    
+    }
+
     // if we have't already found that it's considered a script, we'll look through the content
     if (scriptReason == null) {
       for (String fn : files) {
@@ -278,6 +384,12 @@ public class TemplateManager {
             }
           }
 
+          // scripts/ (ig.scripts) is where the scripts keep what they run and read: stylesheets, jars, and data files
+          // with harmless extensions (e.g. groupings.txt). Anything there is active content, whatever its extension
+          if (unix.toLowerCase().startsWith("scripts/")) {
+            scriptReason = "Template has content in scripts/ ("+unix+")";
+            break;
+          }
           String s = extension(n);
           if (antScripts.contains(n)) {
             // nah, if you overwrite an xml ant script, you're doing active content
@@ -297,21 +409,36 @@ public class TemplateManager {
       }
     }
 
-    // if it has active content, then we check to see if it's trusted. Locally: always trusted. auto-build: only some trusted
-    if (scriptReason != null) {
-      checkTemplateId(template, npm.name(), scriptReason);
-    }
-    if (level==0 && configs.size() > 1) {
-      config = configs.get(0);
-      for (int i=1;i<configs.size(); i++) {
-        applyConfigChanges(config, configs.get(i));
+    return scriptReason;
+  }
+
+  /**
+   * A template in the IG's own folder (template = #template) is used as it is: it isn't installed, so it doesn't go
+   * through installTemplate(). It's local to the repository, so it can't be a trusted template (only templates loaded
+   * by package id can be): like any other template that isn't trusted, it can be used on the ci-build only if it has no
+   * active content, as decided by the same rules
+   */
+  private void checkInPlaceTemplate(String template, String templateDir) throws IOException {
+    JsonObject config = null;
+    File cfg = new File(Utilities.path(templateDir, "config.json"));
+    if (cfg.exists()) {
+      try {
+        config = JsonParser.parseObject(cfg);
+      } catch (Exception e) {
+        throw new FHIRException("Error parsing "+cfg.getAbsolutePath()+": "+e.getMessage(), e);
       }
-      String configString = JsonParser.compose(config, true);
-      String configPath = Utilities.path(templateDir, "config.json");
-      FileUtilities.stringToFile(configString, configPath);
     }
-    if (level==0 && !configs.isEmpty()) {
-      generateMakeAccessible(templateDir, configs.get(0));
+    List<String> files = new ArrayList<>();
+    if (new File(templateDir).isDirectory()) {
+      try (Stream<Path> s = Files.walk(Paths.get(templateDir))) {
+        s.filter(Files::isRegularFile).forEach(f -> files.add(f.toString()));
+      }
+    }
+    String reason = activeContentReason(Paths.get(templateDir).toString(), files, config, template);
+    if (reason != null) {
+      canExecute = false;
+      templateThatCantExecute = template;
+      templateReason = reason;
     }
   }
 
@@ -392,10 +519,9 @@ public class TemplateManager {
    * We only allow scripts from packages loaded by package id, for known packages 
    * (the only way to fiddle with packages loaded by id is through the code)
    * 
-   * todo:
-   * - cross-check that the package id matches the github id (needs change on the ci-build infrastructure)
-   *   this change would check that someone hasn't run a different template through the ci-build with the same id
-   *   
+   * The trusted templates are listed in TrustedTemplates, with the repository each is built from: the ci-build only
+   * builds a template claiming a trusted package id from that repository (PublisherIGLoader.checkTrustedTemplateSource)
+   *
    * @param template
    * @param packageId
    * @return
@@ -406,37 +532,28 @@ public class TemplateManager {
       canExecute = false;
       templateThatCantExecute = template;
       templateReason = reason;
-    } else if (!Utilities.existsInList(packageId, 
-        // if you are proposing to change this list, discuss with FHIR Product Director first
-        "fhir.test.template", 
-        "fhir.base.template",
-        "fhir.base.template.a",
-        "fhir2.base.template",
-        "hl7.base.template",
-        "hl7.fhir.template",
-        "hl7.au.base.template",
-        "hl7.au.fhir.template",
-        "hl7.utg.template",
-        "hl7.be.fhir.template",
-        "hl7.cda.template",
-        "hl7.davinci.template",
-        "hl7.sdc.template",
-        "openhie.fhir.template",
-        "who.fhir.template",
-        "who.template.root",
-        "hl7.davinci.template",
-        "hl7.extensions.template",
-        "ihe.fhir.template",
-        "cqf.fhir.template",
-        "ans.fr.template",
-        "ans.cda.fr.template",
-        "hl7.v2plus.template",
-        "openehr.fhir.template",
-        "ch.fhir.ig.template")) {
+    } else if (!TrustedTemplates.isTrusted(packageId)) {
       canExecute = false;
       templateThatCantExecute = template;
       templateReason = reason;
+    } else if (!isTrustableVersion(template)) {
+      canExecute = false;
+      templateThatCantExecute = template;
+      templateReason = reason+", and only a released version or #current of a trusted template is trusted";
     }
+  }
+
+  /**
+   * A trusted template is trusted only as published: a released version (n.n.n), #current, or no version (which
+   * loads the latest release). Not a branch build (current$branch), a dev build, or a version with a label (e.g.
+   * -cibuild), none of which have been released
+   */
+  static boolean isTrustableVersion(String template) {
+    if (!template.contains("#")) {
+      return true;
+    }
+    String version = template.substring(template.indexOf("#") + 1);
+    return "current".equals(version) || version.matches("[0-9]+\\.[0-9]+\\.[0-9]+");
   }
 
   private boolean isTemplate(String url, String id, String template) {

@@ -3275,7 +3275,9 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       related.add(rig.getCode(), o);
       o.add("id", rig.getId());
       o.add("link", rig.getWebLocation());
-      o.add("homepage", rig.getWebLocation().startsWith("file:") ? Utilities.pathURL(rig.getWebLocation(), "index.html") : rig.getWebLocation());
+      if (rig.getWebLocation() != null) {
+        o.add("homepage", rig.getWebLocation().startsWith("file:") ? Utilities.pathURL(rig.getWebLocation(), "index.html") : rig.getWebLocation());
+      }
       o.add("canonical", rig.getCanonical());
       o.add("title", rig.getTitle());
       o.add("version", rig.getVersion());
@@ -4556,15 +4558,40 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     ExecuteWatchdog watchdog = new ExecuteWatchdog(pf.jekyllTimeout);
     exec.setWatchdog(watchdog);
 
+    // jekyll runs over content that comes from the IG and the template, so it must not be able to run ruby from it:
+    // * --safe turns off _plugins/ and plugins_dir
+    // * in safe mode jekyll still requires anything that is in both plugins and whitelist, and require takes a path as
+    //   well as a gem name, so the publisher's own config file, read after the IG's (later files win), empties them
+    // * --source on the command line, because _config.yml could otherwise nominate another folder (e.g. /) to publish
+    // * a Gemfile in the folder is evaluated (ruby) whether or not jekyll is in safe mode: JEKYLL_NO_BUNDLER_REQUIRE stops that
+    // there's no use for a Gemfile where jekyll runs, and bundler evaluates one (it's ruby): refuse rather than rely on the environment
+    String[] names = new File(pf.tempDir).list();
+    if (names != null) {
+      for (String n : names) {
+        if (n.equalsIgnoreCase("Gemfile") || n.equalsIgnoreCase("gems.rb")) {
+          throw new FHIRException("Jekyll will not be run: there is a "+n+" in "+pf.tempDir+". Remove it from the IG source (or the template) that put it there");
+        }
+      }
+    }
+    File ownConfig = File.createTempFile("jekyll-publisher-", ".yml");
+    ownConfig.deleteOnExit();
+    FileUtilities.stringToFile("# written by the IG publisher, and read after the IG's _config.yml so that it wins\nplugins: []\ngems: []\nwhitelist: []\n", ownConfig.getAbsolutePath());
+    File igConfig = new File(Utilities.path(pf.tempDir, "_config.yml"));
+    String configFiles = igConfig.exists() ? igConfig.getAbsolutePath()+","+ownConfig.getAbsolutePath() : ownConfig.getAbsolutePath();
+    Map<String, String> env = new HashMap<>(System.getenv());
+    env.put("JEKYLL_NO_BUNDLER_REQUIRE", "true");
+    env.remove("BUNDLE_GEMFILE");
+    String jekyllArgs = "build --safe --source \""+pf.tempDir+"\" --config \""+configFiles+"\" --destination \""+ pf.outputDir +"\"";
     try {
-      log("Run jekyll: "+ settings.jekyllCommand +" build --destination \""+ pf.outputDir +"\" (in folder "+ pf.tempDir +")");
+      log("Run jekyll: "+ settings.jekyllCommand +" "+jekyllArgs+" (in folder "+ pf.tempDir +")");
       if (SystemUtils.IS_OS_WINDOWS) {
         log("Due to a known issue, Jekyll errors are lost between Java and Ruby in windows systems.");
         log("If the build process hangs at this point, you have to go to a");
-        log("command prompt, and then run these two commands:");
+        log("command prompt, and then run these commands:");
         log("");
         log("cd "+ pf.tempDir);
-        log(settings.jekyllCommand +" build --destination \""+ pf.outputDir +"\"");
+        log("set JEKYLL_NO_BUNDLER_REQUIRE=true");
+        log(settings.jekyllCommand +" "+jekyllArgs);
         log("");
         log("and then investigate why Jekyll has failed");
       }
@@ -4577,28 +4604,47 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
                 .addArgument( "/C")
                 .addArgument(settings.jekyllCommand)
                 .addArgument("build")
+                .addArgument("--safe")
+                .addArgument("--source")
+                .addArgument("\"" + pf.tempDir + "\"")
+                .addArgument("--config")
+                .addArgument("\"" + configFiles + "\"")
                 .addArgument("--destination")
                 .addArgument(enclosedOutputDir);
-        exec.execute(commandLine);
+        exec.execute(commandLine, env);
       } else if (FhirSettings.hasRubyPath()) {
-        ProcessBuilder processBuilder = new ProcessBuilder(new String("bash -c "+ settings.jekyllCommand));
-        Map<String, String> env = processBuilder.environment();
-        Map<String, String> vars = new HashMap<>();
-        vars.putAll(env);
+        Map<String, String> vars = new HashMap<>(env);
         String path = FhirSettings.getRubyPath()+":"+env.get("PATH");
         vars.put("PATH", path);
         if (FhirSettings.getGemPath() != null) {
           vars.put("GEM_PATH", FhirSettings.getGemPath());
         }
-        CommandLine commandLine = new CommandLine("bash").addArgument("-c").addArgument(settings.jekyllCommand +" build --destination "+ pf.outputDir, false);
+        // bash is only here so that jekyll is found on the PATH set above. The arguments go to bash separately - "$0" is
+        // the command and "$@" the rest - never as part of the script, because the shell would read anything in them:
+        // the IG chooses the folders (path-temp, path-output), so a folder name like temp/$(...) would run a command
+        CommandLine commandLine = new CommandLine("bash").addArgument("-c").addArgument("exec \"$0\" \"$@\"", false)
+            .addArgument(settings.jekyllCommand, false)
+            .addArgument("build", false)
+            .addArgument("--safe", false)
+            .addArgument("--source", false)
+            .addArgument(pf.tempDir, false)
+            .addArgument("--config", false)
+            .addArgument(configFiles, false)
+            .addArgument("--destination", false)
+            .addArgument(pf.outputDir, false);
         exec.execute(commandLine, vars);
       } else {
         final String enclosedOutputDir = "\"" + pf.outputDir + "\"";
         final CommandLine commandLine = new CommandLine(settings.jekyllCommand)
                 .addArgument("build")
+                .addArgument("--safe")
+                .addArgument("--source")
+                .addArgument("\"" + pf.tempDir + "\"")
+                .addArgument("--config")
+                .addArgument("\"" + configFiles + "\"")
                 .addArgument("--destination")
                 .addArgument(enclosedOutputDir);
-        exec.execute(commandLine);
+        exec.execute(commandLine, env);
       }
       tts.end();
     } catch (IOException ioex) {

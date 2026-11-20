@@ -155,6 +155,32 @@ import static org.hl7.fhir.igtools.publisher.CliParams.SSRF_PROTECTION_ENABLED_P
  */
 
 public class Publisher extends PublisherBase implements IReferenceResolver, IValidationProfileUsageTracker, IResourceLinkResolver {
+
+  /**
+   * The system property that stops XML parsers created in this JVM from reading external DTDs and external entities
+   */
+  public static final String ACCESS_EXTERNAL_DTD = "javax.xml.accessExternalDTD";
+
+  static {
+    disableExternalXmlEntities();
+  }
+
+  /**
+   * Template scripts run ant tasks (e.g. xslt) over files that the IG supplies, such as input/includes/menu.xml. Ant's
+   * transformers don't come from XMLUtil's protected factories, so without this, an external entity in such a file
+   * reads any local file (or URL) into the transform's output - which ends up in the IG's published QA output.
+   *
+   * It has to be set before anything parses XML: Saxon keeps the parser it creates first, so setting it later doesn't
+   * reach Saxon (the JDK's own parsers read it each time). Nothing the publisher reads should need an external DTD or
+   * entity; if this needs to be turned off, set -Djavax.xml.accessExternalDTD=all on the command line, which this
+   * leaves alone. It doesn't reach forked JVMs (ant's &lt;java fork="true"&gt;)
+   */
+  public static void disableExternalXmlEntities() {
+    if (System.getProperty(ACCESS_EXTERNAL_DTD) == null) {
+      System.setProperty(ACCESS_EXTERNAL_DTD, "");
+    }
+  }
+
   public static final String FHIR_SETTINGS_PARAM = "-fhir-settings";
   public static final int FMM_DERIVATION_MAX = 5;
   public static final String IG_NAME = "!ig!";
@@ -1735,6 +1761,9 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       } else {
         self.setConfigFile(determineActualIG(CliParams.getNamedParam(args, "-ig"), self.settings.getMode()));
         self.setConfigFile(getAbsoluteConfigFilePath(self.getConfigFile()));
+      }
+      if (CliParams.hasNamedParam(args, "-trust-template")) {
+        self.settings.setTrustTemplate(CliParams.getNamedParam(args, "-trust-template"));
       }
       if (CliParams.hasNamedParam(args, "-jekyll")) {
         self.settings.setJekyllCommand(CliParams.getNamedParam(args, "-jekyll"));

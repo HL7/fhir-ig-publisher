@@ -26,6 +26,7 @@ import org.hl7.fhir.igtools.renderers.ValidationPresenter;
 import org.hl7.fhir.igtools.spreadsheets.IgSpreadsheetParser;
 import org.hl7.fhir.utilities.MappingSpace;
 import org.hl7.fhir.igtools.templates.TemplateManager;
+import org.hl7.fhir.igtools.templates.TrustedTemplates;
 import org.hl7.fhir.model.Base;
 import org.hl7.fhir.model.ModelContext;
 import org.hl7.fhir.model.core.Enumerations.PublicationStatus;
@@ -155,6 +156,7 @@ public class PublisherIGLoader extends PublisherBase {
     }
 
     pf.templateManager = new TemplateManager(pf.pcm, pf.logger);
+    pf.templateManager.setTrustTemplate(settings.getTrustTemplate());
     pf.templateProvider = new IGPublisherLiquidTemplateServices();
     pf.extensionTracker = new ExtensionTracker();
     log("Package Cache: "+ pf.pcm.getFolder());
@@ -367,6 +369,7 @@ public class PublisherIGLoader extends PublisherBase {
     } catch (Exception e) {
       throw new Exception("Error Parsing File "+ pf.igName +": "+e.getMessage(), e);
     }
+    checkTrustedTemplateSource(pf.packageId(), false);
     pf.templateManager.loadTemplateOverrides(ini, pf.rootDir);
     try {
       pf.template = pf.templateManager.loadTemplate(templateName, pf.rootDir, pf.packageId(), settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD, pf.logOptions.contains("template"), false); // Rapido has to produce every fragment that a full build does
@@ -430,7 +433,6 @@ public class PublisherIGLoader extends PublisherBase {
     pf.outputDir = Utilities.path(pf.rootDir, "output");
     pf.setSignatureAsR6(VersionUtilities.isR6Plus(pf.version));
     List<String> relatedIGParams = new ArrayList<>();
-    ValidationOptions.R5BundleRelativeReferencePolicy r5BundleRelativeReferencePolicy = ValidationOptions.R5BundleRelativeReferencePolicy.DEFAULT;
 
     Map<String, String> expParamMap = new HashMap<>();
     boolean allowExtensibleWarnings = false;
@@ -932,9 +934,6 @@ public class PublisherIGLoader extends PublisherBase {
         case "no-xig-link":
           pf.noXigLink = "true".equals(p.getValue());
           break;
-        case "r5-bundle-relative-reference-policy" :
-          r5BundleRelativeReferencePolicy = ValidationOptions.R5BundleRelativeReferencePolicy.fromCode(p.getValue());
-          break;
         case "suppress-mappings":
           if ("*".equals(p.getValue())) {
             pf.suppressedMappings.addAll(Utilities.strings("http://hl7.org/fhir/fivews", "http://hl7.org/fhir/workflow", "http://hl7.org/fhir/interface", "http://hl7.org/v2",
@@ -1356,7 +1355,6 @@ public class PublisherIGLoader extends PublisherBase {
     pf.validationFetcher = new ValidationServices(pf.context, pf.igpkp, pf.sourceIg, pf.fileList, pf.npmList, pf.bundleReferencesResolve, pf.specMaps, pf.linkSpecMaps, pf.module, allLangs());
     pf.validator.setFetcher(pf.validationFetcher);
     pf.validator.setPolicyAdvisor(pf.validationFetcher);
-    pf.validator.getSettings().setR5BundleRelativeReferencePolicy(r5BundleRelativeReferencePolicy);
 
     if (!pf.generateVersions.isEmpty()) {
       Collections.sort(pf.generateVersions);
@@ -1515,6 +1513,42 @@ public class PublisherIGLoader extends PublisherBase {
     pf.rootDir = settings.getConfigFile();
     pf.outputDir = Utilities.path(pf.rootDir, "output");
     pf.tempDir = Utilities.path(pf.rootDir, "temp");
+    checkTrustedTemplateSource(pf.templateInfo.asString("name"), true);
+  }
+
+  /**
+   * On the ci-build, a build that claims the package id of a trusted template must be that template, built from its
+   * own repository: the ci-build publishes it as the #current build of that package id, which other IGs then trust.
+   * An IG can't claim such a package id at all.
+   *
+   * Where the build comes from is what the ci-build said (-repo, -target) and what git says (the origin remote): none
+   * of those come from the repository's content. Every one of them that is known must name the template's repository
+   */
+  void checkTrustedTemplateSource(String packageId, boolean isTemplate) {
+    if (settings.getMode() != PublisherUtils.IGBuildMode.AUTOBUILD || !TrustedTemplates.isTrusted(packageId)) {
+      return;
+    }
+    if (!isTemplate) {
+      throw new FHIRException("The package id '"+packageId+"' belongs to a trusted IG template, so an IG can't use it");
+    }
+    String expected = TrustedTemplates.getRepository(packageId);
+    if (expected == null) {
+      throw new FHIRException("The template '"+packageId+"' is a trusted template, but the repository it is built from hasn't been recorded (TrustedTemplates), so it can't be built on the ci-build");
+    }
+    List<String> sources = new ArrayList<>();
+    for (String s : new String[] { settings.getRepoSource(), settings.getTargetOutput(), GitUtilities.getGitSource(new File(pf.rootDir)) }) {
+      if (!Utilities.noString(s)) {
+        sources.add(s);
+      }
+    }
+    if (sources.isEmpty()) {
+      throw new FHIRException("The template '"+packageId+"' is a trusted template, and it isn't known what repository this build is from, so it can't be built on the ci-build");
+    }
+    for (String s : sources) {
+      if (!TrustedTemplates.isBuiltFrom(packageId, s)) {
+        throw new FHIRException("The template '"+packageId+"' is a trusted template, so on the ci-build it can only be built from https://github.com/"+expected+", not "+s);
+      }
+    }
   }
 
 
@@ -1614,6 +1648,10 @@ public class PublisherIGLoader extends PublisherBase {
       pf.prePagesDirs.add(path);
       String prePagesXslt = null;
       if (pp.has("transform")) {
+        // a transform is the template running its own code (xslt), so only a trusted template can have one
+        if (!pf.template.canExecute()) {
+          throw new FHIRException("Unable to use the pre-process transform '"+str(pp, "transform")+"' for "+str(pp, "folder")+" as "+pf.template.getUntrustedReason());
+        }
         prePagesXslt = Utilities.path(root, str(pp, "transform"));
         checkFile(prePagesXslt);
       }
@@ -2203,6 +2241,12 @@ public class PublisherIGLoader extends PublisherBase {
 
     String code = s.substring(0, s.indexOf("="));
     String id =  s.substring(s.indexOf("=")+1);
+    if (id == null) {
+      throw new FHIRException("Invalid related IG '"+s+"': no package id");
+    }
+    if (id.contains("#")) {
+      throw new FHIRException("Invalid related IG '"+s+"': Package Id can't contain a version");
+    }
 
     NpmPackage npm;
     try {

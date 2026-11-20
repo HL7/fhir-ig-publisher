@@ -35,6 +35,7 @@ public class PublisherSettings {
     @Getter @Setter private String packagesFolder;
     @Getter @Setter private PublisherUtils.CacheOption cacheOption;
     @Getter @Setter private boolean noSushi;
+    @Getter @Setter private String trustTemplate; // -trust-template: a template id or "all" that the user trusts to run locally
     @Getter @Setter private String repoSource;
     @Getter @Setter private boolean milestoneBuild;
     @Getter private final List<String> noNarratives = new ArrayList<String>();
