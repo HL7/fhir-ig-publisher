@@ -1159,6 +1159,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
     // the additional bindings (#970): a row each, after the base binding, with the path blank
     AdditionalBindingsRenderer abr = new AdditionalBindingsRenderer(null, corePath, sd, ed.getPath(), gen, null, null);
+    /*// core-tem-unwind
     for (TxAdditionalBinding ab : additionalBindings(tx)) {
       tr = tbl.tr();
       tr.td();
@@ -1183,6 +1184,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         }
       }
     }
+    */
   }
 
   /**
@@ -1645,10 +1647,12 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         if(hasMaps || hasComments) {
           allEmpty = false; // that assumption is wrong
           String url = mappingLink(map);
+          /*// core-tem-unwind
           if (url == null)
             s.append("<a name=\"" + map.getIdentity() + "\"> </a><h3>" +gen.formatPhrase(RenderingI18nContext.SD_SUMMARY_MAPPINGS, Utilities.escapeXml(gen.getTranslated(map.getNameElement())), Utilities.escapeXml(map.getUri()), "", "") + "</h3>");
           else
             s.append("<a name=\"" + map.getIdentity() + "\"> </a><h3>" +gen.formatPhrase(RenderingI18nContext.SD_SUMMARY_MAPPINGS, Utilities.escapeXml(gen.getTranslated(map.getNameElement())), Utilities.escapeXml(map.getUri()), "<a href=\"" + Utilities.escapeXml(url) + "\">", "</a>") + "</h3>");
+          */
           if (map.hasComment())
             s.append("<p>" + Utilities.escapeXml(gen.getTranslated(map.getCommentElement())) + "</p>");
 
@@ -1670,7 +1674,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
       // Well all the mappings are empty
       if(allEmpty) {
-        s.append("<p>" + gen.formatPhrase(RenderingI18nContext.STRUC_DEF_ALL_MAP_KEY) + "</p>");
+// core-tem-unwind         s.append("<p>" + gen.formatPhrase(RenderingI18nContext.STRUC_DEF_ALL_MAP_KEY) + "</p>");
       }
 
       return s.toString();
@@ -1683,7 +1687,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
    * mapping space metadata, then the uri itself, if it's a URL
    */
   private String mappingLink(StructureDefinitionMappingComponent map) {
-    return org.hl7.fhir.services.renderers.mappings.StructureDefinitionMappingProvider.mappingLink(gen, map);
+    return null; // core-tem-unwind org.hl7.fhir.services.renderers.mappings.StructureDefinitionMappingProvider.mappingLink(gen, map);
   }
 
   public String mappings(String defnFile, Set<String> outputTracker) throws FHIRException, IOException {
@@ -3300,7 +3304,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           }
           // the root of a resource, or an element (#610)
           boolean resourceRoot = !c.getExpression().contains(".") && t != null && t.getKind() == StructureDefinitionKind.RESOURCE;
-          li.tx(" " + gen.formatPhrase(resourceRoot ? RenderingI18nContext.SDR_EXT_ROOT_ELEMENTS : RenderingI18nContext.SDR_EXT_ELEMENTS));
+          // core-tem-unwind li.tx(" " + gen.formatPhrase(resourceRoot ? RenderingI18nContext.SDR_EXT_ROOT_ELEMENTS : RenderingI18nContext.SDR_EXT_ELEMENTS));
           break;
         case EXTENSION:
           li.tx(gen.formatPhrase(RenderingI18nContext.SDR_EXT_EXT)); 

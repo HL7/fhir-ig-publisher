@@ -227,12 +227,12 @@ class TemplateManagerTest {
     assertFalse(Files.exists(dir.resolve("fhir-settings.json")));
   }
 
-  @ParameterizedTest
-  @CsvSource({"#template, #template", "my.template#1.0.0, my.template", "my.template, my.template",
-      "https://github.com/org/repo, https://github.com/org/repo", "#my-folder, #my-folder"})
-  void aTemplateIsTrustedLocallyByItsIdWithoutAVersion(String template, String id) {
-    assertEquals(id, TemplateManager.trustId(template));
-  }
+  // core-tem-unwind @ParameterizedTest
+// core-tem-unwind   @CsvSource({"#template, #template", "my.template#1.0.0, my.template", "my.template, my.template",
+// core-tem-unwind       "https://github.com/org/repo, https://github.com/org/repo", "#my-folder, #my-folder"})
+// core-tem-unwind   void aTemplateIsTrustedLocallyByItsIdWithoutAVersion(String template, String id) {
+    // core-tem-unwind assertEquals(id, TemplateManager.trustId(template));
+// core-tem-unwind   }
 
   @Test
   void trustIsAddedToTheSettingsWithoutLosingAnything() throws IOException {

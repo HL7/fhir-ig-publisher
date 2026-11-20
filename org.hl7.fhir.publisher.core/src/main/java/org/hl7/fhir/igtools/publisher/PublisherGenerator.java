@@ -82,7 +82,7 @@ import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.model.JsonProperty;
 import org.hl7.fhir.utilities.json.model.JsonString;
 import org.hl7.fhir.utilities.npm.NpmPackage;
-import org.hl7.fhir.utilities.npm.NpmPackageSigner;
+// core-tem-unwind import org.hl7.fhir.utilities.npm.NpmPackageSigner;
 import org.hl7.fhir.utilities.npm.ToolsVersion;
 import org.hl7.fhir.utilities.settings.FhirSettings;
 import org.hl7.fhir.utilities.turtle.Turtle;
@@ -720,26 +720,26 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
    * publish unsigned packages. Signatures left in the output by an earlier build are removed first.
    */
   private void signPackages() throws IOException {
-    File[] stale = new File(pf.outputDir).listFiles((d, n) -> n.endsWith(".tgz" + NpmPackageSigner.SIGNATURE_SUFFIX));
-    if (stale != null) {
-      for (File f : stale) {
-        f.delete();
-      }
-    }
-    NpmPackageSigner signer = NpmPackageSigner.fromSettings();
-    if (signer == null) {
-      return;
-    }
-    File[] packages = new File(pf.outputDir).listFiles((d, n) -> n.endsWith(".tgz"));
-    if (packages == null || packages.length == 0) {
-      return;
-    }
-    Arrays.sort(packages);
-    for (File f : packages) {
-      File sig = signer.sign(f, "FHIR IG Publisher " + IGVersionUtil.getVersion());
-      pf.otherFilesRun.add(sig.getAbsolutePath());
-    }
-    log("Signed " + packages.length + " " + checkPlural("package", packages.length) + " with key " + signer.getKeyId());
+// core-tem-unwind     File[] stale = new File(pf.outputDir).listFiles((d, n) -> n.endsWith(".tgz" + NpmPackageSigner.SIGNATURE_SUFFIX));
+    // core-tem-unwind if (stale != null) {
+// core-tem-unwind       for (File f : stale) {
+// core-tem-unwind         f.delete();
+// core-tem-unwind       }
+// core-tem-unwind     }
+// core-tem-unwind     NpmPackageSigner signer = NpmPackageSigner.fromSettings();
+// core-tem-unwind     if (signer == null) {
+// core-tem-unwind       return;
+// core-tem-unwind     }
+// core-tem-unwind     File[] packages = new File(pf.outputDir).listFiles((d, n) -> n.endsWith(".tgz"));
+// core-tem-unwind     if (packages == null || packages.length == 0) {
+// core-tem-unwind       return;
+// core-tem-unwind     }
+// core-tem-unwind     Arrays.sort(packages);
+// core-tem-unwind     for (File f : packages) {
+// core-tem-unwind       File sig = signer.sign(f, "FHIR IG Publisher " + IGVersionUtil.getVersion());
+// core-tem-unwind       pf.otherFilesRun.add(sig.getAbsolutePath());
+// core-tem-unwind     }
+// core-tem-unwind     log("Signed " + packages.length + " " + checkPlural("package", packages.length) + " with key " + signer.getKeyId());
   }
 
   private void genCombinedPackage() throws IOException {

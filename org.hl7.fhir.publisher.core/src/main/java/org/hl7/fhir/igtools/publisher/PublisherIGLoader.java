@@ -24,7 +24,7 @@ import org.hl7.fhir.igtools.publisher.realm.RealmBusinessRules;
 import org.hl7.fhir.igtools.publisher.realm.USRealmBusinessRules;
 import org.hl7.fhir.igtools.renderers.ValidationPresenter;
 import org.hl7.fhir.igtools.spreadsheets.IgSpreadsheetParser;
-import org.hl7.fhir.utilities.MappingSpace;
+// core-tem-unwind import org.hl7.fhir.utilities.MappingSpace;
 import org.hl7.fhir.igtools.templates.TemplateManager;
 import org.hl7.fhir.igtools.templates.TrustedTemplates;
 import org.hl7.fhir.model.Base;
@@ -2432,7 +2432,7 @@ public class PublisherIGLoader extends PublisherBase {
     }
 
     loadMappingSpaces(pf.context.getBinaryForKey("mappingSpaces.details"));
-    pf.validationFetcher.getMappingUrls().addAll(pf.mappingSpaces.keySet());
+    // core-tem-unwind pf.validationFetcher.getMappingUrls().addAll(pf.mappingSpaces.keySet());
     pf.validationFetcher.getOtherUrls().add(pf.publishedIg.getUrl());
     for (SpecMapManager s : pf.specMaps) {
       pf.validationFetcher.getOtherUrls().add(s.getBase());
@@ -2740,7 +2740,7 @@ public class PublisherIGLoader extends PublisherBase {
 
     pf.rc = new RenderingContext(pf.context, pf.rendererFactory, pf.markdownEngine, ValidationOptions.defaults(), checkAppendSlash(pf.specPath), "", locale, RenderingContext.ResourceRendererMode.TECHNICAL, RenderingContext.GenerationRules.IG_PUBLISHER);
     pf.rc.setTemplateProvider(pf.templateProvider);
-    pf.rc.getMappingSpaces().putAll(pf.mappingSpaces);
+    // core-tem-unwind pf.rc.getMappingSpaces().putAll(pf.mappingSpaces);
     pf.rc.setServices(pf.validator.getExternalHostServices());
     pf.rc.setDestDir(Utilities.path(pf.tempDir));
     pf.rc.setProfileUtilities(new ProfileUtilities(pf.context, new ArrayList<ValidationMessage>(), pf.igpkp));
@@ -3552,7 +3552,7 @@ public class PublisherIGLoader extends PublisherBase {
 
 
   private void loadMappingSpaces(byte[] source) throws Exception {
-    pf.mappingSpaces.putAll(MappingSpace.loadMappingSpaces(source));
+    // core-tem-unwind pf.mappingSpaces.putAll(MappingSpace.loadMappingSpaces(source));
   }
 
 
@@ -3832,7 +3832,7 @@ public class PublisherIGLoader extends PublisherBase {
     if (changed) {
       f.getValuesetsToLoad().clear();
       logDebugMessage(LogCategory.INIT, "load "+f.getPath());
-      Bundle bnd = new IgSpreadsheetParser(this.pf.context, this.pf.getExecTime(), this.pf.igpkp.getCanonical(), f.getValuesetsToLoad(), this.pf.mappingSpaces, knownValueSetIds).parse(f);
+      Bundle bnd = new IgSpreadsheetParser(this.pf.context, this.pf.getExecTime(), this.pf.igpkp.getCanonical(), f.getValuesetsToLoad(), /*// core-tem-unwind this.pf.mappingSpaces,*/null, knownValueSetIds).parse(f);
       f.setBundle(new FetchedResource(f.getName()+" (ex spreadsheet)"));
       f.setBundleType(FetchedFile.FetchedBundleType.SPREADSHEET);
       f.getBundle().setResource(bnd);
