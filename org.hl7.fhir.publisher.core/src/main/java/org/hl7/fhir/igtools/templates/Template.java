@@ -34,6 +34,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
@@ -791,8 +792,9 @@ public class Template {
     return scriptMappings ;
   }
 
-  private int fragments;
-  private int noproduced;
+  // AtomicInteger: with -threads, the native outputs ask from several threads
+  private final AtomicInteger fragments = new AtomicInteger();
+  private final AtomicInteger noproduced = new AtomicInteger();
 
   public boolean wantGenerateFragment(String s, String code) {
     if (usedFragmentTypes == null) {
@@ -801,7 +803,7 @@ public class Template {
     if (!rapido) {
       return true;
     }
-    fragments++;
+    fragments.incrementAndGet();
     TemplateFragmentTypeLoader.PrefixGroup pfx = usedFragmentTypes.get(s);
 
     if (pfx != null && pfx.suffixes.contains(code)) {
@@ -818,7 +820,7 @@ public class Template {
       return true;
     }
 
-    noproduced++;
+    noproduced.incrementAndGet();
     return false;
   }
 

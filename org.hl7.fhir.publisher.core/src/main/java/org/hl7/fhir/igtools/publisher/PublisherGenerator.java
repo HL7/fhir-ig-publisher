@@ -275,14 +275,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
       logMessage("Generate Native Outputs");
 
-      for (FetchedFile f : pf.changeList) {
-        f.start("generate1");
-        try {
-          generateNativeOutputs(f, false, db);
-        } finally {
-          f.finish("generate1");
-        }
-      }
+      generateNativeOutputs(db);
       if (db != null) {
         db.finishResources();
       }
@@ -843,11 +836,133 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
   private void generateNativeOutputs(FetchedFile f, boolean regen, DBBuilder db) throws IOException, FHIRException, SQLException {
     for (FetchedResource r : f.getResources()) {
       logDebugMessage(LogCategory.PROGRESS, "Produce resources for "+r.fhirType()+"/"+r.getId());
-      var json = saveNativeResourceOutputs(f, r);
+      var json = saveNativeResourceOutputs(f, r, null);
       if (db != null) {
         db.saveResource(f, r, json);
       }
     }
+  }
+
+  /**
+   * The native outputs of every file in the change list. With -threads, the files are done on the extra threads:
+   * each worker writes its file's outputs into temp, and keeps the steps that add to shared state (the packages,
+   * the cross-version notes, the log) for this thread, which runs them in change list order. The database rows come
+   * last, in the same order, once no worker is left: saving a row marks the resource (and, for a custom resource,
+   * its structure definition) with its key, which the workers read. Until then, the rows hold the resources' json.
+   * <p>
+   * If a file fails, the files after it may already have written their outputs into temp; the build stops anyway.
+   */
+  void generateNativeOutputs(DBBuilder db) throws Exception {
+    int threads = settings.getThreads();
+    if (threads == 0 || pf.changeList.size() < 2 || nativeOutputNamesClash(pf.changeList)) {
+      for (FetchedFile f : pf.changeList) {
+        f.start("generate1");
+        try {
+          generateNativeOutputs(f, false, db);
+        } finally {
+          f.finish("generate1");
+        }
+      }
+      return;
+    }
+    List<Runnable> rows = new ArrayList<>();
+    try {
+      OrderedWorkers.run("ig-native", threads, 8 * threads, pf.changeList, this::prepareNativeOutputs, (f, outputs) -> {
+        for (NativeOutputs o : outputs.resources) {
+          logDebugMessage(LogCategory.PROGRESS, "Produce resources for "+o.resource.fhirType()+"/"+o.resource.getId());
+          for (PackageStep step : o.steps) {
+            step.run();
+          }
+          if (db != null && o.json != null) {
+            rows.add(() -> db.saveResource(f, o.resource, o.json));
+          }
+        }
+        if (outputs.failure instanceof Error) {
+          throw (Error) outputs.failure;
+        } else if (outputs.failure != null) {
+          throw (Exception) outputs.failure;
+        }
+      });
+    } catch (Exception | Error e) {
+      // as without threads, the rows of the resources before a failure are saved. They come before it, so if one
+      // fails, that is what the loop without threads would have thrown
+      try {
+        rows.forEach(Runnable::run);
+      } catch (RuntimeException | Error rowFailure) {
+        rowFailure.addSuppressed(e);
+        throw rowFailure;
+      }
+      throw e;
+    }
+    rows.forEach(Runnable::run);
+  }
+
+  /** a step of saveNativeResourceOutputs that changes state shared by all the files */
+  private interface PackageStep {
+    void run() throws IOException;
+  }
+
+  /** runs step now, or, if steps isn't null, keeps it for later */
+  private static void packageStep(List<PackageStep> steps, PackageStep step) throws IOException {
+    if (steps == null) {
+      step.run();
+    } else {
+      steps.add(step);
+    }
+  }
+
+  /** one resource's native outputs: written, but with its package steps still to run */
+  private static class NativeOutputs {
+    private final FetchedResource resource;
+    private final List<PackageStep> steps;
+    /** null if the resource failed (after the steps it got to) */
+    private byte[] json;
+
+    private NativeOutputs(FetchedResource resource) {
+      this.resource = resource;
+      this.steps = new ArrayList<>();
+    }
+  }
+
+  /** the resources of one file done on a worker, up to and including the first one that failed, if one did */
+  private static class FileNativeOutputs {
+    private final List<NativeOutputs> resources = new ArrayList<>();
+    private Throwable failure;
+  }
+
+  /** on a worker: writes the native outputs of f's resources, and keeps the steps that have to run in order */
+  private FileNativeOutputs prepareNativeOutputs(FetchedFile f) {
+    FileNativeOutputs result = new FileNativeOutputs();
+    f.start("generate1");
+    try {
+      for (FetchedResource r : f.getResources()) {
+        NativeOutputs o = new NativeOutputs(r);
+        result.resources.add(o);
+        o.json = saveNativeResourceOutputs(f, r, o.steps);
+      }
+    } catch (Exception | Error e) {
+      // the package steps before the failure still run, as in the loop without threads
+      result.failure = e;
+    } finally {
+      f.finish("generate1");
+    }
+    return result;
+  }
+
+  /**
+   * On a file system that ignores case, two resources whose type and id differ only in case write the same files.
+   * Without threads, the last one wins; with them, either could, so then the files are done without threads.
+   */
+  static boolean nativeOutputNamesClash(List<FetchedFile> files) {
+    Set<String> names = new HashSet<>();
+    for (FetchedFile f : files) {
+      for (FetchedResource r : f.getResources()) {
+        if (!names.add((r.fhirType()+"-"+r.getId()).toLowerCase(Locale.ROOT))) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   private void generateHtmlOutputs(FetchedFile f, boolean regen, DBBuilder db, String lang) throws Exception {
@@ -6450,7 +6565,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
    * @throws FileNotFoundException
    * @throws Exception
    */
-  private byte[] saveNativeResourceOutputs(FetchedFile f, FetchedResource r) throws FHIRException, IOException {
+  private byte[] saveNativeResourceOutputs(FetchedFile f, FetchedResource r, List<PackageStep> later) throws FHIRException, IOException {
     ByteArrayOutputStream bsj = new ByteArrayOutputStream();
     org.hl7.fhir.services.elementmodel.JsonParser jp = new org.hl7.fhir.services.elementmodel.JsonParser(this.pf.context);
     Element element = r.getElement();
@@ -6482,13 +6597,15 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       NPMPackageGenerator.Category cat = isExample(f, r) ? NPMPackageGenerator.Category.EXAMPLE : NPMPackageGenerator.Category.RESOURCE;
       String name = "Binary-"+r.getId()+".json";
       if (includedInVersion(r, this.pf.version)) {
-        this.pf.npm.addFile(cat, name, wrapAsBinary(r.getId(), bsj.toByteArray()));
+        byte[] bin = wrapAsBinary(r.getId(), bsj.toByteArray());
+        packageStep(later, () -> this.pf.npm.addFile(cat, name, bin));
         if (isNewML()) {
           for (String l : allLangs()) {
             Element le = this.pf.langUtils.copyToLanguage(baseElement, l, true, r.getElement().getChildValue("language"), pf.defaultTranslationLang, r.getErrors());
             ByteArrayOutputStream bsjl = new ByteArrayOutputStream();
             jp.compose(le, bsjl, OutputStyle.NORMAL, this.pf.igpkp.getCanonical());
-            this.pf.lnpms.get(l).addFile(cat, name, wrapAsBinary(r.getId(), bsjl.toByteArray()));
+            byte[] binl = wrapAsBinary(r.getId(), bsjl.toByteArray());
+            packageStep(later, () -> this.pf.lnpms.get(l).addFile(cat, name, binl));
           }
         }
       }
@@ -6496,23 +6613,28 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         String ver = VersionUtilities.versionFromCode(v);
         if (!includedInVersion(r, ver)) {
           if (this.pf.cvAnalyser != null) {
-            this.pf.cvAnalyser.recordOmission(ver, r.fhirType()+"/"+r.getId());
+            packageStep(later, () -> this.pf.cvAnalyser.recordOmission(ver, r.fhirType()+"/"+r.getId()));
           }
           continue;
         }
         // a Binary is the same in every version, and the instance inside it is not a FHIR resource,
         // so there is nothing to convert
-        this.pf.vnpms.get(v).addFile(cat, name, wrapAsBinary(r.getId(), bsj.toByteArray()));
+        byte[] binv = wrapAsBinary(r.getId(), bsj.toByteArray());
+        packageStep(later, () -> this.pf.vnpms.get(v).addFile(cat, name, binv));
       }
     } else if (!r.isCustomResource()) {
       if (includedInVersion(r, this.pf.version)) {
-        this.pf.npm.addFile(isExample(f,r ) ? NPMPackageGenerator.Category.EXAMPLE : NPMPackageGenerator.Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", bsj.toByteArray());
+        NPMPackageGenerator.Category cat = isExample(f,r ) ? NPMPackageGenerator.Category.EXAMPLE : NPMPackageGenerator.Category.RESOURCE;
+        String name = element.fhirTypeRoot()+"-"+r.getId()+".json";
+        byte[] cnt = bsj.toByteArray();
+        packageStep(later, () -> this.pf.npm.addFile(cat, name, cnt));
         if (isNewML()) {
           for (String l : allLangs()) {
             Element le = this.pf.langUtils.copyToLanguage(baseElement, l, true, r.getElement().getChildValue("language"), pf.defaultTranslationLang, r.getErrors()); // todo: should we keep this?
             ByteArrayOutputStream bsjl = new ByteArrayOutputStream();
             jp.compose(le, bsjl, OutputStyle.NORMAL, this.pf.igpkp.getCanonical());
-            this.pf.lnpms.get(l).addFile(isExample(f,r ) ? NPMPackageGenerator.Category.EXAMPLE : NPMPackageGenerator.Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", bsjl.toByteArray());
+            byte[] cntl = bsjl.toByteArray();
+            packageStep(later, () -> this.pf.lnpms.get(l).addFile(cat, name, cntl));
           }
         }
       }
@@ -6520,7 +6642,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         String ver = VersionUtilities.versionFromCode(v);
         if (!includedInVersion(r, ver)) {
           if (this.pf.cvAnalyser != null) {
-            this.pf.cvAnalyser.recordOmission(ver, r.fhirType()+"/"+r.getId());
+            packageStep(later, () -> this.pf.cvAnalyser.recordOmission(ver, r.fhirType()+"/"+r.getId()));
           }
           continue; // resource scoped out of this target version via *-inclusion (intentional membership omission)
         }
@@ -6542,37 +6664,52 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           try {
             resVer = convVersion(res.copy(Base.COPY_DATA), ver);
           } catch (Exception e) {
-            System.out.println("Unable to convert "+res.fhirType()+"/"+res.getId()+" to "+ver+": "+e.getMessage());
-            if (this.pf.cvAnalyser != null) {
-              this.pf.cvAnalyser.recordProblem(ver, res.fhirType()+"/"+r.getId(), e.getMessage());
-            }
+            String type = res.fhirType();
+            String resId = res.getId();
+            String msg = e.getMessage();
+            packageStep(later, () -> {
+              System.out.println("Unable to convert "+type+"/"+resId+" to "+ver+": "+msg);
+              if (this.pf.cvAnalyser != null) {
+                this.pf.cvAnalyser.recordProblem(ver, type+"/"+r.getId(), msg);
+              }
+            });
             resVer = null;
           }
           if (resVer != null) {
-            this.pf.vnpms.get(v).addFile(isExample(f,r ) ? NPMPackageGenerator.Category.EXAMPLE : NPMPackageGenerator.Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", resVer);
+            NPMPackageGenerator.Category cat = isExample(f,r ) ? NPMPackageGenerator.Category.EXAMPLE : NPMPackageGenerator.Category.RESOURCE;
+            String name = element.fhirTypeRoot()+"-"+r.getId()+".json";
+            byte[] cntv = resVer;
+            packageStep(later, () -> this.pf.vnpms.get(v).addFile(cat, name, cntv));
           }
         }
       }
       if (r.getResource() != null && r.getResource().hasUserData(UserDataNames.archetypeSource)) {
-        addFileToNpm(NPMPackageGenerator.Category.ADL, r.getResource().getUserString(UserDataNames.archetypeName), r.getResource().getUserString(UserDataNames.archetypeSource).getBytes(StandardCharsets.UTF_8));
+        String adlName = r.getResource().getUserString(UserDataNames.archetypeName);
+        byte[] adl = r.getResource().getUserString(UserDataNames.archetypeSource).getBytes(StandardCharsets.UTF_8);
+        packageStep(later, () -> addFileToNpm(NPMPackageGenerator.Category.ADL, adlName, adl));
       }
 
     } else  if ("StructureDefinition".equals(r.fhirType())) {
       // GG 20-Feb 2025 - how can you ever get to here?
-      addFileToNpm(NPMPackageGenerator.Category.RESOURCE, element.fhirType()+"-"+r.getId()+".json", bsj.toByteArray());
+      byte[] cnt = bsj.toByteArray();
+      packageStep(later, () -> addFileToNpm(NPMPackageGenerator.Category.RESOURCE, element.fhirType()+"-"+r.getId()+".json", cnt));
       StructureDefinition sdt = (StructureDefinition) r.getResource().copy(Base.COPY_DATA);
       sdt.setKind(StructureDefinition.StructureDefinitionKind.RESOURCE);
       bsj = new ByteArrayOutputStream();
       new JsonParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.NORMAL).compose(bsj, sdt);
-      addFileToNpm(NPMPackageGenerator.Category.CUSTOM, "StructureDefinition-"+r.getId()+".json", bsj.toByteArray());
+      byte[] cntSd = bsj.toByteArray();
+      packageStep(later, () -> addFileToNpm(NPMPackageGenerator.Category.CUSTOM, "StructureDefinition-"+r.getId()+".json", cntSd));
     } else {
-      addFileToNpm(NPMPackageGenerator.Category.CUSTOM, element.fhirType()+"-"+r.getId()+".json", bsj.toByteArray());
+      byte[] cnt = bsj.toByteArray();
+      packageStep(later, () -> addFileToNpm(NPMPackageGenerator.Category.CUSTOM, element.fhirType()+"-"+r.getId()+".json", cnt));
       Binary bin = new Binary(pf.context.getModelContext(), "application/fhir+json");
       bin.setId(r.getId());
       bin.setContent(bsj.toByteArray());
       bsj = new ByteArrayOutputStream();
       new JsonParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.NORMAL).compose(bsj, bin);
-      addFileToNpm(isExample(f,r ) ? NPMPackageGenerator.Category.EXAMPLE : NPMPackageGenerator.Category.RESOURCE, "Binary-"+r.getId()+".json", bsj.toByteArray());
+      NPMPackageGenerator.Category cat = isExample(f,r ) ? NPMPackageGenerator.Category.EXAMPLE : NPMPackageGenerator.Category.RESOURCE;
+      byte[] cntBin = bsj.toByteArray();
+      packageStep(later, () -> addFileToNpm(cat, "Binary-"+r.getId()+".json", cntBin));
     }
 
     if (this.pf.module.isNoNarrative()) {
