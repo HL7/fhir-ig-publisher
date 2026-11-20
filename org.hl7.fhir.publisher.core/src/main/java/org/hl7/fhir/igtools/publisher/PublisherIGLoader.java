@@ -24,8 +24,9 @@ import org.hl7.fhir.igtools.publisher.realm.RealmBusinessRules;
 import org.hl7.fhir.igtools.publisher.realm.USRealmBusinessRules;
 import org.hl7.fhir.igtools.renderers.ValidationPresenter;
 import org.hl7.fhir.igtools.spreadsheets.IgSpreadsheetParser;
-import org.hl7.fhir.utilities.MappingSpace;
+// core-tem-unwind import org.hl7.fhir.utilities.MappingSpace;
 import org.hl7.fhir.igtools.templates.TemplateManager;
+import org.hl7.fhir.igtools.templates.TrustedTemplates;
 import org.hl7.fhir.model.Base;
 import org.hl7.fhir.model.ModelContext;
 import org.hl7.fhir.model.core.Enumerations.PublicationStatus;
@@ -64,6 +65,7 @@ import org.hl7.fhir.utilities.UserDataNames;
 import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.filesystem.CSFile;
 import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
+import org.hl7.fhir.utilities.http.HTTPResult;
 import org.hl7.fhir.utilities.http.ManagedWebAccess;
 import org.hl7.fhir.utilities.i18n.*;
 import org.hl7.fhir.utilities.json.JsonException;
@@ -155,6 +157,7 @@ public class PublisherIGLoader extends PublisherBase {
     }
 
     pf.templateManager = new TemplateManager(pf.pcm, pf.logger);
+    pf.templateManager.setTrustTemplate(settings.getTrustTemplate());
     pf.templateProvider = new IGPublisherLiquidTemplateServices();
     pf.extensionTracker = new ExtensionTracker();
     log("Package Cache: "+ pf.pcm.getFolder());
@@ -168,6 +171,9 @@ public class PublisherIGLoader extends PublisherBase {
       throw new Error("There is a space in the folder path: \""+focusDir()+"\". Please fix your directory arrangement to remove the space and try again");
     }
     if (settings.getConfigFile() != null) {
+      // before anything reads the IG's files: sushi (run next) follows links too, and its errors quote what it read
+      // into the log, which the ci-build publishes
+      checkNoLinksOut(focusDir());
       File ckm = new File(Utilities.path(focusDir(), "ckm.ini"));
       if (ckm.exists()) {
         IniFile ini = new IniFile(ckm.getAbsolutePath());
@@ -210,7 +216,7 @@ public class PublisherIGLoader extends PublisherBase {
     }
     try {
       prescanSushiConfig(focusDir());
-      new FSHRunner(this).runFsh(new File(FileUtilities.getDirectoryForFile(fsh.getAbsolutePath())), settings.getMode());
+      new FSHRunner(this).runFsh(new File(FileUtilities.getDirectoryForFile(fsh.getAbsolutePath())), new File(focusDir()), settings.getMode());
     } catch (Exception | Error e) {
       if (watchSession != null) {
         try {
@@ -367,6 +373,7 @@ public class PublisherIGLoader extends PublisherBase {
     } catch (Exception e) {
       throw new Exception("Error Parsing File "+ pf.igName +": "+e.getMessage(), e);
     }
+    checkTrustedTemplateSource(pf.packageId(), false);
     pf.templateManager.loadTemplateOverrides(ini, pf.rootDir);
     try {
       pf.template = pf.templateManager.loadTemplate(templateName, pf.rootDir, pf.packageId(), settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD, pf.logOptions.contains("template"), false); // Rapido has to produce every fragment that a full build does
@@ -430,7 +437,6 @@ public class PublisherIGLoader extends PublisherBase {
     pf.outputDir = Utilities.path(pf.rootDir, "output");
     pf.setSignatureAsR6(VersionUtilities.isR6Plus(pf.version));
     List<String> relatedIGParams = new ArrayList<>();
-    ValidationOptions.R5BundleRelativeReferencePolicy r5BundleRelativeReferencePolicy = ValidationOptions.R5BundleRelativeReferencePolicy.DEFAULT;
 
     Map<String, String> expParamMap = new HashMap<>();
     boolean allowExtensibleWarnings = false;
@@ -510,7 +516,16 @@ public class PublisherIGLoader extends PublisherBase {
           pf.qaDir = Utilities.path(pf.rootDir, p.getValue());
           break;
         case "path-tx-cache":
-          pf.vsCache = Paths.get(p.getValue()).isAbsolute() ? p.getValue() : Utilities.path(pf.rootDir, p.getValue());
+          String txCache = txCachePath(pf.repoRoot, pf.rootDir, p.getValue());
+          if (txCache != null) {
+            pf.vsCache = txCache;
+          } else {
+            // the publisher deletes files in the cache folder (all but three of them on the ci-build), so it has to be the IG's own
+            pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher,
+                ValidationMessage.IssueType.BUSINESSRULE, "ImplementationGuide.definition.parameter[path-tx-cache]",
+                "The path-tx-cache '"+p.getValue()+"' is outside the IG's folder, so it has been ignored: the terminology cache is "+pf.vsCache,
+                ValidationMessage.IssueSeverity.ERROR));
+          }
           break;
         case "path-liquid":
           liquid1.add(p.getValue());
@@ -523,15 +538,13 @@ public class PublisherIGLoader extends PublisherBase {
           break;
         case "path-temp":
           pf.tempDir = Utilities.path(pf.rootDir, p.getValue());
-          if (!pf.tempDir.startsWith(pf.rootDir))
-            throw new Exception("Temp directory must be a sub-folder of the base directory");
+          checkInsideRoot(pf.tempDir, "temp");
           break;
         case "path-output":
           if (settings.getMode() != PublisherUtils.IGBuildMode.WEBSERVER) {
             // Can't override outputDir if building using webserver
             pf.outputDir = Utilities.path(pf.rootDir, p.getValue());
-            if (!pf.outputDir.startsWith(pf.rootDir))
-              throw new Exception("Output directory must be a sub-folder of the base directory");
+            checkInsideRoot(pf.outputDir, "output");
           }
           break;
         case "path-history":
@@ -811,6 +824,7 @@ public class PublisherIGLoader extends PublisherBase {
           break;
         case "page-factory":
           dir = Utilities.path(pf.rootDir, "temp", "factory-pages", "factory"+ pf.pageFactories.size());
+          checkInsideRoot(dir, "page factory");
           FileUtilities.createDirectory(dir);
           pf.pageFactories.add(new PageFactory(Utilities.path(pf.rootDir, p.getValue()), dir));
           pf.pagesDirs.add(dir);
@@ -932,9 +946,6 @@ public class PublisherIGLoader extends PublisherBase {
         case "no-xig-link":
           pf.noXigLink = "true".equals(p.getValue());
           break;
-        case "r5-bundle-relative-reference-policy" :
-          r5BundleRelativeReferencePolicy = ValidationOptions.R5BundleRelativeReferencePolicy.fromCode(p.getValue());
-          break;
         case "suppress-mappings":
           if ("*".equals(p.getValue())) {
             pf.suppressedMappings.addAll(Utilities.strings("http://hl7.org/fhir/fivews", "http://hl7.org/fhir/workflow", "http://hl7.org/fhir/interface", "http://hl7.org/v2",
@@ -1000,21 +1011,34 @@ public class PublisherIGLoader extends PublisherBase {
       }
     }
     if (ini.hasProperty("IG", "jekyll-timeout")) { //todo: consider adding this to ImplementationGuideDefinitionParameterComponent
-      pf.jekyllTimeout = ini.getLongProperty("IG", "jekyll-timeout") * 1000;
+      pf.jekyllTimeout = jekyllTimeout(ini.getLongProperty("IG", "jekyll-timeout") * 1000, settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD);
+      if (pf.jekyllTimeout < ini.getLongProperty("IG", "jekyll-timeout") * 1000) {
+        log("jekyll-timeout in ig.ini is "+ini.getLongProperty("IG", "jekyll-timeout")+" seconds, but the ci-build allows Jekyll at most "+(MAX_CI_JEKYLL_TIMEOUT/1000)+" seconds");
+      }
     }
 
+    // before either is cleared or written to
+    if (settings.getMode() != PublisherUtils.IGBuildMode.WEBSERVER) {
+      checkInsideRoot(pf.tempDir, "temp");
+      checkInsideRoot(pf.outputDir, "output");
+    }
     if (pf.template.isDevMode() && !settings.isRapidoMode()) {
       // (Rapido hashes the template, and clears the temp folder itself when it changes: clearing it here would throw
       // away what Rapido reuses, in every build with a local template)
-      FileUtilities.clearDirectory(pf.tempDir);
+      PublisherUtils.clearFolder(pf.tempDir);
     } else {
       File fTempDir = new File(pf.tempDir);
       if (fTempDir.exists()) {
         {
           for (File ff : fTempDir.listFiles()) {
-            if (ff.getName().startsWith("comparison-") && ff.isDirectory()) {
-              FileUtilities.clearDirectory(ff.getAbsolutePath());
-              ff.delete();
+            if (ff.getName().startsWith("comparison-")) {
+              if (Files.isSymbolicLink(ff.toPath())) {
+                // the link, not what it links to
+                ff.delete();
+              } else if (ff.isDirectory()) {
+                PublisherUtils.clearFolder(ff.getAbsolutePath());
+                ff.delete();
+              }
             }
           }
         }
@@ -1077,11 +1101,12 @@ public class PublisherIGLoader extends PublisherBase {
     }
     pf.pagesDirs.removeAll(missingDirs);
     checkPageResourceDirOverlap();
+    checkFoldersInsideRoot();
 
     logDebugMessage(LogCategory.INIT, "Output: "+ pf.outputDir);
     forceDir(pf.outputDir);
     setUpWatchOutput();
-    FileUtilities.clearDirectory(pf.outputDir);
+    PublisherUtils.clearFolder(pf.outputDir);
     if (pf.qaDir != null) {
       logDebugMessage(LogCategory.INIT, "QA Dir: "+ pf.qaDir);
       forceDir(pf.qaDir);
@@ -1098,10 +1123,10 @@ public class PublisherIGLoader extends PublisherBase {
     FileUtilities.createDirectory(pf.vsCache);
     if (settings.getCacheOption() == PublisherUtils.CacheOption.CLEAR_ALL) {
       log("Terminology Cache is at "+ pf.vsCache +". Clearing now");
-      FileUtilities.clearDirectory(pf.vsCache);
+      PublisherUtils.clearFolder(pf.vsCache);
     } else if (settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD) {
       log("Terminology Cache is at "+ pf.vsCache +". Trimming now");
-      FileUtilities.clearDirectory(pf.vsCache, "snomed.cache", "loinc.cache", "ucum.cache");
+      PublisherUtils.clearFolder(pf.vsCache, "snomed.cache", "loinc.cache", "ucum.cache");
     } else if (settings.getCacheOption() == PublisherUtils.CacheOption.CLEAR_ERRORS) {
       log("Terminology Cache is at "+ pf.vsCache +". Clearing Errors now");
       logDebugMessage(LogCategory.INIT, "Deleted "+Integer.toString(clearErrors(pf.vsCache))+" files");
@@ -1356,7 +1381,6 @@ public class PublisherIGLoader extends PublisherBase {
     pf.validationFetcher = new ValidationServices(pf.context, pf.igpkp, pf.sourceIg, pf.fileList, pf.npmList, pf.bundleReferencesResolve, pf.specMaps, pf.linkSpecMaps, pf.module, allLangs());
     pf.validator.setFetcher(pf.validationFetcher);
     pf.validator.setPolicyAdvisor(pf.validationFetcher);
-    pf.validator.getSettings().setR5BundleRelativeReferencePolicy(r5BundleRelativeReferencePolicy);
 
     if (!pf.generateVersions.isEmpty()) {
       Collections.sort(pf.generateVersions);
@@ -1490,7 +1514,7 @@ public class PublisherIGLoader extends PublisherBase {
         }
       }
     } else {
-      FileUtilities.clearDirectory(pf.tempDir);
+      PublisherUtils.clearFolder(pf.tempDir);
     }
     forceDir(pf.tempDir);
     forceDir(Utilities.path(pf.tempDir, "_includes"));
@@ -1515,6 +1539,44 @@ public class PublisherIGLoader extends PublisherBase {
     pf.rootDir = settings.getConfigFile();
     pf.outputDir = Utilities.path(pf.rootDir, "output");
     pf.tempDir = Utilities.path(pf.rootDir, "temp");
+    checkInsideRoot(pf.outputDir, "output");
+    checkInsideRoot(pf.tempDir, "temp");
+    checkTrustedTemplateSource(pf.templateInfo.asString("name"), true);
+  }
+
+  /**
+   * On the ci-build, a build that claims the package id of a trusted template must be that template, built from its
+   * own repository: the ci-build publishes it as the #current build of that package id, which other IGs then trust.
+   * An IG can't claim such a package id at all.
+   *
+   * Where the build comes from is what the ci-build said (-repo, -target) and what git says (the origin remote): none
+   * of those come from the repository's content. Every one of them that is known must name the template's repository
+   */
+  void checkTrustedTemplateSource(String packageId, boolean isTemplate) {
+    if (settings.getMode() != PublisherUtils.IGBuildMode.AUTOBUILD || !TrustedTemplates.isTrusted(packageId)) {
+      return;
+    }
+    if (!isTemplate) {
+      throw new FHIRException("The package id '"+packageId+"' belongs to a trusted IG template, so an IG can't use it");
+    }
+    String expected = TrustedTemplates.getRepository(packageId);
+    if (expected == null) {
+      throw new FHIRException("The template '"+packageId+"' is a trusted template, but the repository it is built from hasn't been recorded (TrustedTemplates), so it can't be built on the ci-build");
+    }
+    List<String> sources = new ArrayList<>();
+    for (String s : new String[] { settings.getRepoSource(), settings.getTargetOutput(), GitUtilities.getGitSource(new File(pf.rootDir)) }) {
+      if (!Utilities.noString(s)) {
+        sources.add(s);
+      }
+    }
+    if (sources.isEmpty()) {
+      throw new FHIRException("The template '"+packageId+"' is a trusted template, and it isn't known what repository this build is from, so it can't be built on the ci-build");
+    }
+    for (String s : sources) {
+      if (!TrustedTemplates.isBuiltFrom(packageId, s)) {
+        throw new FHIRException("The template '"+packageId+"' is a trusted template, so on the ci-build it can only be built from https://github.com/"+expected+", not "+s);
+      }
+    }
   }
 
 
@@ -1614,6 +1676,10 @@ public class PublisherIGLoader extends PublisherBase {
       pf.prePagesDirs.add(path);
       String prePagesXslt = null;
       if (pp.has("transform")) {
+        // a transform is the template running its own code (xslt), so only a trusted template can have one
+        if (!pf.template.canExecute()) {
+          throw new FHIRException("Unable to use the pre-process transform '"+str(pp, "transform")+"' for "+str(pp, "folder")+" as "+pf.template.getUntrustedReason());
+        }
         prePagesXslt = Utilities.path(root, str(pp, "transform"));
         checkFile(prePagesXslt);
       }
@@ -2154,6 +2220,82 @@ public class PublisherIGLoader extends PublisherBase {
     return dep;
   }
 
+  /** the longest the ci-build lets Jekyll run (ms), whatever ig.ini says: the ci-build kills the whole build at 10 hours */
+  public static final long MAX_CI_JEKYLL_TIMEOUT = 60 * 60 * 1000;
+
+  /** the Jekyll timeout the IG asks for (ms), but no more than MAX_CI_JEKYLL_TIMEOUT on the ci-build */
+  static long jekyllTimeout(long requested, boolean ciBuild) {
+    return ciBuild ? Math.min(requested, MAX_CI_JEKYLL_TIMEOUT) : requested;
+  }
+
+  /**
+   * The folder path-tx-cache names (relative to the IG root, or absolute), or null if it isn't inside the IG's folder
+   * (the folder ig.ini is in). Symbolic links are followed, as far as the path exists, since a repository can have one
+   */
+  static String txCachePath(String repoRoot, String rootDir, String value) {
+    Path path = Paths.get(rootDir).toAbsolutePath().resolve(value).normalize();
+    return isInside(repoRoot, path.toString()) ? path.toString() : null;
+  }
+
+  /**
+   * Whether path is inside root, where they really are: symbolic links are followed (as far as the path exists - the
+   * rest of it is created later, as folders), since a repository can contain a link to anywhere. The publisher reads
+   * the IG's source folders, and writes to (and clears) temp and output, so none of them can be somewhere else
+   */
+  static boolean isInside(String root, String path) {
+    return PublisherUtils.isInside(root, path);
+  }
+
+  /**
+   * Symbolic links that lead out of the IG's folder (or nowhere): whatever they link to would be read as IG content and
+   * published (a page linked to /proc/self/environ), or emptied when the publisher clears a folder (temp, template), or
+   * written into. Refused on the ci-build; locally, only if the user allows them (see ExternalLinkPermission). Checked
+   * before anything in the IG's folder is read, cleared or written
+   */
+  private void checkNoLinksOut(String root) throws IOException {
+    ExternalLinkPermission.check(PublisherUtils.linksOut(root), root, settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD,
+        settings.isAllowExternalLinks(), FhirSettings.getFilePath(), msg -> {
+          log("Warning: "+msg);
+          pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.SECURITY, "ImplementationGuide", msg, ValidationMessage.IssueSeverity.WARNING));
+        });
+  }
+
+  private void checkInsideRoot(String dir, String what) throws IOException {
+    String d = dir.endsWith("*") ? dir.substring(0, dir.length() - 1) : dir;
+    if (!isInside(pf.rootDir, d)) {
+      throw new IOException("The "+what+" folder "+dir+" must be inside the IG's folder ("+pf.rootDir+"), and it, or a folder on its path, is outside it or a link to somewhere else");
+    }
+  }
+
+  private void checkFoldersInsideRoot() throws IOException {
+    // a program that runs the publisher as a web server sets temp and output itself (setTempDir, setOutputDir)
+    if (settings.getMode() != PublisherUtils.IGBuildMode.WEBSERVER) {
+      checkInsideRoot(pf.tempDir, "temp");
+      checkInsideRoot(pf.outputDir, "output");
+    }
+    if (pf.qaDir != null) {
+      checkInsideRoot(pf.qaDir, "qa");
+    }
+    for (String s : pf.resourceDirs) {
+      checkInsideRoot(s, "resource");
+    }
+    for (String s : pf.resourceFactoryDirs) {
+      checkInsideRoot(s, "factory");
+    }
+    for (String s : pf.pagesDirs) {
+      checkInsideRoot(s, "pages");
+    }
+    for (String s : pf.testDirs) {
+      checkInsideRoot(s, "test");
+    }
+    for (String s : pf.dataDirs) {
+      checkInsideRoot(s, "data");
+    }
+    for (String s : pf.otherDirs) {
+      checkInsideRoot(s, "other");
+    }
+  }
+
   private NpmPackage resolveDependency(String canonical, String packageId, String igver) throws Exception {
     PackageList pl;
     logDebugMessage(LogCategory.INIT, "Fetch Package history from "+Utilities.pathURL(canonical, "package-list.json"));
@@ -2167,11 +2309,36 @@ public class PublisherIGLoader extends PublisherBase {
       throw new Exception("Canonical mismatch fetching package list for "+canonical+"#"+igver+", package-list.json says "+pl.canonical());
     for (PackageList.PackageListEntry e : pl.versions()) {
       if (igver.equals(e.version())) {
-        InputStream src = fetchFromSource(pl.pid()+"-"+igver, Utilities.pathURL(e.path(), "package.tgz"));
-        return pf.pcm.addPackageToCache(pl.pid(), igver, src, Utilities.pathURL(e.path(), "package.tgz"));
+        String source = Utilities.pathURL(e.path(), "package.tgz");
+        byte[] tgz;
+        try (InputStream src = fetchFromSource(pl.pid()+"-"+igver, source)) {
+          tgz = PublisherUtils.readLimited(src, MAX_DEPENDENCY_DOWNLOAD, "The package "+pl.pid()+"#"+igver+" from "+source);
+        }
+        // read once to check it, and then again by the cache (which has no way to check it first)
+        checkDependencyIsNotATemplate(pl.pid(), igver, tgz, source);
+        return pf.pcm.addPackageToCache(pl.pid(), igver, new ByteArrayInputStream(tgz), source);
       }
     }
     return null;
+  }
+
+  /**
+   * A dependency found through its canonical (not on a package server) is put in the package cache under the id its
+   * package-list.json gives, which other builds that share the cache then use. A dependency is never a template, so
+   * nothing that is a template, or has the id of a trusted template - as package-list.json says, or as its own
+   * package.json says - is put there: a later build would run it as that template
+   */
+  static void checkDependencyIsNotATemplate(String pid, String version, byte[] tgz, String source) throws IOException {
+    if (TrustedTemplates.isTrusted(pid)) {
+      throw new FHIRException("The dependency "+pid+"#"+version+" from "+source+" claims the id of a trusted template: a dependency can't be a template");
+    }
+    NpmPackage npm = NpmPackage.fromPackage(new ByteArrayInputStream(tgz), source);
+    if (TrustedTemplates.isTrusted(npm.name())) {
+      throw new FHIRException("The dependency "+pid+"#"+version+" from "+source+" is the trusted template "+npm.name()+": a dependency can't be a template");
+    }
+    if (npm.isType(PackageGenerator.PackageType.IG_TEMPLATE)) {
+      throw new FHIRException("The dependency "+pid+"#"+version+" from "+source+" is a template ("+npm.name()+"): a dependency can't be a template");
+    }
   }
 
 
@@ -2203,6 +2370,12 @@ public class PublisherIGLoader extends PublisherBase {
 
     String code = s.substring(0, s.indexOf("="));
     String id =  s.substring(s.indexOf("=")+1);
+    if (id == null) {
+      throw new FHIRException("Invalid related IG '"+s+"': no package id");
+    }
+    if (id.contains("#")) {
+      throw new FHIRException("Invalid related IG '"+s+"': Package Id can't contain a version");
+    }
 
     NpmPackage npm;
     try {
@@ -2291,11 +2464,21 @@ public class PublisherIGLoader extends PublisherBase {
     return map;
   }
 
+  /** the largest dependency package that will be downloaded from where the IG says it is (bytes) */
+  public static final long MAX_DEPENDENCY_DOWNLOAD = 1024L * 1024 * 1024;
+
+  /**
+   * Through ManagedWebAccess, like every other fetch of a URL an IG chooses: the package-list.json that names this
+   * package is the IG's to write, so it can name any URL, and only public https servers are reached (SSRF protection)
+   */
   private InputStream fetchFromSource(String id, String source) throws IOException {
     logDebugMessage(LogCategory.INIT, "Fetch "+id+" package from "+source);
-    URL url = URI.create(source+"?nocache=" + System.currentTimeMillis()).toURL();
-    URLConnection c = url.openConnection();
-    return c.getInputStream();
+    HTTPResult res = ManagedWebAccess.get(Arrays.asList("web"), source+"?nocache=" + System.currentTimeMillis());
+    res.checkThrowException();
+    if (res.getContent() == null) {
+      throw new IOException("No content fetching "+source);
+    }
+    return new ByteArrayInputStream(res.getContent());
   }
 
 
@@ -2388,7 +2571,7 @@ public class PublisherIGLoader extends PublisherBase {
     }
 
     loadMappingSpaces(pf.context.getBinaryForKey("mappingSpaces.details"));
-    pf.validationFetcher.getMappingUrls().addAll(pf.mappingSpaces.keySet());
+    // core-tem-unwind pf.validationFetcher.getMappingUrls().addAll(pf.mappingSpaces.keySet());
     pf.validationFetcher.getOtherUrls().add(pf.publishedIg.getUrl());
     for (SpecMapManager s : pf.specMaps) {
       pf.validationFetcher.getOtherUrls().add(s.getBase());
@@ -2461,7 +2644,7 @@ public class PublisherIGLoader extends PublisherBase {
 
     loadConformance1(true);
     for (String s : pf.resourceFactoryDirs) {
-      FileUtilities.clearDirectory(s);
+      PublisherUtils.clearFolder(s);
     }
     if (!pf.testDataFactories.isEmpty()) {
       processFactories(pf.testDataFactories);
@@ -2696,7 +2879,7 @@ public class PublisherIGLoader extends PublisherBase {
 
     pf.rc = new RenderingContext(pf.context, pf.rendererFactory, pf.markdownEngine, ValidationOptions.defaults(), checkAppendSlash(pf.specPath), "", locale, RenderingContext.ResourceRendererMode.TECHNICAL, RenderingContext.GenerationRules.IG_PUBLISHER);
     pf.rc.setTemplateProvider(pf.templateProvider);
-    pf.rc.getMappingSpaces().putAll(pf.mappingSpaces);
+    // core-tem-unwind pf.rc.getMappingSpaces().putAll(pf.mappingSpaces);
     pf.rc.setServices(pf.validator.getExternalHostServices());
     pf.rc.setDestDir(Utilities.path(pf.tempDir));
     pf.rc.setProfileUtilities(new ProfileUtilities(pf.context, new ArrayList<ValidationMessage>(), pf.igpkp));
@@ -3508,7 +3691,7 @@ public class PublisherIGLoader extends PublisherBase {
 
 
   private void loadMappingSpaces(byte[] source) throws Exception {
-    pf.mappingSpaces.putAll(MappingSpace.loadMappingSpaces(source));
+    // core-tem-unwind pf.mappingSpaces.putAll(MappingSpace.loadMappingSpaces(source));
   }
 
 
@@ -3788,7 +3971,7 @@ public class PublisherIGLoader extends PublisherBase {
     if (changed) {
       f.getValuesetsToLoad().clear();
       logDebugMessage(LogCategory.INIT, "load "+f.getPath());
-      Bundle bnd = new IgSpreadsheetParser(this.pf.context, this.pf.getExecTime(), this.pf.igpkp.getCanonical(), f.getValuesetsToLoad(), this.pf.mappingSpaces, knownValueSetIds).parse(f);
+      Bundle bnd = new IgSpreadsheetParser(this.pf.context, this.pf.getExecTime(), this.pf.igpkp.getCanonical(), f.getValuesetsToLoad(), /*// core-tem-unwind this.pf.mappingSpaces,*/null, knownValueSetIds).parse(f);
       f.setBundle(new FetchedResource(f.getName()+" (ex spreadsheet)"));
       f.setBundleType(FetchedFile.FetchedBundleType.SPREADSHEET);
       f.getBundle().setResource(bnd);

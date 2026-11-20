@@ -16,7 +16,7 @@ import java.util.stream.Stream;
 
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
-import org.hl7.fhir.utilities.npm.NpmPackageSigner;
+// core-tem-unwind import org.hl7.fhir.utilities.npm.NpmPackageSigner;
 
 /**
  * Signs the packages already published in a set of web folders, and records the signatures in
@@ -47,7 +47,7 @@ public class PackageSigningUpdater {
   private static final Pattern LINK = Pattern.compile("<link>(.*?)</link>", Pattern.DOTALL);
   private static final Pattern HINT = Pattern.compile("\"hint\"\\s*:\\s*\"([^\"]*)\"");
 
-  private final NpmPackageSigner signer;
+  // core-tem-unwind private final NpmPackageSigner signer;
   private final boolean dryRun;
   private final PrintStream log;
   private final String tool;
@@ -62,8 +62,8 @@ public class PackageSigningUpdater {
   // web location (no scheme, ending in /) -> folder
   private final List<String[]> maps = new ArrayList<>();
 
-  public PackageSigningUpdater(NpmPackageSigner signer, boolean dryRun, PrintStream log, String tool) {
-    this.signer = signer;
+  public PackageSigningUpdater(/*NpmPackageSigner signer, */ boolean dryRun, PrintStream log, String tool) {
+    // core-tem-unwind this.signer = signer;
     this.dryRun = dryRun;
     this.log = log;
     this.tool = tool;
@@ -107,23 +107,23 @@ public class PackageSigningUpdater {
     if (folders.isEmpty()) {
       throw new IOException("No folders (usage: -sign-packages [-key {pem}] [-dry-run] {folder}...)");
     }
-    NpmPackageSigner signer = key != null ? NpmPackageSigner.load(new File(key)) : NpmPackageSigner.fromSettings();
-    if (signer == null) {
-      throw new IOException("No signing key: use -key, or set packageSigningKey in fhir-settings.json");
-    }
-    PackageSigningUpdater updater = new PackageSigningUpdater(signer, dryRun, System.out, tool);
-    for (String m : mapArgs) {
-      int eq = m.indexOf('=');
-      if (eq < 0 || !new File(m.substring(eq + 1)).isDirectory()) {
-        throw new IOException("-map must be {url}={folder}, with an existing folder: " + m);
-      }
-      updater.addMap(m.substring(0, eq), new File(m.substring(eq + 1)));
-    }
-    updater.execute(folders);
+    // core-tem-unwind NpmPackageSigner signer = key != null ? NpmPackageSigner.load(new File(key)) : NpmPackageSigner.fromSettings();
+    // core-tem-unwind if (signer == null) {
+    // core-tem-unwind   throw new IOException("No signing key: use -key, or set packageSigningKey in fhir-settings.json");
+    // core-tem-unwind }
+    // core-tem-unwind PackageSigningUpdater updater = new PackageSigningUpdater(signer, dryRun, System.out, tool);
+    // core-tem-unwind for (String m : mapArgs) {
+    // core-tem-unwind   int eq = m.indexOf('=');
+    // core-tem-unwind   if (eq < 0 || !new File(m.substring(eq + 1)).isDirectory()) {
+    // core-tem-unwind throw new IOException("-map must be {url}={folder}, with an existing folder: " + m);
+    // core-tem-unwind }
+    // core-tem-unwind updater.addMap(m.substring(0, eq), new File(m.substring(eq + 1)));
+    // core-tem-unwind }
+    // core-tem-unwind updater.execute(folders);
   }
 
   public void execute(List<File> folders) throws IOException {
-    log.println((dryRun ? "Dry run: " : "") + "signing packages with key " + signer.getKeyId());
+    // core-tem-unwind log.println((dryRun ? "Dry run: " : "") + "signing packages with key " + signer.getKeyId());
     // every package first, since a feed can list packages in another of the folders (see -map)
     for (File folder : folders) {
       log.println("== " + folder.getAbsolutePath());
@@ -167,13 +167,13 @@ public class PackageSigningUpdater {
             problems.add("Would not sign, not a package: " + f);
           }
         } else {
-          try {
-            signer.sign(f, tool);
-            signed++;
-          } catch (NpmPackageSigner.NotAPackageException e) {
-            notPackages++;
-            problems.add("Not signed, not a package: " + f + " (" + e.getMessage() + ")");
-          }
+// core-tem-unwind           try {
+            // core-tem-unwind signer.sign(f, tool);
+          // core-tem-unwind signed++;
+          // core-tem-unwind } catch (NpmPackageSigner.NotAPackageException e) {
+          // core-tem-unwind notPackages++;
+          // core-tem-unwind problems.add("Not signed, not a package: " + f + " (" + e.getMessage() + ")");
+          // core-tem-unwind }
         }
       } catch (Exception e) {
         failed++;
@@ -187,21 +187,23 @@ public class PackageSigningUpdater {
 
   // Signed by this key since the package last changed: nothing to do
   private boolean isSignedByThisKey(File tgz) throws IOException {
-    File partner = new File(tgz.getAbsolutePath() + NpmPackageSigner.SIGNATURE_SUFFIX);
-    if (!partner.exists() || partner.lastModified() < tgz.lastModified()) {
-      return false;
-    }
-    Matcher m = HINT.matcher(new String(Files.readAllBytes(partner.toPath()), StandardCharsets.UTF_8));
-    return m.find() && signer.getKeyId().equals(m.group(1));
+    // core-tem-unwind File partner = new File(tgz.getAbsolutePath() + NpmPackageSigner.SIGNATURE_SUFFIX);
+    // core-tem-unwind if (!partner.exists() || partner.lastModified() < tgz.lastModified()) {
+    // core-tem-unwind return false;
+    // core-tem-unwind }
+    // core-tem-unwind Matcher m = HINT.matcher(new String(Files.readAllBytes(partner.toPath()), StandardCharsets.UTF_8));
+    // core-tem-unwind return m.find() && signer.getKeyId().equals(m.group(1));
+    return false;
   }
 
   private boolean isPackage(File tgz) {
-    try {
-      JsonObject pj = NpmPackageSigner.readPackageJson(Files.readAllBytes(tgz.toPath()));
-      return pj.asString("name") != null && pj.asString("version") != null;
-    } catch (Exception e) {
-      return false;
-    }
+    // core-tem-unwind try {
+    // core-tem-unwind JsonObject pj = NpmPackageSigner.readPackageJson(Files.readAllBytes(tgz.toPath()));
+    // core-tem-unwind return pj.asString("name") != null && pj.asString("version") != null;
+    // core-tem-unwind } catch (Exception e) {
+    // core-tem-unwind return false;
+    // core-tem-unwind }
+    return false;
   }
 
   // --- the feed ----------------------------------------------------------------------------------
@@ -234,15 +236,15 @@ public class PackageSigningUpdater {
           if (tgz == null) {
             problems.add(feed.getName() + " in " + folder + ": " + link + " is not under " + feedUrl + " (or a -map); not signed here");
           } else {
-            File partner = new File(tgz.getAbsolutePath() + NpmPackageSigner.SIGNATURE_SUFFIX);
-            if (!tgz.exists()) {
-              problems.add(feed.getName() + " in " + folder + ": " + link + " - no such file " + tgz);
-            } else if (dryRun ? isSignedByThisKey(tgz) || isPackage(tgz) : isSignedByThisKey(tgz)) {
-              newBody = insertSignature(body, lineIndent(body, lm.start()), link + NpmPackageSigner.SIGNATURE_SUFFIX, nl);
-              added++;
-            } else {
-              problems.add(feed.getName() + " in " + folder + ": " + link + " is not signed");
-            }
+// core-tem-unwind             File partner = new File(tgz.getAbsolutePath() + NpmPackageSigner.SIGNATURE_SUFFIX);
+// core-tem-unwind             if (!tgz.exists()) {
+// core-tem-unwind               problems.add(feed.getName() + " in " + folder + ": " + link + " - no such file " + tgz);
+// core-tem-unwind             } else if (dryRun ? isSignedByThisKey(tgz) || isPackage(tgz) : isSignedByThisKey(tgz)) {
+// core-tem-unwind               newBody = insertSignature(body, lineIndent(body, lm.start()), link + NpmPackageSigner.SIGNATURE_SUFFIX, nl);
+// core-tem-unwind               added++;
+// core-tem-unwind             } else {
+// core-tem-unwind               problems.add(feed.getName() + " in " + folder + ": " + link + " is not signed");
+// core-tem-unwind             }
           }
         }
       }

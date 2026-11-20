@@ -149,25 +149,30 @@ public class Template {
         targetOnJekyll = targets.asString("onJekyll");
       if (targets.has("onCheck"))
         targetOnCheck = targets.asString("onCheck");
-      File buildFile = new File(Utilities.path(templateDir, script));
-      antProject = new Project();
+      // nothing from the script can be loaded unless the template is trusted: ant runs any tasks that are outside a
+      // target while it parses the build file, so configuring the project is already running the template's code.
+      // An untrusted template that names a script gets no project, and runScriptTargetAnt() reports why it can't run
+      if (canExecute) {
+        File buildFile = new File(Utilities.path(templateDir, script));
+        antProject = new Project();
 
-      ProjectHelper.configureProject(antProject, buildFile);
-      DefaultLogger consoleLogger = new DefaultLogger();
-      consoleLogger.setErrorPrintStream(System.err);
-      consoleLogger.setOutputPrintStream(System.out);
-      if (wantLog) {        
-        consoleLogger.setMessageOutputLevel(Project.MSG_INFO);
-      } else {
-        consoleLogger.setMessageOutputLevel(Project.MSG_ERR);        
+        ProjectHelper.configureProject(antProject, buildFile);
+        DefaultLogger consoleLogger = new DefaultLogger();
+        consoleLogger.setErrorPrintStream(System.err);
+        consoleLogger.setOutputPrintStream(System.out);
+        if (wantLog) {        
+          consoleLogger.setMessageOutputLevel(Project.MSG_INFO);
+        } else {
+          consoleLogger.setMessageOutputLevel(Project.MSG_ERR);        
+        }
+        antProject.addBuildListener(consoleLogger);
+        antProject.setBasedir(root);
+        antProject.setProperty("ig.root", root);
+        antProject.setProperty("ig.template", templateDir);
+        antProject.setProperty("ig.scripts", Utilities.path(templateDir, "scripts"));
+        antProject.setProperty("ig.networkprohibited", Boolean.toString(FhirSettings.isProhibitNetworkAccess()));
+        antProject.init();
       }
-      antProject.addBuildListener(consoleLogger);
-      antProject.setBasedir(root);
-      antProject.setProperty("ig.root", root);
-      antProject.setProperty("ig.template", templateDir);
-      antProject.setProperty("ig.scripts", Utilities.path(templateDir, "scripts"));
-      antProject.setProperty("ig.networkprohibited", Boolean.toString(FhirSettings.isProhibitNetworkAccess()));
-      antProject.init();
     }
     for (JsonProperty p : configuration.getProperties()) {
       if (p.getName().startsWith("template-parameters")) {
@@ -698,6 +703,20 @@ public class Template {
     return null;
   }
 
+  /**
+   * Whether the template is trusted to run what it nominates: its ant script, and its pre-process transforms
+   */
+  public boolean canExecute() {
+    return canExecute;
+  }
+
+  /**
+   * Why the template isn't trusted (see canExecute())
+   */
+  public String getUntrustedReason() {
+    return "the template '"+templateThatCantExecute+"' is not trusted (reason: "+templateReason+")";
+  }
+
   public ImplementationGuide onLoadEvent(ImplementationGuide ig, Map<String, List<ValidationMessage>> messages) throws IOException, FHIRException {
     if (targetOnLoad == null)
       return ig;
@@ -732,7 +751,9 @@ public class Template {
     }
     if (targetOnGenerate != null) {
       Map<String, List<ValidationMessage>> messages = new HashMap<String, List<ValidationMessage>>();
-      antProject.setProperty("ig.temp", tempDir);
+      if (antProject != null) { // null if the template isn't trusted: runScriptTarget() fails with the reason
+        antProject.setProperty("ig.temp", tempDir);
+      }
       runScriptTarget(context, targetOnGenerate, messages, ig, newFileList, IG_NO_RESOURCE);
       return messages;
     } else

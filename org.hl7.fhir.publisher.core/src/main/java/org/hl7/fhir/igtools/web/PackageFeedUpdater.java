@@ -1,6 +1,6 @@
 package org.hl7.fhir.igtools.web;
 
-import org.hl7.fhir.utilities.npm.NpmPackageSigner;
+// core-tem-unwind import org.hl7.fhir.utilities.npm.NpmPackageSigner;
 import org.hl7.fhir.utilities.xml.XMLUtil;
 import org.w3c.dom.*;
 import org.xml.sax.SAXException;
@@ -354,12 +354,12 @@ public class PackageFeedUpdater {
     item.appendChild(doc.createTextNode("\n      "));
 
     // fhir:signature - the package's signature, when it was signed (see NpmPackageSigner)
-    if (new File(pkg.filePath + NpmPackageSigner.SIGNATURE_SUFFIX).exists()) {
-      Element signature = doc.createElementNS("http://hl7.org/fhir/feed", "fhir:signature");
-      signature.setTextContent(url + NpmPackageSigner.SIGNATURE_SUFFIX);
-      item.appendChild(signature);
-      item.appendChild(doc.createTextNode("\n      "));
-    }
+// core-tem-unwind     if (new File(pkg.filePath + NpmPackageSigner.SIGNATURE_SUFFIX).exists()) {
+    // core-tem-unwind Element signa// core-tem-unwind ture = doc.createElementNS("http://hl7.org/fhir/feed", "fhir:signature");
+    // core-tem-unwind signature.setTextContent(url + NpmPackageSigner.SIGNATURE_SUFFIX);
+    // core-tem-unwind item.appendChild(signature);
+    // core-tem-unwind item.appendChild(doc.createTextNode("\n      "));
+    // core-tem-unwind }
 
     // PubDate
     Element pubDate = doc.createElement("pubDate");

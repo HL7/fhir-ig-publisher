@@ -47,6 +47,9 @@ import org.hl7.fhir.utilities.json.model.JsonString;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
+import org.sqlite.ProgressHandler;
+import org.sqlite.SQLiteConnection;
+import org.sqlite.SQLiteLimits;
 
 public class DBBuilder {
 
@@ -1004,7 +1007,139 @@ public class DBBuilder {
   }
 
 
+  /**
+   * The SQL in a page ({% sql %}) comes from the IG, and runs against the build's database. It can only be a query: a
+   * single statement that starts with SELECT or WITH (after any comments). SQLite runs a statement before the driver
+   * finds that it isn't a query, and some statements write files wherever they are told to (ATTACH DATABASE creates
+   * the file it names, and so does VACUUM INTO)
+   */
+  static void checkQuery(String sql) {
+    if (sql == null) {
+      throw new FHIRException("No SQL query");
+    }
+    int i = skipSpaceAndComments(sql, 0);
+    int e = i;
+    while (e < sql.length() && (Character.isLetterOrDigit(sql.charAt(e)) || sql.charAt(e) == '_')) {
+      e++;
+    }
+    String word = sql.substring(i, e);
+    if (!word.equalsIgnoreCase("select") && !word.equalsIgnoreCase("with")) {
+      throw new FHIRException("Only a query (SELECT, or WITH ... SELECT) can be run, not '"+(word.isEmpty() ? sql.trim() : word)+"'");
+    }
+    // one statement: a ; can only be followed by spaces and comments
+    while (i < sql.length()) {
+      char c = sql.charAt(i);
+      if (c == '\'' || c == '"' || c == '`') {
+        i = skipQuoted(sql, i, c);
+      } else if (c == '[') {
+        int end = sql.indexOf(']', i + 1);
+        i = end < 0 ? sql.length() : end + 1;
+      } else if (sql.startsWith("--", i) || sql.startsWith("/*", i)) {
+        i = skipSpaceAndComments(sql, i);
+      } else if (c == ';') {
+        if (skipSpaceAndComments(sql, i + 1) < sql.length()) {
+          throw new FHIRException("Only one SQL statement can be run");
+        }
+        return;
+      } else {
+        i++;
+      }
+    }
+  }
+
+  /** a quoted string or name: the quote character doubled is the quote character itself */
+  private static int skipQuoted(String sql, int i, char q) {
+    i++;
+    while (i < sql.length()) {
+      if (sql.charAt(i) == q) {
+        if (i + 1 < sql.length() && sql.charAt(i + 1) == q) {
+          i = i + 2;
+        } else {
+          return i + 1;
+        }
+      } else {
+        i++;
+      }
+    }
+    return i;
+  }
+
+  /** past spaces, -- comments (to the end of the line) and /* comments (to the end of the text, if they aren't closed, as SQLite does) */
+  private static int skipSpaceAndComments(String sql, int i) {
+    while (i < sql.length()) {
+      if (Character.isWhitespace(sql.charAt(i))) {
+        i++;
+      } else if (sql.startsWith("--", i)) {
+        int end = sql.indexOf('\n', i);
+        i = end < 0 ? sql.length() : end + 1;
+      } else if (sql.startsWith("/*", i)) {
+        int end = sql.indexOf("*/", i + 2);
+        i = end < 0 ? sql.length() : end + 2;
+      } else {
+        return i;
+      }
+    }
+    return i;
+  }
+
+  /** how long the SQL in a page can run (seconds) */
+  public static final int MAX_QUERY_SECONDS = 60;
+  /** the longest string or blob the SQL in a page can make (bytes) */
+  public static final int MAX_QUERY_VALUE_LENGTH = 100_000_000;
+  /** SQLite's own default for SQLITE_LIMIT_LENGTH, which is what the build itself runs with */
+  private static final int SQLITE_DEFAULT_LENGTH = 1_000_000_000;
+
+  /**
+   * The SQL in a page comes from the IG, and SQLite has no limit on how long a query runs (a recursive CTE needn't
+   * ever stop) or on how big the strings it makes are (printf and zeroblob make them in native memory, outside the
+   * Java heap). setQueryTimeout doesn't help: in the sqlite-jdbc driver it only covers waiting for locks. So while a
+   * page's SQL runs, a progress handler stops it after MAX_QUERY_SECONDS, and longer values than MAX_QUERY_VALUE_LENGTH
+   * are refused. Both are put back afterwards, for the build's own use of the database
+   */
+  private int maxQuerySeconds = MAX_QUERY_SECONDS;
+
+  /** for tests */
+  void setMaxQuerySeconds(int maxQuerySeconds) {
+    this.maxQuerySeconds = maxQuerySeconds;
+  }
+
+  private void startPageQuery() throws SQLException {
+    con.unwrap(SQLiteConnection.class).setLimit(SQLiteLimits.SQLITE_LIMIT_LENGTH, MAX_QUERY_VALUE_LENGTH);
+    final long deadline = System.currentTimeMillis() + maxQuerySeconds * 1000L;
+    ProgressHandler.setHandler(con, 10000, new ProgressHandler() {
+      @Override
+      protected int progress() {
+        return System.currentTimeMillis() > deadline ? 1 : 0;
+      }
+    });
+  }
+
+  private void endPageQuery() {
+    try {
+      ProgressHandler.clearHandler(con);
+      con.unwrap(SQLiteConnection.class).setLimit(SQLiteLimits.SQLITE_LIMIT_LENGTH, SQLITE_DEFAULT_LENGTH);
+    } catch (SQLException e) {
+      // the connection is gone
+    }
+  }
+
   public synchronized String processSQL(String sql) {
+    if (con == null) {
+      return "<span style=\"color: maroon\">Error processing SQL: SQL is not set up properly</span>";
+    }
+    try {
+      startPageQuery();
+    } catch (SQLException e) {
+      return "<span style=\"color: maroon\">Error processing SQL: "+Utilities.escapeXml(e.getMessage())+"</span>";
+    }
+    try {
+      return processSQLInner(sql);
+    } finally {
+      endPageQuery();
+    }
+  }
+
+  private String processSQLInner(String sql) {
     long start = System.currentTimeMillis();
     if (con == null) {
       return "<span style=\"color: maroon\">Error processing SQL: SQL is not set up properly</span>";
@@ -1070,6 +1205,7 @@ public class DBBuilder {
         ctrl.setTitles(true);
       }
       
+      checkQuery(ctrl.getQuery());
       Statement stmt = con.createStatement();
       ResultSet rs = stmt.executeQuery(ctrl.getQuery());
       ResultSetMetaData rsmd = rs.getMetaData();
@@ -1207,11 +1343,24 @@ public class DBBuilder {
     if (con == null) {
       throw new IllegalStateException("No database connection available.");
     }
+    startPageQuery();
+    try {
+      return executeQueryToJsonInner(sql);
+    } finally {
+      endPageQuery();
+    }
+  }
+
+  private String executeQueryToJsonInner(String sql) throws SQLException {
+    if (con == null) {
+      throw new IllegalStateException("No database connection available.");
+    }
 
     if (sql == null) {
       throw new IllegalArgumentException("Param sql cannot be null.");
     }
 
+    checkQuery(sql);
     Statement stmt = con.createStatement();
     ResultSet rs = stmt.executeQuery(sql);
     ResultSetMetaData rsmd = rs.getMetaData();
