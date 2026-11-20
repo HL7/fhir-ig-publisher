@@ -170,6 +170,9 @@ public class PublisherIGLoader extends PublisherBase {
       throw new Error("There is a space in the folder path: \""+focusDir()+"\". Please fix your directory arrangement to remove the space and try again");
     }
     if (settings.getConfigFile() != null) {
+      // before anything reads the IG's files: sushi (run next) follows links too, and its errors quote what it read
+      // into the log, which the ci-build publishes
+      checkNoLinksOut(focusDir());
       File ckm = new File(Utilities.path(focusDir(), "ckm.ini"));
       if (ckm.exists()) {
         IniFile ini = new IniFile(ckm.getAbsolutePath());
@@ -323,7 +326,6 @@ public class PublisherIGLoader extends PublisherBase {
       log("Root directory: " + pf.rootDir);
     }
     pf.fetcher.setRootDir(pf.rootDir);
-    checkNoLinksOut();
     pf.killFile = new File(Utilities.path(pf.rootDir, "ig-publisher.kill"));
     // ok, first we load the template
     String templateName = ini.getStringProperty("IG", "template");
@@ -1536,7 +1538,6 @@ public class PublisherIGLoader extends PublisherBase {
     pf.rootDir = settings.getConfigFile();
     pf.outputDir = Utilities.path(pf.rootDir, "output");
     pf.tempDir = Utilities.path(pf.rootDir, "temp");
-    checkNoLinksOut();
     checkInsideRoot(pf.outputDir, "output");
     checkInsideRoot(pf.tempDir, "temp");
     checkTrustedTemplateSource(pf.templateInfo.asString("name"), true);
@@ -2250,8 +2251,8 @@ public class PublisherIGLoader extends PublisherBase {
    * written into. Refused on the ci-build; locally, only if the user allows them (see ExternalLinkPermission). Checked
    * before anything in the IG's folder is read, cleared or written
    */
-  private void checkNoLinksOut() throws IOException {
-    ExternalLinkPermission.check(PublisherUtils.linksOut(pf.rootDir), pf.rootDir, settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD,
+  private void checkNoLinksOut(String root) throws IOException {
+    ExternalLinkPermission.check(PublisherUtils.linksOut(root), root, settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD,
         settings.isAllowExternalLinks(), FhirSettings.getFilePath(), msg -> {
           log("Warning: "+msg);
           pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.SECURITY, "ImplementationGuide", msg, ValidationMessage.IssueSeverity.WARNING));
