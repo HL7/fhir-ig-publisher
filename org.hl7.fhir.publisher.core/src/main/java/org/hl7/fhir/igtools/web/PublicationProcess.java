@@ -168,11 +168,7 @@ public class PublicationProcess {
   }
 
   private static String removePassword(String[] args, int i) {
-    if (i == 0 || !args[i-1].toLowerCase().contains("password")) {
-      return args[i];
-    } else {
-      return "XXXXXX";
-    }
+    return Publisher.removePassword(args, i);
   }
 
 

@@ -1939,13 +1939,23 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 
   /**
    * Make a command line argument safe to log: mask the value after any parameter named *password*, and strip
-   * user info (e.g. a token in https://user:token@github.com/...) from any URL in the argument
+   * user info (e.g. a token in https://user:token@github.com/...) from any URL in the argument, and from a value
+   * that starts user:password@ with no scheme (e.g. a -proxy value: user:password@proxy:8080)
    */
-  static String removePassword(String[] args, int i) {
+  public static String removePassword(String[] args, int i) {
     if (i > 0 && args[i-1].toLowerCase().contains("password")) {
       return "XXXXXX";
     }
-    return args[i] == null ? null : args[i].replaceAll("(?i)\\b([a-z][a-z0-9+.-]*://)[^/@\\s]*@", "$1");
+    if (args[i] == null) {
+      return null;
+    }
+    String s = args[i].replaceAll("(?i)\\b([a-z][a-z0-9+.-]*://)[^/@\\s]*@", "$1");
+    int at = s.indexOf('@');
+    int colon = s.indexOf(':');
+    if (!s.contains("://") && colon > 0 && colon < at && s.lastIndexOf('/', at) == -1 && s.lastIndexOf('\\', at) == -1 && s.lastIndexOf(' ', at) == -1) {
+      s = s.substring(at + 1);
+    }
+    return s;
   }
 
   /** reads -threads into the settings and, if it was given, says how many extra threads the run may use */

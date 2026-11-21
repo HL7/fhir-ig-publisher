@@ -17,6 +17,11 @@ class RemovePasswordTest {
     "-ig, /work/my@ig/ig.ini, /work/my@ig/ig.ini",
     "-target, https://build.fhir.org/ig/org/repo/branches/a@b, https://build.fhir.org/ig/org/repo/branches/a@b",
     "-proxy-password, secret, XXXXXX",
+    "-proxy, user:secret@proxy.example.org:8080, proxy.example.org:8080",
+    "-proxy, user:@proxy.example.org:8080, proxy.example.org:8080",
+    "-proxy, proxy.example.org:8080, proxy.example.org:8080",
+    "-proxy, user@proxy.example.org:8080, user@proxy.example.org:8080",
+    "-ig, C:\\work\\my@ig\\ig.ini, C:\\work\\my@ig\\ig.ini",
   })
   void masksCredentials(String name, String value, String expected) {
     assertEquals(expected, Publisher.removePassword(new String[] {name, value}, 1));
