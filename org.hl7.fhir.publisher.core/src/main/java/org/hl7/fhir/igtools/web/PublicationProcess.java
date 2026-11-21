@@ -14,6 +14,7 @@ import java.util.Locale;
 import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
+import org.hl7.fhir.igtools.publisher.GitUtilities;
 import org.hl7.fhir.igtools.publisher.IGVersionUtil;
 import org.hl7.fhir.igtools.publisher.PastProcessHackerUtilities;
 import org.hl7.fhir.igtools.publisher.Publisher;
@@ -650,6 +651,11 @@ public class PublicationProcess {
       File tempM = null; 
       System.out.println("Build IG at "+fSource.getAbsolutePath()+": final copy suitable for publication (in "+temp.getAbsolutePath()+")");
       String[] baseParams = new String[] {"-publish", pathVer, "-no-exit" };
+      // the copy built has no .git (see cloneToTemp), so the build can't ask git where the IG came from
+      String repo = GitUtilities.getGitSource(fSource);
+      if (!Utilities.noString(repo)) {
+        baseParams = Utilities.concatStringArray(baseParams, new String[] {"-repo", repo});
+      }
       String tx = getNamedParam(args, "-tx");
       if (tx != null) {
         baseParams = Utilities.concatStringArray(baseParams, new String[] {"-tx", tx});
@@ -1213,7 +1219,7 @@ public class PublicationProcess {
     return html;
   }
 
-  private File cloneToTemp(String tempDir, File fSource, String name) throws IOException {
+  static File cloneToTemp(String tempDir, File fSource, String name) throws IOException {
     if (tempDir == null) {
       tempDir = "[tmp]";
     }
@@ -1225,7 +1231,9 @@ public class PublicationProcess {
     } else {
       FileUtilities.clearDirectory(dest);
     }
-    FileUtils.copyDirectory(fSource, fDest);
+    // not .git: clearDirectory never empties the root of a git repository, so the next publication of this IG
+    // couldn't clear this folder. The build is told where the IG came from instead (-repo, see buildParams)
+    FileUtils.copyDirectory(fSource, fDest, f -> !f.getName().equals(".git"));
     return fDest;
   }
   

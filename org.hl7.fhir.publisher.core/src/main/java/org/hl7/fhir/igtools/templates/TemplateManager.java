@@ -621,11 +621,13 @@ public class TemplateManager {
         String[] p = template.split("\\#");
         return pcm.loadPackage(p[0], p[1]);
       }
-      File f = ManagedFileAccess.file(template);
-      if (!f.exists() && !Utilities.isURL(template)) {
+      // a URL isn't a file: asking file access about it can fail (it isn't in a folder the build may use, and on Windows
+      // it isn't a path at all)
+      File f = Utilities.isURL(template) ? null : ManagedFileAccess.file(template);
+      if (f != null && !f.exists()) {
         f = ManagedFileAccess.file(Utilities.path(rootFolder, template));
       }
-      if (f.exists()) {
+      if (f != null && f.exists()) {
         if (f.isDirectory()) {
           localFolders.add(f.getAbsolutePath());
           return NpmPackage.fromFolder(f.getAbsolutePath());

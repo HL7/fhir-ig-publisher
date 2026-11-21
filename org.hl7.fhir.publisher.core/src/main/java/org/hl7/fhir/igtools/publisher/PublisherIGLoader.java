@@ -2304,6 +2304,10 @@ public class PublisherIGLoader extends PublisherBase {
   }
 
   private List<String> checkNoLinksOut(String root) throws IOException {
+    // linksOut finds nothing in something that isn't a folder, so this would pass whatever the IG has in it
+    if (!ManagedFileAccess.file(root).isDirectory()) {
+      throw new FHIRException("The IG's folder "+root+" doesn't exist, or isn't a folder");
+    }
     List<String> links = PublisherUtils.linksOut(root);
     ExternalLinkPermission.check(links, root, settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD,
         settings.isAllowExternalLinks(), FhirSettings.getFilePath(), msg -> {

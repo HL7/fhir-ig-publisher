@@ -1662,6 +1662,10 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       //      }
       self.logMessage("Start Clock @ " + nowAsString(self.settings.getStartTime()) + " (" + nowAsDate(self.settings.getStartTime()) + ")");
       self.logMessage("");
+      if (CliParams.hasNamedParam(args, "-publish") && !CliParams.hasNamedParam(args, "-auto-ig-build")) {
+        // a publication build runs in a copy of the IG without its .git: the publication process says where it came from
+        self.setRepoSource(CliParams.getNamedParam(args, "-repo"));
+      }
       if (CliParams.hasNamedParam(args, "-auto-ig-build")) {
         self.settings.setMode(PublisherUtils.IGBuildMode.AUTOBUILD);
         self.settings.setTargetOutput(CliParams.getNamedParam(args, "-target"));

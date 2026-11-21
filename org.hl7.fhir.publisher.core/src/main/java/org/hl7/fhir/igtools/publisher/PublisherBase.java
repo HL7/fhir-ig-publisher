@@ -103,11 +103,27 @@ public class PublisherBase implements ILoggingService {
   }
 
   protected String focusDir() {
-    String dir = settings.getConfigFile().endsWith("ig.ini") ? settings.getConfigFile().substring(0, settings.getConfigFile().length()-6) : settings.getConfigFile();
-    if (dir.endsWith(File.separatorChar+".")) {
-      dir = dir.substring(0, dir.length()-2);
+    return focusDir(settings.getConfigFile());
+  }
+
+  /**
+   * The IG's folder. -ig names the folder, or the IG's ini file, which needn't be called ig.ini (-ig /x/custom.ini):
+   * its folder is the one it's in. This is the folder that file access is limited to, and that is checked for links
+   * out, so it has to be the folder, not the file
+   */
+  static String focusDir(String configFile) {
+    String cf = configFile;
+    if (cf.endsWith(File.separatorChar+".")) {
+      cf = cf.substring(0, cf.length()-2);
     }
-    return Utilities.noString(dir) ? PublisherBase.getCurentDirectory() : dir;
+    if (Utilities.noString(cf)) {
+      return PublisherBase.getCurentDirectory();
+    }
+    File f = new File(cf);
+    if (f.isFile() || (!f.exists() && cf.toLowerCase(java.util.Locale.ROOT).endsWith(".ini"))) {
+      return f.getAbsoluteFile().getParent();
+    }
+    return cf;
   }
 
   @Override
