@@ -1,6 +1,7 @@
 package org.hl7.fhir.igtools.renderers;
 
 import java.io.File;
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -50,6 +51,7 @@ import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.sqlite.ProgressHandler;
 import org.sqlite.SQLiteConnection;
 import org.sqlite.SQLiteLimits;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 
 public class DBBuilder {
 
@@ -783,8 +785,8 @@ public class DBBuilder {
     return null;
   }
 
-  private Connection connect(String filename) throws SQLException, ClassNotFoundException {
-    new File(filename).delete();
+  private Connection connect(String filename) throws SQLException, ClassNotFoundException, IOException {
+    ManagedFileAccess.file(filename).delete();
     Connection con = DriverManager.getConnection("jdbc:sqlite:"+filename); 
     configureForBuildArtifact(con);
     makeMetadataTable(con);

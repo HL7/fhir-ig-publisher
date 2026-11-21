@@ -175,21 +175,21 @@ public class PublisherIGLoader extends PublisherBase {
       // into the log, which the ci-build publishes
       checkNoLinksOut(focusDir());
       confineFileAccess(focusDir());
-      File ckm = new File(Utilities.path(focusDir(), "ckm.ini"));
+      File ckm = ManagedFileAccess.file(Utilities.path(focusDir(), "ckm.ini"));
       if (ckm.exists()) {
         IniFile ini = new IniFile(ckm.getAbsolutePath());
         if (ini.getBooleanProperty("ckm", "process")) {
-          if (!new CKMClient().process(ini, new File(Utilities.path(focusDir(), ini.getStringProperty("ckm", "destination"))))) {
+          if (!new CKMClient().process(ini, ManagedFileAccess.file(Utilities.path(focusDir(), ini.getStringProperty("ckm", "destination"))))) {
             throw new Error("Failed to process CKM API - stopping");
           }
         }
       }
-      File fsh = new File(Utilities.path(focusDir(), "fsh"));
+      File fsh = ManagedFileAccess.file(Utilities.path(focusDir(), "fsh"));
       if (fsh.exists() && fsh.isDirectory() && !settings.isNoSushi()) {
         runSushi(fsh);
         pf.isSushi = true;
       } else {
-        File fsh2 = new File(Utilities.path(focusDir(), "input", "fsh"));
+        File fsh2 = ManagedFileAccess.file(Utilities.path(focusDir(), "input", "fsh"));
         if (fsh2.exists() && fsh2.isDirectory() && !settings.isNoSushi()) {
           runSushi(fsh);
           pf.isSushi = true;
@@ -217,7 +217,7 @@ public class PublisherIGLoader extends PublisherBase {
     }
     try {
       prescanSushiConfig(focusDir());
-      new FSHRunner(this).runFsh(new File(FileUtilities.getDirectoryForFile(fsh.getAbsolutePath())), new File(focusDir()), settings.getMode());
+      new FSHRunner(this).runFsh(ManagedFileAccess.file(FileUtilities.getDirectoryForFile(fsh.getAbsolutePath())), ManagedFileAccess.file(focusDir()), settings.getMode());
     } catch (Exception | Error e) {
       if (watchSession != null) {
         try {
@@ -239,7 +239,7 @@ public class PublisherIGLoader extends PublisherBase {
 
   private void prescanSushiConfig(String dir) throws IOException {
     // resolve packages for Sushi in advance
-    File sc = new File(Utilities.path(dir, "sushi-config.yaml"));
+    File sc = ManagedFileAccess.file(Utilities.path(dir, "sushi-config.yaml"));
     if (sc.exists()) {
       List<String> lines = Files.readAllLines(sc.toPath());
       boolean indeps = false;
@@ -304,11 +304,11 @@ public class PublisherIGLoader extends PublisherBase {
     if (settings.getConfigFile().endsWith(File.separatorChar+".")) {
       settings.setConfigFile(settings.getConfigFile().substring(0, settings.getConfigFile().length() - 2));
     }
-    File cf = settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD ? new File(settings.getConfigFile()) : new CSFile(settings.getConfigFile());
+    File cf = settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD ? ManagedFileAccess.file(settings.getConfigFile()) : ManagedFileAccess.csfile(settings.getConfigFile());
     if (!cf.exists())
       return null;
     if (cf.isDirectory())
-      cf = settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD ? new File(Utilities.path(settings.getConfigFile(), "ig.ini")) : new CSFile(Utilities.path(settings.getConfigFile(), "ig.ini"));
+      cf = settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD ? ManagedFileAccess.file(Utilities.path(settings.getConfigFile(), "ig.ini")) : ManagedFileAccess.csfile(Utilities.path(settings.getConfigFile(), "ig.ini"));
     if (!cf.exists())
       return null;
     String s = FileUtilities.fileToString(cf);
@@ -328,7 +328,7 @@ public class PublisherIGLoader extends PublisherBase {
       log("Root directory: " + pf.rootDir);
     }
     pf.fetcher.setRootDir(pf.rootDir);
-    pf.killFile = new File(Utilities.path(pf.rootDir, "ig-publisher.kill"));
+    pf.killFile = ManagedFileAccess.file(Utilities.path(pf.rootDir, "ig-publisher.kill"));
     // ok, first we load the template
     String templateName = ini.getStringProperty("IG", "template");
     if (templateName == null)
@@ -722,7 +722,7 @@ public class PublisherIGLoader extends PublisherBase {
           pf.additionalResourceFiles.add(p.getValue());
           try {
             StructureDefinition sd;
-            try (FileInputStream in = new FileInputStream(Utilities.path(pf.rootDir, p.getValue()))) {
+            try (FileInputStream in = ManagedFileAccess.inStream(Utilities.path(pf.rootDir, p.getValue()))) {
               sd = (StructureDefinition) new XmlParser(ModelContext.fullCoreContext()).parse(in);
             }
             if (sd.hasExtension(ExtensionDefinitions.EXT_ADDITIONAL_RESOURCE)) {
@@ -1028,7 +1028,7 @@ public class PublisherIGLoader extends PublisherBase {
       // away what Rapido reuses, in every build with a local template)
       PublisherUtils.clearFolder(pf.tempDir);
     } else {
-      File fTempDir = new File(pf.tempDir);
+      File fTempDir = ManagedFileAccess.file(pf.tempDir);
       if (fTempDir.exists()) {
         {
           for (File ff : fTempDir.listFiles()) {
@@ -1135,7 +1135,7 @@ public class PublisherIGLoader extends PublisherBase {
     } else {
       log("Terminology Cache is at "+ pf.vsCache +". "+Integer.toString(FileUtilities.countFilesInDirectory(pf.vsCache))+" files in cache");
     }
-    if (!new File(pf.vsCache).exists())
+    if (!ManagedFileAccess.file(pf.vsCache).exists())
       throw new Exception("Unable to access or create the cache directory at "+ pf.vsCache);
     logDebugMessage(LogCategory.INIT, "Load Terminology Cache from "+ pf.vsCache);
 
@@ -1477,10 +1477,10 @@ public class PublisherIGLoader extends PublisherBase {
     if (settings.isWatchMode()) {
       log("The output folder "+ pf.outputDir +" is, or is inside, the temp folder's "+ WATCH_OUTPUT_STAGING +", so it is emptied on each rebuild");
     }
-    if (new File(staging).exists() && !nested(staging, pf.outputDir)) {
+    if (ManagedFileAccess.file(staging).exists() && !nested(staging, pf.outputDir)) {
       // left by a watch session: it isn't part of this build
       try {
-        FileUtils.deleteDirectory(new File(staging));
+        FileUtils.deleteDirectory(ManagedFileAccess.file(staging));
       } catch (IOException e) {
         log("Unable to delete "+ staging +", left by a watch session (it isn't used by this build): "+e.getMessage());
       }
@@ -1508,7 +1508,7 @@ public class PublisherIGLoader extends PublisherBase {
     logDebugMessage(LogCategory.INIT, "Temp: "+ pf.tempDir);
     if (pf.watchOutputDir != null) {
       // everything but the staging folder, which already has what this build wrote to the output so far
-      File[] children = new File(pf.tempDir).listFiles();
+      File[] children = ManagedFileAccess.file(pf.tempDir).listFiles();
       if (children != null) {
         for (File f : children) {
           if (!f.getName().equals(WATCH_OUTPUT_STAGING)) {
@@ -1555,7 +1555,7 @@ public class PublisherIGLoader extends PublisherBase {
    * Where the build comes from is what the ci-build said (-repo, -target) and what git says (the origin remote): none
    * of those come from the repository's content. Every one of them that is known must name the template's repository
    */
-  void checkTrustedTemplateSource(String packageId, boolean isTemplate) {
+  void checkTrustedTemplateSource(String packageId, boolean isTemplate) throws IOException {
     if (settings.getMode() != PublisherUtils.IGBuildMode.AUTOBUILD || !TrustedTemplates.isTrusted(packageId)) {
       return;
     }
@@ -1567,7 +1567,7 @@ public class PublisherIGLoader extends PublisherBase {
       throw new FHIRException("The template '"+packageId+"' is a trusted template, but the repository it is built from hasn't been recorded (TrustedTemplates), so it can't be built on the ci-build");
     }
     List<String> sources = new ArrayList<>();
-    for (String s : new String[] { settings.getRepoSource(), settings.getTargetOutput(), GitUtilities.getGitSource(new File(pf.rootDir)) }) {
+    for (String s : new String[] { settings.getRepoSource(), settings.getTargetOutput(), GitUtilities.getGitSource(ManagedFileAccess.file(pf.rootDir)) }) {
       if (!Utilities.noString(s)) {
         sources.add(s);
       }
@@ -1709,7 +1709,7 @@ public class PublisherIGLoader extends PublisherBase {
 
 
   private void loadSuppressedMessages(String messageFile, String path) throws Exception {
-    File f = new File(messageFile);
+    File f = ManagedFileAccess.file(messageFile);
     if (!f.exists()) {
       this.pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.NOTFOUND, path, "Supressed messages file not found", ValidationMessage.IssueSeverity.ERROR));
     } else {
@@ -1734,7 +1734,7 @@ public class PublisherIGLoader extends PublisherBase {
         }
       } else {
         this.pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.NOTFOUND, path, "Supressed messages file is not using the new format (see https://confluence.hl7.org/display/FHIR/Implementation+Guide+Parameters)", ValidationMessage.IssueSeverity.ERROR));
-        try (InputStreamReader r = new InputStreamReader(new FileInputStream(messageFile))) {
+        try (InputStreamReader r = new InputStreamReader(ManagedFileAccess.inStream(messageFile))) {
           StringBuilder b = new StringBuilder();
           while (r.ready()) {
             char c = (char) r.read();
@@ -1754,7 +1754,7 @@ public class PublisherIGLoader extends PublisherBase {
 
 
   private int clearErrors(String dirName) throws FileNotFoundException, IOException {
-    File dir = new File(dirName);
+    File dir = ManagedFileAccess.file(dirName);
     int i = 0;
     for (File f : dir.listFiles()) {
       String s = FileUtilities.fileToString(f);
@@ -2527,7 +2527,7 @@ public class PublisherIGLoader extends PublisherBase {
     // if it's already published, we use that location
     // if it's to be published, we find #current, extract that publication request, and use that path (check version)
     // otherwise, bang
-    JsonObject pr = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(new File(Utilities.path(FileUtilities.getDirectoryForFile(settings.getConfigFile()), "publication-request.json")));
+    JsonObject pr = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(ManagedFileAccess.file(Utilities.path(FileUtilities.getDirectoryForFile(settings.getConfigFile()), "publication-request.json")));
     String rigV = pr.forceObject("related").asString(code);
     if (rigV == null) {
       throw new FHIRException("No specified Publication version for relatedIG "+code);
@@ -3200,7 +3200,7 @@ public class PublisherIGLoader extends PublisherBase {
     String base = fhirType+"-"+id;
     String tbase = fhirType+"-$all";
     for (String dir : pf.translationSources) {
-      File df = new File(Utilities.path(pf.rootDir, dir));
+      File df = ManagedFileAccess.file(Utilities.path(pf.rootDir, dir));
       if (df.exists()) {
         // sorted, so that translations come in the same order on every machine: File.list() makes no promise
         // about the order, and the translation extensions are made in the order the units are found
@@ -3229,11 +3229,11 @@ public class PublisherIGLoader extends PublisherBase {
               if (res == null) {
                 res = new ArrayList<>();
               }
-              File f = new File(Utilities.path(this.pf.rootDir, dir, fn));
+              File f = ManagedFileAccess.file(Utilities.path(this.pf.rootDir, dir, fn));
               this.pf.usedLangFiles.add(f.getAbsolutePath());
               if (!Utilities.noString(FileUtilities.fileToString(f).trim())) {
                 try {
-                  FileInputStream s = new FileInputStream(f);
+                  FileInputStream s = ManagedFileAccess.inStream(f);
                   try {
                     res.addAll(lp.loadSource(s));
                   } finally {
@@ -3853,8 +3853,8 @@ public class PublisherIGLoader extends PublisherBase {
     for (ImplementationGuide.ImplementationGuideDefinitionResourceComponent res : pf.publishedIg.getDefinition().getResourceList()) {
       if (res.getReference().getReference().startsWith("Binary/")) {
         String id = res.getReference().getReference().substring(res.getReference().getReference().indexOf("/")+1);
-        File of = new File(Utilities.path(FileUtilities.getDirectoryForFile(this.getConfigFile()), "fsh-generated", "resources", "Binary-"+id+".json"));
-        File nf = new File(Utilities.path(FileUtilities.getDirectoryForFile(this.getConfigFile()), "fsh-generated", "resources", def.getType()+"-"+id+".json"));
+        File of = ManagedFileAccess.file(Utilities.path(FileUtilities.getDirectoryForFile(this.getConfigFile()), "fsh-generated", "resources", "Binary-"+id+".json"));
+        File nf = ManagedFileAccess.file(Utilities.path(FileUtilities.getDirectoryForFile(this.getConfigFile()), "fsh-generated", "resources", def.getType()+"-"+id+".json"));
 
         boolean read = false;
         boolean matches = res.getProfileList().size() == 1 && (def.getUrl().equals(res.getProfileList().get(0).primitiveValue()));
@@ -4271,7 +4271,7 @@ public class PublisherIGLoader extends PublisherBase {
 
   private void loadTranslationSupplements(FetchedFile igf) throws Exception {
     for (String p : pf.translationSources) {
-      File dir = new File(Utilities.path(pf.rootDir, p));
+      File dir = ManagedFileAccess.file(Utilities.path(pf.rootDir, p));
       FileUtilities.createDirectory(dir.getAbsolutePath());
       for (File f : dir.listFiles()) {
         if (!this.pf.usedLangFiles.contains(f.getAbsolutePath())) {
@@ -4280,7 +4280,7 @@ public class PublisherIGLoader extends PublisherBase {
         }
       }
       for (String s : Utilities.stringSet("po", "json", "xliff")) {
-        File fdir = new File(Utilities.path(pf.rootDir, p));
+        File fdir = ManagedFileAccess.file(Utilities.path(pf.rootDir, p));
         if (fdir.exists()) {
           for (File f : fdir.listFiles()) {
             if (!this.pf.usedLangFiles.contains(f.getAbsolutePath())) {
@@ -4519,7 +4519,7 @@ public class PublisherIGLoader extends PublisherBase {
 
   private List<LanguageFileProducer.TranslationUnit> loadTranslations(File f, String ext) throws FileNotFoundException, IOException, ParserConfigurationException, SAXException {
     try {
-      try (FileInputStream in = new FileInputStream(f)) {
+      try (FileInputStream in = ManagedFileAccess.inStream(f)) {
         switch (ext) {
           case "po": return new PoGetTextProducer().loadSource(in);
           case "xliff": return new XLIFFProducer().loadSource(in);
@@ -5436,11 +5436,11 @@ public class PublisherIGLoader extends PublisherBase {
     LiquidEngine liquid = new LiquidEngine(pf.context, pf.validator.getExternalHostServices());
     for (String f : factories) {
       String rootFolder = FileUtilities.getDirectoryForFile(this.settings.getConfigFile());
-      File path = new File(Utilities.path(rootFolder, f));
+      File path = ManagedFileAccess.file(Utilities.path(rootFolder, f));
       if (!path.exists()) {
         throw new FHIRException("factory source '"+f+"' not found");
       }
-      File log = new File(Utilities.path(FileUtilities.getDirectoryForFile(path.getAbsolutePath()), "log"));
+      File log = ManagedFileAccess.file(Utilities.path(FileUtilities.getDirectoryForFile(path.getAbsolutePath()), "log"));
       if (!log.exists()) {
         FileUtilities.createDirectory(log.getAbsolutePath());
       }

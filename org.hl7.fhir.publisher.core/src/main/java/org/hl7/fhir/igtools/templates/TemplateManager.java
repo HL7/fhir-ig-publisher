@@ -58,6 +58,7 @@ import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.PackageGenerator.PackageType;
 import org.hl7.fhir.utilities.settings.FhirSettings;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 
 public class TemplateManager {
 
@@ -429,7 +430,7 @@ public class TemplateManager {
    */
   private void checkInPlaceTemplate(String template, String templateDir) throws IOException {
     JsonObject config = null;
-    File cfg = new File(Utilities.path(templateDir, "config.json"));
+    File cfg = ManagedFileAccess.file(Utilities.path(templateDir, "config.json"));
     if (cfg.exists()) {
       try {
         config = JsonParser.parseObject(cfg);
@@ -438,8 +439,8 @@ public class TemplateManager {
       }
     }
     List<String> files = new ArrayList<>();
-    if (new File(templateDir).isDirectory()) {
-      try (Stream<Path> s = Files.walk(Paths.get(templateDir))) {
+    if (ManagedFileAccess.file(templateDir).isDirectory()) {
+      try (Stream<Path> s = Files.walk(ManagedFileAccess.file(templateDir).toPath())) {
         s.filter(Files::isRegularFile).forEach(f -> files.add(f.toString()));
       }
     }
@@ -464,7 +465,7 @@ public class TemplateManager {
    */
   private void generateMakeAccessible(String templateDir, JsonObject config) throws IOException {
     String path = Utilities.path(templateDir, "content", "assets", "js", "accessible.js");
-    File f = new File(path);
+    File f = ManagedFileAccess.file(path);
     if (!f.exists()) {
       return;
     }
@@ -606,7 +607,7 @@ public class TemplateManager {
   private NpmPackage loadPackage(String template, String rootFolder) throws FHIRException, IOException {
     try {
       if (template.startsWith("#")) {
-        File f = new File(Utilities.path(rootFolder, template.substring(1)));
+        File f = ManagedFileAccess.file(Utilities.path(rootFolder, template.substring(1)));
         if (f.exists() && f.isDirectory()) {
           localFolders.add(f.getAbsolutePath()); // first, as for an override
           return NpmPackage.fromFolder(f.getAbsolutePath(), PackageType.IG_TEMPLATE, "output", ".git");
@@ -620,16 +621,16 @@ public class TemplateManager {
         String[] p = template.split("\\#");
         return pcm.loadPackage(p[0], p[1]);
       }
-      File f = new File(template);
+      File f = ManagedFileAccess.file(template);
       if (!f.exists() && !Utilities.isURL(template)) {
-        f = new File(Utilities.path(rootFolder, template));
+        f = ManagedFileAccess.file(Utilities.path(rootFolder, template));
       }
       if (f.exists()) {
         if (f.isDirectory()) {
           localFolders.add(f.getAbsolutePath());
           return NpmPackage.fromFolder(f.getAbsolutePath());
         } else {
-          try (FileInputStream in = new FileInputStream(template)) {
+          try (FileInputStream in = ManagedFileAccess.inStream(template)) {
             return NpmPackage.fromPackage(in);
           }
         }

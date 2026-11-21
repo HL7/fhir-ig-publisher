@@ -8,6 +8,7 @@ import java.nio.file.attribute.FileTime;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 
 /**
  * Monitors files and directories for changes.
@@ -171,6 +172,7 @@ public class FileChangeMonitor implements Closeable {
    * the modified time and size of each file in a folder, so that changedFiles can tell what a step of the build wrote
    */
   static Map<Path, String> fileStates(Path folder) throws IOException {
+    ManagedFileAccess.fromPath(folder); // the root has to be one the build may access
     Map<Path, String> states = new HashMap<>();
     if (Files.isDirectory(folder)) {
       Files.walkFileTree(folder, new SimpleFileVisitor<Path>() {
@@ -376,7 +378,7 @@ public class FileChangeMonitor implements Closeable {
       this.monitoring = false;
 
       for (MonitoredPath monitoredPath : pathsToMonitor) {
-        Path path = monitoredPath.path.toAbsolutePath().normalize();
+        Path path = ManagedFileAccess.fromPath(monitoredPath.path.toAbsolutePath().normalize()).toPath();
 
         if (monitoredPath.recursive) {
           recursiveRoots.add(path);

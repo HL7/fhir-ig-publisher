@@ -294,10 +294,14 @@ public class RapidoTracker {
     if (j == null) {
       return false;
     }
-    for (String s : j.forceArray("outputs").asStrings()) {
-      if (!new File(s).exists()) {
-        return false;
+    try {
+      for (String s : j.forceArray("outputs").asStrings()) {
+        if (!ManagedFileAccess.file(s).exists()) {
+          return false;
+        }
       }
+    } catch (IOException e) {
+      return false; // an output somewhere the build's file access doesn't reach
     }
     return true;
   }
@@ -505,7 +509,7 @@ public class RapidoTracker {
     }
     Hasher tmpl = new Hasher();
     boolean[] templateUsesFshIndex = new boolean[1];
-    hashTree(new File(Utilities.path(pf.rootDir, "template")), tmpl, Collections.emptySet(), templateUsesFshIndex);
+    hashTree(ManagedFileAccess.file(Utilities.path(pf.rootDir, "template")), tmpl, Collections.emptySet(), templateUsesFshIndex);
     global.put("template", tmpl.finish());
     if (!templateUsesFshIndex[0]) {
       // written by sushi on every run, and not read by the publisher or the template
@@ -577,8 +581,8 @@ public class RapidoTracker {
   }
 
   /** the other files in the IG folder (see computeGlobal), relative path to content hash */
-  private Map<String, String> scanOtherFiles() {
-    return scanTree(new File(pf.rootDir), otherSkip);
+  private Map<String, String> scanOtherFiles() throws IOException {
+    return scanTree(ManagedFileAccess.file(pf.rootDir), otherSkip);
   }
 
   /**
@@ -719,7 +723,7 @@ public class RapidoTracker {
    * writes a non-ASCII name with '?' for what can't be encoded, and that name isn't a valid Path
    */
   static byte[] read(File f) throws IOException {
-    try (FileInputStream in = new FileInputStream(f)) {
+    try (FileInputStream in = ManagedFileAccess.inStream(f)) {
       return in.readAllBytes();
     }
   }
@@ -750,7 +754,7 @@ public class RapidoTracker {
     String folder = pf.pcm == null ? null : pf.pcm.getFolder();
     if (folder != null) {
       try {
-        File pj = new File(Utilities.path(folder, p.replace("|", "#"), "package", "package.json"));
+        File pj = ManagedFileAccess.file(Utilities.path(folder, p.replace("|", "#"), "package", "package.json"));
         if (pj.exists()) {
           return h.add(read(pj)).finish();
         }
@@ -783,11 +787,11 @@ public class RapidoTracker {
   // ---- state ---------------------------------------------------------------------------------------------------------
 
   private JsonObject loadState() {
-    File f = new File(stateFile);
-    if (!f.exists()) {
-      return null;
-    }
     try {
+      File f = ManagedFileAccess.file(stateFile);
+      if (!f.exists()) {
+        return null;
+      }
       return readState(f);
     } catch (Exception e) {
       return new JsonObject().add("unreadable", e.getMessage() == null ? e.getClass().getName() : e.getMessage());
@@ -892,7 +896,7 @@ public class RapidoTracker {
   public void save() throws IOException {
     JsonObject state = new JsonObject();
     state.add("version", STATE_VERSION);
-    File sf = new File(stateFile);
+    File sf = ManagedFileAccess.file(stateFile);
     FileUtilities.createDirectory(sf.getParent());
     int txFailures = txFailures();
     if (txFailures > 0) {
@@ -1445,11 +1449,11 @@ public class RapidoTracker {
   }
 
   static String fileHash(String path) {
-    File f = new File(path);
-    if (!f.isFile()) {
-      return "missing";
-    }
     try {
+      File f = ManagedFileAccess.file(path);
+      if (!f.isFile()) {
+        return "missing";
+      }
       return new Hasher().add(read(f)).finish();
     } catch (IOException e) {
       return "unreadable: "+UUID.randomUUID();

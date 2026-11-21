@@ -28,6 +28,7 @@ import org.hl7.fhir.utilities.logging.ILoggingService;
 import org.hl7.fhir.utilities.settings.FhirSettings;
 
 import com.google.common.collect.ImmutableList;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 
 public class FSHRunner {
 
@@ -55,7 +56,7 @@ public class FSHRunner {
      */
     protected void runFsh(File file, File igRoot, PublisherUtils.IGBuildMode mode) throws IOException {
         checkNoNpmContent(file, igRoot);
-        File fshIni = new File(Utilities.path(file.getAbsolutePath(), "fsh.ini"));
+        File fshIni = ManagedFileAccess.file(Utilities.path(file.getAbsolutePath(), "fsh.ini"));
         /* Changed 2023-03-20 by dotasek. If the fshIni file resolution below is still commented out
         // by 2023-06-20, delete the code below.
         if (!fshIni.exists()) {
@@ -69,7 +70,7 @@ public class FSHRunner {
         String fshVersion = null;
         if (fshIni.exists()) {
             IniFile ini;
-            try (FileInputStream in = new FileInputStream(fshIni)) {
+            try (FileInputStream in = ManagedFileAccess.inStream(fshIni)) {
               ini = new IniFile(in);
             }
             if (ini.hasProperty("FSH", "timeout")) {
@@ -128,15 +129,15 @@ public class FSHRunner {
      * node_modules, to decide what runs as sushi. It isn't run in the IG's folder any more, so it wouldn't find them,
      * but an IG that has them is refused anyway: they can only be there to change what runs
      */
-    static void checkNoNpmContent(File... folders) {
+    static void checkNoNpmContent(File... folders) throws IOException {
         for (File f : folders) {
             if (f == null) {
                 continue;
             }
-            if (new File(f, ".npmrc").exists()) {
+            if (ManagedFileAccess.file(f, ".npmrc").exists()) {
                 throw new FHIRException("Sushi can't be run: the IG has an .npmrc file ("+new File(f, ".npmrc").getAbsolutePath()+"), which would change what npm runs. Remove it");
             }
-            if (new File(new File(f, "node_modules"), "fsh-sushi").exists()) {
+            if (ManagedFileAccess.file(new File(f, "node_modules"), "fsh-sushi").exists()) {
                 throw new FHIRException("Sushi can't be run: the IG has its own copy of sushi ("+new File(new File(f, "node_modules"), "fsh-sushi").getAbsolutePath()+"). Remove it");
             }
         }
@@ -149,7 +150,7 @@ public class FSHRunner {
      */
     static File makeWorkFolder() throws IOException {
         File workDir = Files.createTempDirectory("sushi-").toFile();
-        Files.write(new File(workDir, "package.json").toPath(), "{}".getBytes(StandardCharsets.UTF_8));
+        Files.write(ManagedFileAccess.file(workDir, "package.json").toPath(), "{}".getBytes(StandardCharsets.UTF_8));
         return workDir;
     }
 

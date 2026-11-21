@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 
 /**
  * The content of a set of files (single files, and directory trees) at one moment: for each file, its size, modified
@@ -118,7 +119,7 @@ public class SourceSnapshot {
     Map<Path, Entry> entries = new HashMap<>();
     long start = System.currentTimeMillis();
     for (Path root : roots) {
-      Path r = root.toAbsolutePath();
+      Path r = ManagedFileAccess.fromPath(root.toAbsolutePath()).toPath();
       if (Files.isDirectory(r)) {
         // linked folders aren't read, as the file monitor doesn't watch them either
         Files.walkFileTree(r, new SimpleFileVisitor<Path>() {

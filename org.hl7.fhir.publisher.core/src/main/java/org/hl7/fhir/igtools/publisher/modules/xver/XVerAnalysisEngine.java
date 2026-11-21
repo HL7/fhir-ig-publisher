@@ -94,6 +94,7 @@ import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.hl7.fhir.validation.BaseValidator.BooleanHolder;
 import org.w3._1999.xhtml.B;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 
 /**
  * This class runs as a pre-compile step for the xversion IG
@@ -770,7 +771,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   
   private void checkIds(String folder) throws IOException {
     List<LoadedFile> files = new ArrayList<>();
-    loadAllFiles(files, new File(Utilities.path(folder, "input")));
+    loadAllFiles(files, ManagedFileAccess.file(Utilities.path(folder, "input")));
     Set<String> ids = new HashSet<>();
     int ic = 0;
     int t = files.size()/50;
@@ -826,7 +827,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
       }
       if (file.changed) {
         if (file.id != null && !file.id.equals(file.nid)) {
-          new File(file.filename).delete();
+          ManagedFileAccess.file(file.filename).delete();
           file.filename = file.filename.replace(file.id, file.nid);
           FileUtilities.stringToFile(file.source, file.filename);
         } else {
@@ -1653,10 +1654,10 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     List<String> issues = new ArrayList<String>();
     if (ConceptMapUtilities.checkReciprocal(left, right, issues, save)) {
       // wipes formatting in files
-      try (FileOutputStream out = new FileOutputStream(Utilities.path(processingPath, "input", folder, "ConceptMap-"+left.getId()+".json"))) {
+      try (FileOutputStream out = ManagedFileAccess.outStream(Utilities.path(processingPath, "input", folder, "ConceptMap-"+left.getId()+".json"))) {
         new org.hl7.fhir.model.core.formats.JsonParser(vdr5.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(out, left);
       }
-      try (FileOutputStream out = new FileOutputStream(Utilities.path(processingPath, "input", folder, "ConceptMap-"+right.getId()+".json"))) {
+      try (FileOutputStream out = ManagedFileAccess.outStream(Utilities.path(processingPath, "input", folder, "ConceptMap-"+right.getId()+".json"))) {
         new org.hl7.fhir.model.core.formats.JsonParser(vdr5.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(out, right);
       }
     }
@@ -1684,11 +1685,11 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   }
 
   private void loadConceptMaps(String dir) throws FHIRFormatError, FileNotFoundException, IOException {
-    loadConceptMaps(new File(Utilities.path(dir, "input", "resources")), false);
-    loadConceptMaps(new File(Utilities.path(dir, "input", "types")), false);
-    loadConceptMaps(new File(Utilities.path(dir, "input", "elements")), false);
-    loadConceptMaps(new File(Utilities.path(dir, "input", "codes")), true);
-    loadConceptMaps(new File(Utilities.path(dir, "input", "search-params")), false);
+    loadConceptMaps(ManagedFileAccess.file(Utilities.path(dir, "input", "resources")), false);
+    loadConceptMaps(ManagedFileAccess.file(Utilities.path(dir, "input", "types")), false);
+    loadConceptMaps(ManagedFileAccess.file(Utilities.path(dir, "input", "elements")), false);
+    loadConceptMaps(ManagedFileAccess.file(Utilities.path(dir, "input", "codes")), true);
+    loadConceptMaps(ManagedFileAccess.file(Utilities.path(dir, "input", "search-params")), false);
   }
 
   private void loadConceptMaps(File file, boolean track) throws FHIRFormatError, FileNotFoundException, IOException {
@@ -1699,18 +1700,18 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
         ConceptMap cm = null;
         String id = null;
         try {
-          try (FileInputStream in = new FileInputStream(f)) {
+          try (FileInputStream in = ManagedFileAccess.inStream(f)) {
             cm = (ConceptMap) new org.hl7.fhir.model.core.formats.JsonParser(vdr5.getModelContext()).parse(in);
           }
 
           if (cm.getName().contains("-")) {
             cm.setName(fixName(cm.getName(), cm.getSourceScope().primitiveValue()));
-            try (FileOutputStream out = new FileOutputStream(f)) {
+            try (FileOutputStream out = ManagedFileAccess.outStream(f)) {
               new org.hl7.fhir.model.core.formats.JsonParser(vdr5.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(out, cm);
             }
           }
           if (addRelationships(cm)) {
-            try (FileOutputStream out = new FileOutputStream(f)) {
+            try (FileOutputStream out = ManagedFileAccess.outStream(f)) {
               new org.hl7.fhir.model.core.formats.JsonParser(vdr5.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(out, cm);
             }
           }
@@ -1790,14 +1791,14 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   }
 
   private void loadStructureMaps(String dir) throws FHIRFormatError, FileNotFoundException, IOException {
-    loadStructureMaps(vdr5, new File(Utilities.path(dir, "input", "R2toR3")));
-    loadStructureMaps(vdr5, new File(Utilities.path(dir, "input", "R3toR2")));
-    loadStructureMaps(vdr5, new File(Utilities.path(dir, "input", "R3toR4")));
-    loadStructureMaps(vdr5, new File(Utilities.path(dir, "input", "R4BtoR5")));
-    loadStructureMaps(vdr5, new File(Utilities.path(dir, "input", "R4toR3")));
-    loadStructureMaps(vdr5, new File(Utilities.path(dir, "input", "R4toR5")));
-    loadStructureMaps(vdr5, new File(Utilities.path(dir, "input", "R5toR4")));
-    loadStructureMaps(vdr5, new File(Utilities.path(dir, "input", "R5toR4B")));
+    loadStructureMaps(vdr5, ManagedFileAccess.file(Utilities.path(dir, "input", "R2toR3")));
+    loadStructureMaps(vdr5, ManagedFileAccess.file(Utilities.path(dir, "input", "R3toR2")));
+    loadStructureMaps(vdr5, ManagedFileAccess.file(Utilities.path(dir, "input", "R3toR4")));
+    loadStructureMaps(vdr5, ManagedFileAccess.file(Utilities.path(dir, "input", "R4BtoR5")));
+    loadStructureMaps(vdr5, ManagedFileAccess.file(Utilities.path(dir, "input", "R4toR3")));
+    loadStructureMaps(vdr5, ManagedFileAccess.file(Utilities.path(dir, "input", "R4toR5")));
+    loadStructureMaps(vdr5, ManagedFileAccess.file(Utilities.path(dir, "input", "R5toR4")));
+    loadStructureMaps(vdr5, ManagedFileAccess.file(Utilities.path(dir, "input", "R5toR4B")));
   }
 
   private void loadStructureMaps(IWorkerContext ctxt, File file) throws FHIRFormatError, FileNotFoundException, IOException {
@@ -2023,10 +2024,10 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
               qaMsg("Error between "+cmF.getId()+" and "+cmR.getId()+" maps: "+s, true);
             }
             if (altered) {
-              try (FileOutputStream out = new FileOutputStream(Utilities.path(processingPath, "input", "codes", "ConceptMap-"+cmR.getId()+".json"))) {
+              try (FileOutputStream out = ManagedFileAccess.outStream(Utilities.path(processingPath, "input", "codes", "ConceptMap-"+cmR.getId()+".json"))) {
                 new org.hl7.fhir.model.core.formats.JsonParser(vdr5.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(out, cmR);
               }
-              try (FileOutputStream out = new FileOutputStream(Utilities.path(processingPath, "input", "codes", "ConceptMap-"+cmF.getId()+".json"))) {
+              try (FileOutputStream out = ManagedFileAccess.outStream(Utilities.path(processingPath, "input", "codes", "ConceptMap-"+cmF.getId()+".json"))) {
                 new org.hl7.fhir.model.core.formats.JsonParser(vdr5.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(out, cmF);
               }
             }
@@ -2235,7 +2236,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
       Collections.sort(g.getElementList(), new ConceptMapUtilities.ConceptMapElementSorter());
     }
     cm.getGroupList().removeIf(g -> g.getElementList().isEmpty());
-    try (FileOutputStream out = new FileOutputStream(Utilities.path(processingPath, "input", "codes", "ConceptMap-"+cm.getId()+".json"))) {
+    try (FileOutputStream out = ManagedFileAccess.outStream(Utilities.path(processingPath, "input", "codes", "ConceptMap-"+cm.getId()+".json"))) {
       new org.hl7.fhir.model.core.formats.JsonParser(vdr5.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(out, cm);
     }
     return cm;

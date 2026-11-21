@@ -67,6 +67,7 @@ import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 
 import kotlin.NotImplementedError;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 
 public class CrossVersionModule implements IPublisherModule, ProfileKnowledgeProvider {
 
@@ -97,7 +98,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
       cleanup(path);
       if (engine.process(path)) {
         ImplementationGuide ig;
-        try (FileInputStream in = new FileInputStream(Utilities.path(path, "input", "xver-ig.xml"))) {
+        try (FileInputStream in = ManagedFileAccess.inStream(Utilities.path(path, "input", "xver-ig.xml"))) {
           ig = (ImplementationGuide) new XmlParser(cu.getWorker().getModelContext()).parse(in);
         }
         ImplementationGuideDefinitionPageComponent resPage = ig.getPageByName("cross-version-resources.html");
@@ -121,19 +122,19 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
         engine.logProgress("Generating extensions");
         FileUtilities.createDirectory(Utilities.path(path, "temp", "xver", "x-extensions"));
         for (StructureDefinition sd : engine.getExtensions()) {
-          try (FileOutputStream out = new FileOutputStream(Utilities.path(path, "temp", "xver", "x-extensions", "StructureDefinition-"+sd.getId()+".json"))) {
+          try (FileOutputStream out = ManagedFileAccess.outStream(Utilities.path(path, "temp", "xver", "x-extensions", "StructureDefinition-"+sd.getId()+".json"))) {
             new JsonParser(cu.getWorker().getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(out, sd);
           }
           genExtensionPage(path, sd);
         }  
         for (ValueSet vs : engine.getNewValueSets().values()) {
-          try (FileOutputStream out = new FileOutputStream(Utilities.path(path, "temp", "xver", "x-extensions", "ValueSet-"+vs.getId()+".json"))) {
+          try (FileOutputStream out = ManagedFileAccess.outStream(Utilities.path(path, "temp", "xver", "x-extensions", "ValueSet-"+vs.getId()+".json"))) {
             new JsonParser(cu.getWorker().getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(out, vs);
           }
         }
         genSummaryPages(path);
         genZips(path); 
-        try (FileOutputStream out = new FileOutputStream(Utilities.path(path, "input", "xver-ig.xml"))) {
+        try (FileOutputStream out = ManagedFileAccess.outStream(Utilities.path(path, "input", "xver-ig.xml"))) {
           new XmlParser(cu.getWorker().getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(out, ig);
         }
 
@@ -175,7 +176,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
 
   private void cleanup(String path) throws IOException {
     org.hl7.fhir.igtools.publisher.PublisherUtils.clearFolder(Utilities.path(path, "input", "extensions"));
-    File dir = new File(Utilities.path(path, "temp", "xver-qa"));
+    File dir = ManagedFileAccess.file(Utilities.path(path, "temp", "xver-qa"));
     if (dir.exists()) {
       for (File f : dir.listFiles()) {
         if (f.getName().endsWith(".html") && f.getName().contains("-")) {
@@ -187,7 +188,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
 
   private void genExtensionPage(String path, StructureDefinition sd) throws IOException {
     String fn = Utilities.path(path, "temp", "xver-qa", "StructureDefinition-"+sd.getId()+".html");
-    if (new File(fn).exists()) {
+    if (ManagedFileAccess.file(fn).exists()) {
       throw new FHIRException("Duplicate id: "+sd.getId());
     }
     XhtmlNode body = new XhtmlNode(NodeType.Element, "div");  

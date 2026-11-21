@@ -230,7 +230,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     try {
       if (settings.isWatchMode()) {
         watchRoot = watchRoot(rootDir);
-        Path igIni = new File(rootDir).isFile() ? Paths.get(rootDir).toAbsolutePath().normalize() : watchRoot.resolve("ig.ini");
+        Path igIni = ManagedFileAccess.file(rootDir).isFile() ? Paths.get(rootDir).toAbsolutePath().normalize() : watchRoot.resolve("ig.ini");
         watched = new ArrayList<>(Arrays.asList(
                 FileChangeMonitor.MonitoredPath.file(igIni),
                 FileChangeMonitor.MonitoredPath.file(watchRoot.resolve("sushi-config.yaml")),
@@ -351,13 +351,13 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         throw e;
       }
     }
-    if (pf.templateLoaded && new File(rootDir).exists()) {
+    if (pf.templateLoaded && ManagedFileAccess.file(rootDir).exists()) {
       PublisherUtils.clearFolder(Utilities.path(rootDir, "template"));
     }
     if (pf.folderToDelete != null) {
       try {
         FileUtilities.clearDirectory(pf.folderToDelete);
-        new File(pf.folderToDelete).delete();
+        ManagedFileAccess.file(pf.folderToDelete).delete();
       } catch (Throwable e) {
         // nothing
       }
@@ -485,7 +485,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     try {
       PublisherUtils.clearFolder(pf.outputDir);
       pf.npm = new NPMPackageGenerator(Utilities.path(pf.outputDir, "package.tgz"), pf.templateInfo, pf.getExecTime().getTime(), !settings.isPublishing());
-      pf.npm.loadFiles(pf.rootDir, ".npmignore", new File(pf.rootDir), ".git", "output", "package", "temp");
+      pf.npm.loadFiles(pf.rootDir, ".npmignore", ManagedFileAccess.file(pf.rootDir), ".git", "output", "package", "temp");
       pf.npm.finish();
 
       FileUtilities.stringToFile(makeTemplateIndexPage(), Utilities.path(pf.outputDir, "index.html"));
@@ -493,10 +493,10 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       FileUtilities.stringToFile(makeTemplateQAPage(), Utilities.path(pf.outputDir, "qa.html"));
 
       if (settings.getMode() != PublisherUtils.IGBuildMode.AUTOBUILD) {
-        try (FileInputStream in = new FileInputStream(pf.npm.filename())) {
+        try (FileInputStream in = ManagedFileAccess.inStream(pf.npm.filename())) {
           pf.pcm.addPackageToCache(pf.templateInfo.asString("name"), pf.templateInfo.asString("version"), in, Utilities.path(pf.outputDir, "package.tgz"));
         }
-        try (FileInputStream in = new FileInputStream(pf.npm.filename())) {
+        try (FileInputStream in = ManagedFileAccess.inStream(pf.npm.filename())) {
           pf.pcm.addPackageToCache(pf.templateInfo.asString("name"), "dev", in, Utilities.path(pf.outputDir, "package.tgz"));
         }
       }
@@ -518,7 +518,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     zip.addFileSource("index.html", REDIRECT_SOURCE, false);
     zip.close();
     FileUtilities.copyFile(Utilities.path(pf.tempDir, "full-ig.zip"), Utilities.path(pf.outputDir, "full-ig.zip"));
-    new File(Utilities.path(pf.tempDir, "full-ig.zip")).delete();
+    ManagedFileAccess.file(Utilities.path(pf.tempDir, "full-ig.zip")).delete();
 
     // registering the package locally
     log("Finished @ "+nowString()+". "+DurationUtil.presentDuration(endTime - startTime)+". Output in "+ pf.outputDir);
@@ -1162,7 +1162,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       pf.context.dropResource(r);
     }
     if (settings.getDestDir() != null) {
-      if (!(new File(settings.getDestDir()).exists()))
+      if (!(ManagedFileAccess.file(settings.getDestDir()).exists()))
         FileUtilities.createDirectory(settings.getDestDir());
       FileUtilities.copyDirectory(pf.outputDir, settings.getDestDir(), null);
     }
@@ -1242,7 +1242,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   }
 
   private void copyDefaultTemplate() throws IOException, FHIRException {
-    if (!new File(pf.adHocTmpDir).exists())
+    if (!ManagedFileAccess.file(pf.adHocTmpDir).exists())
       FileUtilities.createDirectory(pf.adHocTmpDir);
     FileUtilities.clearDirectory(pf.adHocTmpDir);
 
@@ -1278,7 +1278,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       CompressionUtilities.zipSlipProtect(n, Path.of(dir));
       FileUtilities.createDirectory(dir);
 
-      try (FileOutputStream output = new FileOutputStream(filename)) {
+      try (FileOutputStream output = ManagedFileAccess.outStream(filename)) {
         int len = 0;
         while ((len = zip.read(buffer)) > 0)
           output.write(buffer, 0, len);
@@ -1318,12 +1318,12 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 
 
   private void copyFiles(String base, String folder, String dest, List<String> files) throws IOException {
-    for (File f : new File(folder).listFiles()) {
+    for (File f : ManagedFileAccess.file(folder).listFiles()) {
       if (f.isDirectory()) {
         copyFiles(base, f.getAbsolutePath(),  Utilities.path(dest, f.getName()), files);
       } else {
         String dst = Utilities.path(dest, f.getName());
-        FileUtils.copyFile(f, new File(dst), true);
+        FileUtils.copyFile(f, ManagedFileAccess.file(dst), true);
         files.add(f.getAbsolutePath().substring(base.length()+1));
       }
     } 
@@ -1334,7 +1334,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     URL url = URI.create(address).toURL();
     URLConnection c = url.openConnection();
     InputStream s = c.getInputStream();
-    try (FileOutputStream f = new FileOutputStream(filename)) {
+    try (FileOutputStream f = ManagedFileAccess.outStream(filename)) {
       transfer(s, f, 1024);
     }
   }

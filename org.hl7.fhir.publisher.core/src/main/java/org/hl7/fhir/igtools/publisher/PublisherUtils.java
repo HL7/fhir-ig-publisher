@@ -26,6 +26,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 
 public class PublisherUtils {
 
@@ -66,7 +67,7 @@ public class PublisherUtils {
    */
   public static List<String> linksOut(String root) throws IOException {
     List<String> res = new ArrayList<>();
-    java.nio.file.Path r = java.nio.file.Paths.get(root).toAbsolutePath().normalize();
+    java.nio.file.Path r = ManagedFileAccess.file(root).toPath().toAbsolutePath().normalize();
     if (!java.nio.file.Files.isDirectory(r)) {
       return res;
     }
@@ -102,7 +103,7 @@ public class PublisherUtils {
    * @param exemptions names of files directly in the folder to keep
    */
   public static void clearFolder(String folder, String... exemptions) throws IOException {
-    java.nio.file.Path dir = java.nio.file.Paths.get(folder);
+    java.nio.file.Path dir = ManagedFileAccess.file(folder).toPath();
     if (java.nio.file.Files.isSymbolicLink(dir)) {
       throw new IOException("The folder "+folder+" is a link to somewhere else, so it won't be cleared");
     }
