@@ -13,6 +13,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.utilities.json.model.JsonObject;
+import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -37,6 +39,10 @@ class ExternalLinkPermissionTest {
 
   private String settingsContent() throws IOException {
     return new String(Files.readAllBytes(dir.resolve("fhir-settings.json")), StandardCharsets.UTF_8);
+  }
+
+  private JsonObject settingsJson() throws IOException {
+    return JsonParser.parseObject(settingsContent());
   }
 
   @Test
@@ -69,7 +75,7 @@ class ExternalLinkPermissionTest {
     ExternalLinkPermission.check(LINKS, ig("ig"), false, true, settings(), warnings::add);
     assertEquals(1, warnings.size());
     assertTrue(ExternalLinkPermission.isAllowed(settings(), ig("ig")));
-    assertTrue(settingsContent().contains("/usr/bin"));
+    assertEquals("/usr/bin", settingsJson().getJsonObject("npm").asString("path"));
     // and next time, without the parameter, it goes on with a warning
     warnings.clear();
     ExternalLinkPermission.check(LINKS, ig("ig"), false, false, settings(), warnings::add);
@@ -101,7 +107,8 @@ class ExternalLinkPermissionTest {
     // allowing an IG replaces it
     ExternalLinkPermission.check(LINKS, ig("ig"), false, true, settings(), s -> {});
     assertTrue(ExternalLinkPermission.isAllowed(settings(), ig("ig")));
-    assertFalse(settingsContent().contains("true"), settingsContent());
+    // the setting is now the list of IGs, not true
+    assertTrue(settingsJson().get(ExternalLinkPermission.PROPERTY).isJsonArray(), settingsContent());
   }
 
   @Test

@@ -115,9 +115,9 @@ public class PackageSigningUpdater {
     for (String m : mapArgs) {
       int eq = m.indexOf('=');
       if (eq < 0 || !new File(m.substring(eq + 1)).isDirectory()) {
-    throw new IOException("-map must be {url}={folder}, with an existing folder: " + m);
-    }
-    updater.addMap(m.substring(0, eq), new File(m.substring(eq + 1)));
+        throw new IOException("-map must be {url}={folder}, with an existing folder: " + m);
+      }
+      updater.addMap(m.substring(0, eq), new File(m.substring(eq + 1)));
     }
     updater.execute(folders);
   }
@@ -169,10 +169,10 @@ public class PackageSigningUpdater {
         } else {
           try {
             signer.sign(f, tool);
-          signed++;
+            signed++;
           } catch (NpmPackageSigner.NotAPackageException e) {
-          notPackages++;
-          problems.add("Not signed, not a package: " + f + " (" + e.getMessage() + ")");
+            notPackages++;
+            problems.add("Not signed, not a package: " + f + " (" + e.getMessage() + ")");
           }
         }
       } catch (Exception e) {

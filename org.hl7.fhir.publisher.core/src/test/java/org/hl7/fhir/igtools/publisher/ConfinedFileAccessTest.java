@@ -1,6 +1,8 @@
 package org.hl7.fhir.igtools.publisher;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -16,6 +18,8 @@ import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Unless links out of the IG are allowed, a build's own file access is limited to the IG's folder, the temp folder,
@@ -62,6 +66,35 @@ class ConfinedFileAccessTest {
     ManagedFileAccess.setAllowedPaths(paths);
     assertEquals("a", FileUtilities.fileToString(ig.resolve("input/shared/a.md").toString()));
     assertThrows(IOException.class, () -> FileUtilities.fileToString(other.resolve("b.md").toString()));
+  }
+
+  /** web server and publication mode work on other folders, so they aren't limited */
+  @ParameterizedTest
+  @EnumSource(value = PublisherUtils.IGBuildMode.class, names = {"WEBSERVER", "PUBLICATION"})
+  void notLimitedInWebServerOrPublicationMode(PublisherUtils.IGBuildMode mode) throws IOException {
+    assertNull(PublisherIGLoader.confinedPaths(mode, dir.toString(), List.of(), "/cache/packages"));
+  }
+
+  /**
+   * A build (locally, or on the ci-build) is limited to the IG's folder - the folder, even when -ig names the ini
+   * file, which needn't be called ig.ini - and what the allowed links lead to, as well as the usual places
+   */
+  @ParameterizedTest
+  @EnumSource(value = PublisherUtils.IGBuildMode.class, names = {"MANUAL", "AUTOBUILD"})
+  void aBuildIsLimitedToTheIGsFolder(PublisherUtils.IGBuildMode mode) throws IOException {
+    Path ig = Files.createDirectories(dir.resolve("ig"));
+    Path ini = Files.write(ig.resolve("custom.ini"), "[IG]".getBytes(StandardCharsets.UTF_8));
+    Path shared = Files.createDirectories(dir.resolve("shared"));
+    Files.createSymbolicLink(ig.resolve("shared"), shared);
+    Path settings = Files.write(dir.resolve("fhir-settings.json"), "{}".getBytes(StandardCharsets.UTF_8));
+
+    String root = PublisherBase.focusDir(ini.toString());
+    List<String> paths = PublisherIGLoader.confinedPaths(mode, root, List.of("shared"), null, "", settings.toString());
+    assertEquals(ig.toFile().getAbsoluteFile(), new java.io.File(paths.get(0)).getAbsoluteFile());
+    assertFalse(paths.contains(ini.toString()));
+    assertTrue(paths.contains(shared.toRealPath().toString()));
+    assertTrue(paths.contains(settings.toString()));
+    assertFalse(paths.contains(dir.toString()));
   }
 
   /** the settings file is allowed, not the folder it's in (on the ci-build, /etc, which has the key file too) */

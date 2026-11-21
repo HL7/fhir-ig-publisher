@@ -689,7 +689,7 @@ public class PublicationProcess {
         // and its signature, if the build signed it
         File sig = new File(Utilities.path(temp.getAbsolutePath(), "output", "package.tgz" + NpmPackageSigner.SIGNATURE_SUFFIX));
         if (sig.exists()) {
-        FileUtilities.copyFile(sig, new File(Utilities.path(destVer, "package.tgz" + NpmPackageSigner.SIGNATURE_SUFFIX)));
+          FileUtilities.copyFile(sig, new File(Utilities.path(destVer, "package.tgz" + NpmPackageSigner.SIGNATURE_SUFFIX)));
         }
       } else {
         FileUtils.copyDirectory(new File(Utilities.path(temp.getAbsolutePath(), "output")), new File(destVer));
@@ -1418,7 +1418,7 @@ public class PublicationProcess {
     // signed like any other package, if this publisher signs (see NpmPackageSigner)
     NpmPackageSigner signer = NpmPackageSigner.fromSettings();
     if (signer != null) {
-    signer.sign(new File(Utilities.path(destVer, "package.tgz")), id, version, "FHIR IG Publisher " + IGVersionUtil.getVersionString());
+      signer.sign(new File(Utilities.path(destVer, "package.tgz")), id, version, "FHIR IG Publisher " + IGVersionUtil.getVersionString());
     }
 
     String withdrawalPage = makeWithdrawalPage(pl, prSrc, templateSrc, version);

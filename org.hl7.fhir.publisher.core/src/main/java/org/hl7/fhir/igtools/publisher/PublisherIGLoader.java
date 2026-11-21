@@ -2250,12 +2250,6 @@ public class PublisherIGLoader extends PublisherBase {
   }
 
   /**
-   * Symbolic links that lead out of the IG's folder (or nowhere): whatever they link to would be read as IG content and
-   * published (a page linked to /proc/self/environ), or emptied when the publisher clears a folder (temp, template), or
-   * written into. Refused on the ci-build; locally, only if the user allows them (see ExternalLinkPermission). Checked
-   * before anything in the IG's folder is read, cleared or written
-   */
-  /**
    * The build's own file access - everything that goes through ManagedFileAccess, which core uses throughout - is
    * limited to the IG's folder, the temp folder, ~/.fhir (packages, fhir-settings.json, the tx cache), and what the
    * person running the publisher chose: the package cache, -packages, the source and destination folders, and the
@@ -2264,15 +2258,26 @@ public class PublisherIGLoader extends PublisherBase {
    * run outside this. Not in web server or publication mode, which work on other folders
    */
   private void confineFileAccess(String root, List<String> linksOut) throws IOException {
-    if (settings.getMode() == PublisherUtils.IGBuildMode.WEBSERVER || settings.getMode() == PublisherUtils.IGBuildMode.PUBLICATION) {
-      ManagedFileAccess.setAllowedPaths(null);
-      return;
-    }
-    List<String> paths = allowedFileAccessPaths(root, pf.pcm == null ? null : pf.pcm.getFolder(), settings.getPackageCacheFolder(), settings.getPackagesFolder(),
-        settings.getSourceDir(), settings.getDestDir(), FhirSettings.getFilePath());
-    paths.addAll(linkTargets(root, linksOut));
+    List<String> paths = confinedPaths(settings.getMode(), root, linksOut, pf.pcm == null ? null : pf.pcm.getFolder(), settings.getPackageCacheFolder(),
+        settings.getPackagesFolder(), settings.getSourceDir(), settings.getDestDir(), FhirSettings.getFilePath());
     ManagedFileAccess.setAllowedPaths(paths);
-    log("File access limited to the folders: "+String.join(", ", ManagedFileAccess.getAllowedPaths()));
+    if (paths != null) {
+      log("File access limited to the folders: "+String.join(", ", ManagedFileAccess.getAllowedPaths()));
+    }
+  }
+
+  /**
+   * The folders (and files) the build's file access is limited to, or null for no limit (web server and publication
+   * mode). root is the IG's folder (focusDir - the folder, even when -ig names the ini file); linksOut are the links out
+   * of it the user has allowed; chosen are what the person running the publisher chose (any may be null)
+   */
+  static List<String> confinedPaths(PublisherUtils.IGBuildMode mode, String root, List<String> linksOut, String... chosen) throws IOException {
+    if (mode == PublisherUtils.IGBuildMode.WEBSERVER || mode == PublisherUtils.IGBuildMode.PUBLICATION) {
+      return null;
+    }
+    List<String> paths = allowedFileAccessPaths(root, chosen);
+    paths.addAll(linkTargets(root, linksOut));
+    return paths;
   }
 
   /** where the links (relative to root) really lead, for those that lead somewhere */
@@ -2303,6 +2308,12 @@ public class PublisherIGLoader extends PublisherBase {
     return paths;
   }
 
+  /**
+   * Symbolic links that lead out of the IG's folder (or nowhere): whatever they link to would be read as IG content and
+   * published (a page linked to /proc/self/environ), or emptied when the publisher clears a folder (temp, template), or
+   * written into. Refused on the ci-build; locally, only if the user allows them (see ExternalLinkPermission). Checked
+   * before anything in the IG's folder is read, cleared or written
+   */
   private List<String> checkNoLinksOut(String root) throws IOException {
     // linksOut finds nothing in something that isn't a folder, so this would pass whatever the IG has in it
     if (!ManagedFileAccess.file(root).isDirectory()) {

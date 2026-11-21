@@ -1,5 +1,6 @@
 package org.hl7.fhir.igtools.publisher;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -15,7 +16,7 @@ class SpreadsheetsUnsupportedTest {
   void anIGThatUsesASpreadsheetStops() {
     FHIRException e = assertThrows(FHIRException.class, () -> PublisherIGLoader.checkNoSpreadsheets(List.of("profiles.xml", "!old.xml")));
     assertTrue(e.getMessage().contains("profiles.xml"), e.getMessage());
-    assertTrue(!e.getMessage().contains("old.xml"), e.getMessage());
+    assertFalse(e.getMessage().contains("old.xml"), e.getMessage());
   }
 
   @Test
