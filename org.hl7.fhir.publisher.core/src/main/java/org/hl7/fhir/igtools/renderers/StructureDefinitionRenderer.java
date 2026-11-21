@@ -2417,7 +2417,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     List<ElementDefinition> slices = getSlices(elem, children);
     int c = 0;
     for (ElementDefinition slice : slices) {
-      List<CanonicalType> profiles = slice.getTypeFirstRep().getProfileList();
+      // getTypeFirstRep() adds an empty type when there isn't one, and this is reading, not changing, the definition
+      List<CanonicalType> profiles = slice.hasType() ? slice.getTypeFirstRep().getProfileList() : new ArrayList<>();
       // Won't have a profile if this slice is part of a complex extension
       String url = profiles.isEmpty() ? null : profiles.get(0).getValue();
       StructureDefinition sdExt = url == null ? null : context.fetchResource(StructureDefinition.class, url, ExtensionUtilities.getVersionResolutionRules(profiles.get(0)));
@@ -3167,7 +3168,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       }
     } else if (element.types().size() == 0) {
       // unprofiled primitive type value
-      TypeRefComponent tr = element.definition().getTypeFirstRep();
+      // getTypeFirstRep() adds an empty type when there isn't one, and this is reading, not changing, the definition
+      TypeRefComponent tr = element.definition().hasType() ? element.definition().getTypeFirstRep() : new TypeRefComponent();
       StructureDefinition sd = context.fetchTypeDefinition(tr.getWorkingCode());
       if (sd != null) {
         gc.addPiece(gen.new Piece(sd.getWebPath(), "("+tr.getWorkingCode()+" value)", this.gen.formatPhrase(RenderingI18nContext.SDR_PRIM_VALUE, tr.getWorkingCode())));         

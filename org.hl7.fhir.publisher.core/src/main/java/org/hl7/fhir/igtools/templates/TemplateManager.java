@@ -202,15 +202,21 @@ public class TemplateManager {
   private void checkLocalTrust() throws IOException {
     String id = trustId(templateThatCantExecute);
     String settings = getSettingsPath();
-    if (settings != null && LocalTemplateTrust.isTrusted(settings, id)) {
+    if (settings != null && isTrustedInSettings(settings, id)) {
       return;
     }
     if (trustTemplate != null && (LocalTemplateTrust.ALL.equals(trustTemplate) || trustTemplate.equals(id))) {
-      if (settings != null) {
-        LocalTemplateTrust.addTrust(settings, trustTemplate);
-        logger.logMessage("Template '"+id+"' is trusted, as you said ("+(LocalTemplateTrust.ALL.equals(trustTemplate) ? "all templates" : "this template")+"): recorded in "+settings+", so you won't be asked again");
-      } else {
+      if (settings == null) {
         logger.logMessage("Template '"+id+"' is trusted for this run, as you said. It couldn't be recorded, because the FHIR settings file isn't known");
+      } else {
+        try {
+          LocalTemplateTrust.addTrust(settings, trustTemplate);
+          logger.logMessage("Template '"+id+"' is trusted, as you said ("+(LocalTemplateTrust.ALL.equals(trustTemplate) ? "all templates" : "this template")+"): recorded in "+settings+", so you won't be asked again");
+        } catch (IOException | RuntimeException e) {
+          // the settings file can't be written (a container, a read-only home folder) or read: the user has still said
+          // they trust it, so it runs - they'll have to say so again next time
+          logger.logMessage("Template '"+id+"' is trusted for this run, as you said. It couldn't be recorded in "+settings+" ("+e.getMessage()+"), so you'll need -trust-template again next time");
+        }
       }
       return;
     }
@@ -219,6 +225,16 @@ public class TemplateManager {
         + "If you are sure, run the IG Publisher again with '-trust-template "+id+"' to trust this template, or '-trust-template all' to trust all templates. "
         + (settings != null ? "That will be recorded in "+settings+", and you won't be asked again." : "")
         + (trustTemplate != null ? " (-trust-template '"+trustTemplate+"' doesn't name this template.)" : ""));
+  }
+
+  /** whether the settings file says the template is trusted; if it can't be read, it doesn't say so */
+  private boolean isTrustedInSettings(String settings, String id) {
+    try {
+      return LocalTemplateTrust.isTrusted(settings, id);
+    } catch (IOException | RuntimeException e) {
+      logger.logMessage("Unable to read the trusted templates from "+settings+": "+e.getMessage());
+      return false;
+    }
   }
 
   /**
