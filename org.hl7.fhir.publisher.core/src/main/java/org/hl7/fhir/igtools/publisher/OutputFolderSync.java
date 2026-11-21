@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 
 /**
  * Brings a folder up to date with a freshly built copy of it, touching only what differs. In watch mode the build
@@ -70,6 +71,9 @@ public class OutputFolderSync {
   }
 
   public static Result sync(Path staged, Path target) throws IOException {
+    // both roots have to be ones the build may access
+    ManagedFileAccess.fromPath(staged);
+    ManagedFileAccess.fromPath(target);
     Result result = new Result();
     // a folder that is a link (output linked into a web server's folder, say) is synced where it points
     staged = staged.toRealPath();

@@ -46,14 +46,14 @@ public class AIProcessor {
     // processing new templates is different to old template because of the layout with regard to
     // languages, and because there's a specific .ai file
     NpmPackage npm;
-    try (FileInputStream in = new FileInputStream(Utilities.path(rootDir, "package.tgz"))) {
+    try (FileInputStream in = ManagedFileAccess.inStream(Utilities.path(rootDir, "package.tgz"))) {
       npm = NpmPackage.fromPackage(in);
     }
 
     for (String lang : langs) {
-      processFolderNew(new File(Utilities.path(rootDir, lang)), npm, lang);
+      processFolderNew(ManagedFileAccess.file(Utilities.path(rootDir, lang)), npm, lang);
     }
-    for (File f : new File(rootDir).listFiles()) {
+    for (File f : ManagedFileAccess.file(rootDir).listFiles()) {
       if (f.getName().endsWith(".ai.html")) {
         f.delete();
       }
@@ -72,10 +72,10 @@ public class AIProcessor {
    */
   public void processOldTemplates() throws IOException {
     NpmPackage npm;
-    try (FileInputStream in = new FileInputStream(Utilities.path(rootDir, "package.tgz"))) {
+    try (FileInputStream in = ManagedFileAccess.inStream(Utilities.path(rootDir, "package.tgz"))) {
       npm = NpmPackage.fromPackage(in);
     }
-    processFolderOld(new File(rootDir), npm);
+    processFolderOld(ManagedFileAccess.file(rootDir), npm);
   }
 
   public void processFolderNew(File dir, NpmPackage npm, String lang) throws IOException {
@@ -173,7 +173,7 @@ public class AIProcessor {
     zip.addFileSource("llms.txt", llms.toString(), false);
     zip.addFileSource("llms.md", llms.toString(), false);
     zip.close();
-    new File(Utilities.path(dir, "ai-prep.zip")).renameTo(new File(Utilities.path(dir, "ai.zip")));
+    ManagedFileAccess.file(Utilities.path(dir, "ai-prep.zip")).renameTo(ManagedFileAccess.file(Utilities.path(dir, "ai.zip")));
     FileUtilities.stringToFile(llms.toString(), Utilities.path(dir, "llms.txt"));
     newSize += llms.toString().length();
     String pct = oldSize == 0 ? "n/a" : "" + (100 - ((newSize * 100) / oldSize));

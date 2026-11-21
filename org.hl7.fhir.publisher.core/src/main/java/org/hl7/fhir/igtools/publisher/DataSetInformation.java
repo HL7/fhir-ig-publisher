@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 
 public class DataSetInformation {
   @Getter private final JsonObject config;
@@ -31,7 +32,7 @@ public class DataSetInformation {
     for (String s : config.getStrings("searches")) {
       String file = Utilities.path(rootDir, s);
       SearchParameter sp;
-      try (FileInputStream in = new FileInputStream(file)) {
+      try (FileInputStream in = ManagedFileAccess.inStream(file)) {
         sp = (SearchParameter) new JsonParser(ModelContext.fullCoreContext()).parse(in);
       }
       allSearchParameters.add(sp);

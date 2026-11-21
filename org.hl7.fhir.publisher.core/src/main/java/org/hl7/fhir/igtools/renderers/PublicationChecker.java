@@ -27,6 +27,7 @@ import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.PackageList;
 import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 
 
 public class PublicationChecker {
@@ -178,18 +179,18 @@ public class PublicationChecker {
 
   private JsonObject checkFolder(List<String> messages, List<StringPair> summary) throws IOException {
     check(messages, !exists("package-list.json"), "The file package-list.json should not exist in the root folder"+mkError());
-    check(messages, !new File(Utilities.path(outputFolder(), "package-list.json")).exists(), "The file package-list.json should not exist in generated output"+mkError());
-    if (check(messages, new File(Utilities.path(outputFolder(), "package.tgz")).exists(), "No output package found - can't check publication details"+mkWarning())) {
+    check(messages, !ManagedFileAccess.file(Utilities.path(outputFolder(), "package-list.json")).exists(), "The file package-list.json should not exist in generated output"+mkError());
+    if (check(messages, ManagedFileAccess.file(Utilities.path(outputFolder(), "package.tgz")).exists(), "No output package found - can't check publication details"+mkWarning())) {
       NpmPackage npm = null;
       try {
-        try (FileInputStream in = new FileInputStream(Utilities.path(outputFolder(), "package.tgz"))) {
+        try (FileInputStream in = ManagedFileAccess.inStream(Utilities.path(outputFolder(), "package.tgz"))) {
           npm = NpmPackage.fromPackage(in);
         }
       } catch (Exception e) {
         check(messages, false, "Error reading package: "+e.getMessage()+mkError());
       }
       JsonObject pr = null;
-      File prFile = new File(Utilities.path(folder, "publication-request.json"));
+      File prFile = ManagedFileAccess.file(Utilities.path(folder, "publication-request.json"));
       if (prFile.exists()) {
         pr = JsonParser.parseObject(prFile);
       }
@@ -401,7 +402,7 @@ public class PublicationChecker {
     if (pr.has("descmd")) {
       String md = pr.asString("descmd");
       if (md.startsWith("@")) {
-        File mdFile = new File(Utilities.path(folder, md.substring(1)));
+        File mdFile = ManagedFileAccess.file(Utilities.path(folder, md.substring(1)));
         if (check(messages, mdFile.exists(), "descmd references the file "+md.substring(1)+" but it doesn't exist")) {
           md = FileUtilities.fileToString(mdFile);
         }
@@ -576,7 +577,7 @@ public class PublicationChecker {
     for (String s : parts) {
       p.add(s);
     }
-    File f = new File(Utilities.path(p.toArray(new String[] {})));
+    File f = ManagedFileAccess.file(Utilities.path(p.toArray(new String[] {})));
     return f.exists();
   }
   

@@ -48,6 +48,7 @@ import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.hl7.fhir.utilities.xhtml.XhtmlToMarkdownConverter;
 import org.hl7.fhir.validation.BaseValidator.BooleanHolder;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 
 class ConformanceStatementHandler {
 
@@ -373,7 +374,7 @@ class ConformanceStatementHandler {
         messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Requirements/fromNarrative", "There are differences between the requirements found in the narrative and what's found the provided Requirements resource.  A new version has been generated in the root.  It should be used to replace the one in the input folder.",
             IssueSeverity.WARNING));
 
-      try (FileOutputStream fs = new FileOutputStream(fname)) {
+      try (FileOutputStream fs = ManagedFileAccess.outStream(fname)) {
         composeRequirements(fs, req, context);
       }
     }

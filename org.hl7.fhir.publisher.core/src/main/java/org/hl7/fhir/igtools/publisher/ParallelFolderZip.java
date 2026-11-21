@@ -297,7 +297,7 @@ public class ParallelFolderZip {
     e.setSize(c.size);
     e.setCompressedSize(c.csize);
     e.setCrc(c.crc);
-    try (InputStream raw = c.temp != null ? new FileInputStream(c.temp) : new ByteArrayInputStream(c.data, 0, (int) c.csize)) {
+    try (InputStream raw = c.temp != null ? ManagedFileAccess.inStream(c.temp) : new ByteArrayInputStream(c.data, 0, (int) c.csize)) {
       out.addRawArchiveEntry(e, raw);
     }
   }
@@ -316,10 +316,10 @@ public class ParallelFolderZip {
   }
 
   private Compressed compressToFile(Source s, File dir, Queue<File> temps) throws IOException {
-    File temp = Files.createTempFile(dir.toPath(), "zip-", ".deflate").toFile();
+    File temp = ManagedFileAccess.createTempFile(dir, "zip-", ".deflate");
     temps.add(temp);
     long[] res;
-    try (InputStream in = open(s.file); OutputStream out = new BufferedOutputStream(new FileOutputStream(temp), BUFFER)) {
+    try (InputStream in = open(s.file); OutputStream out = new BufferedOutputStream(ManagedFileAccess.outStream(temp), BUFFER)) {
       res = deflate(in, out);
     } catch (IOException | RuntimeException | Error e) {
       // write() deletes it too, but may have stopped waiting for this worker before new FileOutputStream() made it again

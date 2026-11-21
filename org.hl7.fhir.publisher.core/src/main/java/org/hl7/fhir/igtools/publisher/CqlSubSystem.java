@@ -54,6 +54,7 @@ import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 
 import static org.hl7.elm_modelinfo.r1.serializing.XmlModelInfoReaderKt.parseModelInfoXml;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 
 /**
  * What this system does
@@ -426,10 +427,7 @@ public class CqlSubSystem {
     private static ObjectMapper om = new ObjectMapper();
 
     public static CqlPublisherOptions fromFile(String fileName) {
-      FileReader fr = null;
-
-      try {
-        fr = new FileReader(fileName);
+      try (Reader fr = new InputStreamReader(ManagedFileAccess.inStream(fileName), java.nio.charset.StandardCharsets.UTF_8)) {
         return fromReader(fr);
       } catch (IOException e) {
         throw new RuntimeException(String.format("Errors occurred reading options: %s", e.getMessage()));
@@ -445,10 +443,7 @@ public class CqlSubSystem {
     }
 
     public static void toFile(String fileName, CqlPublisherOptions options) {
-      FileWriter fw = null;
-
-      try {
-        fw = new FileWriter(fileName);
+      try (Writer fw = new OutputStreamWriter(ManagedFileAccess.outStream(fileName), java.nio.charset.StandardCharsets.UTF_8)) {
         toWriter(fw, options);
       } catch (IOException e) {
         throw new RuntimeException(String.format("Errors occurred writing options: %s", e.getMessage()));
@@ -471,10 +466,10 @@ public class CqlSubSystem {
    * @param folder
    * @return
    */
-  private CqlPublisherOptions getPublisherCqlOptions(String folder) {
+  private CqlPublisherOptions getPublisherCqlOptions(String folder) throws IOException {
     String optionsFileName = folder + File.separator + "cql-publisher-options.json";
     CqlPublisherOptions options = null;
-    File file = new File(optionsFileName);
+    File file = ManagedFileAccess.file(optionsFileName);
     if (file.exists()) {
       options = CqlPublisherOptionsMapper.fromFile(optionsFileName);
     }
@@ -490,10 +485,10 @@ public class CqlSubSystem {
    * @param folder
    * @return
    */
-  private CqlTranslatorOptions getTranslatorOptions(String folder) {
+  private CqlTranslatorOptions getTranslatorOptions(String folder) throws IOException {
     String optionsFileName = folder + File.separator + "cql-options.json";
     CqlTranslatorOptions options = null;
-    File file = new File(optionsFileName);
+    File file = ManagedFileAccess.file(optionsFileName);
     if (file.exists()) {
       options = CqlTranslatorOptions.fromFile(new kotlinx.io.files.Path(file));
     }
@@ -567,7 +562,7 @@ public class CqlSubSystem {
     }
   }
 
-  private void translateFolder(String folder) {
+  private void translateFolder(String folder) throws IOException {
     logger.logMessage(String.format("Translating CQL source in folder %s", folder));
 
     CqlTranslatorOptions options = getTranslatorOptions(folder);
@@ -589,13 +584,13 @@ public class CqlSubSystem {
 
     boolean hadCqlFiles = false;
     // foreach *-modelinfo* file (need to process all the models first so that they are available for dependency detection)
-    for (File file : new File(folder).listFiles(getModelInfoFilenameFilter())) {
+    for (File file : ManagedFileAccess.file(folder).listFiles(getModelInfoFilenameFilter())) {
       hadCqlFiles = true;
       processModelInfoFile(modelManager, libraryManager, file, options);
     }
 
     // foreach *.cql file
-    for (File file : new File(folder).listFiles(getCqlFilenameFilter())) {
+    for (File file : ManagedFileAccess.file(folder).listFiles(getCqlFilenameFilter())) {
       hadCqlFiles = true;
       translateFile(modelManager, libraryManager, file, options, publisherOptions);
     }

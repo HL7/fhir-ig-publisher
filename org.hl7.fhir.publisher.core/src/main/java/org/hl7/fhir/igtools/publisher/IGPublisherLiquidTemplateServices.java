@@ -31,6 +31,7 @@ import org.hl7.fhir.model.core.DomainResource;
 import org.hl7.fhir.services.renderers.utils.RenderingContext;
 import org.hl7.fhir.services.renderers.utils.RenderingContext.ILiquidTemplateProvider;
 import org.hl7.fhir.utilities.FileUtilities;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 
 public class IGPublisherLiquidTemplateServices implements ILiquidTemplateProvider {
 
@@ -41,7 +42,7 @@ public class IGPublisherLiquidTemplateServices implements ILiquidTemplateProvide
   }
   
   public void load(String path) throws FileNotFoundException, IOException {
-    File p = new File(path);
+    File p = ManagedFileAccess.file(path);
     if (!p.exists())
       return;
     for (File f : p.listFiles()) {

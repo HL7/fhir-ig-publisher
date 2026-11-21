@@ -14,6 +14,7 @@ import java.util.Locale;
 import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
+import org.hl7.fhir.igtools.publisher.GitUtilities;
 import org.hl7.fhir.igtools.publisher.IGVersionUtil;
 import org.hl7.fhir.igtools.publisher.PastProcessHackerUtilities;
 import org.hl7.fhir.igtools.publisher.Publisher;
@@ -29,7 +30,7 @@ import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.model.JsonProperty;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.NpmPackage;
-// core-tem-unwind import org.hl7.fhir.utilities.npm.NpmPackageSigner;
+import org.hl7.fhir.utilities.npm.NpmPackageSigner;
 import org.hl7.fhir.utilities.npm.PackageGenerator.PackageType;
 import org.hl7.fhir.utilities.npm.PackageList;
 import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
@@ -650,6 +651,11 @@ public class PublicationProcess {
       File tempM = null; 
       System.out.println("Build IG at "+fSource.getAbsolutePath()+": final copy suitable for publication (in "+temp.getAbsolutePath()+")");
       String[] baseParams = new String[] {"-publish", pathVer, "-no-exit" };
+      // the copy built has no .git (see cloneToTemp), so the build can't ask git where the IG came from
+      String repo = GitUtilities.getGitSource(fSource);
+      if (!Utilities.noString(repo)) {
+        baseParams = Utilities.concatStringArray(baseParams, new String[] {"-repo", repo});
+      }
       String tx = getNamedParam(args, "-tx");
       if (tx != null) {
         baseParams = Utilities.concatStringArray(baseParams, new String[] {"-tx", tx});
@@ -681,10 +687,10 @@ public class PublicationProcess {
       if (pl.isCurrentOnly()) {
         FileUtilities.copyFile(new File(Utilities.path(temp.getAbsolutePath(), "output", "package.tgz")), new File(Utilities.path(destVer, "package.tgz")));
         // and its signature, if the build signed it
-        // core-tem-unwind File sig = new File(Utilities.path(temp.getAbsolutePath(), "output", "package.tgz" + NpmPackageSigner.SIGNATURE_SUFFIX));
-        // core-tem-unwind if (sig.exists()) {
-        // core-tem-unwind FileUtilities.copyFile(sig, new File(Utilities.path(destVer, "package.tgz" + NpmPackageSigner.SIGNATURE_SUFFIX)));
-        // core-tem-unwind }
+        File sig = new File(Utilities.path(temp.getAbsolutePath(), "output", "package.tgz" + NpmPackageSigner.SIGNATURE_SUFFIX));
+        if (sig.exists()) {
+        FileUtilities.copyFile(sig, new File(Utilities.path(destVer, "package.tgz" + NpmPackageSigner.SIGNATURE_SUFFIX)));
+        }
       } else {
         FileUtils.copyDirectory(new File(Utilities.path(temp.getAbsolutePath(), "output")), new File(destVer));
       }
@@ -1213,7 +1219,7 @@ public class PublicationProcess {
     return html;
   }
 
-  private File cloneToTemp(String tempDir, File fSource, String name) throws IOException {
+  static File cloneToTemp(String tempDir, File fSource, String name) throws IOException {
     if (tempDir == null) {
       tempDir = "[tmp]";
     }
@@ -1225,7 +1231,9 @@ public class PublicationProcess {
     } else {
       FileUtilities.clearDirectory(dest);
     }
-    FileUtils.copyDirectory(fSource, fDest);
+    // not .git: clearDirectory never empties the root of a git repository, so the next publication of this IG
+    // couldn't clear this folder. The build is told where the IG came from instead (-repo, see buildParams)
+    FileUtils.copyDirectory(fSource, fDest, f -> !f.getName().equals(".git"));
     return fDest;
   }
   
@@ -1408,10 +1416,10 @@ public class PublicationProcess {
     FileUtilities.createDirectory(destVer);
     FileUtilities.bytesToFile(npm, Utilities.path(destVer, "package.tgz"));
     // signed like any other package, if this publisher signs (see NpmPackageSigner)
-    // core-tem-unwind NpmPackageSigner signer = NpmPackageSigner.fromSettings();
-    // core-tem-unwind if (signer != null) {
-    // core-tem-unwind signer.sign(new File(Utilities.path(destVer, "package.tgz")), "FHIR IG Publisher " + IGVersionUtil.getVersionString());
-    // core-tem-unwind }
+    NpmPackageSigner signer = NpmPackageSigner.fromSettings();
+    if (signer != null) {
+    signer.sign(new File(Utilities.path(destVer, "package.tgz")), id, version, "FHIR IG Publisher " + IGVersionUtil.getVersionString());
+    }
 
     String withdrawalPage = makeWithdrawalPage(pl, prSrc, templateSrc, version);
     

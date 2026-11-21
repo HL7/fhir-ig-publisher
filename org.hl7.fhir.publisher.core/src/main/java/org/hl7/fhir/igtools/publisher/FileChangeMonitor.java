@@ -8,6 +8,7 @@ import java.nio.file.attribute.FileTime;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 
 /**
  * Monitors files and directories for changes.
@@ -75,6 +76,10 @@ public class FileChangeMonitor implements Closeable {
 
   // polling can be chosen on any OS, for testing
   FileChangeMonitor(List<MonitoredPath> pathsToMonitor, boolean polling) throws IOException {
+    for (MonitoredPath monitoredPath : pathsToMonitor) {
+      // the roots, whichever way they're monitored, have to be ones the build may access
+      ManagedFileAccess.fromPath(monitoredPath.path.toAbsolutePath().normalize());
+    }
     if (polling) {
       System.out.println("Detected macOS - using polling-based file monitor");
       impl = new PollingFileChangeMonitorImpl(pathsToMonitor, 200);
@@ -171,6 +176,7 @@ public class FileChangeMonitor implements Closeable {
    * the modified time and size of each file in a folder, so that changedFiles can tell what a step of the build wrote
    */
   static Map<Path, String> fileStates(Path folder) throws IOException {
+    ManagedFileAccess.fromPath(folder); // the root has to be one the build may access
     Map<Path, String> states = new HashMap<>();
     if (Files.isDirectory(folder)) {
       Files.walkFileTree(folder, new SimpleFileVisitor<Path>() {
