@@ -149,7 +149,7 @@ public class FSHRunner {
      * there
      */
     static File makeWorkFolder() throws IOException {
-        File workDir = Files.createTempDirectory("sushi-").toFile();
+        File workDir = ManagedFileAccess.createTempDirectory("sushi-");
         Files.write(ManagedFileAccess.file(workDir, "package.json").toPath(), "{}".getBytes(StandardCharsets.UTF_8));
         return workDir;
     }

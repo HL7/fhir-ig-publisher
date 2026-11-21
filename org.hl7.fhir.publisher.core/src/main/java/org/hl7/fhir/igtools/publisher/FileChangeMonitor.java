@@ -76,6 +76,10 @@ public class FileChangeMonitor implements Closeable {
 
   // polling can be chosen on any OS, for testing
   FileChangeMonitor(List<MonitoredPath> pathsToMonitor, boolean polling) throws IOException {
+    for (MonitoredPath monitoredPath : pathsToMonitor) {
+      // the roots, whichever way they're monitored, have to be ones the build may access
+      ManagedFileAccess.fromPath(monitoredPath.path.toAbsolutePath().normalize());
+    }
     if (polling) {
       System.out.println("Detected macOS - using polling-based file monitor");
       impl = new PollingFileChangeMonitorImpl(pathsToMonitor, 200);
@@ -378,7 +382,7 @@ public class FileChangeMonitor implements Closeable {
       this.monitoring = false;
 
       for (MonitoredPath monitoredPath : pathsToMonitor) {
-        Path path = ManagedFileAccess.fromPath(monitoredPath.path.toAbsolutePath().normalize()).toPath();
+        Path path = monitoredPath.path.toAbsolutePath().normalize();
 
         if (monitoredPath.recursive) {
           recursiveRoots.add(path);

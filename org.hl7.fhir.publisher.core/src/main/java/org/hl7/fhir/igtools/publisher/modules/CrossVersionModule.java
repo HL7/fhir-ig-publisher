@@ -175,14 +175,26 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
   }
 
   private void cleanup(String path) throws IOException {
-    org.hl7.fhir.igtools.publisher.PublisherUtils.clearFolder(Utilities.path(path, "input", "extensions"));
-    File dir = ManagedFileAccess.file(Utilities.path(path, "temp", "xver-qa"));
+    // input/extensions is emptied, and temp/xver-qa has files deleted from it: both must really be in the IG's folder
+    // (a link on the way to either, e.g. input itself, would take this somewhere else)
+    String extensions = Utilities.path(path, "input", "extensions");
+    checkInsideIG(path, extensions);
+    org.hl7.fhir.igtools.publisher.PublisherUtils.clearFolder(extensions);
+    String qa = Utilities.path(path, "temp", "xver-qa");
+    checkInsideIG(path, qa);
+    File dir = ManagedFileAccess.file(qa);
     if (dir.exists()) {
       for (File f : dir.listFiles()) {
         if (f.getName().endsWith(".html") && f.getName().contains("-")) {
           f.delete();
         }
       }
+    }
+  }
+
+  private static void checkInsideIG(String root, String folder) throws IOException {
+    if (!org.hl7.fhir.igtools.publisher.PublisherUtils.isInside(root, folder)) {
+      throw new IOException("The folder "+folder+" must be inside the IG's folder ("+root+"), and it, or a folder on its path, is outside it or a link to somewhere else");
     }
   }
 

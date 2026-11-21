@@ -730,6 +730,9 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
    * when the output folder was emptied for each build)
    */
   static void recordFailure(Path staging, Path output) throws IOException {
+    // both roots have to be ones the build may access
+    ManagedFileAccess.fromPath(staging);
+    ManagedFileAccess.fromPath(output);
     Path staged = staging.resolve("qa.json");
     Path qa = output.resolve("qa.json");
     if (Files.exists(staged)) {
@@ -2104,11 +2107,15 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     }
     String folder = Utilities.path("[tmp]", "fhir-igs", makeFileName(org), makeFileName(repo), branch == null ? "master" : makeFileName(branch));
     File f = new File(folder);
-    if (f.exists() && !f.isDirectory()) {
-      f.delete();
+    if (java.nio.file.Files.exists(f.toPath(), java.nio.file.LinkOption.NOFOLLOW_LINKS) && !java.nio.file.Files.isDirectory(f.toPath(), java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+      f.delete(); // a file, or a link: the link is deleted, not what it links to
     }
     if (!f.exists()) {
       FileUtilities.createDirectory(folder);
+    }
+    // the temp folder is shared, so someone else could have made a folder on the way a link to somewhere else
+    if (!PublisherUtils.isInside(Utilities.path("[tmp]"), folder)) {
+      throw new IOException("The folder "+folder+" isn't really in the temp folder: a folder on its path is a link to somewhere else");
     }
     FileUtilities.clearDirectory(f.getAbsolutePath());
 

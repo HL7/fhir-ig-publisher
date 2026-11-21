@@ -4578,7 +4578,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         }
       }
     }
-    File ownConfig = File.createTempFile("jekyll-publisher-", ".yml");
+    File ownConfig = ManagedFileAccess.createTempFile("jekyll-publisher-", ".yml");
     ownConfig.deleteOnExit();
     FileUtilities.stringToFile("# written by the IG publisher, and read after the IG's _config.yml so that it wins\nplugins: []\ngems: []\nwhitelist: []\n", ownConfig.getAbsolutePath());
     File igConfig = ManagedFileAccess.file(Utilities.path(pf.tempDir, "_config.yml"));
@@ -4734,7 +4734,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         map.target(s);
       }
     }
-    File df = File.createTempFile("fhir", "tmp");
+    File df = ManagedFileAccess.createTempFile("fhir", "tmp");
     df.deleteOnExit();
     map.save(df.getCanonicalPath());
     return df;
@@ -4761,7 +4761,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
 
   private String makeTempZip(String ext) throws IOException {
-    File tmp = File.createTempFile("fhir", "zip");
+    File tmp = ManagedFileAccess.createTempFile("fhir", "zip");
     tmp.deleteOnExit();
     if (generateZipByExtension(tmp.getCanonicalPath(), ext)) {
       return tmp.getCanonicalPath();

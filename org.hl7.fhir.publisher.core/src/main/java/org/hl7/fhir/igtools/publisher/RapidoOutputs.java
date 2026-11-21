@@ -106,7 +106,9 @@ public class RapidoOutputs {
         if (p.getValue() instanceof JsonArray) {
           for (String name : ((JsonArray) p.getValue()).asStrings()) {
             String path = Utilities.path(tempDir, name);
-            if (!writtenAnyCase.contains(path.toLowerCase(Locale.ROOT))) {
+            // the record is in the IG's folder (so can be edited): only what is really in the temp folder is deleted, not
+            // somewhere a link on the way leads to
+            if (!writtenAnyCase.contains(path.toLowerCase(Locale.ROOT)) && PublisherUtils.isInside(tempDir, path)) {
               change.gone.add(path);
             }
           }

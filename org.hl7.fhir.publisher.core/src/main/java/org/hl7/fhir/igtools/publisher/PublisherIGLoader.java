@@ -173,8 +173,8 @@ public class PublisherIGLoader extends PublisherBase {
     if (settings.getConfigFile() != null) {
       // before anything reads the IG's files: sushi (run next) follows links too, and its errors quote what it read
       // into the log, which the ci-build publishes
-      checkNoLinksOut(focusDir());
-      confineFileAccess(focusDir());
+      List<String> linksOut = checkNoLinksOut(focusDir());
+      confineFileAccess(focusDir(), linksOut);
       File ckm = ManagedFileAccess.file(Utilities.path(focusDir(), "ckm.ini"));
       if (ckm.exists()) {
         IniFile ini = new IniFile(ckm.getAbsolutePath());
@@ -2256,23 +2256,36 @@ public class PublisherIGLoader extends PublisherBase {
    * before anything in the IG's folder is read, cleared or written
    */
   /**
-   * Unless links out of the IG's folder are allowed (-allow-external-links), the build's own file access - everything
-   * that goes through ManagedFileAccess, which core uses throughout - is limited to the IG's folder, the temp folder,
-   * ~/.fhir (packages, fhir-settings.json, the tx cache), and what the person running the publisher chose: the package
-   * cache, -packages, the source and destination folders, and the fhir-settings.json file itself. Template scripts,
-   * sushi and Jekyll run outside this. Not in web server or publication mode, which work on other folders
+   * The build's own file access - everything that goes through ManagedFileAccess, which core uses throughout - is
+   * limited to the IG's folder, the temp folder, ~/.fhir (packages, fhir-settings.json, the tx cache), and what the
+   * person running the publisher chose: the package cache, -packages, the source and destination folders, and the
+   * fhir-settings.json file itself. Where the user has allowed links out of the IG's folder (-allow-external-links, see
+   * checkNoLinksOut, which runs first), what they link to is added, and nothing else. Template scripts, sushi and Jekyll
+   * run outside this. Not in web server or publication mode, which work on other folders
    */
-  private void confineFileAccess(String root) throws IOException {
-    boolean linksAllowed = settings.getMode() != PublisherUtils.IGBuildMode.AUTOBUILD
-        && (settings.isAllowExternalLinks() || (FhirSettings.getFilePath() != null && ExternalLinkPermission.isAllowed(FhirSettings.getFilePath())));
-    if (linksAllowed || settings.getMode() == PublisherUtils.IGBuildMode.WEBSERVER || settings.getMode() == PublisherUtils.IGBuildMode.PUBLICATION) {
+  private void confineFileAccess(String root, List<String> linksOut) throws IOException {
+    if (settings.getMode() == PublisherUtils.IGBuildMode.WEBSERVER || settings.getMode() == PublisherUtils.IGBuildMode.PUBLICATION) {
       ManagedFileAccess.setAllowedPaths(null);
       return;
     }
     List<String> paths = allowedFileAccessPaths(root, pf.pcm == null ? null : pf.pcm.getFolder(), settings.getPackageCacheFolder(), settings.getPackagesFolder(),
         settings.getSourceDir(), settings.getDestDir(), FhirSettings.getFilePath());
+    paths.addAll(linkTargets(root, linksOut));
     ManagedFileAccess.setAllowedPaths(paths);
     log("File access limited to the folders: "+String.join(", ", ManagedFileAccess.getAllowedPaths()));
+  }
+
+  /** where the links (relative to root) really lead, for those that lead somewhere */
+  static List<String> linkTargets(String root, List<String> links) {
+    List<String> res = new ArrayList<>();
+    for (String link : links) {
+      try {
+        res.add(java.nio.file.Paths.get(root).resolve(link).toRealPath().toString());
+      } catch (IOException e) {
+        // it leads nowhere
+      }
+    }
+    return res;
   }
 
   /** the IG's folder, the temp folder, ~/.fhir, and any of the others that are set */
@@ -2290,12 +2303,14 @@ public class PublisherIGLoader extends PublisherBase {
     return paths;
   }
 
-  private void checkNoLinksOut(String root) throws IOException {
-    ExternalLinkPermission.check(PublisherUtils.linksOut(root), root, settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD,
+  private List<String> checkNoLinksOut(String root) throws IOException {
+    List<String> links = PublisherUtils.linksOut(root);
+    ExternalLinkPermission.check(links, root, settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD,
         settings.isAllowExternalLinks(), FhirSettings.getFilePath(), msg -> {
           log("Warning: "+msg);
           pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.SECURITY, "ImplementationGuide", msg, ValidationMessage.IssueSeverity.WARNING));
         });
+    return links;
   }
 
   private void checkInsideRoot(String dir, String what) throws IOException {

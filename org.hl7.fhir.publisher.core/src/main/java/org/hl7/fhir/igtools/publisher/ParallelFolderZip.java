@@ -316,7 +316,7 @@ public class ParallelFolderZip {
   }
 
   private Compressed compressToFile(Source s, File dir, Queue<File> temps) throws IOException {
-    File temp = Files.createTempFile(dir.toPath(), "zip-", ".deflate").toFile();
+    File temp = ManagedFileAccess.createTempFile(dir, "zip-", ".deflate");
     temps.add(temp);
     long[] res;
     try (InputStream in = open(s.file); OutputStream out = new BufferedOutputStream(ManagedFileAccess.outStream(temp), BUFFER)) {

@@ -19,13 +19,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 
 public class PublisherUtils {
@@ -97,46 +94,13 @@ public class PublisherUtils {
 
   /**
    * Empties a folder, without following symbolic links: a link in it is deleted (not what it links to), and a folder
-   * that is itself a link isn't cleared at all. FileUtilities.clearDirectory (core 7.0.6) follows both, so a link in
-   * the IG (temp, template, or one inside them) would have the publisher empty whatever it pointed to
+   * that is itself a link isn't cleared at all. Core's FileUtilities.clearDirectory does this now (it followed links up
+   * to core 7.0.6), and also refuses folders that are never scratch folders (home, system folders, a git repository...)
    *
    * @param exemptions names of files directly in the folder to keep
    */
   public static void clearFolder(String folder, String... exemptions) throws IOException {
-    java.nio.file.Path dir = ManagedFileAccess.file(folder).toPath();
-    if (java.nio.file.Files.isSymbolicLink(dir)) {
-      throw new IOException("The folder "+folder+" is a link to somewhere else, so it won't be cleared");
-    }
-    if (!java.nio.file.Files.isDirectory(dir, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
-      return;
-    }
-    Set<String> keep = new HashSet<>(Arrays.asList(exemptions));
-    List<java.nio.file.Path> entries = new ArrayList<>();
-    try (java.nio.file.DirectoryStream<java.nio.file.Path> ds = java.nio.file.Files.newDirectoryStream(dir)) {
-      for (java.nio.file.Path e : ds) {
-        if (!keep.contains(e.getFileName().toString())) {
-          entries.add(e);
-        }
-      }
-    }
-    for (java.nio.file.Path e : entries) {
-      deleteNoFollow(e);
-    }
-  }
-
-  private static void deleteNoFollow(java.nio.file.Path p) throws IOException {
-    if (java.nio.file.Files.isDirectory(p, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
-      List<java.nio.file.Path> children = new ArrayList<>();
-      try (java.nio.file.DirectoryStream<java.nio.file.Path> ds = java.nio.file.Files.newDirectoryStream(p)) {
-        for (java.nio.file.Path c : ds) {
-          children.add(c);
-        }
-      }
-      for (java.nio.file.Path c : children) {
-        deleteNoFollow(c);
-      }
-    }
-    java.nio.file.Files.deleteIfExists(p);
+    org.hl7.fhir.utilities.FileUtilities.clearDirectory(folder, exemptions);
   }
 
   /**

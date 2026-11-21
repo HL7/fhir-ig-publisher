@@ -43,6 +43,27 @@ class ConfinedFileAccessTest {
     assertEquals(6, paths.size());
   }
 
+  /** where the user has allowed links out of the IG, what they lead to is allowed, and nothing else */
+  @Test
+  void whatAllowedLinksLeadTo() throws IOException {
+    Path ig = Files.createDirectories(dir.resolve("ig"));
+    Path shared = Files.createDirectories(dir.resolve("shared"));
+    Files.write(shared.resolve("a.md"), "a".getBytes(StandardCharsets.UTF_8));
+    Path other = Files.createDirectories(dir.resolve("other"));
+    Files.write(other.resolve("b.md"), "b".getBytes(StandardCharsets.UTF_8));
+    Files.createDirectories(ig.resolve("input"));
+    Files.createSymbolicLink(ig.resolve("input/shared"), shared);
+    Files.createSymbolicLink(ig.resolve("input/broken"), dir.resolve("nowhere"));
+    List<String> links = PublisherUtils.linksOut(ig.toString());
+    List<String> targets = PublisherIGLoader.linkTargets(ig.toString(), links);
+    assertEquals(List.of(shared.toRealPath().toString()), targets);
+    List<String> paths = new java.util.ArrayList<>(List.of(ig.toString()));
+    paths.addAll(targets);
+    ManagedFileAccess.setAllowedPaths(paths);
+    assertEquals("a", FileUtilities.fileToString(ig.resolve("input/shared/a.md").toString()));
+    assertThrows(IOException.class, () -> FileUtilities.fileToString(other.resolve("b.md").toString()));
+  }
+
   /** the settings file is allowed, not the folder it's in (on the ci-build, /etc, which has the key file too) */
   @Test
   void onlyTheSettingsFileNotItsFolder() throws IOException {
