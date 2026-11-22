@@ -76,6 +76,22 @@ class FolderInsideRootTest {
     assertFalse(PublisherIGLoader.isInside(ig.toString(), ig.resolve("output").toString()));
   }
 
+  /**
+   * A .. after a link goes up from where the link leads, as the file system does it: path-tx-cache: input/../x is the
+   * folder next to where input really is, not the IG's x. (Not on Windows, where the file system takes the .. off first)
+   */
+  @Test
+  @org.junit.jupiter.api.condition.DisabledOnOs(org.junit.jupiter.api.condition.OS.WINDOWS)
+  void aDotDotAfterALinkGoesUpFromWhereItLeads() throws IOException {
+    Path ig = ig();
+    Path outside = Files.createDirectories(dir.resolve("elsewhere/inner"));
+    Files.createSymbolicLink(ig.resolve("input"), outside);
+    assertFalse(PublisherIGLoader.isInside(ig.toString(), ig.resolve("input/../tx-cache").toString()));
+    assertFalse(PublisherIGLoader.isInside(ig.toString(), ig.toString() + "/input/../tx-cache"));
+    assertFalse(PublisherIGLoader.isInside(ig.toString(), ig.toString() + "/new/../input/../tx-cache"));
+    assertTrue(PublisherIGLoader.isInside(ig.toString(), ig.toString() + "/input/../../ig/tx-cache"));
+  }
+
   /** the IG itself can be reached through a link (e.g. /tmp on macOS is /private/tmp) */
   @Test
   void theIGFolderCanBeALink() throws IOException {

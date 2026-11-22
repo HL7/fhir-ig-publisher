@@ -1949,10 +1949,19 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     if (args[i] == null) {
       return null;
     }
-    String s = args[i].replaceAll("(?i)\\b([a-z][a-z0-9+.-]*://)[^/@\\s]*@", "$1");
-    int at = s.indexOf('@');
+    // user info runs to the last @ before the host: a password can have an @ in it (it should be %40, but)
+    String s = args[i].replaceAll("(?i)\\b([a-z][a-z0-9+.-]*://)[^/\\s]*@", "$1");
+    // and with no scheme, the user info is before the last @ that comes before any /, \ or space (so not a path)
+    int end = s.length();
+    for (char c : new char[] {'/', '\\', ' '}) {
+      int k = s.indexOf(c);
+      if (k >= 0 && k < end) {
+        end = k;
+      }
+    }
+    int at = end == 0 ? -1 : s.lastIndexOf('@', end - 1);
     int colon = s.indexOf(':');
-    if (!s.contains("://") && colon > 0 && colon < at && s.lastIndexOf('/', at) == -1 && s.lastIndexOf('\\', at) == -1 && s.lastIndexOf(' ', at) == -1) {
+    if (!s.contains("://") && colon > 0 && colon < at) {
       s = s.substring(at + 1);
     }
     return s;

@@ -2233,11 +2233,14 @@ public class PublisherIGLoader extends PublisherBase {
 
   /**
    * The folder path-tx-cache names (relative to the IG root, or absolute), or null if it isn't inside the IG's folder
-   * (the folder ig.ini is in). Symbolic links are followed, as far as the path exists, since a repository can have one
+   * (the folder ig.ini is in). Symbolic links are followed, as far as the path exists, since a repository can have one.
+   * Not normalised first: in input/../x, the .. goes up from where input really is. What's returned is where the folder
+   * really is (see ManagedFileAccess.realPath), so the folder that's used is the one that was checked
    */
   static String txCachePath(String repoRoot, String rootDir, String value) {
-    Path path = Paths.get(rootDir).toAbsolutePath().resolve(value).normalize();
-    return isInside(repoRoot, path.toString()) ? path.toString() : null;
+    String path = Paths.get(rootDir).toAbsolutePath().resolve(value).toString();
+    Path real = ManagedFileAccess.realPath(path);
+    return real != null && isInside(repoRoot, path) ? real.toString() : null;
   }
 
   /**

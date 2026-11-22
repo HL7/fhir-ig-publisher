@@ -22,6 +22,14 @@ class RemovePasswordTest {
     "-proxy, proxy.example.org:8080, proxy.example.org:8080",
     "-proxy, user@proxy.example.org:8080, user@proxy.example.org:8080",
     "-ig, C:\\work\\my@ig\\ig.ini, C:\\work\\my@ig\\ig.ini",
+    // an @ in the password
+    "-repo, https://user:p@ss@github.com/org/repo, https://github.com/org/repo",
+    "-repo, https://user:p@ss@github.com/org/repo@x, https://github.com/org/repo@x",
+    "-proxy, user:p@ss@proxy.example.org:8080, proxy.example.org:8080",
+    "-x, git@github.com:org/repo@x, git@github.com:org/repo@x",
+    "-x, user:p@ss@host:8080/path@x, host:8080/path@x",
+    "-x, user:p@ss@host:8080/path, host:8080/path",
+    "-x, a:b c@d, a:b c@d",
   })
   void masksCredentials(String name, String value, String expected) {
     assertEquals(expected, Publisher.removePassword(new String[] {name, value}, 1));

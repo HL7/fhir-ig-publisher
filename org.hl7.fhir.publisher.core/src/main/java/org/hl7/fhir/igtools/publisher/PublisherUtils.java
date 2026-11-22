@@ -40,22 +40,11 @@ public class PublisherUtils {
 
   /**
    * Whether path is inside root, where they really are: symbolic links are followed (as far as the path exists - the
-   * rest of it is created later, as folders), since a repository can contain a link to anywhere
+   * rest of it is created later, as folders), since a repository can contain a link to anywhere. A .. after a link
+   * goes up from where the link leads, as it does in the file system (see ManagedFileAccess.realPath)
    */
   public static boolean isInside(String root, String path) {
-    try {
-      java.nio.file.Path r = java.nio.file.Paths.get(root).toAbsolutePath().normalize();
-      r = java.nio.file.Files.exists(r) ? r.toRealPath() : r;
-      java.nio.file.Path p = java.nio.file.Paths.get(path).toAbsolutePath().normalize();
-      java.nio.file.Path existing = p;
-      while (existing != null && !java.nio.file.Files.exists(existing, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
-        existing = existing.getParent();
-      }
-      java.nio.file.Path real = existing == null ? p : existing.toRealPath().resolve(existing.relativize(p)).normalize();
-      return real.startsWith(r);
-    } catch (Exception e) {
-      return false;
-    }
+    return ManagedFileAccess.isInside(root, path);
   }
 
   /**
