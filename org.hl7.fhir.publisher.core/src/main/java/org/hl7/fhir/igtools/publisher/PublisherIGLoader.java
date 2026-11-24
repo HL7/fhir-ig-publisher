@@ -174,6 +174,7 @@ public class PublisherIGLoader extends PublisherBase {
       // before anything reads the IG's files: sushi (run next) follows links too, and its errors quote what it read
       // into the log, which the ci-build publishes
       List<String> linksOut = checkNoLinksOut(focusDir());
+      checkNoCommittedScripts(focusDir());
       confineFileAccess(focusDir(), linksOut);
       File ckm = ManagedFileAccess.file(Utilities.path(focusDir(), "ckm.ini"));
       if (ckm.exists()) {
@@ -1061,15 +1062,9 @@ public class PublisherIGLoader extends PublisherBase {
       pf.resourceDirs.add(Utilities.path(pf.rootDir, "resources"));
     if (pf.pagesDirs.isEmpty())
       pf.pagesDirs.add(Utilities.path(pf.rootDir, "pages"));
+    // otherwise the IG's own txCache folder (or its path-tx-cache), set when the IG's parameters were read
     if (settings.getMode() == PublisherUtils.IGBuildMode.WEBSERVER)
       pf.vsCache = Utilities.path(System.getProperty("java.io.tmpdir"), "fhircache");
-    else if (pf.vsCache == null) {
-      if (settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD)
-        pf.vsCache = Utilities.path(System.getProperty("java.io.tmpdir"), "fhircache");
-      else
-        // with the rest of what the publisher keeps between runs (packages, fhir-settings.json): see also ManagedFileAccess allowed paths
-        pf.vsCache = Utilities.path(System.getProperty("user.home"), ".fhir", "tx-cache");
-    }
 
     logDebugMessage(LogCategory.INIT, "Check folders");
     List<String> extraDirs = new ArrayList<String>();
@@ -2329,6 +2324,18 @@ public class PublisherIGLoader extends PublisherBase {
           pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.SECURITY, "ImplementationGuide", msg, ValidationMessage.IssueSeverity.WARNING));
         });
     return links;
+  }
+
+  /**
+   * Scripts and programs committed to the IG's repository (see CommittedScriptPermission): for now, a warning (that in
+   * the root folder says they will be refused in a future version)
+   */
+  private void checkNoCommittedScripts(String root) throws IOException {
+    CommittedScriptPermission.check(CommittedScriptPermission.findScripts(root), root, settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD,
+        settings.isAllowCommittedScripts(), FhirSettings.getFilePath(), msg -> {
+          log("Warning: "+msg);
+          pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.SECURITY, "ImplementationGuide", msg, ValidationMessage.IssueSeverity.WARNING));
+        });
   }
 
   private void checkInsideRoot(String dir, String what) throws IOException {

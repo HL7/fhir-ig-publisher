@@ -1,15 +1,11 @@
 package org.hl7.fhir.igtools.publisher;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.function.Consumer;
 
 import org.hl7.fhir.exceptions.FHIRException;
-import org.hl7.fhir.utilities.FileUtilities;
-import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonObject;
-import org.hl7.fhir.utilities.json.parser.JsonParser;
 
 /**
  * Symbolic links that lead out of the IG's folder (see PublisherUtils.linksOut()). Whatever they link to is read as IG
@@ -68,62 +64,16 @@ public class ExternalLinkPermission {
 
   /** whether links out of the IG's folder have been allowed for this IG */
   public static boolean isAllowed(String settingsPath, String root) throws IOException {
-    JsonObject settings = read(settingsPath);
-    if (settings == null || !settings.has(PROPERTY) || !settings.get(PROPERTY).isJsonArray()) {
-      return false;
-    }
-    return settings.getJsonArray(PROPERTY).asStrings().contains(realPath(root));
+    return IGPermissions.isAllowed(settingsPath, PROPERTY, root);
   }
 
   /** records that links out of the IG's folder are allowed for this IG (and drops the old allow-all, if it's there) */
   public static void allow(String settingsPath, String root) throws IOException {
-    JsonObject settings = read(settingsPath);
-    if (settings == null) {
-      settings = new JsonObject();
-    }
-    String ig = realPath(root);
-    JsonArray igs = new JsonArray();
-    if (settings.has(PROPERTY) && settings.get(PROPERTY).isJsonArray()) {
-      igs = settings.getJsonArray(PROPERTY);
-    } else {
-      settings.remove(PROPERTY);
-      settings.add(PROPERTY, igs);
-    }
-    if (!igs.asStrings().contains(ig)) {
-      igs.add(ig);
-    }
-    File f = new File(settingsPath);
-    if (f.getParentFile() != null) {
-      FileUtilities.createDirectory(f.getParentFile().getAbsolutePath());
-    }
-    FileUtilities.stringToFile(JsonParser.compose(settings, true), settingsPath);
+    IGPermissions.allow(settingsPath, PROPERTY, root);
   }
 
   private static boolean hasLegacyAllowAll(String settingsPath) throws IOException {
-    JsonObject settings = read(settingsPath);
+    JsonObject settings = IGPermissions.read(settingsPath);
     return settings != null && settings.has(PROPERTY) && settings.get(PROPERTY).isJsonBoolean() && settings.asBoolean(PROPERTY);
-  }
-
-  /** where the IG's folder really is, so a link to it, or another way of writing it, is the same IG */
-  private static String realPath(String root) {
-    File f = new File(root).getAbsoluteFile();
-    try {
-      return f.toPath().normalize().toRealPath().toString();
-    } catch (IOException e) {
-      return f.toPath().normalize().toString();
-    }
-  }
-
-  private static JsonObject read(String settingsPath) throws IOException {
-    File f = new File(settingsPath);
-    if (!f.exists()) {
-      return null;
-    }
-    try {
-      return JsonParser.parseObject(f);
-    } catch (Exception e) {
-      // never write over a settings file we can't read
-      throw new FHIRException("Unable to read the FHIR settings file "+settingsPath+": "+e.getMessage(), e);
-    }
   }
 }

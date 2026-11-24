@@ -1369,7 +1369,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     b.append("\r\n");
   }
 
-  public static String buildReport(String ig, String source, String log, String qafile, String tx) throws Exception {
+  public static String buildReport(String ig, String source, String log, String qafile, String tx, String txCache) throws Exception {
     StringBuilder b = new StringBuilder();
     b.append("= Log =\r\n");
     b.append(log);
@@ -1381,7 +1381,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     prop(b, "source", source);
     prop(b, "user.dir", System.getProperty("user.home"));
     prop(b, "tx.server", tx);
-    prop(b, "tx.cache", Utilities.path(System.getProperty("user.home"), ".fhir", "tx-cache"));
+    prop(b, "tx.cache", txCache == null ? "(not set yet)" : txCache);
     prop(b, "system.type", System.getProperty("sun.arch.data.model"));
     prop(b, "system.cores", Integer.toString(Runtime.getRuntime().availableProcessors()));   
     prop(b, "system.mem.free", Long.toString(Runtime.getRuntime().freeMemory()));   
@@ -1626,7 +1626,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
             e.printStackTrace();
             break;
           }
-          FileUtilities.stringToFile(buildReport(ig, null, self.pf.filelog.toString(), Utilities.path(self.pf.qaDir, "validation.txt"), self.settings.getTxServer()), Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher-" + Integer.toString(i) + ".log"));
+          FileUtilities.stringToFile(buildReport(ig, null, self.pf.filelog.toString(), Utilities.path(self.pf.qaDir, "validation.txt"), self.settings.getTxServer(), self.pf.vsCache), Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher-" + Integer.toString(i) + ".log"));
           System.out.println("=======================================================================================");
           System.out.println("");
           System.out.println("");
@@ -1774,6 +1774,9 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       if (CliParams.hasNamedParam(args, ExternalLinkPermission.PARAMETER)) {
         self.settings.setAllowExternalLinks(true);
       }
+      if (CliParams.hasNamedParam(args, CommittedScriptPermission.PARAMETER)) {
+        self.settings.setAllowCommittedScripts(true);
+      }
       if (CliParams.hasNamedParam(args, "-jekyll")) {
         self.settings.setJekyllCommand(CliParams.getNamedParam(args, "-jekyll"));
       }
@@ -1851,7 +1854,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         exitCode = 1;
       } finally {
         if (self.settings.getMode() == PublisherUtils.IGBuildMode.MANUAL) {
-          FileUtilities.stringToFile(buildReport(CliParams.getNamedParam(args, "-ig"), CliParams.getNamedParam(args, "-source"), self.pf.filelog.toString(), Utilities.path(self.pf.qaDir, "validation.txt"), self.settings.getTxServer()), Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher.log"));
+          FileUtilities.stringToFile(buildReport(CliParams.getNamedParam(args, "-ig"), CliParams.getNamedParam(args, "-source"), self.pf.filelog.toString(), Utilities.path(self.pf.qaDir, "validation.txt"), self.settings.getTxServer(), self.pf.vsCache), Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher.log"));
         }
       }
       PublisherFields.consoleLogger.stop();
