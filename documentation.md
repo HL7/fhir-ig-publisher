@@ -38,6 +38,9 @@ Command line build mode parameters
 * ```-tx``` - alternative tx server to tx.fhir.org (but still most be the same software, see [running your own copy of tx.fhir.org](https://confluence.hl7.org/display/FHIR/Running+your+own+copy+of+tx.fhir.org))
 * ```-no-network``` - turn of all network access - any attempt to use the network will generate an error (offline build mode)
 * ```-no-sushi``` - don't run sushi before build IG (if it's there to be run)
+* ```-trust-template``` {id} - trust a template that runs scripts but isn't a trusted template (its id as the IG names it, without a version, e.g. ```my.template``` or ```#template```), or ```all``` to trust every template. Recorded in trustedTemplates in fhir-settings.json, so it only needs to be given once. Without it, a local run that uses such a template stops and explains
+* ```-allow-external-links``` - allow symbolic links that lead outside the IG's folder, for all IGs. Recorded as allowExternalLinks in fhir-settings.json, so it only needs to be given once; the build then goes on with a warning. Without it, a local build of an IG that has such links stops and explains. Never allowed on the ci-build
+* ```-allow-committed-scripts``` - accept the scripts and programs (e.g. _genonce.sh, a jar) committed in the IG's root folder, for this IG. Recorded as allowCommittedScripts in fhir-settings.json, so it only needs to be given once. For now, scripts and programs in an IG's repository are only a warning in qa.html; in a future version a local build will stop unless they're accepted this way, and the ci-build will refuse them
 * ```-generation-off``` - turn narrative generation off completely to make for faster local run time
 * ```-no-narrative``` - comma list of resources (type/id) to not generate narrative for (e.g. faster run)
 * ```-validation-off``` - turn validation off completely to make for faster local run time

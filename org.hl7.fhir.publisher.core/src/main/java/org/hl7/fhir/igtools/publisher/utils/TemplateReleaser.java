@@ -634,7 +634,7 @@ public class TemplateReleaser {
       // sign the package, so its signature (package.tgz.sigstore.json) is copied with it
       File sig = new File(Utilities.path(source, vd.getId(), "output", "package.tgz"+NpmPackageSigner.SIGNATURE_SUFFIX));
       if (signer != null) {
-        signer.sign(new File(Utilities.path(source, vd.getId(), "output", "package.tgz")), "FHIR IG Publisher "+IGVersionUtil.getVersion());
+        signer.sign(new File(Utilities.path(source, vd.getId(), "output", "package.tgz")), npm.name(), npm.version(), "FHIR IG Publisher "+IGVersionUtil.getVersion());
       } else if (sig.exists()) {
         sig.delete(); // an old signature must not be published with a package it may not match
       }
@@ -673,7 +673,7 @@ public class TemplateReleaser {
       addTextChild(item, "dc:creator", "FHIR Project");
       addTextChild(item, "fhir:kind", npm.type());
       if (signer != null) {
-        addTextChild(item, "fhir:signature", Utilities.pathURL(linkRoot, npm.name(), npm.version(), "package.tgz"+NpmPackageSigner.SIGNATURE_SUFFIX));
+      addTextChild(item, "fhir:signature", Utilities.pathURL(linkRoot, npm.name(), npm.version(), "package.tgz"+NpmPackageSigner.SIGNATURE_SUFFIX));
       }
       addTextChild(item, "pubDate", df.format(new Date()));
       txt = rss.createTextNode("\n    ");

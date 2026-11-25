@@ -1159,6 +1159,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
     // the additional bindings (#970): a row each, after the base binding, with the path blank
     AdditionalBindingsRenderer abr = new AdditionalBindingsRenderer(null, corePath, sd, ed.getPath(), gen, null, null);
+    
     for (TxAdditionalBinding ab : additionalBindings(tx)) {
       tr = tbl.tr();
       tr.td();
@@ -1645,12 +1646,15 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         if(hasMaps || hasComments) {
           allEmpty = false; // that assumption is wrong
           String url = mappingLink(map);
-          if (url == null)
-            s.append("<a name=\"" + map.getIdentity() + "\"> </a><h3>" +gen.formatPhrase(RenderingI18nContext.SD_SUMMARY_MAPPINGS, Utilities.escapeXml(gen.getTranslated(map.getNameElement())), Utilities.escapeXml(map.getUri()), "", "") + "</h3>");
-          else
-            s.append("<a name=\"" + map.getIdentity() + "\"> </a><h3>" +gen.formatPhrase(RenderingI18nContext.SD_SUMMARY_MAPPINGS, Utilities.escapeXml(gen.getTranslated(map.getNameElement())), Utilities.escapeXml(map.getUri()), "<a href=\"" + Utilities.escapeXml(url) + "\">", "</a>") + "</h3>");
-          if (map.hasComment())
+          
+          if (url == null) {
+            s.append("<a name=\"" + map.getIdentity() + "\"> </a><h3>" + gen.formatPhrase(RenderingI18nContext.SD_SUMMARY_MAPPINGS, Utilities.escapeXml(gen.getTranslated(map.getNameElement())), Utilities.escapeXml(map.getUri()), "", "") + "</h3>");
+          } else {
+            s.append("<a name=\"" + map.getIdentity() + "\"> </a><h3>" + gen.formatPhrase(RenderingI18nContext.SD_SUMMARY_MAPPINGS, Utilities.escapeXml(gen.getTranslated(map.getNameElement())), Utilities.escapeXml(map.getUri()), "<a href=\"" + Utilities.escapeXml(url) + "\">", "</a>") + "</h3>");
+          }
+          if (map.hasComment()) {
             s.append("<p>" + Utilities.escapeXml(gen.getTranslated(map.getCommentElement())) + "</p>");
+          }
 
           s.append("<table class=\"grid\">\r\n");
           s.append(" <tr><td colspan=\"3\"><b>" + Utilities.escapeXml(gen.getTranslated(sd.getNameElement())) + "</b></td></tr>\r\n");
@@ -2413,7 +2417,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     List<ElementDefinition> slices = getSlices(elem, children);
     int c = 0;
     for (ElementDefinition slice : slices) {
-      List<CanonicalType> profiles = slice.getTypeFirstRep().getProfileList();
+      // getTypeFirstRep() adds an empty type when there isn't one, and this is reading, not changing, the definition
+      List<CanonicalType> profiles = slice.hasType() ? slice.getTypeFirstRep().getProfileList() : new ArrayList<>();
       // Won't have a profile if this slice is part of a complex extension
       String url = profiles.isEmpty() ? null : profiles.get(0).getValue();
       StructureDefinition sdExt = url == null ? null : context.fetchResource(StructureDefinition.class, url, ExtensionUtilities.getVersionResolutionRules(profiles.get(0)));
@@ -3163,7 +3168,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       }
     } else if (element.types().size() == 0) {
       // unprofiled primitive type value
-      TypeRefComponent tr = element.definition().getTypeFirstRep();
+      // getTypeFirstRep() adds an empty type when there isn't one, and this is reading, not changing, the definition
+      TypeRefComponent tr = element.definition().hasType() ? element.definition().getTypeFirstRep() : new TypeRefComponent();
       StructureDefinition sd = context.fetchTypeDefinition(tr.getWorkingCode());
       if (sd != null) {
         gc.addPiece(gen.new Piece(sd.getWebPath(), "("+tr.getWorkingCode()+" value)", this.gen.formatPhrase(RenderingI18nContext.SDR_PRIM_VALUE, tr.getWorkingCode())));         

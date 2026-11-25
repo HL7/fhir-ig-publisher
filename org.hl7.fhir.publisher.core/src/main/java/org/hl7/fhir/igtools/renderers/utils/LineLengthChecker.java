@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 
 import org.hl7.fhir.utilities.FileUtilities;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 
 public class LineLengthChecker {
 
@@ -16,7 +17,7 @@ public class LineLengthChecker {
   
   private void check(String path, int limit) throws IOException {
     System.out.println("Checking line lengths in "+path);
-    check(new File(path), limit);
+    check(ManagedFileAccess.file(path), limit);
     System.out.println("Finished - checked "+total+" files");
   }
 

@@ -12,7 +12,6 @@ import org.hl7.fhir.igtools.publisher.modules.IPublisherModule;
 import org.hl7.fhir.igtools.publisher.realm.RealmBusinessRules;
 import org.hl7.fhir.igtools.renderers.BaseRenderer;
 import org.hl7.fhir.igtools.renderers.ValidationPresenter;
-import org.hl7.fhir.utilities.MappingSpace;
 import org.hl7.fhir.igtools.templates.Template;
 import org.hl7.fhir.igtools.templates.TemplateManager;
 import org.hl7.fhir.igtools.web.PublisherConsoleLogger;

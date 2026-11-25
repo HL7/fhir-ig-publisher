@@ -42,6 +42,7 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.function.Function;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 
 /**
  * this class is part of the Publisher Core cluster. See @Publisher for discussion
@@ -102,11 +103,27 @@ public class PublisherBase implements ILoggingService {
   }
 
   protected String focusDir() {
-    String dir = settings.getConfigFile().endsWith("ig.ini") ? settings.getConfigFile().substring(0, settings.getConfigFile().length()-6) : settings.getConfigFile();
-    if (dir.endsWith(File.separatorChar+".")) {
-      dir = dir.substring(0, dir.length()-2);
+    return focusDir(settings.getConfigFile());
+  }
+
+  /**
+   * The IG's folder. -ig names the folder, or the IG's ini file, which needn't be called ig.ini (-ig /x/custom.ini):
+   * its folder is the one it's in. This is the folder that file access is limited to, and that is checked for links
+   * out, so it has to be the folder, not the file
+   */
+  static String focusDir(String configFile) {
+    String cf = configFile;
+    if (cf.endsWith(File.separatorChar+".")) {
+      cf = cf.substring(0, cf.length()-2);
     }
-    return Utilities.noString(dir) ? PublisherBase.getCurentDirectory() : dir;
+    if (Utilities.noString(cf)) {
+      return PublisherBase.getCurentDirectory();
+    }
+    File f = new File(cf);
+    if (f.isFile() || (!f.exists() && cf.toLowerCase(java.util.Locale.ROOT).endsWith(".ini"))) {
+      return f.getAbsoluteFile().getParent();
+    }
+    return cf;
   }
 
   @Override
@@ -157,7 +174,7 @@ public class PublisherBase implements ILoggingService {
   }
 
   protected boolean isTemplate() throws IOException {
-    File pack = new File(Utilities.path(settings.getConfigFile(), "package", "package.json"));
+    File pack = ManagedFileAccess.file(Utilities.path(settings.getConfigFile(), "package", "package.json"));
     if (pack.exists()) {
       JsonObject json = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(pack);
       if (json.has("type") && "fhir.template".equals(json.asString("type"))) {
@@ -196,7 +213,7 @@ public class PublisherBase implements ILoggingService {
   }
 
   protected void forceDir(String dir) throws Exception {
-    File f = new File(dir);
+    File f = ManagedFileAccess.file(dir);
     if (!f.exists())
       FileUtilities.createDirectory(dir);
     else if (!f.isDirectory())
@@ -250,11 +267,11 @@ public class PublisherBase implements ILoggingService {
 
   protected String oidIniLocation() throws IOException {
     String f = Utilities.path(FileUtilities.getDirectoryForFile(this.pf.igName), "oids.ini");
-    if (new File(f).exists()) {
+    if (ManagedFileAccess.file(f).exists()) {
       if (this.pf.isSushi) {
         String nf = Utilities.path(this.pf.rootDir, "oids.ini");
         FileUtilities.copyFile(f, nf);
-        new File(f).delete();
+        ManagedFileAccess.file(f).delete();
         return nf;
       }
       return f;
@@ -312,8 +329,8 @@ public class PublisherBase implements ILoggingService {
     }
     outputTracker.add(path);
 
-    File f = new CSFile(path);
-    File folder = new File(FileUtilities.getDirectoryForFile(f));
+    File f = ManagedFileAccess.csfile(path);
+    File folder = ManagedFileAccess.file(FileUtilities.getDirectoryForFile(f));
     if (!folder.exists()) {
       FileUtilities.createDirectory(folder.getAbsolutePath());
     }
@@ -1432,7 +1449,7 @@ public class PublisherBase implements ILoggingService {
     // before we truncate the same path) and correct the core deps. package.json carries no
     // resourceType, so .index.json/.index.db need no rebuild.
     NpmPackage tgz;
-    try (InputStream in = new FileInputStream(packageFilename)) {
+    try (InputStream in = ManagedFileAccess.inStream(packageFilename)) {
       tgz = NpmPackage.fromPackage(in);
     }
     JsonObject tgzDeps = tgz.getNpm().forceObject("dependencies");
@@ -1453,7 +1470,7 @@ public class PublisherBase implements ILoggingService {
       tgzDeps.add(core[0], core[1]);
       manifestDeps.add(core[0], core[1]);
     }
-    try (OutputStream out = new FileOutputStream(packageFilename)) {
+    try (OutputStream out = ManagedFileAccess.outStream(packageFilename)) {
       tgz.save(out);
     }
     return true;

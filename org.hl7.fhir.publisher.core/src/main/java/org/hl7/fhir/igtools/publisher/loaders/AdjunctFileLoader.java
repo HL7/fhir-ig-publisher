@@ -25,6 +25,7 @@ import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 
 public class AdjunctFileLoader {
 
@@ -244,7 +245,7 @@ public class AdjunctFileLoader {
 
   private Attachment loadFile(String fn) throws FileNotFoundException, IOException {
     for (String dir : binaryPaths) {
-      File f = new File(Utilities.path(dir, fn));
+      File f = ManagedFileAccess.file(Utilities.path(dir, fn));
       if (f.exists()) {
         Attachment att = new Attachment();
         att.setContentType(determineContentType(Utilities.getFileExtension(fn)));

@@ -69,6 +69,7 @@ import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
 import org.hl7.fhir.utilities.xhtml.*;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode.Location;
 import org.hl7.fhir.validation.BaseValidator.BooleanHolder;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 
 public class HTMLInspector {
   public class XhtmlNodeHolder {
@@ -665,8 +666,8 @@ public class HTMLInspector {
   }
 
   public void saveFile(LoadedFile lf, XhtmlNode x) throws IOException {
-    new File(lf.getFilename()).delete();
-    try (FileOutputStream f = new FileOutputStream(lf.getFilename())) {
+    ManagedFileAccess.file(lf.getFilename()).delete();
+    try (FileOutputStream f = ManagedFileAccess.outStream(lf.getFilename())) {
       new XhtmlComposer(XhtmlComposer.HTML).composeDocument(f, x);
     }
   }
@@ -682,8 +683,8 @@ public class HTMLInspector {
       cache.remove(s);
   }
 
-  private void listFiles(String folder, List<String> loadList) {
-    for (File f : new File(folder).listFiles()) {
+  private void listFiles(String folder, List<String> loadList) throws IOException {
+    for (File f : ManagedFileAccess.file(folder).listFiles()) {
       if (!Utilities.startsWithInList(f.getAbsolutePath(), exceptions)) {
         if (f.isDirectory()) {
           listFiles(f.getAbsolutePath(), loadList);
@@ -698,10 +699,22 @@ public class HTMLInspector {
     }
   }
 
-  private void loadFile(String s, String base, List<ValidationMessage> messages) {
+  /**
+   * Whether a file that a page links to exists, as far as the build is allowed to know: a link to a file outside the
+   * folders the build's file access is limited to (see ManagedFileAccess) is treated as not there
+   */
+  private static boolean fileExists(String path) {
+    try {
+      return ManagedFileAccess.file(path).exists();
+    } catch (IOException e) {
+      return false;
+    }
+  }
+
+  private void loadFile(String s, String base, List<ValidationMessage> messages) throws IOException {
     log.logDebugMessage(ILoggingService.LogCategory.HTML, "Load "+s);
 
-    File f = new File(s);
+    File f = ManagedFileAccess.file(s);
     Boolean hl7State = null;
     XhtmlNode x = null;
     boolean htmlName = f.getName().endsWith(".html") || f.getName().endsWith(".xhtml") || f.getName().endsWith(".svg");
@@ -776,7 +789,7 @@ public class HTMLInspector {
   }
 
   private static boolean startsWithTag(File f) throws IOException {
-    try (Reader r = new BufferedReader(new InputStreamReader(new FileInputStream(f), StandardCharsets.UTF_8))) {
+    try (Reader r = new BufferedReader(new InputStreamReader(ManagedFileAccess.inStream(f), StandardCharsets.UTF_8))) {
       int c;
       do {
         c = r.read();
@@ -1884,7 +1897,7 @@ public class HTMLInspector {
     }
 
     if (Utilities.isAbsoluteFileName(ref)) {
-      if (new File(ref).exists()) {
+      if (fileExists(ref)) {
         addExternalReference(ExternalReferenceType.FILE, ref, parent == null ? x : parent, filename);
         return true;
       }
@@ -1908,7 +1921,7 @@ public class HTMLInspector {
     // a local file may have been created by some poorly tracked process, so we'll consider that as a possible
     if (!Utilities.isAbsoluteUrl(rref) && !rref.contains("..") && filename != null) { // .. is security check. Maybe there's some ways it could be valid, but we're not interested for now
       String fname = buildRef(new File(filename).getParent(), rref);
-      if (new File(fname).exists()) {
+      if (fileExists(fname)) {
         return true;
       }
     }
@@ -2134,7 +2147,7 @@ public class HTMLInspector {
       }
     }
     if (resolved) {
-      if (!Utilities.startsWithInList(ref, "icon_", "icon-", "tbl_", "data:", "cc0.png", "external.png", "assets/images/") && !ref.contains("hl7.org"))
+      if (!Utilities.startsWithInList(ref, "icon_", "conf-", "icon-", "tbl_", "data:", "cc0.png", "external.png", "assets/images/") && !ref.contains("hl7.org"))
         if (ref.startsWith("http://") || ref.startsWith("https://")) {
           addExternalReference(ExternalReferenceType.IMG, ref, src, filename);
         } else {

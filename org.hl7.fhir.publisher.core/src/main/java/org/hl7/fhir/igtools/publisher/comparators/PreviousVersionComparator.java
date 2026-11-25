@@ -36,6 +36,7 @@ import org.hl7.fhir.services.comparison.ComparisonRenderer;
 import org.hl7.fhir.services.comparison.ComparisonSession;
 import org.hl7.fhir.services.conformance.profile.ProfileKnowledgeProvider;
 import org.hl7.fhir.standalone.context.SimpleWorkerContext;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 
 
 public class PreviousVersionComparator {
@@ -164,9 +165,9 @@ public class PreviousVersionComparator {
   }
     
   private IniFile makeIni(String rootDir, String v) throws IOException {
-    File ini = new File(Utilities.path(rootDir, "url-map-v-"+v+".ini"));
+    File ini = ManagedFileAccess.file(Utilities.path(rootDir, "url-map-v-"+v+".ini"));
     if (ini.exists()) {
-      try (FileInputStream in = new FileInputStream(ini)) {
+      try (FileInputStream in = ManagedFileAccess.inStream(ini)) {
         return new IniFile(in);
       }
     } else {

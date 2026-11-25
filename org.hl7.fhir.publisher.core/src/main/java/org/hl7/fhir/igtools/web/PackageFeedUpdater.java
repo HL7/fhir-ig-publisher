@@ -355,10 +355,10 @@ public class PackageFeedUpdater {
 
     // fhir:signature - the package's signature, when it was signed (see NpmPackageSigner)
     if (new File(pkg.filePath + NpmPackageSigner.SIGNATURE_SUFFIX).exists()) {
-      Element signature = doc.createElementNS("http://hl7.org/fhir/feed", "fhir:signature");
-      signature.setTextContent(url + NpmPackageSigner.SIGNATURE_SUFFIX);
-      item.appendChild(signature);
-      item.appendChild(doc.createTextNode("\n      "));
+    Element signature = doc.createElementNS("http://hl7.org/fhir/feed", "fhir:signature");
+    signature.setTextContent(url + NpmPackageSigner.SIGNATURE_SUFFIX);
+    item.appendChild(signature);
+    item.appendChild(doc.createTextNode("\n      "));
     }
 
     // PubDate

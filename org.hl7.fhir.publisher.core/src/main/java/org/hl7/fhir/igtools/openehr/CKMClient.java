@@ -15,6 +15,7 @@ import org.hl7.fhir.utilities.http.*;
 import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 
 /**
  * Client for downloading resources from openEHR Clinical Knowledge Manager (CKM).
@@ -200,9 +201,9 @@ public class CKMClient {
       }
 
       String filename = sanitizeFilename(mainId) + ".adl";
-      File file = new File(dest, filename);
+      File file = ManagedFileAccess.file(dest, filename);
 
-      try (FileOutputStream fos = new FileOutputStream(file)) {
+      try (FileOutputStream fos = ManagedFileAccess.outStream(file)) {
         fos.write(result.getContent());
       }
 
@@ -289,9 +290,9 @@ public class CKMClient {
       }
 
       String filename = sanitizeFilename(mainId) + ".oet";
-      File file = new File(dest, filename);
+      File file = ManagedFileAccess.file(dest, filename);
 
-      try (FileOutputStream fos = new FileOutputStream(file)) {
+      try (FileOutputStream fos = ManagedFileAccess.outStream(file)) {
         fos.write(result.getContent());
       }
 

@@ -16,6 +16,7 @@ import org.hl7.fhir.utilities.json.model.JsonElement;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.model.JsonProperty;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 
 /**
  * -rapido: the files each source file put in the temp folder when it was last generated, kept from one build to the
@@ -50,7 +51,7 @@ public class RapidoOutputs {
   private final String tempDir;
 
   public RapidoOutputs(String vsCache, String tempDir) throws IOException {
-    this.record = new File(Utilities.path(vsCache, ".build-outputs.json"));
+    this.record = ManagedFileAccess.file(Utilities.path(vsCache, ".build-outputs.json"));
     this.tempDir = tempDir;
   }
 
@@ -105,7 +106,9 @@ public class RapidoOutputs {
         if (p.getValue() instanceof JsonArray) {
           for (String name : ((JsonArray) p.getValue()).asStrings()) {
             String path = Utilities.path(tempDir, name);
-            if (!writtenAnyCase.contains(path.toLowerCase(Locale.ROOT))) {
+            // the record is in the IG's folder (so can be edited): only what is really in the temp folder is deleted, not
+            // somewhere a link on the way leads to
+            if (!writtenAnyCase.contains(path.toLowerCase(Locale.ROOT)) && PublisherUtils.isInside(tempDir, path)) {
               change.gone.add(path);
             }
           }
@@ -140,7 +143,7 @@ public class RapidoOutputs {
         return false;
       }
       for (String name : ((JsonArray) p.getValue()).asStrings()) {
-        if (!new File(Utilities.path(tempDir, name)).exists()) {
+        if (!ManagedFileAccess.file(Utilities.path(tempDir, name)).exists()) {
           return false;
         }
       }

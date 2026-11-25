@@ -80,6 +80,7 @@ import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
 import org.hl7.fhir.utilities.xml.XMLUtil;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 
 
 public class Template {
@@ -149,25 +150,30 @@ public class Template {
         targetOnJekyll = targets.asString("onJekyll");
       if (targets.has("onCheck"))
         targetOnCheck = targets.asString("onCheck");
-      File buildFile = new File(Utilities.path(templateDir, script));
-      antProject = new Project();
+      // nothing from the script can be loaded unless the template is trusted: ant runs any tasks that are outside a
+      // target while it parses the build file, so configuring the project is already running the template's code.
+      // An untrusted template that names a script gets no project, and runScriptTargetAnt() reports why it can't run
+      if (canExecute) {
+        File buildFile = ManagedFileAccess.file(Utilities.path(templateDir, script));
+        antProject = new Project();
 
-      ProjectHelper.configureProject(antProject, buildFile);
-      DefaultLogger consoleLogger = new DefaultLogger();
-      consoleLogger.setErrorPrintStream(System.err);
-      consoleLogger.setOutputPrintStream(System.out);
-      if (wantLog) {        
-        consoleLogger.setMessageOutputLevel(Project.MSG_INFO);
-      } else {
-        consoleLogger.setMessageOutputLevel(Project.MSG_ERR);        
+        ProjectHelper.configureProject(antProject, buildFile);
+        DefaultLogger consoleLogger = new DefaultLogger();
+        consoleLogger.setErrorPrintStream(System.err);
+        consoleLogger.setOutputPrintStream(System.out);
+        if (wantLog) {        
+          consoleLogger.setMessageOutputLevel(Project.MSG_INFO);
+        } else {
+          consoleLogger.setMessageOutputLevel(Project.MSG_ERR);        
+        }
+        antProject.addBuildListener(consoleLogger);
+        antProject.setBasedir(root);
+        antProject.setProperty("ig.root", root);
+        antProject.setProperty("ig.template", templateDir);
+        antProject.setProperty("ig.scripts", Utilities.path(templateDir, "scripts"));
+        antProject.setProperty("ig.networkprohibited", Boolean.toString(FhirSettings.isProhibitNetworkAccess()));
+        antProject.init();
       }
-      antProject.addBuildListener(consoleLogger);
-      antProject.setBasedir(root);
-      antProject.setProperty("ig.root", root);
-      antProject.setProperty("ig.template", templateDir);
-      antProject.setProperty("ig.scripts", Utilities.path(templateDir, "scripts"));
-      antProject.setProperty("ig.networkprohibited", Boolean.toString(FhirSettings.isProhibitNetworkAccess()));
-      antProject.init();
     }
     for (JsonProperty p : configuration.getProperties()) {
       if (p.getName().startsWith("template-parameters")) {
@@ -214,7 +220,7 @@ public class Template {
     allLangCodes.add(defLang);
     allLangCodes.addAll(langCodes);
     String tf = Utilities.path(templateDir, "translations");
-    File tff = new File(tf);
+    File tff = ManagedFileAccess.file(tf);
     if (tff.exists()) {
       for (File f : tff.listFiles()) {
         if (f.getName().endsWith(".json")) {
@@ -225,14 +231,14 @@ public class Template {
   }
 
   private void processTranslationFile(String tf, File fl, List<String> langCodes) throws JsonException, IOException {
-    String base = FileUtilities.fileTitle(fl.getName());
+    String base = FileUtilities.fileTitle(fl.getAbsolutePath());
     Map<String, POSource> translations = new HashMap<>();
 
     // load the base file
     JsonObject lf = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(fl);
     
     // load all the translations
-    for (File f : new File(tf).listFiles()) {
+    for (File f : ManagedFileAccess.file(tf).listFiles()) {
       if (f.getName().startsWith(base+"-") && f.getName().endsWith(".po")) {
         String lang = f.getName().substring(base.length()+1).replace(".po", "");
         translations.put(lang, POSource.loadPOFile(f.getAbsolutePath()));
@@ -313,7 +319,7 @@ public class Template {
     String xmlFile = fl.getAbsolutePath();
     xmlFile = xmlFile.substring(0, xmlFile.length()-4)+"xml";
     try {
-      Files.writeString(Paths.get(xmlFile), xml);
+      Files.writeString(ManagedFileAccess.file(xmlFile).toPath(), xml);
     } catch (IOException e) {
         System.err.println("An error occurred while writing to the file " + xmlFile + ": " + e.getMessage());
     }
@@ -463,18 +469,18 @@ public class Template {
     if (!canExecute) {
       throw new FHIRException("Unable to execute '"+target+"' in script '"+script+"' as the template '"+templateThatCantExecute+"' is not trusted (reason: "+templateReason+")");
     }
-    File jsonOutcomes = new File(Utilities.path(templateDir, target + "-validation.json"));
-    File xmlOutcomes = new File(Utilities.path(templateDir, target + "-validation.xml"));
+    File jsonOutcomes = ManagedFileAccess.file(Utilities.path(templateDir, target + "-validation.json"));
+    File xmlOutcomes = ManagedFileAccess.file(Utilities.path(templateDir, target + "-validation.xml"));
     if (jsonOutcomes.exists())
       jsonOutcomes.delete();
     if (xmlOutcomes.exists())
       xmlOutcomes.delete();
     String sfn = Utilities.path(templateDir, target + "-ig-working.");
     String fn = Utilities.path(templateDir, target + "-ig-updated.");
-    File jsonIg = new File(sfn +"json");
-    File xmlIg = new File(sfn + "xml");
-    File jsonUpdated = new File(fn + "json");
-    File xmlUpdated = new File(fn + "xml");
+    File jsonIg = ManagedFileAccess.file(sfn +"json");
+    File xmlIg = ManagedFileAccess.file(sfn + "xml");
+    File jsonUpdated = ManagedFileAccess.file(fn + "json");
+    File xmlUpdated = ManagedFileAccess.file(fn + "xml");
     if (ig != null) {
       antProject.setProperty(target + ".ig.source", sfn);
       antProject.setProperty(target + ".ig.dest", fn);
@@ -487,18 +493,18 @@ public class Template {
       Files.deleteIfExists(xmlUpdated.toPath());
       if (USE_R5_IG_FORMAT) {
         org.hl7.fhir.r5.model.ImplementationGuide ig5 = (org.hl7.fhir.r5.model.ImplementationGuide) VersionConvertorFactory_50_N.convertResource(ig, new BaseAdvisor_50_N(true, true));
-        try (FileOutputStream f = new FileOutputStream(sfn+"xml")) {
+        try (FileOutputStream f = ManagedFileAccess.outStream(sfn+"xml")) {
           new org.hl7.fhir.r5.formats.XmlParser().compose(f, ig5);
         }
-        try (FileOutputStream f = new FileOutputStream(sfn+"json")) {
+        try (FileOutputStream f = ManagedFileAccess.outStream(sfn+"json")) {
           new org.hl7.fhir.r5.formats.JsonParser().compose(f, ig5);
         }
       } else {
         org.hl7.fhir.r4.model.ImplementationGuide ig4 = (org.hl7.fhir.r4.model.ImplementationGuide) VersionConvertorFactory_40_N.convertResource(ig, new BaseAdvisor_40_N(true, true));
-        try (FileOutputStream f = new FileOutputStream(sfn+"xml")) {
+        try (FileOutputStream f = ManagedFileAccess.outStream(sfn+"xml")) {
           new org.hl7.fhir.r4.formats.XmlParser().compose(f, ig4);
         }
-        try (FileOutputStream f = new FileOutputStream(sfn+"json")) {
+        try (FileOutputStream f = ManagedFileAccess.outStream(sfn+"json")) {
           new org.hl7.fhir.r4.formats.JsonParser().compose(f, ig4);
         }
       }
@@ -532,16 +538,16 @@ public class Template {
       String newJson = fn+"json";
       switch (modifyIg) {
         case IG_ANY:
-          if (new File(newXml).exists()) {
-            try (FileInputStream f = new FileInputStream(newXml)) {
+          if (ManagedFileAccess.file(newXml).exists()) {
+            try (FileInputStream f = ManagedFileAccess.inStream(newXml)) {
               if (USE_R5_IG_FORMAT) {
                 return (ImplementationGuide) VersionConvertorFactory_50_N.convertResource(new org.hl7.fhir.r5.formats.XmlParser().parse(f));
               } else {
                 return (ImplementationGuide) VersionConvertorFactory_40_N.convertResource(new org.hl7.fhir.r4.formats.XmlParser().parse(f));
               }
             }
-          } else if (new File(newJson).exists()) {
-            try (FileInputStream f = new FileInputStream(newJson)) {
+          } else if (ManagedFileAccess.file(newJson).exists()) {
+            try (FileInputStream f = ManagedFileAccess.inStream(newJson)) {
               if (USE_R5_IG_FORMAT) {
                 return (ImplementationGuide) VersionConvertorFactory_50_N.convertResource(new org.hl7.fhir.r5.formats.JsonParser().parse(f));
               } else {
@@ -551,8 +557,8 @@ public class Template {
           } else
             throw new FHIRException("onLoad script "+targetOnLoad+" failed - no output file produced");        
         case IG_NO_RESOURCE:
-          if (new File(newXml).exists()) {
-            try (FileInputStream f = new FileInputStream(newXml)) {
+          if (ManagedFileAccess.file(newXml).exists()) {
+            try (FileInputStream f = ManagedFileAccess.inStream(newXml)) {
               if (USE_R5_IG_FORMAT) {
                 loadModifiedIg((ImplementationGuide) VersionConvertorFactory_50_N.convertResource(new org.hl7.fhir.r5.formats.XmlParser().parse(f)), ig);
               } else {
@@ -560,8 +566,8 @@ public class Template {
               }
             }
           }
-          else if (new File(newJson).exists()) {
-            try (FileInputStream f = new FileInputStream(newJson)) {
+          else if (ManagedFileAccess.file(newJson).exists()) {
+            try (FileInputStream f = ManagedFileAccess.inStream(newJson)) {
               if (USE_R5_IG_FORMAT) {
                 loadModifiedIg((ImplementationGuide) VersionConvertorFactory_50_N.convertResource(new org.hl7.fhir.r5.formats.JsonParser().parse(f)), ig);
               } else {
@@ -616,7 +622,7 @@ public class Template {
    * @return the parsed OperationOutcome, or null if the file could not be read
    */
   private OperationOutcome readOutcomes(String target, File outcomes, IParser parser, Map<String, List<ValidationMessage>> res) {
-    try (FileInputStream f = new FileInputStream(outcomes)) {
+    try (FileInputStream f = ManagedFileAccess.inStream(outcomes)) {
       return (OperationOutcome) parser.parse(f);
     } catch (IOException | FHIRException | ClassCastException e) {
       if (!res.containsKey("")) {
@@ -698,6 +704,20 @@ public class Template {
     return null;
   }
 
+  /**
+   * Whether the template is trusted to run what it nominates: its ant script, and its pre-process transforms
+   */
+  public boolean canExecute() {
+    return canExecute;
+  }
+
+  /**
+   * Why the template isn't trusted (see canExecute())
+   */
+  public String getUntrustedReason() {
+    return "the template '"+templateThatCantExecute+"' is not trusted (reason: "+templateReason+")";
+  }
+
   public ImplementationGuide onLoadEvent(ImplementationGuide ig, Map<String, List<ValidationMessage>> messages) throws IOException, FHIRException {
     if (targetOnLoad == null)
       return ig;
@@ -706,23 +726,23 @@ public class Template {
   }
   
   public Map<String, List<ValidationMessage>> beforeGenerateEvent(IWorkerContext context, ImplementationGuide ig, String tempDir, Set<String> fileList, List<String> newFileList, List<String> translationLangs) throws IOException, FHIRException {
-    File src = new File(Utilities.path(templateDir, "content"));
+    File src = ManagedFileAccess.file(Utilities.path(templateDir, "content"));
     if (src.exists()) {
       for (File f : src.listFiles()) {
         if (f.isDirectory()) {
-          FileUtils.copyDirectory(f, new File(Utilities.path(tempDir, f.getName())));
+          FileUtils.copyDirectory(f, ManagedFileAccess.file(Utilities.path(tempDir, f.getName())));
           if (!translationLangs.isEmpty()) {
             for (String lang: translationLangs) {
-              FileUtils.copyDirectory(f, new File(Utilities.path(tempDir, lang, f.getName())));
+              FileUtils.copyDirectory(f, ManagedFileAccess.file(Utilities.path(tempDir, lang, f.getName())));
             }
           }
         } else {
-          File nf = new File(Utilities.path(tempDir, f.getName()));
+          File nf = ManagedFileAccess.file(Utilities.path(tempDir, f.getName()));
           fileList.add(nf.getAbsolutePath());
           FileUtils.copyFile(f, nf);
           if (!translationLangs.isEmpty()) {
             for (String lang: translationLangs) {
-              File nfl = new File(Utilities.path(tempDir, lang, f.getName()));
+              File nfl = ManagedFileAccess.file(Utilities.path(tempDir, lang, f.getName()));
               fileList.add(nfl.getAbsolutePath());
               FileUtils.copyFile(f, nfl);
             }
@@ -732,7 +752,9 @@ public class Template {
     }
     if (targetOnGenerate != null) {
       Map<String, List<ValidationMessage>> messages = new HashMap<String, List<ValidationMessage>>();
-      antProject.setProperty("ig.temp", tempDir);
+      if (antProject != null) { // null if the template isn't trusted: runScriptTarget() fails with the reason
+        antProject.setProperty("ig.temp", tempDir);
+      }
       runScriptTarget(context, targetOnGenerate, messages, ig, newFileList, IG_NO_RESOURCE);
       return messages;
     } else

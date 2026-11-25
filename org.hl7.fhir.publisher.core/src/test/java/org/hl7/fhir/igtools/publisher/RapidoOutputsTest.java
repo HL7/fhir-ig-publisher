@@ -170,6 +170,27 @@ class RapidoOutputsTest {
     assertFalse(Files.exists(dir.resolve("cache").resolve(".build-outputs.json")));
   }
 
+  /**
+   * The record of what was written is in the IG's folder, so it can be edited: what is gone is only deleted where it
+   * really is in the temp folder, not through a link in it
+   */
+  @Test
+  void whatIsGoneThroughALinkIsNotDeleted() throws Exception {
+    String temp = dir.resolve("temp").toString();
+    String cache = dir.resolve("cache").toString();
+    Files.createDirectories(dir.resolve("cache"));
+    Files.createDirectories(dir.resolve("temp"));
+    Path precious = Files.createDirectories(dir.resolve("precious"));
+    Files.writeString(precious.resolve("a.html"), "a");
+    FetchedFile page = file("a.md", temp, "sub/a.html", "b.html");
+    new RapidoOutputs(cache, temp).update(List.of(page), List.of(page));
+
+    Files.createSymbolicLink(dir.resolve("temp").resolve("sub"), precious);
+    FetchedFile page2 = file("a.md", temp);
+    RapidoOutputs.Change change = new RapidoOutputs(cache, temp).update(List.of(page2), List.of(page2));
+    assertEquals(Set.of(p(temp, "b.html")), change.getGone());
+  }
+
   private static String p(String temp, String name) throws Exception {
     return Utilities.path(temp, name);
   }

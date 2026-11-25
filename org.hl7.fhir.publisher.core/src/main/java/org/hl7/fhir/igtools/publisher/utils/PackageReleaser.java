@@ -223,7 +223,7 @@ public class PackageReleaser {
     // a key that is configured but can't be used stops the release before anything is published
     signer = NpmPackageSigner.fromSettings();
     if (signer != null) {
-      System.out.println("Signing packages with key "+signer.getKeyId());
+    System.out.println("Signing packages with key "+signer.getKeyId());
     }
     Map<String, String> currentPublishedVersions = scanForCurrentVersions(dest);
     System.out.println("Current Published Versions");
@@ -865,7 +865,7 @@ public class PackageReleaser {
       // sign the package, so its signature (package.tgz.sigstore.json) is copied with it
       File sig = new File(Utilities.path(source, vd.getId(), "output", "package.tgz"+NpmPackageSigner.SIGNATURE_SUFFIX));
       if (signer != null) {
-        signer.sign(new File(Utilities.path(source, vd.getId(), "output", "package.tgz")), "FHIR IG Publisher "+IGVersionUtil.getVersion());
+        signer.sign(new File(Utilities.path(source, vd.getId(), "output", "package.tgz")), npm.name(), npm.version(), "FHIR IG Publisher "+IGVersionUtil.getVersion());
       } else if (sig.exists()) {
         sig.delete(); // an old signature must not be published with a package it may not match
       }

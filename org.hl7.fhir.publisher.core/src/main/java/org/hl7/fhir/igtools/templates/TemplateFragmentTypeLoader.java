@@ -9,6 +9,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 
 public class TemplateFragmentTypeLoader {
 
@@ -44,7 +45,7 @@ public class TemplateFragmentTypeLoader {
    * Finds all .html files in a directory and its subdirectories
    */
   public List<Path> findHtmlFiles(String directoryPath) throws IOException {
-    Path startPath = Paths.get(directoryPath);
+    Path startPath = ManagedFileAccess.file(directoryPath).toPath();
 
     try (Stream<Path> paths = Files.walk(startPath)) {
       return paths

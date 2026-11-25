@@ -113,32 +113,6 @@ import static org.hl7.fhir.igtools.publisher.CliParams.SSRF_PROTECTION_ENABLED_P
 /**
  * Implementation Guide Publisher
  *
- * If you want to use this inside a FHIR server, and not to access content
- * on a local folder, provide your own implementation of the file fetcher
- *
- * rough sequence of activities:
- *
- *   load the context using the internal validation pack
- *   connect to the terminology service
- *
- *   parse the implementation guide
- *   find all the source files and determine the resource type
- *   load resources in this order:
- *     naming system
- *     code system
- *     value setx
- *     data element?
- *     structure definition
- *     concept map
- *     structure map
- *
- *   validate all source files (including the IG itself)
- *
- *   for each source file:
- *     generate all outputs
- *
- *   generate summary file
- *
  * Documentation: see http://wiki.hl7.org/index.php?title=IG_Publisher_Documentation
  *
  * The Publisher has 4 main related classes (and was broken up into these classes in August 2025)
@@ -155,6 +129,32 @@ import static org.hl7.fhir.igtools.publisher.CliParams.SSRF_PROTECTION_ENABLED_P
  */
 
 public class Publisher extends PublisherBase implements IReferenceResolver, IValidationProfileUsageTracker, IResourceLinkResolver {
+
+  /**
+   * The system property that stops XML parsers created in this JVM from reading external DTDs and external entities
+   */
+  public static final String ACCESS_EXTERNAL_DTD = "javax.xml.accessExternalDTD";
+
+  static {
+    disableExternalXmlEntities();
+  }
+
+  /**
+   * Template scripts run ant tasks (e.g. xslt) over files that the IG supplies, such as input/includes/menu.xml. Ant's
+   * transformers don't come from XMLUtil's protected factories, so without this, an external entity in such a file
+   * reads any local file (or URL) into the transform's output - which ends up in the IG's published QA output.
+   *
+   * It has to be set before anything parses XML: Saxon keeps the parser it creates first, so setting it later doesn't
+   * reach Saxon (the JDK's own parsers read it each time). Nothing the publisher reads should need an external DTD or
+   * entity; if this needs to be turned off, set -Djavax.xml.accessExternalDTD=all on the command line, which this
+   * leaves alone. It doesn't reach forked JVMs (ant's &lt;java fork="true"&gt;)
+   */
+  public static void disableExternalXmlEntities() {
+    if (System.getProperty(ACCESS_EXTERNAL_DTD) == null) {
+      System.setProperty(ACCESS_EXTERNAL_DTD, "");
+    }
+  }
+
   public static final String FHIR_SETTINGS_PARAM = "-fhir-settings";
   public static final int FMM_DERIVATION_MAX = 5;
   public static final String IG_NAME = "!ig!";
@@ -204,7 +204,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     try {
       if (settings.isWatchMode()) {
         watchRoot = watchRoot(rootDir);
-        Path igIni = new File(rootDir).isFile() ? Paths.get(rootDir).toAbsolutePath().normalize() : watchRoot.resolve("ig.ini");
+        Path igIni = ManagedFileAccess.file(rootDir).isFile() ? Paths.get(rootDir).toAbsolutePath().normalize() : watchRoot.resolve("ig.ini");
         watched = new ArrayList<>(Arrays.asList(
                 FileChangeMonitor.MonitoredPath.file(igIni),
                 FileChangeMonitor.MonitoredPath.file(watchRoot.resolve("sushi-config.yaml")),
@@ -325,13 +325,13 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         throw e;
       }
     }
-    if (pf.templateLoaded && new File(rootDir).exists()) {
-      FileUtilities.clearDirectory(Utilities.path(rootDir, "template"));
+    if (pf.templateLoaded && ManagedFileAccess.file(rootDir).exists()) {
+      PublisherUtils.clearFolder(Utilities.path(rootDir, "template"));
     }
     if (pf.folderToDelete != null) {
       try {
         FileUtilities.clearDirectory(pf.folderToDelete);
-        new File(pf.folderToDelete).delete();
+        ManagedFileAccess.file(pf.folderToDelete).delete();
       } catch (Throwable e) {
         // nothing
       }
@@ -457,10 +457,9 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     qaJson.add("version", Constants.VERSION);
     qaJson.add("tool", Constants.VERSION+" ("+ToolsVersion.TOOLS_VERSION+")");
     try {
-      File od = new File(pf.outputDir);
-      FileUtils.cleanDirectory(od);
+      PublisherUtils.clearFolder(pf.outputDir);
       pf.npm = new NPMPackageGenerator(Utilities.path(pf.outputDir, "package.tgz"), pf.templateInfo, pf.getExecTime().getTime(), !settings.isPublishing());
-      pf.npm.loadFiles(pf.rootDir, ".npmignore", new File(pf.rootDir), ".git", "output", "package", "temp");
+      pf.npm.loadFiles(pf.rootDir, ".npmignore", ManagedFileAccess.file(pf.rootDir), ".git", "output", "package", "temp");
       pf.npm.finish();
 
       FileUtilities.stringToFile(makeTemplateIndexPage(), Utilities.path(pf.outputDir, "index.html"));
@@ -468,10 +467,10 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       FileUtilities.stringToFile(makeTemplateQAPage(), Utilities.path(pf.outputDir, "qa.html"));
 
       if (settings.getMode() != PublisherUtils.IGBuildMode.AUTOBUILD) {
-        try (FileInputStream in = new FileInputStream(pf.npm.filename())) {
+        try (FileInputStream in = ManagedFileAccess.inStream(pf.npm.filename())) {
           pf.pcm.addPackageToCache(pf.templateInfo.asString("name"), pf.templateInfo.asString("version"), in, Utilities.path(pf.outputDir, "package.tgz"));
         }
-        try (FileInputStream in = new FileInputStream(pf.npm.filename())) {
+        try (FileInputStream in = ManagedFileAccess.inStream(pf.npm.filename())) {
           pf.pcm.addPackageToCache(pf.templateInfo.asString("name"), "dev", in, Utilities.path(pf.outputDir, "package.tgz"));
         }
       }
@@ -493,7 +492,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     zip.addFileSource("index.html", REDIRECT_SOURCE, false);
     zip.close();
     FileUtilities.copyFile(Utilities.path(pf.tempDir, "full-ig.zip"), Utilities.path(pf.outputDir, "full-ig.zip"));
-    new File(Utilities.path(pf.tempDir, "full-ig.zip")).delete();
+    ManagedFileAccess.file(Utilities.path(pf.tempDir, "full-ig.zip")).delete();
 
     // registering the package locally
     log("Finished @ "+nowString()+". "+DurationUtil.presentDuration(endTime - startTime)+". Output in "+ pf.outputDir);
@@ -705,6 +704,9 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
    * when the output folder was emptied for each build)
    */
   static void recordFailure(Path staging, Path output) throws IOException {
+    // both roots have to be ones the build may access
+    ManagedFileAccess.fromPath(staging);
+    ManagedFileAccess.fromPath(output);
     Path staged = staging.resolve("qa.json");
     Path qa = output.resolve("qa.json");
     if (Files.exists(staged)) {
@@ -1137,7 +1139,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       pf.context.dropResource(r);
     }
     if (settings.getDestDir() != null) {
-      if (!(new File(settings.getDestDir()).exists()))
+      if (!(ManagedFileAccess.file(settings.getDestDir()).exists()))
         FileUtilities.createDirectory(settings.getDestDir());
       FileUtilities.copyDirectory(pf.outputDir, settings.getDestDir(), null);
     }
@@ -1217,7 +1219,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   }
 
   private void copyDefaultTemplate() throws IOException, FHIRException {
-    if (!new File(pf.adHocTmpDir).exists())
+    if (!ManagedFileAccess.file(pf.adHocTmpDir).exists())
       FileUtilities.createDirectory(pf.adHocTmpDir);
     FileUtilities.clearDirectory(pf.adHocTmpDir);
 
@@ -1253,7 +1255,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       CompressionUtilities.zipSlipProtect(n, Path.of(dir));
       FileUtilities.createDirectory(dir);
 
-      try (FileOutputStream output = new FileOutputStream(filename)) {
+      try (FileOutputStream output = ManagedFileAccess.outStream(filename)) {
         int len = 0;
         while ((len = zip.read(buffer)) > 0)
           output.write(buffer, 0, len);
@@ -1293,12 +1295,12 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 
 
   private void copyFiles(String base, String folder, String dest, List<String> files) throws IOException {
-    for (File f : new File(folder).listFiles()) {
+    for (File f : ManagedFileAccess.file(folder).listFiles()) {
       if (f.isDirectory()) {
         copyFiles(base, f.getAbsolutePath(),  Utilities.path(dest, f.getName()), files);
       } else {
         String dst = Utilities.path(dest, f.getName());
-        FileUtils.copyFile(f, new File(dst), true);
+        FileUtils.copyFile(f, ManagedFileAccess.file(dst), true);
         files.add(f.getAbsolutePath().substring(base.length()+1));
       }
     } 
@@ -1309,7 +1311,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     URL url = URI.create(address).toURL();
     URLConnection c = url.openConnection();
     InputStream s = c.getInputStream();
-    try (FileOutputStream f = new FileOutputStream(filename)) {
+    try (FileOutputStream f = ManagedFileAccess.outStream(filename)) {
       transfer(s, f, 1024);
     }
   }
@@ -1341,7 +1343,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     b.append("\r\n");
   }
 
-  public static String buildReport(String ig, String source, String log, String qafile, String tx) throws Exception {
+  public static String buildReport(String ig, String source, String log, String qafile, String tx, String txCache) throws Exception {
     StringBuilder b = new StringBuilder();
     b.append("= Log =\r\n");
     b.append(log);
@@ -1353,7 +1355,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     prop(b, "source", source);
     prop(b, "user.dir", System.getProperty("user.home"));
     prop(b, "tx.server", tx);
-    prop(b, "tx.cache", Utilities.path(System.getProperty("user.home"), "fhircache"));
+    prop(b, "tx.cache", txCache == null ? "(not set yet)" : txCache);
     prop(b, "system.type", System.getProperty("sun.arch.data.model"));
     prop(b, "system.cores", Integer.toString(Runtime.getRuntime().availableProcessors()));   
     prop(b, "system.mem.free", Long.toString(Runtime.getRuntime().freeMemory()));   
@@ -1598,7 +1600,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
             e.printStackTrace();
             break;
           }
-          FileUtilities.stringToFile(buildReport(ig, null, self.pf.filelog.toString(), Utilities.path(self.pf.qaDir, "validation.txt"), self.settings.getTxServer()), Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher-" + Integer.toString(i) + ".log"));
+          FileUtilities.stringToFile(buildReport(ig, null, self.pf.filelog.toString(), Utilities.path(self.pf.qaDir, "validation.txt"), self.settings.getTxServer(), self.pf.vsCache), Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher-" + Integer.toString(i) + ".log"));
           System.out.println("=======================================================================================");
           System.out.println("");
           System.out.println("");
@@ -1634,10 +1636,14 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       //      }
       self.logMessage("Start Clock @ " + nowAsString(self.settings.getStartTime()) + " (" + nowAsDate(self.settings.getStartTime()) + ")");
       self.logMessage("");
+      if (CliParams.hasNamedParam(args, "-publish") && !CliParams.hasNamedParam(args, "-auto-ig-build")) {
+        // a publication build runs in a copy of the IG without its .git: the publication process says where it came from
+        self.setRepoSource(CliParams.getNamedParam(args, "-repo"));
+      }
       if (CliParams.hasNamedParam(args, "-auto-ig-build")) {
         self.settings.setMode(PublisherUtils.IGBuildMode.AUTOBUILD);
         self.settings.setTargetOutput(CliParams.getNamedParam(args, "-target"));
-        self.settings.setRepoSource(CliParams.getNamedParam(args, "-repo"));
+        self.setRepoSource(CliParams.getNamedParam(args, "-repo"));
       } else if (CliParams.hasNamedParam(args, "-rapido") || CliParams.hasNamedParam(args, "-cascais")) {
         self.settings.setRapidoMode(true);
         if (CliParams.hasNamedParam(args, "-watch")) {
@@ -1736,6 +1742,15 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         self.setConfigFile(determineActualIG(CliParams.getNamedParam(args, "-ig"), self.settings.getMode()));
         self.setConfigFile(getAbsoluteConfigFilePath(self.getConfigFile()));
       }
+      if (CliParams.hasNamedParam(args, "-trust-template")) {
+        self.settings.setTrustTemplate(CliParams.getNamedParam(args, "-trust-template"));
+      }
+      if (CliParams.hasNamedParam(args, ExternalLinkPermission.PARAMETER)) {
+        self.settings.setAllowExternalLinks(true);
+      }
+      if (CliParams.hasNamedParam(args, CommittedScriptPermission.PARAMETER)) {
+        self.settings.setAllowCommittedScripts(true);
+      }
       if (CliParams.hasNamedParam(args, "-jekyll")) {
         self.settings.setJekyllCommand(CliParams.getNamedParam(args, "-jekyll"));
       }
@@ -1813,7 +1828,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         exitCode = 1;
       } finally {
         if (self.settings.getMode() == PublisherUtils.IGBuildMode.MANUAL) {
-          FileUtilities.stringToFile(buildReport(CliParams.getNamedParam(args, "-ig"), CliParams.getNamedParam(args, "-source"), self.pf.filelog.toString(), Utilities.path(self.pf.qaDir, "validation.txt"), self.settings.getTxServer()), Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher.log"));
+          FileUtilities.stringToFile(buildReport(CliParams.getNamedParam(args, "-ig"), CliParams.getNamedParam(args, "-source"), self.pf.filelog.toString(), Utilities.path(self.pf.qaDir, "validation.txt"), self.settings.getTxServer(), self.pf.vsCache), Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher.log"));
         }
       }
       PublisherFields.consoleLogger.stop();
@@ -1840,6 +1855,22 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       if ("false".equalsIgnoreCase(ssrfProtectionEnabled)) {
         ManagedWebAccess.setSsrfProtectionEnabled(false);
       }
+    }
+    forceSsrfProtectionOnCiBuild(args);
+  }
+
+  /**
+   * The ci-build builds IGs that anyone can write, and an IG chooses URLs (dependencies, canonicals, references): only
+   * public https servers are reached, whatever fhir-settings.json or the command line says. A server that
+   * fhir-settings.json names with allowPrivateNetwork or allowHttp is still allowed: that's the builder's own choice,
+   * for that server
+   */
+  static void forceSsrfProtectionOnCiBuild(String[] args) {
+    if (CliParams.hasNamedParam(args, "-auto-ig-build")) {
+      if (!ManagedWebAccess.isSsrfProtectionEnabled()) {
+        System.out.println("SSRF protection is always on for the ci-build (-auto-ig-build): the setting that turned it off is ignored");
+      }
+      ManagedWebAccess.setSsrfProtectionEnabled(true);
     }
   }
 
@@ -1883,17 +1914,34 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     }
   }
 
-  private static String removePassword(String[] args, int i) {
-    if (i == 0 || !args[i-1].toLowerCase().contains("password")) {
-      return args[i];
-    } else {
+  /**
+   * Make a command line argument safe to log: mask the value after any parameter named *password*, and strip
+   * user info (e.g. a token in https://user:token@github.com/...) from any URL in the argument, and from a value
+   * that starts user:password@ with no scheme (e.g. a -proxy value: user:password@proxy:8080)
+   */
+  public static String removePassword(String[] args, int i) {
+    if (i > 0 && args[i-1].toLowerCase().contains("password")) {
       return "XXXXXX";
     }
-  }
-
-  private static String removePassword(String string) {
-    // TODO Auto-generated method stub
-    return null;
+    if (args[i] == null) {
+      return null;
+    }
+    // user info runs to the last @ before the host: a password can have an @ in it (it should be %40, but)
+    String s = args[i].replaceAll("(?i)\\b([a-z][a-z0-9+.-]*://)[^/\\s]*@", "$1");
+    // and with no scheme, the user info is before the last @ that comes before any /, \ or space (so not a path)
+    int end = s.length();
+    for (char c : new char[] {'/', '\\', ' '}) {
+      int k = s.indexOf(c);
+      if (k >= 0 && k < end) {
+        end = k;
+      }
+    }
+    int at = end == 0 ? -1 : s.lastIndexOf('@', end - 1);
+    int colon = s.indexOf(':');
+    if (!s.contains("://") && colon > 0 && colon < at) {
+      s = s.substring(at + 1);
+    }
+    return s;
   }
 
   /** reads -threads into the settings and, if it was given, says how many extra threads the run may use */
@@ -2059,11 +2107,15 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     }
     String folder = Utilities.path("[tmp]", "fhir-igs", makeFileName(org), makeFileName(repo), branch == null ? "master" : makeFileName(branch));
     File f = new File(folder);
-    if (f.exists() && !f.isDirectory()) {
-      f.delete();
+    if (java.nio.file.Files.exists(f.toPath(), java.nio.file.LinkOption.NOFOLLOW_LINKS) && !java.nio.file.Files.isDirectory(f.toPath(), java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+      f.delete(); // a file, or a link: the link is deleted, not what it links to
     }
     if (!f.exists()) {
       FileUtilities.createDirectory(folder);
+    }
+    // the temp folder is shared, so someone else could have made a folder on the way a link to somewhere else
+    if (!PublisherUtils.isInside(Utilities.path("[tmp]"), folder)) {
+      throw new IOException("The folder "+folder+" isn't really in the temp folder: a folder on its path is a link to somewhere else");
     }
     FileUtilities.clearDirectory(f.getAbsolutePath());
 

@@ -6,6 +6,7 @@ import java.util.List;
 
 import org.hl7.fhir.services.sql.Provider;
 import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.services.elementmodel.Element;
 import org.hl7.fhir.services.elementmodel.Manager;
 import org.hl7.fhir.model.utilities.formats.FhirFormat;
 import org.hl7.fhir.services.elementmodel.ValidatedFragment;
@@ -83,13 +84,14 @@ public class PublisherProvider implements Provider {
   @Override
   public Base resolveReference(Base rootResource, String ref, String specifiedResourceType) {
     if (ref.startsWith("#")) {
-      return null;
+      return resolveContained(rootResource, ref.substring(1), specifiedResourceType);
     }
     if (Utilities.isAbsoluteUrl(ref)) {
       return null;
     } else {
       String[] p = ref.split("/");
-      if (p.length == 2 && context.getResourceNamesAsSet().contains(p[0])) {
+      // getReferenceKey(Type) has no value when the reference is to some other type
+      if (p.length == 2 && context.getResourceNamesAsSet().contains(p[0]) && (specifiedResourceType == null || specifiedResourceType.equals(p[0]))) {
         for (FetchedFile f : fileList) {
           for (FetchedResource r : f.getResources()) {
             if (p[0].equals(r.fhirType()) && p[1].equals(r.getId())) {
@@ -97,6 +99,26 @@ public class PublisherProvider implements Provider {
             }
           }
         }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * A contained reference (#id) is resolved inside the resource being processed, which the
+   * runner passes as rootResource
+   */
+  private Base resolveContained(Base rootResource, String id, String specifiedResourceType) {
+    if (!(rootResource instanceof Element)) {
+      return null;
+    }
+    for (Element c : ((Element) rootResource).getChildren("contained")) {
+      String cid = c.getIdBase();
+      if (cid != null && cid.startsWith("#")) {
+        cid = cid.substring(1);
+      }
+      if (id.equals(cid)) {
+        return specifiedResourceType == null || specifiedResourceType.equals(c.fhirType()) ? c : null;
       }
     }
     return null;

@@ -55,6 +55,7 @@ import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.util.Base64URL;
 import com.nimbusds.jose.util.X509CertUtils;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 
 public class PublisherSigner {
 
@@ -130,8 +131,8 @@ public class PublisherSigner {
     String pem = DEF_X509_CERT;
     String key = DEF_X509_KEY;
 
-    File fc = new File(Utilities.path(rootDir, "input", "signing-key.pem"));
-    File fk = new File(Utilities.path(rootDir, "input", "signing-key.key"));
+    File fc = ManagedFileAccess.file(Utilities.path(rootDir, "input", "signing-key.pem"));
+    File fk = ManagedFileAccess.file(Utilities.path(rootDir, "input", "signing-key.key"));
     if (fc.exists() && fk.exists()) {
       pem = FileUtilities.fileToString(fc);
       key = FileUtilities.fileToString(fk);
