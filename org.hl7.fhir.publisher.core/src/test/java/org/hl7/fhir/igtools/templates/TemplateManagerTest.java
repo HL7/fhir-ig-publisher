@@ -227,12 +227,46 @@ class TemplateManagerTest {
     assertFalse(Files.exists(dir.resolve("fhir-settings.json")));
   }
 
-  // core-tem-unwind @ParameterizedTest
-// core-tem-unwind   @CsvSource({"#template, #template", "my.template#1.0.0, my.template", "my.template, my.template",
-// core-tem-unwind       "https://github.com/org/repo, https://github.com/org/repo", "#my-folder, #my-folder"})
-// core-tem-unwind   void aTemplateIsTrustedLocallyByItsIdWithoutAVersion(String template, String id) {
-    // core-tem-unwind assertEquals(id, TemplateManager.trustId(template));
-// core-tem-unwind   }
+  @ParameterizedTest
+  @CsvSource({"'#template', '#template'", "my.template#1.0.0, my.template", "my.template, my.template",
+      "https://github.com/org/repo, https://github.com/org/repo", "'#my-folder', '#my-folder'"})
+  void aTemplateIsTrustedLocallyByItsIdWithoutAVersion(String template, String id) {
+    assertEquals(id, TemplateManager.trustId(template));
+  }
+
+  /**
+   * Where the settings can't be written (a container, a read-only home folder), -trust-template still trusts the
+   * template for this run: it just can't be recorded
+   */
+  @Test
+  void locallyTrustTemplateRunsTheScriptWhenTheSettingsCantBeWritten() throws IOException {
+    Path marker = scriptedInPlaceTemplate();
+    // a folder that can't be made, even by root: there's a file in the way
+    write("not-a-folder", "x");
+    ILoggingService logger = Mockito.mock(ILoggingService.class);
+    TemplateManager tm = new TemplateManager(null, logger);
+    tm.setSettingsPath(dir.resolve("not-a-folder").resolve("fhir-settings.json").toString());
+    tm.setTrustTemplate("#template");
+
+    tm.loadTemplate("#template", dir.toString(), "x.y", false, false, false);
+
+    assertTrue(Files.exists(marker));
+    Mockito.verify(logger).logMessage(Mockito.contains("is trusted for this run"));
+  }
+
+  /** a settings file that can't be read doesn't stop -trust-template either, and it isn't written over */
+  @Test
+  void locallyTrustTemplateRunsTheScriptWhenTheSettingsCantBeRead() throws IOException {
+    Path marker = scriptedInPlaceTemplate();
+    write("fhir-settings.json", "{ not json");
+    TemplateManager tm = manager();
+    tm.setTrustTemplate("#template");
+
+    tm.loadTemplate("#template", dir.toString(), "x.y", false, false, false);
+
+    assertTrue(Files.exists(marker));
+    assertEquals("{ not json", Files.readString(dir.resolve("fhir-settings.json")));
+  }
 
   @Test
   void trustIsAddedToTheSettingsWithoutLosingAnything() throws IOException {

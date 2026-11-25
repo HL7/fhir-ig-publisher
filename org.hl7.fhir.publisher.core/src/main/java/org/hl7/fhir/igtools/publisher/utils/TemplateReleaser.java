@@ -36,7 +36,7 @@ import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.model.JsonProperty;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.NpmPackage;
-// core-tem-unwind import org.hl7.fhir.utilities.npm.NpmPackageSigner;
+import org.hl7.fhir.utilities.npm.NpmPackageSigner;
 import org.hl7.fhir.igtools.publisher.IGVersionUtil;
 import org.hl7.fhir.utilities.npm.PackageList;
 import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
@@ -124,7 +124,7 @@ public class TemplateReleaser {
   private Element channel;
   private String linkRoot;
   // the key packages are signed with (fhir-settings.json packageSigningKey), or null
-  // core-tem-unwind private NpmPackageSigner signer;
+  private NpmPackageSigner signer;
 
   private File xml;
 
@@ -147,10 +147,10 @@ public class TemplateReleaser {
     SimpleDateFormat df = new SimpleDateFormat(RSS_DATE, new Locale("en", "US"));
     checkDest(dest);
     // a key that is configured but can't be used stops the release before anything is published
-// core-tem-unwind     signer = NpmPackageSigner.fromSettings();
-// core-tem-unwind     if (signer != null) {
-// core-tem-unwind       System.out.println("Signing packages with key "+signer.getKeyId());
-// core-tem-unwind     }
+    signer = NpmPackageSigner.fromSettings();
+    if (signer != null) {
+      System.out.println("Signing packages with key "+signer.getKeyId());
+    }
     
     Map<String, String> currentPublishedVersions = scanForCurrentVersions(dest);
     Map<String, String> currentVersions = scanForCurrentVersions(source);
@@ -632,12 +632,12 @@ public class TemplateReleaser {
       check(!dst.exists() || FileUtilities.isEmptyDirectory(dst), "Implied destination "+dst.getAbsolutePath()+" already exists - check that a new version is being released.");  
       
       // sign the package, so its signature (package.tgz.sigstore.json) is copied with it
-// core-tem-unwind       File sig = new File(Utilities.path(source, vd.getId(), "output", "package.tgz"+NpmPackageSigner.SIGNATURE_SUFFIX));
-// core-tem-unwind       if (signer != null) {
-// core-tem-unwind         signer.sign(new File(Utilities.path(source, vd.getId(), "output", "package.tgz")), "FHIR IG Publisher "+IGVersionUtil.getVersion());
-// core-tem-unwind       } else if (sig.exists()) {
-// core-tem-unwind         sig.delete(); // an old signature must not be published with a package it may not match
-// core-tem-unwind       }
+      File sig = new File(Utilities.path(source, vd.getId(), "output", "package.tgz"+NpmPackageSigner.SIGNATURE_SUFFIX));
+      if (signer != null) {
+        signer.sign(new File(Utilities.path(source, vd.getId(), "output", "package.tgz")), npm.name(), npm.version(), "FHIR IG Publisher "+IGVersionUtil.getVersion());
+      } else if (sig.exists()) {
+        sig.delete(); // an old signature must not be published with a package it may not match
+      }
       // copy files
       FileUtilities.createDirectory(dst.getAbsolutePath());
       FileUtilities.copyDirectory(Utilities.path(source, vd.getId(), "output"), Utilities.path(dest, npm.name(), npm.version()), null);
@@ -672,9 +672,9 @@ public class TemplateReleaser {
       addTextChild(item, "guid", Utilities.pathURL(linkRoot, npm.name(), npm.version(), "package.tgz")).setAttribute("isPermaLink", "true");
       addTextChild(item, "dc:creator", "FHIR Project");
       addTextChild(item, "fhir:kind", npm.type());
-// core-tem-unwind       if (signer != null) {
-      // core-tem-unwind addTextChild(item, "fhir:signature", Utilities.pathURL(linkRoot, npm.name(), npm.version(), "package.tgz"+NpmPackageSigner.SIGNATURE_SUFFIX));
-      // core-tem-unwind }
+      if (signer != null) {
+      addTextChild(item, "fhir:signature", Utilities.pathURL(linkRoot, npm.name(), npm.version(), "package.tgz"+NpmPackageSigner.SIGNATURE_SUFFIX));
+      }
       addTextChild(item, "pubDate", df.format(new Date()));
       txt = rss.createTextNode("\n    ");
       item.appendChild(txt);

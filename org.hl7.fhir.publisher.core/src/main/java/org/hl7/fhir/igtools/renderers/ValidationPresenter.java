@@ -72,6 +72,7 @@ import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.stringtemplate.v4.ST;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 
 public class ValidationPresenter implements Comparator<FetchedFile> {
 
@@ -546,7 +547,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
         }
       }
     }
-    try (FileOutputStream s = new FileOutputStream(FileUtilities.changeFileExt(path, ".xml"))) {
+    try (FileOutputStream s = ManagedFileAccess.outStream(FileUtilities.changeFileExt(path, ".xml"))) {
       new XmlParser(context.getModelContext()).compose(s, validationBundle, true);
     }
 

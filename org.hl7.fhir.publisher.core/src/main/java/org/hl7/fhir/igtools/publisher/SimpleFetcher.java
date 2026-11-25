@@ -58,6 +58,7 @@ import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.logging.ILoggingService;
 import org.hl7.fhir.utilities.regex.RegexConstants;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 
 public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
 
@@ -117,7 +118,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
 
   @Override
   public FetchedFile fetch(String path) throws Exception {
-    File f = new File(path);
+    File f = ManagedFileAccess.file(path);
     if (!f.exists())
       throw new Exception("Unable to find file "+path);
     FetchedFile ff = new FetchedFile(path, getPathFromInput(path));
@@ -140,7 +141,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
       } else if (path.endsWith("xml")) {
         ff.setContentType("application/fhir+xml");
       }
-      try (InputStream ss = new FileInputStream(f)) {
+      try (InputStream ss = ManagedFileAccess.inStream(f)) {
         byte[] b = new byte[ss.available()];
         ss.read(b, 0, ss.available());
         ff.setSource(b);
@@ -209,11 +210,11 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
     String path = null;
     for (String dir : resourceDirs) {
       path = Utilities.path(dir, name);
-      f = new File(path+".xml");
+      f = ManagedFileAccess.file(path+".xml");
       if (f.exists()) {
         break;
       } else {
-        f = new File(path+".json");
+        f = ManagedFileAccess.file(path+".json");
         if (f.exists()) {
           break;
         }
@@ -231,7 +232,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
     } else if (f.getName().endsWith("xml")) {
       ff.setContentType("application/fhir+xml");
     }
-    try (InputStream ss = new FileInputStream(f)) {
+    try (InputStream ss = ManagedFileAccess.inStream(f)) {
       byte[] b = new byte[ss.available()];
       ss.read(b, 0, ss.available());
       ff.setSource(b);
@@ -266,9 +267,9 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
   @Override
   public boolean canFetchFlexible(String name) throws Exception {
     for (String dir : resourceDirs) {
-      if (new File(dir + File.separator + name + ".xml").exists()) {
+      if (ManagedFileAccess.file(dir + File.separator + name + ".xml").exists()) {
         return true;
-      } else if(new File(dir + File.separator + name + ".json").exists()) {
+      } else if(ManagedFileAccess.file(dir + File.separator + name + ".json").exists()) {
         return true;
       }
     }
@@ -346,7 +347,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
 
   String findFileAnyExt(List<String> dirs, String name) throws IOException {
     for (String dir : dirs) {
-      for (String fn : new File(dir).list()) {
+      for (String fn : ManagedFileAccess.file(dir).list()) {
         if (fn.startsWith(name+".")) {
           return Utilities.path(dir, fn);
         }
@@ -378,14 +379,18 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
   String findFile(List<String> dirs, String name) throws IOException {
     for (String dir : dirs) {
       String fn = Utilities.path(dir, name);
-      if (new File(fn).exists())
+      if (ManagedFileAccess.file(fn).exists())
         return fn;
     }
     return null;
   }
 
   private boolean exists(String fn) {
-    return new File(fn).exists();
+    try {
+      return ManagedFileAccess.file(fn).exists();
+    } catch (IOException e) {
+      return false; // somewhere the build's file access doesn't reach
+    }
   }
   
   @Override
@@ -401,7 +406,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
     List<FetchedFile> res = new ArrayList<>();
     for (String s : Utilities.sorted(sources)) {
       int count = 0;
-      File file = new File(s);
+      File file = ManagedFileAccess.file(s);
       if (file.exists()) {
         for (File f : file.listFiles()) {
           if (!f.isDirectory() && !isUndecodableFolder(f) && !exemptions.contains(f.getAbsolutePath()) && !isExemptFileType(f.getName())) {
@@ -416,7 +421,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
               if (!Utilities.existsInList(ext, fixedFileTypes()))
                 try {
                   org.hl7.fhir.services.elementmodel.Element e;
-                  try (FileInputStream in = new FileInputStream(f)) {
+                  try (FileInputStream in = ManagedFileAccess.inStream(f)) {
                     e = new org.hl7.fhir.services.elementmodel.XmlParser(context).parseSingle(in, null);
                   }
                   addFileForElement(res, f, e, "application/fhir+xml");
@@ -435,7 +440,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
               if (!ok && !Utilities.existsInList(ext, "xml", "ttl", "html", "txt", "fml", "adl")) {
                 try {
                   List<ValidatedFragment> el;
-                  try (FileInputStream in = new FileInputStream(fn)) {
+                  try (FileInputStream in = ManagedFileAccess.inStream(fn)) {
                     el = new org.hl7.fhir.services.elementmodel.JsonParser(context).setLogicalModelResolver(this).parse(in);
                   }
                   if (el.size() == 1) {
@@ -457,7 +462,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
               if (!ok && !Utilities.existsInList(ext, "json", "xml", "html", "txt", "fml", "adl")) {
                 try {
                   org.hl7.fhir.services.elementmodel.Element e;
-                  try (FileInputStream in = new FileInputStream(fn)) {
+                  try (FileInputStream in = ManagedFileAccess.inStream(fn)) {
                     e = new org.hl7.fhir.services.elementmodel.TurtleParser(context).parseSingle(in, null);
                   }
                   addFileForElement(res, f, e, "application/fhir+turtle");
@@ -481,7 +486,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
                     fp = new FmlParser(context, fpe);
                   }
                   org.hl7.fhir.services.elementmodel.Element e;
-                  try (FileInputStream in = new FileInputStream(f)) {
+                  try (FileInputStream in = ManagedFileAccess.inStream(f)) {
                     e = fp.parse(in).get(0).getElement();
                   }
                   addFileForElement(res, f, e, "fml");
@@ -501,7 +506,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
               }            
               if (!ok && !Utilities.existsInList(ext, "json", "xml", "html", "txt", "ttl") && context.hasPackage("openehr.base", null)) {
                 try {
-                  try (FileInputStream in = new FileInputStream(f)) {
+                  try (FileInputStream in = ManagedFileAccess.inStream(f)) {
                     new ArchetypeImporter(context, pkp.getCanonical()).checkArchetype(in, f.getName());
                   }
                   addFileForElement(res, f, null, "adl");
@@ -565,7 +570,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
     ff.setTime(f.lastModified());
     ff.setFolder(false);   
     ff.setContentType(cnt);
-    try (InputStream ss = new FileInputStream(f)) {
+    try (InputStream ss = ManagedFileAccess.inStream(f)) {
       byte[] b = new byte[ss.available()];
       ss.read(b, 0, ss.available());
       ff.setSource(b);
@@ -596,7 +601,12 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
 
   @Override
   public FetchState check(String path) {
-    File f = new File(path);
+    File f;
+    try {
+      f = ManagedFileAccess.file(path);
+    } catch (IOException e) {
+      throw new FHIRException(e.getMessage(), e);
+    }
     if (!f.exists())
       return FetchState.NOT_FOUND;
     else if (f.isDirectory())
@@ -612,7 +622,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
 
   @Override
   public InputStream openAsStream(String filename) throws FileNotFoundException {
-    return new FileInputStream(filename);
+    return ManagedFileAccess.inStream(new File(filename));
   }
 
   @Override
@@ -622,7 +632,11 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
 
   @Override
   public void scanFolders(String dir, List<String> dirs) {
-    scanFolders(new File(dir), dirs);
+    try {
+      scanFolders(ManagedFileAccess.file(dir), dirs);
+    } catch (IOException e) {
+      throw new FHIRException(e.getMessage(), e);
+    }
   }
   
   public void scanFolders(File dir, List<String> dirs) {

@@ -12,7 +12,6 @@ import org.hl7.fhir.igtools.publisher.modules.IPublisherModule;
 import org.hl7.fhir.igtools.publisher.realm.RealmBusinessRules;
 import org.hl7.fhir.igtools.renderers.BaseRenderer;
 import org.hl7.fhir.igtools.renderers.ValidationPresenter;
-// core-tem-unwindimport org.hl7.fhir.utilities.MappingSpace;
 import org.hl7.fhir.igtools.templates.Template;
 import org.hl7.fhir.igtools.templates.TemplateManager;
 import org.hl7.fhir.igtools.web.PublisherConsoleLogger;
@@ -110,7 +109,7 @@ public class PublisherFields {
     List<SpecMapManager> specMaps = new ArrayList<SpecMapManager>();
     List<PublisherUtils.LinkedSpecification> linkSpecMaps = new ArrayList<PublisherUtils.LinkedSpecification>();
     List<String> suppressedIds = new ArrayList<String>();
-    // core-tem-unwind Map<String, MappingSpace> mappingSpaces = new HashMap<String, MappingSpace>();
+    Map<String, MappingSpace> mappingSpaces = new HashMap<String, MappingSpace>();
     Map<ImplementationGuide.ImplementationGuideDefinitionResourceComponent, FetchedFile> fileMap = new HashMap<ImplementationGuide.ImplementationGuideDefinitionResourceComponent, FetchedFile>();
     Map<String, FetchedFile> altMap = new HashMap<String, FetchedFile>();
     Map<String, FetchedResource> canonicalResources = new HashMap<String, FetchedResource>();

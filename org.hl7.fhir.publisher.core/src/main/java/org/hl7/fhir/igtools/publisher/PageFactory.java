@@ -20,6 +20,7 @@ import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.JsonException;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 
 public class PageFactory {
 
@@ -212,8 +213,8 @@ public class PageFactory {
     FileUtilities.createDirectory(Utilities.path(dir, "_includes"));
   }
 
-  private void checkFileExists(String purpose, String path) {
-    File f = new File(path);
+  private void checkFileExists(String purpose, String path) throws IOException {
+    File f = ManagedFileAccess.file(path);
     if (!f.exists()) {
       throw new FHIRException("Unable to find "+purpose+" file "+path);
     }

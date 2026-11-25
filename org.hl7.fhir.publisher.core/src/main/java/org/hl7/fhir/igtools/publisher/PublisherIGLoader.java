@@ -24,7 +24,7 @@ import org.hl7.fhir.igtools.publisher.realm.RealmBusinessRules;
 import org.hl7.fhir.igtools.publisher.realm.USRealmBusinessRules;
 import org.hl7.fhir.igtools.renderers.ValidationPresenter;
 import org.hl7.fhir.igtools.spreadsheets.IgSpreadsheetParser;
-// core-tem-unwind import org.hl7.fhir.utilities.MappingSpace;
+import org.hl7.fhir.utilities.MappingSpace;
 import org.hl7.fhir.igtools.templates.TemplateManager;
 import org.hl7.fhir.igtools.templates.TrustedTemplates;
 import org.hl7.fhir.model.Base;
@@ -173,22 +173,24 @@ public class PublisherIGLoader extends PublisherBase {
     if (settings.getConfigFile() != null) {
       // before anything reads the IG's files: sushi (run next) follows links too, and its errors quote what it read
       // into the log, which the ci-build publishes
-      checkNoLinksOut(focusDir());
-      File ckm = new File(Utilities.path(focusDir(), "ckm.ini"));
+      List<String> linksOut = checkNoLinksOut(focusDir());
+      checkNoCommittedScripts(focusDir());
+      confineFileAccess(focusDir(), linksOut);
+      File ckm = ManagedFileAccess.file(Utilities.path(focusDir(), "ckm.ini"));
       if (ckm.exists()) {
         IniFile ini = new IniFile(ckm.getAbsolutePath());
         if (ini.getBooleanProperty("ckm", "process")) {
-          if (!new CKMClient().process(ini, new File(Utilities.path(focusDir(), ini.getStringProperty("ckm", "destination"))))) {
+          if (!new CKMClient().process(ini, ManagedFileAccess.file(Utilities.path(focusDir(), ini.getStringProperty("ckm", "destination"))))) {
             throw new Error("Failed to process CKM API - stopping");
           }
         }
       }
-      File fsh = new File(Utilities.path(focusDir(), "fsh"));
+      File fsh = ManagedFileAccess.file(Utilities.path(focusDir(), "fsh"));
       if (fsh.exists() && fsh.isDirectory() && !settings.isNoSushi()) {
         runSushi(fsh);
         pf.isSushi = true;
       } else {
-        File fsh2 = new File(Utilities.path(focusDir(), "input", "fsh"));
+        File fsh2 = ManagedFileAccess.file(Utilities.path(focusDir(), "input", "fsh"));
         if (fsh2.exists() && fsh2.isDirectory() && !settings.isNoSushi()) {
           runSushi(fsh);
           pf.isSushi = true;
@@ -216,7 +218,7 @@ public class PublisherIGLoader extends PublisherBase {
     }
     try {
       prescanSushiConfig(focusDir());
-      new FSHRunner(this).runFsh(new File(FileUtilities.getDirectoryForFile(fsh.getAbsolutePath())), new File(focusDir()), settings.getMode());
+      new FSHRunner(this).runFsh(ManagedFileAccess.file(FileUtilities.getDirectoryForFile(fsh.getAbsolutePath())), ManagedFileAccess.file(focusDir()), settings.getMode());
     } catch (Exception | Error e) {
       if (watchSession != null) {
         try {
@@ -238,7 +240,7 @@ public class PublisherIGLoader extends PublisherBase {
 
   private void prescanSushiConfig(String dir) throws IOException {
     // resolve packages for Sushi in advance
-    File sc = new File(Utilities.path(dir, "sushi-config.yaml"));
+    File sc = ManagedFileAccess.file(Utilities.path(dir, "sushi-config.yaml"));
     if (sc.exists()) {
       List<String> lines = Files.readAllLines(sc.toPath());
       boolean indeps = false;
@@ -303,11 +305,11 @@ public class PublisherIGLoader extends PublisherBase {
     if (settings.getConfigFile().endsWith(File.separatorChar+".")) {
       settings.setConfigFile(settings.getConfigFile().substring(0, settings.getConfigFile().length() - 2));
     }
-    File cf = settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD ? new File(settings.getConfigFile()) : new CSFile(settings.getConfigFile());
+    File cf = settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD ? ManagedFileAccess.file(settings.getConfigFile()) : ManagedFileAccess.csfile(settings.getConfigFile());
     if (!cf.exists())
       return null;
     if (cf.isDirectory())
-      cf = settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD ? new File(Utilities.path(settings.getConfigFile(), "ig.ini")) : new CSFile(Utilities.path(settings.getConfigFile(), "ig.ini"));
+      cf = settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD ? ManagedFileAccess.file(Utilities.path(settings.getConfigFile(), "ig.ini")) : ManagedFileAccess.csfile(Utilities.path(settings.getConfigFile(), "ig.ini"));
     if (!cf.exists())
       return null;
     String s = FileUtilities.fileToString(cf);
@@ -327,7 +329,7 @@ public class PublisherIGLoader extends PublisherBase {
       log("Root directory: " + pf.rootDir);
     }
     pf.fetcher.setRootDir(pf.rootDir);
-    pf.killFile = new File(Utilities.path(pf.rootDir, "ig-publisher.kill"));
+    pf.killFile = ManagedFileAccess.file(Utilities.path(pf.rootDir, "ig-publisher.kill"));
     // ok, first we load the template
     String templateName = ini.getStringProperty("IG", "template");
     if (templateName == null)
@@ -721,7 +723,7 @@ public class PublisherIGLoader extends PublisherBase {
           pf.additionalResourceFiles.add(p.getValue());
           try {
             StructureDefinition sd;
-            try (FileInputStream in = new FileInputStream(Utilities.path(pf.rootDir, p.getValue()))) {
+            try (FileInputStream in = ManagedFileAccess.inStream(Utilities.path(pf.rootDir, p.getValue()))) {
               sd = (StructureDefinition) new XmlParser(ModelContext.fullCoreContext()).parse(in);
             }
             if (sd.hasExtension(ExtensionDefinitions.EXT_ADDITIONAL_RESOURCE)) {
@@ -1027,7 +1029,7 @@ public class PublisherIGLoader extends PublisherBase {
       // away what Rapido reuses, in every build with a local template)
       PublisherUtils.clearFolder(pf.tempDir);
     } else {
-      File fTempDir = new File(pf.tempDir);
+      File fTempDir = ManagedFileAccess.file(pf.tempDir);
       if (fTempDir.exists()) {
         {
           for (File ff : fTempDir.listFiles()) {
@@ -1060,14 +1062,9 @@ public class PublisherIGLoader extends PublisherBase {
       pf.resourceDirs.add(Utilities.path(pf.rootDir, "resources"));
     if (pf.pagesDirs.isEmpty())
       pf.pagesDirs.add(Utilities.path(pf.rootDir, "pages"));
+    // otherwise the IG's own txCache folder (or its path-tx-cache), set when the IG's parameters were read
     if (settings.getMode() == PublisherUtils.IGBuildMode.WEBSERVER)
       pf.vsCache = Utilities.path(System.getProperty("java.io.tmpdir"), "fhircache");
-    else if (pf.vsCache == null) {
-      if (settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD)
-        pf.vsCache = Utilities.path(System.getProperty("java.io.tmpdir"), "fhircache");
-      else
-        pf.vsCache = Utilities.path(System.getProperty("user.home"), "fhircache");
-    }
 
     logDebugMessage(LogCategory.INIT, "Check folders");
     List<String> extraDirs = new ArrayList<String>();
@@ -1133,7 +1130,7 @@ public class PublisherIGLoader extends PublisherBase {
     } else {
       log("Terminology Cache is at "+ pf.vsCache +". "+Integer.toString(FileUtilities.countFilesInDirectory(pf.vsCache))+" files in cache");
     }
-    if (!new File(pf.vsCache).exists())
+    if (!ManagedFileAccess.file(pf.vsCache).exists())
       throw new Exception("Unable to access or create the cache directory at "+ pf.vsCache);
     logDebugMessage(LogCategory.INIT, "Load Terminology Cache from "+ pf.vsCache);
 
@@ -1410,6 +1407,7 @@ public class PublisherIGLoader extends PublisherBase {
       pf.spreadsheets.add(e.getValue().primitiveValue());
     }
     ExtensionUtilities.removeExtension(pf.sourceIg, ExtensionDefinitions.EXT_IGP_SPREADSHEET);
+    checkNoSpreadsheets(pf.spreadsheets);
 
     for (Extension e : pf.sourceIg.getExtensionsByUrl(ExtensionDefinitions.EXT_IGP_MAPPING_CSV)) {
       pf.mappings.add(e.getValue().primitiveValue());
@@ -1474,10 +1472,10 @@ public class PublisherIGLoader extends PublisherBase {
     if (settings.isWatchMode()) {
       log("The output folder "+ pf.outputDir +" is, or is inside, the temp folder's "+ WATCH_OUTPUT_STAGING +", so it is emptied on each rebuild");
     }
-    if (new File(staging).exists() && !nested(staging, pf.outputDir)) {
+    if (ManagedFileAccess.file(staging).exists() && !nested(staging, pf.outputDir)) {
       // left by a watch session: it isn't part of this build
       try {
-        FileUtils.deleteDirectory(new File(staging));
+        FileUtils.deleteDirectory(ManagedFileAccess.file(staging));
       } catch (IOException e) {
         log("Unable to delete "+ staging +", left by a watch session (it isn't used by this build): "+e.getMessage());
       }
@@ -1505,7 +1503,7 @@ public class PublisherIGLoader extends PublisherBase {
     logDebugMessage(LogCategory.INIT, "Temp: "+ pf.tempDir);
     if (pf.watchOutputDir != null) {
       // everything but the staging folder, which already has what this build wrote to the output so far
-      File[] children = new File(pf.tempDir).listFiles();
+      File[] children = ManagedFileAccess.file(pf.tempDir).listFiles();
       if (children != null) {
         for (File f : children) {
           if (!f.getName().equals(WATCH_OUTPUT_STAGING)) {
@@ -1552,7 +1550,7 @@ public class PublisherIGLoader extends PublisherBase {
    * Where the build comes from is what the ci-build said (-repo, -target) and what git says (the origin remote): none
    * of those come from the repository's content. Every one of them that is known must name the template's repository
    */
-  void checkTrustedTemplateSource(String packageId, boolean isTemplate) {
+  void checkTrustedTemplateSource(String packageId, boolean isTemplate) throws IOException {
     if (settings.getMode() != PublisherUtils.IGBuildMode.AUTOBUILD || !TrustedTemplates.isTrusted(packageId)) {
       return;
     }
@@ -1564,7 +1562,7 @@ public class PublisherIGLoader extends PublisherBase {
       throw new FHIRException("The template '"+packageId+"' is a trusted template, but the repository it is built from hasn't been recorded (TrustedTemplates), so it can't be built on the ci-build");
     }
     List<String> sources = new ArrayList<>();
-    for (String s : new String[] { settings.getRepoSource(), settings.getTargetOutput(), GitUtilities.getGitSource(new File(pf.rootDir)) }) {
+    for (String s : new String[] { settings.getRepoSource(), settings.getTargetOutput(), GitUtilities.getGitSource(ManagedFileAccess.file(pf.rootDir)) }) {
       if (!Utilities.noString(s)) {
         sources.add(s);
       }
@@ -1706,7 +1704,7 @@ public class PublisherIGLoader extends PublisherBase {
 
 
   private void loadSuppressedMessages(String messageFile, String path) throws Exception {
-    File f = new File(messageFile);
+    File f = ManagedFileAccess.file(messageFile);
     if (!f.exists()) {
       this.pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.NOTFOUND, path, "Supressed messages file not found", ValidationMessage.IssueSeverity.ERROR));
     } else {
@@ -1731,7 +1729,7 @@ public class PublisherIGLoader extends PublisherBase {
         }
       } else {
         this.pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.NOTFOUND, path, "Supressed messages file is not using the new format (see https://confluence.hl7.org/display/FHIR/Implementation+Guide+Parameters)", ValidationMessage.IssueSeverity.ERROR));
-        try (InputStreamReader r = new InputStreamReader(new FileInputStream(messageFile))) {
+        try (InputStreamReader r = new InputStreamReader(ManagedFileAccess.inStream(messageFile))) {
           StringBuilder b = new StringBuilder();
           while (r.ready()) {
             char c = (char) r.read();
@@ -1751,7 +1749,7 @@ public class PublisherIGLoader extends PublisherBase {
 
 
   private int clearErrors(String dirName) throws FileNotFoundException, IOException {
-    File dir = new File(dirName);
+    File dir = ManagedFileAccess.file(dirName);
     int i = 0;
     for (File f : dir.listFiles()) {
       String s = FileUtilities.fileToString(f);
@@ -2230,11 +2228,14 @@ public class PublisherIGLoader extends PublisherBase {
 
   /**
    * The folder path-tx-cache names (relative to the IG root, or absolute), or null if it isn't inside the IG's folder
-   * (the folder ig.ini is in). Symbolic links are followed, as far as the path exists, since a repository can have one
+   * (the folder ig.ini is in). Symbolic links are followed, as far as the path exists, since a repository can have one.
+   * Not normalised first: in input/../x, the .. goes up from where input really is. What's returned is where the folder
+   * really is (see ManagedFileAccess.realPath), so the folder that's used is the one that was checked
    */
   static String txCachePath(String repoRoot, String rootDir, String value) {
-    Path path = Paths.get(rootDir).toAbsolutePath().resolve(value).normalize();
-    return isInside(repoRoot, path.toString()) ? path.toString() : null;
+    String path = Paths.get(rootDir).toAbsolutePath().resolve(value).toString();
+    Path real = ManagedFileAccess.realPath(path);
+    return real != null && isInside(repoRoot, path) ? real.toString() : null;
   }
 
   /**
@@ -2247,14 +2248,91 @@ public class PublisherIGLoader extends PublisherBase {
   }
 
   /**
+   * The build's own file access - everything that goes through ManagedFileAccess, which core uses throughout - is
+   * limited to the IG's folder, the temp folder, ~/.fhir (packages, fhir-settings.json, the tx cache), and what the
+   * person running the publisher chose: the package cache, -packages, the source and destination folders, and the
+   * fhir-settings.json file itself. Where the user has allowed links out of the IG's folder (-allow-external-links, see
+   * checkNoLinksOut, which runs first), what they link to is added, and nothing else. Template scripts, sushi and Jekyll
+   * run outside this. Not in web server or publication mode, which work on other folders
+   */
+  private void confineFileAccess(String root, List<String> linksOut) throws IOException {
+    List<String> paths = confinedPaths(settings.getMode(), root, linksOut, pf.pcm == null ? null : pf.pcm.getFolder(), settings.getPackageCacheFolder(),
+        settings.getPackagesFolder(), settings.getSourceDir(), settings.getDestDir(), FhirSettings.getFilePath());
+    ManagedFileAccess.setAllowedPaths(paths);
+    if (paths != null) {
+      log("File access limited to the folders: "+String.join(", ", ManagedFileAccess.getAllowedPaths()));
+    }
+  }
+
+  /**
+   * The folders (and files) the build's file access is limited to, or null for no limit (web server and publication
+   * mode). root is the IG's folder (focusDir - the folder, even when -ig names the ini file); linksOut are the links out
+   * of it the user has allowed; chosen are what the person running the publisher chose (any may be null)
+   */
+  static List<String> confinedPaths(PublisherUtils.IGBuildMode mode, String root, List<String> linksOut, String... chosen) throws IOException {
+    if (mode == PublisherUtils.IGBuildMode.WEBSERVER || mode == PublisherUtils.IGBuildMode.PUBLICATION) {
+      return null;
+    }
+    List<String> paths = allowedFileAccessPaths(root, chosen);
+    paths.addAll(linkTargets(root, linksOut));
+    return paths;
+  }
+
+  /** where the links (relative to root) really lead, for those that lead somewhere */
+  static List<String> linkTargets(String root, List<String> links) {
+    List<String> res = new ArrayList<>();
+    for (String link : links) {
+      try {
+        res.add(java.nio.file.Paths.get(root).resolve(link).toRealPath().toString());
+      } catch (IOException e) {
+        // it leads nowhere
+      }
+    }
+    return res;
+  }
+
+  /** the IG's folder, the temp folder, ~/.fhir, and any of the others that are set */
+  static List<String> allowedFileAccessPaths(String root, String... others) throws IOException {
+    List<String> paths = new ArrayList<>();
+    paths.add(root);
+    paths.add(Utilities.path("[tmp]"));
+    paths.add(System.getProperty("java.io.tmpdir"));
+    paths.add(Utilities.path(System.getProperty("user.home"), ".fhir"));
+    for (String s : others) {
+      if (!Utilities.noString(s)) {
+        paths.add(s);
+      }
+    }
+    return paths;
+  }
+
+  /**
    * Symbolic links that lead out of the IG's folder (or nowhere): whatever they link to would be read as IG content and
    * published (a page linked to /proc/self/environ), or emptied when the publisher clears a folder (temp, template), or
    * written into. Refused on the ci-build; locally, only if the user allows them (see ExternalLinkPermission). Checked
    * before anything in the IG's folder is read, cleared or written
    */
-  private void checkNoLinksOut(String root) throws IOException {
-    ExternalLinkPermission.check(PublisherUtils.linksOut(root), root, settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD,
+  private List<String> checkNoLinksOut(String root) throws IOException {
+    // linksOut finds nothing in something that isn't a folder, so this would pass whatever the IG has in it
+    if (!ManagedFileAccess.file(root).isDirectory()) {
+      throw new FHIRException("The IG's folder "+root+" doesn't exist, or isn't a folder");
+    }
+    List<String> links = PublisherUtils.linksOut(root);
+    ExternalLinkPermission.check(links, root, settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD,
         settings.isAllowExternalLinks(), FhirSettings.getFilePath(), msg -> {
+          log("Warning: "+msg);
+          pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.SECURITY, "ImplementationGuide", msg, ValidationMessage.IssueSeverity.WARNING));
+        });
+    return links;
+  }
+
+  /**
+   * Scripts and programs committed to the IG's repository (see CommittedScriptPermission): for now, a warning (that in
+   * the root folder says they will be refused in a future version)
+   */
+  private void checkNoCommittedScripts(String root) throws IOException {
+    CommittedScriptPermission.check(CommittedScriptPermission.findScripts(root), root, settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD,
+        settings.isAllowCommittedScripts(), FhirSettings.getFilePath(), msg -> {
           log("Warning: "+msg);
           pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.SECURITY, "ImplementationGuide", msg, ValidationMessage.IssueSeverity.WARNING));
         });
@@ -2489,7 +2567,7 @@ public class PublisherIGLoader extends PublisherBase {
     // if it's already published, we use that location
     // if it's to be published, we find #current, extract that publication request, and use that path (check version)
     // otherwise, bang
-    JsonObject pr = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(new File(Utilities.path(FileUtilities.getDirectoryForFile(settings.getConfigFile()), "publication-request.json")));
+    JsonObject pr = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(ManagedFileAccess.file(Utilities.path(FileUtilities.getDirectoryForFile(settings.getConfigFile()), "publication-request.json")));
     String rigV = pr.forceObject("related").asString(code);
     if (rigV == null) {
       throw new FHIRException("No specified Publication version for relatedIG "+code);
@@ -2571,7 +2649,7 @@ public class PublisherIGLoader extends PublisherBase {
     }
 
     loadMappingSpaces(pf.context.getBinaryForKey("mappingSpaces.details"));
-    // core-tem-unwind pf.validationFetcher.getMappingUrls().addAll(pf.mappingSpaces.keySet());
+    pf.validationFetcher.getMappingUrls().addAll(pf.mappingSpaces.keySet());
     pf.validationFetcher.getOtherUrls().add(pf.publishedIg.getUrl());
     for (SpecMapManager s : pf.specMaps) {
       pf.validationFetcher.getOtherUrls().add(s.getBase());
@@ -2879,7 +2957,7 @@ public class PublisherIGLoader extends PublisherBase {
 
     pf.rc = new RenderingContext(pf.context, pf.rendererFactory, pf.markdownEngine, ValidationOptions.defaults(), checkAppendSlash(pf.specPath), "", locale, RenderingContext.ResourceRendererMode.TECHNICAL, RenderingContext.GenerationRules.IG_PUBLISHER);
     pf.rc.setTemplateProvider(pf.templateProvider);
-    // core-tem-unwind pf.rc.getMappingSpaces().putAll(pf.mappingSpaces);
+    pf.rc.getMappingSpaces().putAll(pf.mappingSpaces);
     pf.rc.setServices(pf.validator.getExternalHostServices());
     pf.rc.setDestDir(Utilities.path(pf.tempDir));
     pf.rc.setProfileUtilities(new ProfileUtilities(pf.context, new ArrayList<ValidationMessage>(), pf.igpkp));
@@ -3162,7 +3240,7 @@ public class PublisherIGLoader extends PublisherBase {
     String base = fhirType+"-"+id;
     String tbase = fhirType+"-$all";
     for (String dir : pf.translationSources) {
-      File df = new File(Utilities.path(pf.rootDir, dir));
+      File df = ManagedFileAccess.file(Utilities.path(pf.rootDir, dir));
       if (df.exists()) {
         // sorted, so that translations come in the same order on every machine: File.list() makes no promise
         // about the order, and the translation extensions are made in the order the units are found
@@ -3191,11 +3269,11 @@ public class PublisherIGLoader extends PublisherBase {
               if (res == null) {
                 res = new ArrayList<>();
               }
-              File f = new File(Utilities.path(this.pf.rootDir, dir, fn));
+              File f = ManagedFileAccess.file(Utilities.path(this.pf.rootDir, dir, fn));
               this.pf.usedLangFiles.add(f.getAbsolutePath());
               if (!Utilities.noString(FileUtilities.fileToString(f).trim())) {
                 try {
-                  FileInputStream s = new FileInputStream(f);
+                  FileInputStream s = ManagedFileAccess.inStream(f);
                   try {
                     res.addAll(lp.loadSource(s));
                   } finally {
@@ -3691,7 +3769,7 @@ public class PublisherIGLoader extends PublisherBase {
 
 
   private void loadMappingSpaces(byte[] source) throws Exception {
-    // core-tem-unwind pf.mappingSpaces.putAll(MappingSpace.loadMappingSpaces(source));
+    pf.mappingSpaces.putAll(MappingSpace.loadMappingSpaces(source));
   }
 
 
@@ -3815,8 +3893,8 @@ public class PublisherIGLoader extends PublisherBase {
     for (ImplementationGuide.ImplementationGuideDefinitionResourceComponent res : pf.publishedIg.getDefinition().getResourceList()) {
       if (res.getReference().getReference().startsWith("Binary/")) {
         String id = res.getReference().getReference().substring(res.getReference().getReference().indexOf("/")+1);
-        File of = new File(Utilities.path(FileUtilities.getDirectoryForFile(this.getConfigFile()), "fsh-generated", "resources", "Binary-"+id+".json"));
-        File nf = new File(Utilities.path(FileUtilities.getDirectoryForFile(this.getConfigFile()), "fsh-generated", "resources", def.getType()+"-"+id+".json"));
+        File of = ManagedFileAccess.file(Utilities.path(FileUtilities.getDirectoryForFile(this.getConfigFile()), "fsh-generated", "resources", "Binary-"+id+".json"));
+        File nf = ManagedFileAccess.file(Utilities.path(FileUtilities.getDirectoryForFile(this.getConfigFile()), "fsh-generated", "resources", def.getType()+"-"+id+".json"));
 
         boolean read = false;
         boolean matches = res.getProfileList().size() == 1 && (def.getUrl().equals(res.getProfileList().get(0).primitiveValue()));
@@ -3849,16 +3927,25 @@ public class PublisherIGLoader extends PublisherBase {
   }
 
 
+  /**
+   * The folder a file was found in, as the IG states it (often relative to the IG's folder), for messages. Worked out
+   * from the text: it isn't a file the publisher opens, and a relative path resolves against the current folder, which
+   * the publisher's own file access doesn't allow unless it's in the IG
+   */
+  private static String statedFolder(FetchedFile ff) {
+    return new File(ff.getStatedPath()).getParent();
+  }
+
   private void loadResources(FetchedFile igf) throws Exception { // igf is not currently used, but it was about relative references?
     List<FetchedFile> resources = pf.fetcher.scan(settings.getSourceDir(), pf.context, pf.igpkp.isAutoPath(), makeExemptions());
     for (FetchedFile ff : resources) {
       ff.start("loadResources");
       if (ff.getContentType().equals("adl")) {
-        loadArchetype(ff, "scan folder "+FileUtilities.getDirectoryForFile(ff.getStatedPath()));
+        loadArchetype(ff, "scan folder "+statedFolder(ff));
       } else {
         try {
           if (!ff.matches(igf) && !isBundle(ff)) {
-            loadResource(ff, "scan folder "+FileUtilities.getDirectoryForFile(ff.getStatedPath()));
+            loadResource(ff, "scan folder "+statedFolder(ff));
           }
         } finally {
           ff.finish("loadResources");
@@ -3955,6 +4042,29 @@ public class PublisherIGLoader extends PublisherBase {
   }
 
 
+  /**
+   * IG spreadsheets (the igpublisher-spreadsheet extension) are no longer supported: the IG stops, saying what to do
+   * instead. The code that loads them is still here, behind this switch
+   */
+  static final boolean SPREADSHEETS_SUPPORTED = false;
+
+  /** a name that starts with '!' is a spreadsheet that has been switched off, and was always ignored */
+  static void checkNoSpreadsheets(List<String> spreadsheets) {
+    if (SPREADSHEETS_SUPPORTED) {
+      return;
+    }
+    List<String> used = new ArrayList<>();
+    for (String s : spreadsheets) {
+      if (s != null && !s.startsWith("!")) {
+        used.add(s);
+      }
+    }
+    if (!used.isEmpty()) {
+      throw new FHIRException("IG spreadsheets are no longer supported, but this IG uses "+(used.size() == 1 ? "one" : used.size())+" (the igpublisher-spreadsheet extension on the ImplementationGuide): "+String.join(", ", used)+". "
+          + "Replace each with the resources it defines: they are in the output of the IG's last build with an earlier version of the IG Publisher (output/*.json), and can be copied into input/resources (or written as FSH). Then remove the extension");
+    }
+  }
+
   private void loadSpreadsheets(FetchedFile igf) throws Exception {
     Set<String> knownValueSetIds = new HashSet<>();
     for (String s : pf.spreadsheets) {
@@ -3971,7 +4081,7 @@ public class PublisherIGLoader extends PublisherBase {
     if (changed) {
       f.getValuesetsToLoad().clear();
       logDebugMessage(LogCategory.INIT, "load "+f.getPath());
-      Bundle bnd = new IgSpreadsheetParser(this.pf.context, this.pf.getExecTime(), this.pf.igpkp.getCanonical(), f.getValuesetsToLoad(), /*// core-tem-unwind this.pf.mappingSpaces,*/null, knownValueSetIds).parse(f);
+      Bundle bnd = new IgSpreadsheetParser(this.pf.context, this.pf.getExecTime(), this.pf.igpkp.getCanonical(), f.getValuesetsToLoad(), this.pf.mappingSpaces, knownValueSetIds).parse(f);
       f.setBundle(new FetchedResource(f.getName()+" (ex spreadsheet)"));
       f.setBundleType(FetchedFile.FetchedBundleType.SPREADSHEET);
       f.getBundle().setResource(bnd);
@@ -4201,7 +4311,7 @@ public class PublisherIGLoader extends PublisherBase {
 
   private void loadTranslationSupplements(FetchedFile igf) throws Exception {
     for (String p : pf.translationSources) {
-      File dir = new File(Utilities.path(pf.rootDir, p));
+      File dir = ManagedFileAccess.file(Utilities.path(pf.rootDir, p));
       FileUtilities.createDirectory(dir.getAbsolutePath());
       for (File f : dir.listFiles()) {
         if (!this.pf.usedLangFiles.contains(f.getAbsolutePath())) {
@@ -4210,7 +4320,7 @@ public class PublisherIGLoader extends PublisherBase {
         }
       }
       for (String s : Utilities.stringSet("po", "json", "xliff")) {
-        File fdir = new File(Utilities.path(pf.rootDir, p));
+        File fdir = ManagedFileAccess.file(Utilities.path(pf.rootDir, p));
         if (fdir.exists()) {
           for (File f : fdir.listFiles()) {
             if (!this.pf.usedLangFiles.contains(f.getAbsolutePath())) {
@@ -4449,7 +4559,7 @@ public class PublisherIGLoader extends PublisherBase {
 
   private List<LanguageFileProducer.TranslationUnit> loadTranslations(File f, String ext) throws FileNotFoundException, IOException, ParserConfigurationException, SAXException {
     try {
-      try (FileInputStream in = new FileInputStream(f)) {
+      try (FileInputStream in = ManagedFileAccess.inStream(f)) {
         switch (ext) {
           case "po": return new PoGetTextProducer().loadSource(in);
           case "xliff": return new XLIFFProducer().loadSource(in);
@@ -4607,7 +4717,7 @@ public class PublisherIGLoader extends PublisherBase {
         ff.start("loadResources");
         try {
           if (!ff.matches(igf) && !isBundle(ff)) {
-            loadResource(ff, "scan folder "+FileUtilities.getDirectoryForFile(ff.getStatedPath()));
+            loadResource(ff, "scan folder "+statedFolder(ff));
           }
         } finally {
           ff.finish("loadResources");
@@ -5366,11 +5476,11 @@ public class PublisherIGLoader extends PublisherBase {
     LiquidEngine liquid = new LiquidEngine(pf.context, pf.validator.getExternalHostServices());
     for (String f : factories) {
       String rootFolder = FileUtilities.getDirectoryForFile(this.settings.getConfigFile());
-      File path = new File(Utilities.path(rootFolder, f));
+      File path = ManagedFileAccess.file(Utilities.path(rootFolder, f));
       if (!path.exists()) {
         throw new FHIRException("factory source '"+f+"' not found");
       }
-      File log = new File(Utilities.path(FileUtilities.getDirectoryForFile(path.getAbsolutePath()), "log"));
+      File log = ManagedFileAccess.file(Utilities.path(FileUtilities.getDirectoryForFile(path.getAbsolutePath()), "log"));
       if (!log.exists()) {
         FileUtilities.createDirectory(log.getAbsolutePath());
       }

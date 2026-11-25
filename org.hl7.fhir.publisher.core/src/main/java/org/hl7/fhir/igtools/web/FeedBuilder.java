@@ -20,7 +20,7 @@ import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.json.JsonUtilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
-// core-tem-unwind import org.hl7.fhir.utilities.npm.NpmPackageSigner;
+import org.hl7.fhir.utilities.npm.NpmPackageSigner;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -275,9 +275,9 @@ public class FeedBuilder {
   // The package's signature (its partner file, {package}.tgz.sigstore.json - see NpmPackageSigner),
   // when it was signed. Crawlers check it against the keys the package registry lists for this feed.
   private void appendSignature(StringBuilder b, String folder, String file, String url) throws IOException {
-// core-tem-unwind     if (new File(Utilities.path(folder, file + NpmPackageSigner.SIGNATURE_SUFFIX)).exists()) {
-// core-tem-unwind       b.append("      <fhir:signature>"+Utilities.escapeXml(url + NpmPackageSigner.SIGNATURE_SUFFIX)+"</fhir:signature>\r\n");
-    // core-tem-unwind }
+    if (new File(Utilities.path(folder, file + NpmPackageSigner.SIGNATURE_SUFFIX)).exists()) {
+      b.append("      <fhir:signature>"+Utilities.escapeXml(url + NpmPackageSigner.SIGNATURE_SUFFIX)+"</fhir:signature>\r\n");
+    }
   }
 
   private String root(String link) {

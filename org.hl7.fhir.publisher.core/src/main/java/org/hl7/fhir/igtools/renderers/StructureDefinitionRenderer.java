@@ -1159,7 +1159,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
     // the additional bindings (#970): a row each, after the base binding, with the path blank
     AdditionalBindingsRenderer abr = new AdditionalBindingsRenderer(null, corePath, sd, ed.getPath(), gen, null, null);
-    /*// core-tem-unwind
+    
     for (TxAdditionalBinding ab : additionalBindings(tx)) {
       tr = tbl.tr();
       tr.td();
@@ -1184,7 +1184,6 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         }
       }
     }
-    */
   }
 
   /**
@@ -1647,14 +1646,15 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         if(hasMaps || hasComments) {
           allEmpty = false; // that assumption is wrong
           String url = mappingLink(map);
-          /*// core-tem-unwind
-          if (url == null)
-            s.append("<a name=\"" + map.getIdentity() + "\"> </a><h3>" +gen.formatPhrase(RenderingI18nContext.SD_SUMMARY_MAPPINGS, Utilities.escapeXml(gen.getTranslated(map.getNameElement())), Utilities.escapeXml(map.getUri()), "", "") + "</h3>");
-          else
-            s.append("<a name=\"" + map.getIdentity() + "\"> </a><h3>" +gen.formatPhrase(RenderingI18nContext.SD_SUMMARY_MAPPINGS, Utilities.escapeXml(gen.getTranslated(map.getNameElement())), Utilities.escapeXml(map.getUri()), "<a href=\"" + Utilities.escapeXml(url) + "\">", "</a>") + "</h3>");
-          */
-          if (map.hasComment())
+          
+          if (url == null) {
+            s.append("<a name=\"" + map.getIdentity() + "\"> </a><h3>" + gen.formatPhrase(RenderingI18nContext.SD_SUMMARY_MAPPINGS, Utilities.escapeXml(gen.getTranslated(map.getNameElement())), Utilities.escapeXml(map.getUri()), "", "") + "</h3>");
+          } else {
+            s.append("<a name=\"" + map.getIdentity() + "\"> </a><h3>" + gen.formatPhrase(RenderingI18nContext.SD_SUMMARY_MAPPINGS, Utilities.escapeXml(gen.getTranslated(map.getNameElement())), Utilities.escapeXml(map.getUri()), "<a href=\"" + Utilities.escapeXml(url) + "\">", "</a>") + "</h3>");
+          }
+          if (map.hasComment()) {
             s.append("<p>" + Utilities.escapeXml(gen.getTranslated(map.getCommentElement())) + "</p>");
+          }
 
           s.append("<table class=\"grid\">\r\n");
           s.append(" <tr><td colspan=\"3\"><b>" + Utilities.escapeXml(gen.getTranslated(sd.getNameElement())) + "</b></td></tr>\r\n");
@@ -1674,7 +1674,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
       // Well all the mappings are empty
       if(allEmpty) {
-// core-tem-unwind         s.append("<p>" + gen.formatPhrase(RenderingI18nContext.STRUC_DEF_ALL_MAP_KEY) + "</p>");
+        s.append("<p>" + gen.formatPhrase(RenderingI18nContext.STRUC_DEF_ALL_MAP_KEY) + "</p>");
       }
 
       return s.toString();
@@ -1687,7 +1687,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
    * mapping space metadata, then the uri itself, if it's a URL
    */
   private String mappingLink(StructureDefinitionMappingComponent map) {
-    return null; // core-tem-unwind org.hl7.fhir.services.renderers.mappings.StructureDefinitionMappingProvider.mappingLink(gen, map);
+    return org.hl7.fhir.services.renderers.mappings.StructureDefinitionMappingProvider.mappingLink(gen, map);
   }
 
   public String mappings(String defnFile, Set<String> outputTracker) throws FHIRException, IOException {
@@ -2417,7 +2417,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     List<ElementDefinition> slices = getSlices(elem, children);
     int c = 0;
     for (ElementDefinition slice : slices) {
-      List<CanonicalType> profiles = slice.getTypeFirstRep().getProfileList();
+      // getTypeFirstRep() adds an empty type when there isn't one, and this is reading, not changing, the definition
+      List<CanonicalType> profiles = slice.hasType() ? slice.getTypeFirstRep().getProfileList() : new ArrayList<>();
       // Won't have a profile if this slice is part of a complex extension
       String url = profiles.isEmpty() ? null : profiles.get(0).getValue();
       StructureDefinition sdExt = url == null ? null : context.fetchResource(StructureDefinition.class, url, ExtensionUtilities.getVersionResolutionRules(profiles.get(0)));
@@ -3167,7 +3168,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       }
     } else if (element.types().size() == 0) {
       // unprofiled primitive type value
-      TypeRefComponent tr = element.definition().getTypeFirstRep();
+      // getTypeFirstRep() adds an empty type when there isn't one, and this is reading, not changing, the definition
+      TypeRefComponent tr = element.definition().hasType() ? element.definition().getTypeFirstRep() : new TypeRefComponent();
       StructureDefinition sd = context.fetchTypeDefinition(tr.getWorkingCode());
       if (sd != null) {
         gc.addPiece(gen.new Piece(sd.getWebPath(), "("+tr.getWorkingCode()+" value)", this.gen.formatPhrase(RenderingI18nContext.SDR_PRIM_VALUE, tr.getWorkingCode())));         
@@ -3304,7 +3306,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           }
           // the root of a resource, or an element (#610)
           boolean resourceRoot = !c.getExpression().contains(".") && t != null && t.getKind() == StructureDefinitionKind.RESOURCE;
-          // core-tem-unwind li.tx(" " + gen.formatPhrase(resourceRoot ? RenderingI18nContext.SDR_EXT_ROOT_ELEMENTS : RenderingI18nContext.SDR_EXT_ELEMENTS));
+          li.tx(" " + gen.formatPhrase(resourceRoot ? RenderingI18nContext.SDR_EXT_ROOT_ELEMENTS : RenderingI18nContext.SDR_EXT_ELEMENTS));
           break;
         case EXTENSION:
           li.tx(gen.formatPhrase(RenderingI18nContext.SDR_EXT_EXT)); 

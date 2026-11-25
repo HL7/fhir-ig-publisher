@@ -82,7 +82,7 @@ import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.model.JsonProperty;
 import org.hl7.fhir.utilities.json.model.JsonString;
 import org.hl7.fhir.utilities.npm.NpmPackage;
-// core-tem-unwind import org.hl7.fhir.utilities.npm.NpmPackageSigner;
+import org.hl7.fhir.utilities.npm.NpmPackageSigner;
 import org.hl7.fhir.utilities.npm.ToolsVersion;
 import org.hl7.fhir.utilities.settings.FhirSettings;
 import org.hl7.fhir.utilities.turtle.Turtle;
@@ -110,6 +110,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.hl7.fhir.igtools.publisher.Publisher.*;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 
 /**
  * this class is part of the Publisher Core cluster, and handles all the routines that generate content (other than QA). See @Publisher for discussion
@@ -310,10 +311,10 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       }
       templateBeforeGenerate();
       if (pf.saveExpansionParams) {
-        try (FileOutputStream stream = new FileOutputStream(Utilities.path(pf.tempDir, "parameters-expansion-parameters.json"))) {
+        try (FileOutputStream stream = ManagedFileAccess.outStream(Utilities.path(pf.tempDir, "parameters-expansion-parameters.json"))) {
           new JsonParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.NORMAL).compose(stream, pf.context.getExpansionParameters());
         }
-        try (FileOutputStream stream = new FileOutputStream(Utilities.path(pf.tempDir, "parameters-expansion-parameters.xml"))) {
+        try (FileOutputStream stream = ManagedFileAccess.outStream(Utilities.path(pf.tempDir, "parameters-expansion-parameters.xml"))) {
           new XmlParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.NORMAL).compose(stream, pf.context.getExpansionParameters());
         }
       }
@@ -405,7 +406,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       if (pf.allProfilesXlsx != null) {
         pf.allProfilesXlsx.configure();
         String path = Utilities.path(pf.tempDir, "all-profiles.xlsx");
-        try (FileOutputStream stream = new FileOutputStream(path)) {
+        try (FileOutputStream stream = ManagedFileAccess.outStream(path)) {
           pf.allProfilesXlsx.finish(stream);
         }
         pf.otherFilesRun.add(Utilities.path(pf.tempDir, "all-profiles.xlsx"));
@@ -469,7 +470,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         pf.otherFilesRun.addAll(change.getKept());
         for (String gone : change.getGone()) {
           if (!isValidFile(gone)) { // unless something else wrote it in this build
-            new File(gone).delete();
+            ManagedFileAccess.file(gone).delete();
           }
         }
         cleanOutput(pf.tempDir);
@@ -509,13 +510,13 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         addFileToNpm(NPMPackageGenerator.Category.OTHER, "validation-summary.json", validationSummaryJson());
         addFileToNpm(NPMPackageGenerator.Category.OTHER, "validation-oo.json", validationSummaryOO());
         for (String t : pf.testDirs) {
-          addTestDir(new File(t), t);
+          addTestDir(ManagedFileAccess.file(t), t);
         }
         for (DataSetInformation t : pf.dataSets) {
           processDataSetContent(t);
         }
         for (String n : pf.otherDirs) {
-          File f = new File(n);
+          File f = ManagedFileAccess.file(n);
           if (f.exists()) {
             for (File ff : f.listFiles()) {
               if (!SimpleFetcher.isIgnoredFile(f.getName())) {
@@ -526,7 +527,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
             logMessage("Other Directory not found: "+n);
           }
         }
-        File pr = new File(Utilities.path(FileUtilities.getDirectoryForFile(settings.getConfigFile()), "publication-request.json"));
+        File pr = ManagedFileAccess.file(Utilities.path(FileUtilities.getDirectoryForFile(settings.getConfigFile()), "publication-request.json"));
         if (settings.getMode() != PublisherUtils.IGBuildMode.PUBLICATION && pr.exists()) {
           addFileToNpm(NPMPackageGenerator.Category.OTHER, "publication-request.json", FileUtilities.fileToBytes(pr));
         }
@@ -558,21 +559,21 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
         if (settings.getMode() == null || settings.getMode() == PublisherUtils.IGBuildMode.MANUAL) {
           if (settings.isCacheVersion()) {
-            try (FileInputStream in = new FileInputStream(pf.npm.filename())) {
+            try (FileInputStream in = ManagedFileAccess.inStream(pf.npm.filename())) {
               pf.pcm.addPackageToCache(pf.packageId(), pf.publishedIg.getVersion(), in, "[output]");
             }
           } else {
-            try (FileInputStream in = new FileInputStream(pf.npm.filename())) {
+            try (FileInputStream in = ManagedFileAccess.inStream(pf.npm.filename())) {
               pf.pcm.addPackageToCache(pf.packageId(), "dev", in, "[output]");
             }
             if (pf.branchName != null) {
-              try (FileInputStream in = new FileInputStream(pf.npm.filename())) {
+              try (FileInputStream in = ManagedFileAccess.inStream(pf.npm.filename())) {
                 pf.pcm.addPackageToCache(pf.packageId(), "dev$"+ pf.branchName, in, "[output]");
               }
             }
           }
         } else if (settings.getMode() == PublisherUtils.IGBuildMode.PUBLICATION) {
-          try (FileInputStream in = new FileInputStream(pf.npm.filename())) {
+          try (FileInputStream in = ManagedFileAccess.inStream(pf.npm.filename())) {
             pf.pcm.addPackageToCache(pf.packageId(), pf.publishedIg.getVersion(), in, "[output]");
           }
         }
@@ -720,26 +721,30 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
    * publish unsigned packages. Signatures left in the output by an earlier build are removed first.
    */
   private void signPackages() throws IOException {
-// core-tem-unwind     File[] stale = new File(pf.outputDir).listFiles((d, n) -> n.endsWith(".tgz" + NpmPackageSigner.SIGNATURE_SUFFIX));
-    // core-tem-unwind if (stale != null) {
-// core-tem-unwind       for (File f : stale) {
-// core-tem-unwind         f.delete();
-// core-tem-unwind       }
-// core-tem-unwind     }
-// core-tem-unwind     NpmPackageSigner signer = NpmPackageSigner.fromSettings();
-// core-tem-unwind     if (signer == null) {
-// core-tem-unwind       return;
-// core-tem-unwind     }
-// core-tem-unwind     File[] packages = new File(pf.outputDir).listFiles((d, n) -> n.endsWith(".tgz"));
-// core-tem-unwind     if (packages == null || packages.length == 0) {
-// core-tem-unwind       return;
-// core-tem-unwind     }
-// core-tem-unwind     Arrays.sort(packages);
-// core-tem-unwind     for (File f : packages) {
-// core-tem-unwind       File sig = signer.sign(f, "FHIR IG Publisher " + IGVersionUtil.getVersion());
-// core-tem-unwind       pf.otherFilesRun.add(sig.getAbsolutePath());
-// core-tem-unwind     }
-// core-tem-unwind     log("Signed " + packages.length + " " + checkPlural("package", packages.length) + " with key " + signer.getKeyId());
+    File[] stale = ManagedFileAccess.file(pf.outputDir).listFiles((d, n) -> n.endsWith(".tgz" + NpmPackageSigner.SIGNATURE_SUFFIX));
+    if (stale != null) {
+      for (File f : stale) {
+        f.delete();
+      }
+    }
+    NpmPackageSigner signer = NpmPackageSigner.fromSettings();
+    if (signer == null) {
+      return;
+    }
+    File[] packages = ManagedFileAccess.file(pf.outputDir).listFiles((d, n) -> n.endsWith(".tgz"));
+    if (packages == null || packages.length == 0) {
+      return;
+    }
+    Arrays.sort(packages);
+    String tool = "FHIR IG Publisher " + IGVersionUtil.getVersion();
+    for (File f : packages) {
+      // the IG's own package is signed as the package.json it was written with; the others in the
+      // output (the r4/r4b subsets, the combined package) are read for their name and version
+      JsonObject pj = pf.npm != null && new File(pf.npm.filename()).getAbsoluteFile().equals(f.getAbsoluteFile()) ? pf.npm.getPackageJ() : null;
+      File sig = pj != null && pj.has("name") && pj.has("version") ? signer.sign(f, pj.asString("name"), pj.asString("version"), tool) : signer.sign(f, tool);
+      pf.otherFilesRun.add(sig.getAbsolutePath());
+    }
+    log("Signed " + packages.length + " " + checkPlural("package", packages.length) + " with key " + signer.getKeyId());
   }
 
   private void genCombinedPackage() throws IOException {
@@ -759,7 +764,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       gen.setVerbose(false);
 
       NpmPackage npm;
-      try (FileInputStream in = new FileInputStream(Utilities.path(pf.outputDir, "package.tgz"))) {
+      try (FileInputStream in = ManagedFileAccess.inStream(Utilities.path(pf.outputDir, "package.tgz"))) {
         npm = NpmPackage.fromPackage(in);
       }
       gen.generateCombinedPackage(npm);
@@ -784,14 +789,14 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
   private void copyData() throws IOException {
     for (String d : pf.dataDirs) {
-      File[] fl = new File(d).listFiles();
+      File[] fl = ManagedFileAccess.file(d).listFiles();
       if (fl == null) {
         logDebugMessage(LogCategory.PROGRESS, "No files found to copy at "+d);
       } else {
         for (File f : fl) {
           String df = Utilities.path(this.pf.tempDir, "_data", f.getName());
           this.pf.otherFilesRun.add(df);
-          FileUtilities.copyFile(f, new File(df));
+          FileUtilities.copyFile(f, ManagedFileAccess.file(df));
         }
       }
     }
@@ -1152,7 +1157,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         path = Utilities.path(this.pf.tempDir, r.fhirType()+"-"+r.getId()+".xml");
       }
       f.getOutputNames().add(path);
-      try (FileOutputStream stream = new FileOutputStream(path)) {
+      try (FileOutputStream stream = ManagedFileAccess.outStream(path)) {
         org.hl7.fhir.services.elementmodel.XmlParser xp = new org.hl7.fhir.services.elementmodel.XmlParser(this.pf.context);
         if (suppressId(f, r)) {
           xp.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
@@ -1167,7 +1172,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         path = Utilities.path(this.pf.tempDir, r.fhirType()+"-"+r.getId()+".json");
       }
       f.getOutputNames().add(path);
-      try (FileOutputStream stream = new FileOutputStream(path)) {
+      try (FileOutputStream stream = ManagedFileAccess.outStream(path)) {
         org.hl7.fhir.services.elementmodel.JsonParser jp = new org.hl7.fhir.services.elementmodel.JsonParser(this.pf.context);
         if (suppressId(f, r)) {
           jp.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
@@ -1182,7 +1187,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         path = Utilities.path(this.pf.tempDir, r.fhirType()+"-"+r.getId()+".ttl");
       }
       f.getOutputNames().add(path);
-      try (FileOutputStream stream = new FileOutputStream(path)) {
+      try (FileOutputStream stream = ManagedFileAccess.outStream(path)) {
         org.hl7.fhir.services.elementmodel.TurtleParser tp = new org.hl7.fhir.services.elementmodel.TurtleParser(this.pf.context);
         if (suppressId(f, r)) {
           tp.setIdPolicy(ParserBase.IdRenderingPolicy.NotRoot);
@@ -1310,7 +1315,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
     if (wantGen(r, "jekyll-data") && this.pf.produceJekyllData) {
       org.hl7.fhir.services.elementmodel.JsonParser jp = new org.hl7.fhir.services.elementmodel.JsonParser(this.pf.context);
-      try (FileOutputStream bs = new FileOutputStream(Utilities.path(this.pf.tempDir, "_data", r.fhirType()+"-"+r.getId()+".json"))) {
+      try (FileOutputStream bs = ManagedFileAccess.outStream(Utilities.path(this.pf.tempDir, "_data", r.fhirType()+"-"+r.getId()+".json"))) {
         jp.compose(langElement, bs, OutputStyle.NORMAL, null);
       }
     }
@@ -1820,7 +1825,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         String path = Utilities.path(this.pf.tempDir, "CodeSystem-"+prefixForContainer + cs.getId()+".xlsx");
         f.getOutputNames().add(path);
         vsg.renderCodeSystem(cs);
-        try (FileOutputStream out = new FileOutputStream(path)) {
+        try (FileOutputStream out = ManagedFileAccess.outStream(path)) {
           vsg.finish(out);
         }
       }
@@ -1934,7 +1939,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         String path = Utilities.path(this.pf.tempDir, "ValueSet-"+prefixForContainer + r.getId()+".xlsx");
         f.getOutputNames().add(path);
         vsg.renderValueSet(vs);
-        try (FileOutputStream out = new FileOutputStream(path)) {
+        try (FileOutputStream out = ManagedFileAccess.outStream(path)) {
           vsg.finish(out);
         }
       }
@@ -1993,7 +1998,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       String path = Utilities.path(this.pf.tempDir, prefixForContainer + r.getId()+".xlsx");
       f.getOutputNames().add(path);
       cmg.renderConceptMap(cm);
-      try (FileOutputStream out = new FileOutputStream(path)) {
+      try (FileOutputStream out = ManagedFileAccess.outStream(path)) {
         cmg.finish(out);
       }
     }
@@ -2070,11 +2075,11 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       String lp = isNewML() && lang != null && !lang.equals(this.pf.defaultTranslationLang) ? "-"+lang : "";
       org.hl7.fhir.services.openapi.Writer oa = null;
       if (this.pf.openApiTemplate != null) {
-        try (FileInputStream template = new FileInputStream(Utilities.path(FileUtilities.getDirectoryForFile(this.settings.getConfigFile()), this.pf.openApiTemplate))) {
-          oa = new org.hl7.fhir.services.openapi.Writer(new FileOutputStream(Utilities.path(this.pf.tempDir, cpbs.getId()+ lp+".openapi.json")), template);
+        try (FileInputStream template = ManagedFileAccess.inStream(Utilities.path(FileUtilities.getDirectoryForFile(this.settings.getConfigFile()), this.pf.openApiTemplate))) {
+          oa = new org.hl7.fhir.services.openapi.Writer(ManagedFileAccess.outStream(Utilities.path(this.pf.tempDir, cpbs.getId()+ lp+".openapi.json")), template);
         }
       } else
-        oa = new Writer(new FileOutputStream(Utilities.path(this.pf.tempDir, cpbs.getId()+ lp+".openapi.json")));
+        oa = new Writer(ManagedFileAccess.outStream(Utilities.path(this.pf.tempDir, cpbs.getId()+ lp+".openapi.json")));
       String lic = license();
       String displ = this.pf.context.validateCode(new ValidationOptions(FhirPublication.R5, "en-US"), new Coding("http://hl7.org/fhir/spdx-license",  lic, null), null).getDisplay();
       new OpenApiGenerator(this.pf.context, cpbs, oa).generate(displ, "http://spdx.org/licenses/"+lic+".html");
@@ -2188,7 +2193,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       String path = Utilities.path(this.pf.tempDir, sdPrefix + r.getId()+".csv");
       f.getOutputNames().add(path);
       ProfileUtilities pu = new ProfileUtilities(this.pf.context, this.pf.errors, this.pf.igpkp);
-      try (FileOutputStream out = new FileOutputStream(path)) {
+      try (FileOutputStream out = ManagedFileAccess.outStream(path)) {
         pu.generateCsv(out, sd, true);
       }
       addToAllProfilesCsv(pu, sd);
@@ -2204,13 +2209,13 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       f.getOutputNames().add(path);
       byte[] xlsx = spreadsheetPrefetcher == null ? null : spreadsheetPrefetcher.take(r);
       if (xlsx != null) {
-        try (FileOutputStream out = new FileOutputStream(path)) {
+        try (FileOutputStream out = ManagedFileAccess.outStream(path)) {
           out.write(xlsx);
         }
       } else {
         StructureDefinitionSpreadsheetGenerator sdg = new ProfileSpreadsheetGenerator(this.pf.context, true, anyMustSupport(sd), pf.rendererFactory, columnWidths());
         sdg.renderStructureDefinition(sd, false);
-        try (FileOutputStream out = new FileOutputStream(path)) {
+        try (FileOutputStream out = ManagedFileAccess.outStream(path)) {
           sdg.finish(out);
         }
       }
@@ -2221,7 +2226,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     if (!regen && sd.getDerivation() == StructureDefinition.TypeDerivationRule.CONSTRAINT && wantGen(r, "sch")) {
       String path = Utilities.path(this.pf.tempDir, sdPrefix + r.getId()+".sch");
       f.getOutputNames().add(path);
-      try (FileOutputStream out = new FileOutputStream(path)) {
+      try (FileOutputStream out = ManagedFileAccess.outStream(path)) {
         new ProfileUtilities(this.pf.context, this.pf.errors, this.pf.igpkp).generateSchematrons(out, sd);
       }
       addFileToNpm(NPMPackageGenerator.Category.SCHEMATRON, sdPrefix + r.getId()+".sch", FileUtilities.fileToBytes(Utilities.path(this.pf.tempDir, sdPrefix + r.getId()+".sch")));
@@ -2247,7 +2252,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
   private void addToAllProfilesCsv(ProfileUtilities pu, StructureDefinition sd) throws Exception {
     if (this.pf.allProfilesCsv == null) {
-      this.pf.allProfilesCsv = new  org.hl7.fhir.services.utilities.CSVWriter(new FileOutputStream(Utilities.path(this.pf.tempDir, "all-profiles.csv")), this.pf.context, true);
+      this.pf.allProfilesCsv = new  org.hl7.fhir.services.utilities.CSVWriter(ManagedFileAccess.outStream(Utilities.path(this.pf.tempDir, "all-profiles.csv")), this.pf.context, true);
       this.pf.otherFilesRun.add(Utilities.path(this.pf.tempDir, "all-profiles.csv"));
 
     }
@@ -3308,7 +3313,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         PublisherProvider pprov = new PublisherProvider(pf.context, pf.npmList, pf.fileList, pf.igpkp.getCanonical());
         runner.setProvider(pprov);
         runner.setStorage(new StorageSqlite3(db.getConnection()));
-        JsonObject vd = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(new File(Utilities.path(FileUtilities.getDirectoryForFile(settings.getConfigFile()), vdn)));
+        JsonObject vd = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(ManagedFileAccess.file(Utilities.path(FileUtilities.getDirectoryForFile(settings.getConfigFile()), vdn)));
         pprov.inspect(vd);
         runner.execute(vd);
         captureIssues(vdn, runner.getIssues());
@@ -3338,12 +3343,12 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
 
   private String getGitStatus() throws IOException {
-    File gitDir = new File(FileUtilities.getDirectoryForFile(settings.getConfigFile()));
+    File gitDir = ManagedFileAccess.file(FileUtilities.getDirectoryForFile(settings.getConfigFile()));
     return GitUtilities.getGitStatus(gitDir);
   }
 
   private String getGitSource() throws IOException {
-    File gitDir = new File(FileUtilities.getDirectoryForFile(settings.getConfigFile()));
+    File gitDir = ManagedFileAccess.file(FileUtilities.getDirectoryForFile(settings.getConfigFile()));
     return GitUtilities.getGitSource(gitDir);
   }
 
@@ -3408,7 +3413,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     ObservationSummarySpreadsheetGenerator vsg = new ObservationSummarySpreadsheetGenerator(pf.context, pf.rendererFactory);
     pf.otherFilesRun.add(path);
     vsg.generate(cvr.getObservations());
-    try (FileOutputStream out = new FileOutputStream(path)) {
+    try (FileOutputStream out = ManagedFileAccess.outStream(path)) {
       vsg.finish(out);
     }
     start = System.currentTimeMillis();
@@ -3928,7 +3933,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
   }
 
   private void cleanOutput(String folder) throws IOException {
-    for (File f : new File(folder).listFiles()) {
+    for (File f : ManagedFileAccess.file(folder).listFiles()) {
       cleanOutputFile(f);
     }
   }
@@ -4300,24 +4305,24 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
     for (String pagesDir: pf.pagesDirs) {
       String contentFile = pagesDir + File.separator + "_includes" + File.separator + baseUrl + "-intro.xml";
-      if (new File(contentFile).exists()) {
+      if (ManagedFileAccess.file(contentFile).exists()) {
         registerSubPageFile(jsonPage, url, "intro", baseUrl+"-intro.xml");
         registerSubPageFile(jsonPage, url, "intro-type", "xml");
       } else {
         contentFile = pagesDir + File.separator + "_includes" + File.separator + baseUrl + "-intro.md";
-        if (new File(contentFile).exists()) {
+        if (ManagedFileAccess.file(contentFile).exists()) {
           registerSubPageFile(jsonPage, url, "intro", baseUrl+"-intro.md");
           registerSubPageFile(jsonPage, url, "intro-type", "md");
         }
       }
 
       contentFile = pagesDir + File.separator + "_includes" + File.separator + baseUrl + "-notes.xml";
-      if (new File(contentFile).exists()) {
+      if (ManagedFileAccess.file(contentFile).exists()) {
         registerSubPageFile(jsonPage, url, "notes", baseUrl+"-notes.xml");
         registerSubPageFile(jsonPage, url, "notes-type", "xml");
       } else {
         contentFile = pagesDir + File.separator + "_includes" + File.separator + baseUrl + "-notes.md";
-        if (new File(contentFile).exists()) {
+        if (ManagedFileAccess.file(contentFile).exists()) {
           registerSubPageFile(jsonPage, url, "notes", baseUrl+"-notes.md");
           registerSubPageFile(jsonPage, url, "notes-type", "md");
         }
@@ -4334,24 +4339,24 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       }
       baseFile = baseFile + baseUrl;
       String contentFile = baseFile + "-intro.xml";
-      if (new File(contentFile).exists()) {
+      if (ManagedFileAccess.file(contentFile).exists()) {
         registerSubPageFile(jsonPage, url, "intro", baseUrl+"-intro.xml");
         registerSubPageFile(jsonPage, url, "intro-type", "xml");
       } else {
         contentFile = baseFile + "-intro.md";
-        if (new File(contentFile).exists()) {
+        if (ManagedFileAccess.file(contentFile).exists()) {
           registerSubPageFile(jsonPage, url, "intro", baseUrl+"-intro.md");
           registerSubPageFile(jsonPage, url, "intro-type", "md");
         }
       }
 
       contentFile = baseFile + "-notes.xml";
-      if (new File(contentFile).exists()) {
+      if (ManagedFileAccess.file(contentFile).exists()) {
         registerSubPageFile(jsonPage, url, "notes", baseUrl+"-notes.xml");
         registerSubPageFile(jsonPage, url, "notes-type", "xml");
       } else {
         contentFile = baseFile + "-notes.md";
-        if (new File(contentFile).exists()) {
+        if (ManagedFileAccess.file(contentFile).exists()) {
           registerSubPageFile(jsonPage, url, "notes", baseUrl+"-notes.md");
           registerSubPageFile(jsonPage, url, "notes-type", "md");
         }
@@ -4469,7 +4474,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
   private void fixSearchForm() throws IOException {
 
     String sfn = Utilities.path(pf.tempDir, "searchform.html");
-    if (new File(sfn).exists() ) {
+    if (ManagedFileAccess.file(sfn).exists() ) {
       String sf = FileUtilities.fileToString(sfn);
       sf = sf.replace("{{title}}", pf.publishedIg.present());
       sf = sf.replace("{{url}}", targetUrl());
@@ -4484,7 +4489,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     if (settings.isGenerationOff()) {
       File out = new File(pf.outputDir).getAbsoluteFile();
       // in watch mode the output folder is in temp: it isn't copied into itself
-      FileUtils.copyDirectory(new File(pf.tempDir), out, f -> !f.getAbsoluteFile().equals(out));
+      FileUtils.copyDirectory(ManagedFileAccess.file(pf.tempDir), out, f -> !f.getAbsoluteFile().equals(out));
       return true;
     }
     return runJekyll();
@@ -4565,7 +4570,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     // * --source on the command line, because _config.yml could otherwise nominate another folder (e.g. /) to publish
     // * a Gemfile in the folder is evaluated (ruby) whether or not jekyll is in safe mode: JEKYLL_NO_BUNDLER_REQUIRE stops that
     // there's no use for a Gemfile where jekyll runs, and bundler evaluates one (it's ruby): refuse rather than rely on the environment
-    String[] names = new File(pf.tempDir).list();
+    String[] names = ManagedFileAccess.file(pf.tempDir).list();
     if (names != null) {
       for (String n : names) {
         if (n.equalsIgnoreCase("Gemfile") || n.equalsIgnoreCase("gems.rb")) {
@@ -4573,10 +4578,10 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         }
       }
     }
-    File ownConfig = File.createTempFile("jekyll-publisher-", ".yml");
+    File ownConfig = ManagedFileAccess.createTempFile("jekyll-publisher-", ".yml");
     ownConfig.deleteOnExit();
     FileUtilities.stringToFile("# written by the IG publisher, and read after the IG's _config.yml so that it wins\nplugins: []\ngems: []\nwhitelist: []\n", ownConfig.getAbsolutePath());
-    File igConfig = new File(Utilities.path(pf.tempDir, "_config.yml"));
+    File igConfig = ManagedFileAccess.file(Utilities.path(pf.tempDir, "_config.yml"));
     String configFiles = igConfig.exists() ? igConfig.getAbsolutePath()+","+ownConfig.getAbsolutePath() : ownConfig.getAbsolutePath();
     Map<String, String> env = new HashMap<>(System.getenv());
     env.put("JEKYLL_NO_BUNDLER_REQUIRE", "true");
@@ -4724,12 +4729,12 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         map.path(u, this.pf.igpkp.getLinkFor(r, true));
       }
     }
-    for (String s : new File(pf.outputDir).list()) {
+    for (String s : ManagedFileAccess.file(pf.outputDir).list()) {
       if (s.endsWith(".html")) {
         map.target(s);
       }
     }
-    File df = File.createTempFile("fhir", "tmp");
+    File df = ManagedFileAccess.createTempFile("fhir", "tmp");
     df.deleteOnExit();
     map.save(df.getCanonicalPath());
     return df;
@@ -4748,7 +4753,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     generateExpansions();
     generateValidationPack(df.getCanonicalPath());
     // Create an IG-specific named igpack to make is easy to grab the igpacks for multiple igs without the names colliding (Talk to Lloyd before removing this)
-    FileUtils.copyFile(new File(Utilities.path(pf.outputDir, "validator.pack")),new File(Utilities.path(pf.outputDir, "validator-" + pf.sourceIg.getId() + ".pack")));
+    FileUtils.copyFile(ManagedFileAccess.file(Utilities.path(pf.outputDir, "validator.pack")),ManagedFileAccess.file(Utilities.path(pf.outputDir, "validator-" + pf.sourceIg.getId() + ".pack")));
     generateCsvZip();
     generateExcelZip();
     generateSchematronsZip();
@@ -4756,7 +4761,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
 
   private String makeTempZip(String ext) throws IOException {
-    File tmp = File.createTempFile("fhir", "zip");
+    File tmp = ManagedFileAccess.createTempFile("fhir", "zip");
     tmp.deleteOnExit();
     if (generateZipByExtension(tmp.getCanonicalPath(), ext)) {
       return tmp.getCanonicalPath();
@@ -4767,7 +4772,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
   private boolean generateZipByExtension(String path, String ext) throws IOException {
     Set<String> files = new HashSet<String>();
-    for (String s : new File(pf.outputDir).list()) {
+    for (String s : ManagedFileAccess.file(pf.outputDir).list()) {
       if (s.endsWith(ext)) {
         files.add(s);
       }
@@ -4791,7 +4796,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         for (FetchedResource r : f.getResources()) {
           if (r.isExample()) {
             String fn = Utilities.path(this.pf.outputDir, r.fhirType()+"-"+r.getId()+"."+fmt.getExtension());
-            if (new File(fn).exists()) {
+            if (ManagedFileAccess.file(fn).exists()) {
               files.add(fn);
             }
           }
@@ -4828,10 +4833,10 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         exp.addEntry().setResource(vs).setFullUrl(vs.getUrl());
       }
 
-      try (FileOutputStream stream = new FileOutputStream(Utilities.path(pf.outputDir, "expansions.json"))) {
+      try (FileOutputStream stream = ManagedFileAccess.outStream(Utilities.path(pf.outputDir, "expansions.json"))) {
         new JsonParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(stream, exp);
       }
-      try (FileOutputStream stream = new FileOutputStream(Utilities.path(pf.outputDir, "expansions.xml"))) {
+      try (FileOutputStream stream = ManagedFileAccess.outStream(Utilities.path(pf.outputDir, "expansions.xml"))) {
         new XmlParser(pf.context.getModelContext()).setOutputStyle(OutputStyle.PRETTY).compose(stream, exp);
       }
       ZipGenerator zip = new ZipGenerator(Utilities.path(pf.outputDir, "expansions.json.zip"));
@@ -5206,7 +5211,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
 
   private void processDataSetContent(DataSetInformation t) throws FileNotFoundException, IOException {
     String src = Utilities.path(pf.rootDir, t.getConfig().asString("source"));
-    processDataSetFolder(new File(src), src);
+    processDataSetFolder(ManagedFileAccess.file(src), src);
   }
 
   private void processDataSetFolder(File dir, String t) throws FileNotFoundException, IOException {
@@ -5320,7 +5325,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           item.add("contexts", String.join(", ", contexts));
       }
       if (cr.hasJurisdiction() && !containedCr) {
-        File flagDir = new File(pf.tempDir + "/assets/images");
+        File flagDir = ManagedFileAccess.file(pf.tempDir + "/assets/images");
         if (!flagDir.exists())
           flagDir.mkdirs();
         JsonArray jNodes = new JsonArray();
@@ -5340,7 +5345,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
               } else if (cd.getSystem().equals("urn:iso:std:iso:3166")) {
                 String code = translateCountryCode(cd.getCode()).toLowerCase();
                 jNode.add("name", displayForCountryCode(cd.getCode()));
-                File flagFile = new File(pf.vsCache + "/" + code + ".svg");
+                File flagFile = ManagedFileAccess.file(pf.vsCache + "/" + code + ".svg");
                 if (!flagFile.exists() && !pf.ignoreFlags.contains(code)) {
                   URL url2 = URI.create("https://flagcdn.com/" + pf.shortCountryCode.get(code.toUpperCase()).toLowerCase() + ".svg").toURL();
                   try {
@@ -5359,7 +5364,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
                 String code = cd.getCode();
                 String[] codeParts = cd.getCode().split("-");
                 jNode.add("name", displayForStateCode(cd.getCode()) + " (" + displayForCountryCode(codeParts[0]) + ")");
-                File flagFile = new File(pf.vsCache + "/" + code + ".svg");
+                File flagFile = ManagedFileAccess.file(pf.vsCache + "/" + code + ".svg");
                 if (!flagFile.exists()) {
                   URL url = URI.create("http://flags.ox3.in/svg/" + codeParts[0].toLowerCase() + "/" + codeParts[1].toLowerCase() + ".svg").toURL();
                   try (InputStream in = url.openStream()) {
@@ -7066,8 +7071,8 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     String cnt = null;
     try {
       String args = arguments.trim();
-      File src = new File(Utilities.path(FileUtilities.getDirectoryForFile(this.settings.getConfigFile()), args.substring(0, args.indexOf(" ")).trim()));
-      File tsrc = new File(Utilities.path(FileUtilities.getDirectoryForFile(this.settings.getConfigFile()), args.substring(args.indexOf(" ")+1).trim()));
+      File src = ManagedFileAccess.file(Utilities.path(FileUtilities.getDirectoryForFile(this.settings.getConfigFile()), args.substring(0, args.indexOf(" ")).trim()));
+      File tsrc = ManagedFileAccess.file(Utilities.path(FileUtilities.getDirectoryForFile(this.settings.getConfigFile()), args.substring(args.indexOf(" ")+1).trim()));
 
       JsonObject json = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(src);
       LiquidEngine liquid = new LiquidEngine(this.pf.context, this.pf.rc.getServices());
@@ -7236,7 +7241,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       File ff = null;
       for (String ts : this.pf.translationSources) {
         if (Utilities.endsWithInList(ts, "/"+l, "\\"+l, "-"+l)) {
-          File t = new File(Utilities.path(this.pf.rootDir, ts, f.getLoadPath()));
+          File t = ManagedFileAccess.file(Utilities.path(this.pf.rootDir, ts, f.getLoadPath()));
           if (t.exists()) {
             ff = t;
             f.setTranslation(l, true);
@@ -7403,7 +7408,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
     FileUtilities.stringToFile(b.toString(), Utilities.path(pf.tempDir, name+".csv"));
     pf.otherFilesRun.add(Utilities.path(pf.tempDir, name+".csv"));
-    org.hl7.fhir.utilities.json.parser.JsonParser.compose(json, new File(Utilities.path(pf.tempDir, name+".json")), true);
+    org.hl7.fhir.utilities.json.parser.JsonParser.compose(json, ManagedFileAccess.file(Utilities.path(pf.tempDir, name+".json")), true);
     pf.otherFilesRun.add(Utilities.path(pf.tempDir, name+".json"));
   }
 
@@ -7515,7 +7520,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     }
     FileUtilities.stringToFile(b.toString(), Utilities.path(pf.tempDir, name+".csv"));
     pf.otherFilesRun.add(Utilities.path(pf.tempDir, name+".csv"));
-    org.hl7.fhir.utilities.json.parser.JsonParser.compose(json, new File(Utilities.path(pf.tempDir, name+".json")), true);
+    org.hl7.fhir.utilities.json.parser.JsonParser.compose(json, ManagedFileAccess.file(Utilities.path(pf.tempDir, name+".json")), true);
     pf.otherFilesRun.add(Utilities.path(pf.tempDir, name+".json"));
   }
 

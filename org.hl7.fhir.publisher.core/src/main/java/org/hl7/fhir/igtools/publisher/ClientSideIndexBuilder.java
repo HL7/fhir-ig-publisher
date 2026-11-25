@@ -28,6 +28,7 @@ import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonObject;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 
 /**
  * Builds a compact JSON search index for client-side searching.
@@ -125,7 +126,7 @@ public class ClientSideIndexBuilder {
   }
 
   private void processResources() throws IOException {
-    try (Stream<Path> paths = Files.walk(Path.of(resourceFolder))) {
+    try (Stream<Path> paths = Files.walk(ManagedFileAccess.file(resourceFolder).toPath())) {
       paths.filter(Files::isRegularFile)
               .filter(p -> p.toString().endsWith(".json"))
               .forEach(this::processResourceFile);

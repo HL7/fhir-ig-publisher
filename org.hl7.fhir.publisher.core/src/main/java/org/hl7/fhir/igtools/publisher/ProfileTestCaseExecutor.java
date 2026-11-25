@@ -31,6 +31,7 @@ import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
 import org.hl7.fhir.validation.instance.InstanceValidator;
 import org.hl7.fhir.validation.instance.MatchetypeValidator;
 import org.hl7.fhir.validation.special.TxTesterSorters;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 
 public class ProfileTestCaseExecutor {
 
@@ -70,7 +71,7 @@ public class ProfileTestCaseExecutor {
       }
     } finally {
       // written even when a test case fails hard, since it's the only place the actual outcome can be seen
-      JsonParser.compose(output, new File(FileUtilities.changeFileExt(localFile, ".out.json")), true);
+      JsonParser.compose(output, ManagedFileAccess.file(FileUtilities.changeFileExt(localFile, ".out.json")), true);
     }
   }
 
@@ -168,14 +169,14 @@ public class ProfileTestCaseExecutor {
     filename = filename.replace("\\",  "/");
     File f = null;
     if (filename.startsWith("/")) {
-      f = new File(Utilities.path(rootDir, filename));
+      f = ManagedFileAccess.file(Utilities.path(rootDir, filename));
     } else {
-      f = new File(Utilities.path(localDir, filename));
+      f = ManagedFileAccess.file(Utilities.path(localDir, filename));
     }
     if (!f.exists()) {
       throw new FHIRException("Test Case Source "+filename+" not found at "+f.getAbsolutePath());
     }
-    return new FileInputStream(f);
+    return ManagedFileAccess.inStream(f);
   }
 
 }
