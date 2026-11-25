@@ -623,7 +623,9 @@ public class PublisherIGLoader extends PublisherBase {
           }
           break;
         case "apply-copyright":
-          if (p.getValue().equals("true")) {
+          // only when the IG has a copyright: getCopyrightElement() makes an empty one if it hasn't, and that went
+          // into every resource (and, for R4 types without copyright, into an empty cross-version extension)
+          if (p.getValue().equals("true") && pf.sourceIg.hasCopyright()) {
             pf.copyright = pf.sourceIg.getCopyrightElement();
           }
           break;
@@ -663,7 +665,9 @@ public class PublisherIGLoader extends PublisherBase {
           }
           break;
         case "default-copyright":
-          if (p.getValue().equals("true")) {
+          // only when the IG has a copyright: getCopyrightElement() makes an empty one if it hasn't, and that went
+          // into every resource (and, for R4 types without copyright, into an empty cross-version extension)
+          if (p.getValue().equals("true") && pf.sourceIg.hasCopyright()) {
             pf.defaultCopyright = pf.sourceIg.getCopyrightElement();
           }
           break;
