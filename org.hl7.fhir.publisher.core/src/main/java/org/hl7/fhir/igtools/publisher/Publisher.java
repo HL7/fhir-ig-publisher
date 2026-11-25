@@ -113,32 +113,6 @@ import static org.hl7.fhir.igtools.publisher.CliParams.SSRF_PROTECTION_ENABLED_P
 /**
  * Implementation Guide Publisher
  *
- * If you want to use this inside a FHIR server, and not to access content
- * on a local folder, provide your own implementation of the file fetcher
- *
- * rough sequence of activities:
- *
- *   load the context using the internal validation pack
- *   connect to the terminology service
- *
- *   parse the implementation guide
- *   find all the source files and determine the resource type
- *   load resources in this order:
- *     naming system
- *     code system
- *     value setx
- *     data element?
- *     structure definition
- *     concept map
- *     structure map
- *
- *   validate all source files (including the IG itself)
- *
- *   for each source file:
- *     generate all outputs
- *
- *   generate summary file
- *
  * Documentation: see http://wiki.hl7.org/index.php?title=IG_Publisher_Documentation
  *
  * The Publisher has 4 main related classes (and was broken up into these classes in August 2025)
