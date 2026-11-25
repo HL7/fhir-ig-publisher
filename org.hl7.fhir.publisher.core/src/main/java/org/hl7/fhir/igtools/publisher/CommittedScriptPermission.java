@@ -35,7 +35,8 @@ import java.util.zip.ZipFile;
  * folder isn't a git repository, or git can't be run, every file in it counts). The executable bit doesn't count: plenty
  * of IGs have it on content files.
  *
- * For now, none of this stops the build: it's a warning in qa.html, saying what will happen in a future version. Then,
+ * For now, none of this stops the build: scripts and programs in the root folder are an error in qa.html (a warning
+ * once the user has accepted them), saying what will happen in a future version. Then,
  * scripts and programs in the root folder will be refused on the ci-build, and locally the build will stop unless the
  * user has accepted them for the IG: with -allow-committed-scripts, which records the IG's folder (where it really is)
  * in "allowCommittedScripts" in fhir-settings.json (that already works, so people can accept them now). What they do is
@@ -61,9 +62,20 @@ public class CommittedScriptPermission {
    * @param ciBuild whether this is the ci-build
    * @param parameter whether the user ran with -allow-committed-scripts
    * @param settingsPath fhir-settings.json (null if it isn't known)
-   * @param warn where the warnings go
+   * @param warn where the messages go (errors too: see the other check)
    */
   public static void check(List<String> files, String root, boolean ciBuild, boolean parameter, String settingsPath, Consumer<String> warn) throws IOException {
+    check(files, root, ciBuild, parameter, settingsPath, warn, warn);
+  }
+
+  /**
+   * As check, with the errors apart: scripts and programs in the root folder that the user hasn't accepted. Those in
+   * sub-folders, and those the user has accepted, are warnings
+   *
+   * @param warn where the warnings go
+   * @param error where the errors go
+   */
+  public static void check(List<String> files, String root, boolean ciBuild, boolean parameter, String settingsPath, Consumer<String> warn, Consumer<String> error) throws IOException {
     List<String> inRoot = new ArrayList<>();
     List<String> inSubFolders = new ArrayList<>();
     for (String s : files) {
@@ -81,7 +93,7 @@ public class CommittedScriptPermission {
         + "so anyone who can change the repository can run code on the computer of everyone who builds the IG. Remove them from the repository "
         + "(people who want them can get them from their source, and keep them out of the IG's repository)";
     if (ciBuild) {
-      warn.accept(what+". "+why+". IMPORTANT: in a future version of the IG Publisher, the ci-build will refuse to build an IG that has these");
+      error.accept(what+". "+why+". IMPORTANT: in a future version of the IG Publisher, the ci-build will refuse to build an IG that has these");
       return;
     }
     String ciBuildToo = "Note that in a future version of the IG Publisher, the ci-build will refuse to build an IG that has these, whatever you accept here";
@@ -98,7 +110,7 @@ public class CommittedScriptPermission {
       }
       return;
     }
-    warn.accept(what+". "+why+". IMPORTANT: in a future version of the IG Publisher, the build will stop here, and the ci-build will refuse to build the IG. "
+    error.accept(what+". "+why+". IMPORTANT: in a future version of the IG Publisher, the build will stop here, and the ci-build will refuse to build the IG. "
         + "If you accept these as they are, you can say so now by running the IG Publisher with '"+PARAMETER+"'"
         + (settingsPath != null ? " (recorded in "+settingsPath+", for this IG)" : "")
         + ", and local builds will go on then (but not the ci-build). The IG Publisher doesn't check what they do: accepting them is your decision");
