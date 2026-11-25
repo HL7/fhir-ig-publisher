@@ -2147,7 +2147,7 @@ public class HTMLInspector {
       }
     }
     if (resolved) {
-      if (!Utilities.startsWithInList(ref, "icon_", "icon-", "tbl_", "data:", "cc0.png", "external.png", "assets/images/") && !ref.contains("hl7.org"))
+      if (!Utilities.startsWithInList(ref, "icon_", "conf-", "icon-", "tbl_", "data:", "cc0.png", "external.png", "assets/images/") && !ref.contains("hl7.org"))
         if (ref.startsWith("http://") || ref.startsWith("https://")) {
           addExternalReference(ExternalReferenceType.IMG, ref, src, filename);
         } else {
