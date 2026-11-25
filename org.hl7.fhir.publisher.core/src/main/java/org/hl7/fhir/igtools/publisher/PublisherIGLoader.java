@@ -377,6 +377,7 @@ public class PublisherIGLoader extends PublisherBase {
     }
     checkTrustedTemplateSource(pf.packageId(), false);
     pf.templateManager.loadTemplateOverrides(ini, pf.rootDir);
+    allowTemplateOverrideFolders();
     try {
       pf.template = pf.templateManager.loadTemplate(templateName, pf.rootDir, pf.packageId(), settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD, pf.logOptions.contains("template"), false); // Rapido has to produce every fragment that a full build does
     } catch (Throwable e) {
@@ -2262,6 +2263,25 @@ public class PublisherIGLoader extends PublisherBase {
     if (paths != null) {
       log("File access limited to the folders: "+String.join(", ", ManagedFileAccess.getAllowedPaths()));
     }
+  }
+
+  /**
+   * Template folders that ig.ini nominates (local builds only - see TemplateManager.loadTemplateOverrides) are folders
+   * the person running the publisher chose, like -packages: when file access is limited (see confineFileAccess, which
+   * runs before ig.ini is read), they're added to the folders the build can use, or the template can't be loaded
+   */
+  private void allowTemplateOverrideFolders() throws IOException {
+    List<String> allowed = ManagedFileAccess.getAllowedPaths();
+    if (allowed.isEmpty()) {
+      return; // no limit
+    }
+    List<String> folders = pf.templateManager.getTemplateOverrideFolders(settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD);
+    if (folders.isEmpty()) {
+      return;
+    }
+    allowed.addAll(folders);
+    ManagedFileAccess.setAllowedPaths(allowed);
+    log("File access also allowed to the template folders in ig.ini: "+String.join(", ", folders));
   }
 
   /**

@@ -12,10 +12,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.model.core.ImplementationGuide;
 import org.hl7.fhir.utilities.IniFile;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 import org.hl7.fhir.utilities.logging.ILoggingService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -316,6 +318,43 @@ class TemplateManagerTest {
     tm.loadTemplateOverrides(new IniFile(dir.resolve("ig.ini").toString()), dir.toString());
     assertBrokenJson(assertThrows(Exception.class, () -> tm.loadTemplate("my.template#1.0.0", dir.toString(), "x.y", false, false, false)));
     assertEquals(Collections.singletonList(folder("override")), tm.getLocalFolders());
+  }
+
+  /** the template folders ig.ini names, where they are (relative ones are relative to the IG's folder); none in auto-build mode, which ignores them */
+  @Test
+  void theOverrideFoldersAreTheFoldersIgIniNames(@TempDir Path other) throws IOException {
+    write("ig.ini", "[IG]\nig = input/ig.xml\ntemplate = my.template#1.0.0\nmy.template = override\nother.template#1.0.0 = " + other + "\n");
+    TemplateManager tm = manager();
+    tm.loadTemplateOverrides(new IniFile(dir.resolve("ig.ini").toString()), dir.toString());
+    assertEquals(List.of(folder("override"), other.toFile().getAbsolutePath()), tm.getTemplateOverrideFolders(false));
+    assertTrue(tm.getTemplateOverrideFolders(true).isEmpty());
+  }
+
+  /**
+   * a template folder ig.ini names outside the folders the build is limited to can't be read until it's allowed - as
+   * PublisherIGLoader.allowTemplateOverrideFolders does with getTemplateOverrideFolders. Once it is, the load gets as far
+   * as the (broken) package.json, so the folder was read
+   */
+  @Test
+  void anOverrideOutsideTheAllowedFoldersCanBeReadOnceItIsAllowed(@TempDir Path other) throws IOException {
+    Files.createDirectories(other.resolve("package"));
+    Files.write(other.resolve("package/package.json"), "{ not json".getBytes(StandardCharsets.UTF_8));
+    write("ig.ini", "[IG]\nig = input/ig.xml\ntemplate = my.template#1.0.0\nmy.template = " + other + "\n");
+    List<String> allowed = List.of(dir.toString(), System.getProperty("java.io.tmpdir"));
+    try {
+      ManagedFileAccess.setAllowedPaths(allowed);
+      TemplateManager tm = manager();
+      tm.loadTemplateOverrides(new IniFile(dir.resolve("ig.ini").toString()), dir.toString());
+      Exception e = assertThrows(Exception.class, () -> tm.loadTemplate("my.template#1.0.0", dir.toString(), "x.y", false, false, false));
+      assertTrue(e.getMessage().contains("cannot be accessed by policy"), e.getMessage());
+
+      List<String> withOverrides = new java.util.ArrayList<>(allowed);
+      withOverrides.addAll(tm.getTemplateOverrideFolders(false));
+      ManagedFileAccess.setAllowedPaths(withOverrides);
+      assertBrokenJson(assertThrows(Exception.class, () -> tm.loadTemplate("my.template#1.0.0", dir.toString(), "x.y", false, false, false)));
+    } finally {
+      ManagedFileAccess.setAllowedPaths(Collections.emptyList());
+    }
   }
 
   private static byte[] zip(String... names) throws IOException {

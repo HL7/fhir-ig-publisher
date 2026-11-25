@@ -86,7 +86,9 @@ runs:
         key: ig-publisher-${{ inputs.ref }}-${{ github.run_id }}
     - name: Run Publisher
       id: run-publisher
-      run: java -Xmx${{ inputs.memory }} -jar ig-publisher.jar -ig ${{ env.TARGET_DIRECTORY }}
+      # -trust-template all: the IGs in the delta run with whatever template they name, trusted or not, so that the
+      # QA shows what changed rather than stopping at the template check. Older publishers ignore the parameter
+      run: java -Xmx${{ inputs.memory }} -jar ig-publisher.jar -ig ${{ env.TARGET_DIRECTORY }} -trust-template all
       shell: bash
       continue-on-error: true
     - name: Generate empty QA on failure

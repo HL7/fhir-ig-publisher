@@ -115,6 +115,14 @@ public class TemplateManager {
     }
   }
 
+  /**
+   * The local folders that ig.ini nominates for templates (see loadTemplateOverrides) - none in auto-build mode, where
+   * they're ignored. The build has to be allowed to read them (see PublisherIGLoader.allowTemplateOverrideFolders)
+   */
+  public List<String> getTemplateOverrideFolders(boolean autoMode) {
+    return autoMode ? new ArrayList<>() : new ArrayList<>(templateOverrides.values());
+  }
+
   private String findTemplateOverride(String template) {
     if (templateOverrides.isEmpty()) {
       return null;
