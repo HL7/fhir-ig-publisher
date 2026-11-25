@@ -811,6 +811,8 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       return true;
     if (s.startsWith("icon"))
       return true;
+    if (s.startsWith("conf-"))
+      return true;
     if (Utilities.existsInList(s, "modifier.png", "alert.jpg", "tree-filter.png", "mustsupport.png", "information.png", "summary.png", "help.png", "new.png", "lock.png", "external.png", "cc0.png", "target.png", "link.svg"))
       return true;
 
