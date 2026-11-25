@@ -51,15 +51,15 @@ jobs:
           vmImage: macos-latest
           jdkVersion: 1.17
           gitRepo: https://github.com/FHIR/fhir-tools-ig.git
-        - igName: ACME-FSH-IG-Example
+        - igName: ig-guidance
           vmImage: ubuntu-latest
           jdkVersion: 1.17
-          gitRepo: https://github.com/FirelyTeam/ACME-FSH-IG-Example.git
-        # - igName: ACME-FSH-IG-Example
+          gitRepo: https://github.com/FHIR/ig-guidance.git
+        # - igName: ig-guidance
         #  vmImage: windows-latest
         #  jdkVersion: 1.17
-        #  gitRepo: https://github.com/FirelyTeam/ACME-FSH-IG-Example.git
-        - igName: ACME-FSH-IG-Example
+        #  gitRepo: https://github.com/FHIR/ig-guidance.git
+        - igName: ig-guidance
           vmImage: macos-latest
           jdkVersion: 1.17
-          gitRepo: https://github.com/FirelyTeam/ACME-FSH-IG-Example.git
+          gitRepo: https://github.com/FHIR/ig-guidance.git
