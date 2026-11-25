@@ -2347,14 +2347,18 @@ public class PublisherIGLoader extends PublisherBase {
   }
 
   /**
-   * Scripts and programs committed to the IG's repository (see CommittedScriptPermission): for now, a warning (that in
-   * the root folder says they will be refused in a future version)
+   * Scripts and programs committed to the IG's repository (see CommittedScriptPermission): for now, they don't stop the
+   * build. Those in the root folder that the user hasn't accepted are an error in qa.html (saying they will be refused
+   * in a future version); those in sub-folders, or accepted, are a warning
    */
   private void checkNoCommittedScripts(String root) throws IOException {
     CommittedScriptPermission.check(CommittedScriptPermission.findScripts(root), root, settings.getMode() == PublisherUtils.IGBuildMode.AUTOBUILD,
         settings.isAllowCommittedScripts(), FhirSettings.getFilePath(), msg -> {
           log("Warning: "+msg);
           pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.SECURITY, "ImplementationGuide", msg, ValidationMessage.IssueSeverity.WARNING));
+        }, msg -> {
+          log("Error: "+msg);
+          pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.SECURITY, "ImplementationGuide", msg, ValidationMessage.IssueSeverity.ERROR));
         });
   }
 
@@ -3983,16 +3987,22 @@ public class PublisherIGLoader extends PublisherBase {
     return result;
   }
 
+  /**
+   * The search parameter bundle that goes with an additional resource definition (s, as the IG states it - relative to
+   * the IG's folder), worked out from the text: it isn't opened here, and a relative path would be checked against the
+   * current folder, which the publisher's own file access doesn't allow unless it's in the IG (see statedFolder)
+   */
   private String getSearchParamsFileName(String s) throws IOException {
-    File f = ManagedFileAccess.file(s);
+    File f = new File(s);
     String fn = f.getName().replace("StructureDefinition-", "").replace(".xml", "");
     fn = "bundle-"+fn+"-search-params.xml";
     fn = Utilities.path(f.getParent(), fn);
     return fn;
   }
 
+  /** the resource name from an additional resource definition's file name - text only, see getSearchParamsFileName */
   private String getSearchParamsResourceName(String s) throws IOException {
-    File f = ManagedFileAccess.file(s);
+    File f = new File(s);
     String fn = f.getName().replace("StructureDefinition-", "").replace(".xml", "");
     return fn;
   }

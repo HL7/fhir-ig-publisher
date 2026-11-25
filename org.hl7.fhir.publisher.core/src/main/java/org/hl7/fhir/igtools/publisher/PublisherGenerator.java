@@ -1432,10 +1432,13 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
             }
           }
 
-          if (html == null) {
-            // No specialised renderer or it failed - fall back to JSON/XML rendering.
-            String rXContentType = rX.getElement().getNamedChildValueSingle("contentType");
-            if (rXContentType.contains("xml")) {
+          if (html == null && rX.getLogicalElement() != null) {
+            // No specialised renderer or it failed - fall back to JSON/XML rendering of the logical content. The
+            // content type is the Binary's, or else the file's; with neither, the BinaryRenderer below shows it
+            String rXContentType = rX.getElement() != null && rX.getElement().fhirType().equals("Binary") ? rX.getElement().getNamedChildValueSingle("contentType") : rX.getContentType();
+            if (rXContentType == null) {
+              // left to the BinaryRenderer
+            } else if (rXContentType.contains("xml")) {
               org.hl7.fhir.services.elementmodel.XmlParser xmlParser = new org.hl7.fhir.services.elementmodel.XmlParser(this.pf.context);
               XmlXHtmlRenderer xmlXHtmlRenderer = new XmlXHtmlRenderer();
               xmlXHtmlRenderer.setPrism(true);

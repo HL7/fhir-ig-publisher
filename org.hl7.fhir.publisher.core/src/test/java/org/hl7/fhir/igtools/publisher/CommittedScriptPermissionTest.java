@@ -190,6 +190,37 @@ class CommittedScriptPermissionTest {
     assertTrue(warnings.get(0).contains("the build will stop"), warnings.get(0));
   }
 
+  /**
+   * Root-folder scripts and programs that haven't been accepted are errors (on the ci-build, whatever was accepted
+   * locally); those in sub-folders, and those the user has accepted, are warnings
+   */
+  @Test
+  void unacceptedRootScriptsAreErrorsAndTheRestWarnings() throws IOException {
+    List<String> both = new ArrayList<>(ROOT);
+    both.addAll(SUB);
+    for (boolean ciBuild : new boolean[] { true, false }) {
+      List<String> warnings = new ArrayList<>();
+      List<String> errors = new ArrayList<>();
+      CommittedScriptPermission.check(both, ig("ig"), ciBuild, false, settings(), warnings::add, errors::add);
+      assertEquals(1, errors.size());
+      assertTrue(errors.get(0).contains("_genonce.sh"), errors.get(0));
+      assertEquals(1, warnings.size());
+      assertTrue(warnings.get(0).contains("scripts/build.sh"), warnings.get(0));
+    }
+    // accepted locally: a warning
+    List<String> warnings = new ArrayList<>();
+    List<String> errors = new ArrayList<>();
+    CommittedScriptPermission.check(ROOT, ig("ig"), false, true, settings(), warnings::add, errors::add);
+    assertTrue(errors.isEmpty(), errors.toString());
+    assertEquals(1, warnings.size());
+    assertTrue(warnings.get(0).contains("accepted"), warnings.get(0));
+    // but the ci-build doesn't go by what was accepted locally
+    warnings.clear();
+    CommittedScriptPermission.check(ROOT, ig("ig"), true, false, settings(), warnings::add, errors::add);
+    assertTrue(warnings.isEmpty(), warnings.toString());
+    assertEquals(1, errors.size());
+  }
+
   @Test
   void aSettingsFileThatCantBeReadIsNotWrittenOver() throws IOException {
     Files.write(dir.resolve("fhir-settings.json"), "{ not json".getBytes(StandardCharsets.UTF_8));
