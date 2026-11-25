@@ -333,25 +333,25 @@ class TemplateManagerTest {
   /**
    * a template folder ig.ini names outside the folders the build is limited to can't be read until it's allowed - as
    * PublisherIGLoader.allowTemplateOverrideFolders does with getTemplateOverrideFolders. Once it is, the load gets as far
-   * as the (broken) package.json, so the folder was read
+   * as the (broken) package.json, so the folder was read. The IG and the template are side by side in the test folder,
+   * and only the IG's folder is allowed (not the temp folder, which the test folder is in)
    */
   @Test
-  void anOverrideOutsideTheAllowedFoldersCanBeReadOnceItIsAllowed(@TempDir Path other) throws IOException {
-    Files.createDirectories(other.resolve("package"));
-    Files.write(other.resolve("package/package.json"), "{ not json".getBytes(StandardCharsets.UTF_8));
-    write("ig.ini", "[IG]\nig = input/ig.xml\ntemplate = my.template#1.0.0\nmy.template = " + other + "\n");
-    List<String> allowed = List.of(dir.toString(), System.getProperty("java.io.tmpdir"));
+  void anOverrideOutsideTheAllowedFoldersCanBeReadOnceItIsAllowed() throws IOException {
+    write("template-src/package/package.json", "{ not json");
+    write("ig/ig.ini", "[IG]\nig = input/ig.xml\ntemplate = my.template#1.0.0\nmy.template = " + folder("template-src") + "\n");
+    String ig = folder("ig");
     try {
-      ManagedFileAccess.setAllowedPaths(allowed);
+      ManagedFileAccess.setAllowedPaths(List.of(ig));
       TemplateManager tm = manager();
-      tm.loadTemplateOverrides(new IniFile(dir.resolve("ig.ini").toString()), dir.toString());
-      Exception e = assertThrows(Exception.class, () -> tm.loadTemplate("my.template#1.0.0", dir.toString(), "x.y", false, false, false));
+      tm.loadTemplateOverrides(new IniFile(dir.resolve("ig/ig.ini").toString()), ig);
+      Exception e = assertThrows(Exception.class, () -> tm.loadTemplate("my.template#1.0.0", ig, "x.y", false, false, false));
       assertTrue(e.getMessage().contains("cannot be accessed by policy"), e.getMessage());
 
-      List<String> withOverrides = new java.util.ArrayList<>(allowed);
+      List<String> withOverrides = new java.util.ArrayList<>(List.of(ig));
       withOverrides.addAll(tm.getTemplateOverrideFolders(false));
       ManagedFileAccess.setAllowedPaths(withOverrides);
-      assertBrokenJson(assertThrows(Exception.class, () -> tm.loadTemplate("my.template#1.0.0", dir.toString(), "x.y", false, false, false)));
+      assertBrokenJson(assertThrows(Exception.class, () -> tm.loadTemplate("my.template#1.0.0", ig, "x.y", false, false, false)));
     } finally {
       ManagedFileAccess.setAllowedPaths(Collections.emptyList());
     }
