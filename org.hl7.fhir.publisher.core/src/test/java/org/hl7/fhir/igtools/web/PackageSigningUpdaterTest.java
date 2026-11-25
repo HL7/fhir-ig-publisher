@@ -11,8 +11,11 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.security.interfaces.ECPrivateKey;
 import java.security.spec.ECGenParameterSpec;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 
@@ -41,11 +44,35 @@ class PackageSigningUpdaterTest {
     return out.toByteArray();
   }
 
+  // the signer wants the public key in the key file, as openssl writes it (SEC1, BEGIN EC PRIVATE KEY);
+  // Java's own encoding of the private key leaves it out, so the key is written out as SEC1 here
   private static NpmPackageSigner newSigner() throws Exception {
     KeyPairGenerator g = KeyPairGenerator.getInstance("EC");
     g.initialize(new ECGenParameterSpec("secp256r1"));
-    String pem = "-----BEGIN PRIVATE KEY-----\n" + Base64.getMimeEncoder().encodeToString(g.generateKeyPair().getPrivate().getEncoded()) + "\n-----END PRIVATE KEY-----\n";
+    KeyPair pair = g.generateKeyPair();
+    byte[] d = ((ECPrivateKey) pair.getPrivate()).getS().toByteArray();
+    byte[] d32 = new byte[32];
+    System.arraycopy(d, Math.max(0, d.length - 32), d32, Math.max(0, 32 - d.length), Math.min(32, d.length));
+    byte[] spki = pair.getPublic().getEncoded();
+    byte[] point = Arrays.copyOfRange(spki, spki.length - 65, spki.length);
+    byte[] sec1 = der(0x30, new byte[] {2, 1, 1}, der(0x04, d32), der(0xa1, der(0x03, new byte[] {0}, point)));
+    String pem = "-----BEGIN EC PRIVATE KEY-----\n" + Base64.getMimeEncoder().encodeToString(sec1) + "\n-----END EC PRIVATE KEY-----\n";
     return NpmPackageSigner.fromPem(pem);
+  }
+
+  private static byte[] der(int tag, byte[]... parts) {
+    ByteArrayOutputStream content = new ByteArrayOutputStream();
+    for (byte[] p : parts) {
+      content.write(p, 0, p.length);
+    }
+    ByteArrayOutputStream b = new ByteArrayOutputStream();
+    b.write(tag);
+    if (content.size() >= 0x80) {
+      b.write(0x81);
+    }
+    b.write(content.size());
+    b.write(content.toByteArray(), 0, content.size());
+    return b.toByteArray();
   }
 
   private void write(String path, byte[] content) throws IOException {
