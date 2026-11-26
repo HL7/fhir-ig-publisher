@@ -2,6 +2,7 @@ package org.hl7.fhir.igtools.publisher;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -225,6 +226,20 @@ class WatchSessionTest {
     s.sushiRan();
     s.startBuild();
     assertFalse(s.canSkipSushi());
+  }
+
+  @Test
+  void changesSincePreviousBuildIncludeWhatSushiGeneratedThen() throws IOException {
+    WatchSession s = session();
+    s.startBuild();
+    assertNull(s.changesSincePreviousBuild());
+    write("fsh-generated/resources/A.json", "{\"generated\":1}");
+    s.sushiRan();
+    write("input/pagecontent/index.md", "# Home, edited");
+    s.startBuild();
+    SourceSnapshot.Changes c = s.changesSincePreviousBuild();
+    assertEquals(Collections.singleton(dir.resolve("input/pagecontent/index.md").toAbsolutePath()), c.getModified());
+    assertTrue(c.getAdded().isEmpty() && c.getRemoved().isEmpty());
   }
 
   @Test
