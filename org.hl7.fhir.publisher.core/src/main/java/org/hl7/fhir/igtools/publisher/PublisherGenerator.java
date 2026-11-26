@@ -635,11 +635,11 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         pf.inspector.getComparisonFiles().add("comparison-v"+vi.getVersion()+"/index.html");
       }
     }
-    if (pf.ipaComparator != null && pf.ipaComparator.hasLast()) {
-      pf.inspector.getComparisonFiles().add(pf.ipaComparator.getBaseFile());
+    if (pf.ipaComparator != null) {
+      pf.inspector.getComparisonFiles().addAll(pf.ipaComparator.getIndexFiles());
     }
-    if (pf.ipsComparator != null && pf.ipsComparator.hasLast()) {
-      pf.inspector.getComparisonFiles().add(pf.ipsComparator.getBaseFile());
+    if (pf.ipsComparator != null) {
+      pf.inspector.getComparisonFiles().addAll(pf.ipsComparator.getIndexFiles());
     }
     List<ValidationMessage> linkmsgs = settings.isGenerationOff() ? new ArrayList<ValidationMessage>() : pf.inspector.check(statusMessage, statusMessages);
     int bl = 0;
@@ -4026,6 +4026,13 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
   }
 
 
+  /**
+   * Page content can use {{root-path}} to refer to files at the root of the IG output (package.tgz, full-ig.zip,
+   * comparisons etc.) without caring whether the page ends up in a language folder or not
+   */
+  private static final String ROOT_PATH_LANG = "{% assign root-path = '../' %}";
+  private static final String ROOT_PATH_ROOT = "{% assign root-path = '' %}";
+
   private void applyPageTemplate(String htmlTemplate, String mdTemplate, ImplementationGuide.ImplementationGuideDefinitionPageComponent page) throws Exception {
     String p = page.getName();
     String sourceName = null;
@@ -4051,7 +4058,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           checkMakeFile(makeLangRedirect(p), targetPath, f.getOutputNames());
         }
         for (String l : allLangs()) {
-          String s = "---\r\n---\r\n{% include " + template + " lang='" + l + "' %}";
+          String s = "---\r\n---\r\n" + ROOT_PATH_LANG + "{% include " + template + " lang='" + l + "' %}";
           targetPath = Utilities.path(this.pf.tempDir, l, p);
           FileUtilities.stringToFile(s, targetPath);
           if (f==null) { // toc.xml
@@ -4061,7 +4068,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           }
         }
       } else {
-        String s = "---\r\n---\r\n{% include " + template + " %}";
+        String s = "---\r\n---\r\n" + ROOT_PATH_ROOT + "{% include " + template + " %}";
         String targetPath = Utilities.path(this.pf.tempDir, p);
         FileUtilities.stringToFile(s, targetPath);
         if (f==null) { // toc.xml

@@ -1460,7 +1460,7 @@ public class HTMLInspector {
    * their structure, so it is not useful to raise heading structure errors against them.
    */
   private static final List<String> BUILD_REPORT_PAGES = Arrays.asList(
-          "qa.html", "qa.min.html", "qa-tx.html", "qa-txservers.html", "qa-dep.html", "qa-ipreview.html");
+          "qa.html", "qa.min.html", "qa-tx.html", "qa-txservers.html", "qa-dep.html", "qa-ipreview.html", "qa-experimental.html");
 
   private boolean isBuildReportPage(String path) {
     return path != null && BUILD_REPORT_PAGES.contains(path);
@@ -1834,18 +1834,11 @@ public class HTMLInspector {
       subFolder = filename.substring(rootFolder.length()+1);
       subFolder = subFolder.substring(0, subFolder.lastIndexOf(File.separator));
     }
+    // where a local reference lands, relative to the output root (null if it isn't a local reference)
+    String rootRef = rootRelativeRef(filename, rref);
     // full-ig.zip doesn't exist yet
-    String fixedRef = null;
-    if (subFolder == null) {
-      if ("full-ig.zip".equals(ref)) {
-        return true;
-      }
-      fixedRef = rref;
-    } else {
-      if ("../full-ig.zip".equals(ref)) {
-        return true;
-      }
-      fixedRef = rref.length() > 3 ? rref.substring(3) : rref;
+    if ("full-ig.zip".equals(rootRef)) {
+      return true;
     }
     if (Utilities.existsInList(ref, isSubFolder ? "../qa.html" : "qa.html",
             "http://hl7.org/fhir", "http://hl7.org", "http://www.hl7.org", "http://hl7.org/fhir/search.cfm") ||
@@ -1858,7 +1851,8 @@ public class HTMLInspector {
     if (filename != null && filename.contains("searchform.html") && ref.equals("history.html")) {
       return true;
     }
-    if (manual.contains(rref)) {
+    // files provided manually are at the root, so a relative reference has to land there, not just have the right name
+    if (rootRef != null ? manual.contains(rootRef) : manual.contains(rref)) {
       return true;
     }
     if (rref.startsWith("http://build.fhir.org/ig/FHIR/fhir-tools-ig") || rref.startsWith("http://build.fhir.org/ig/FHIR/ig-guidance")) { // always allowed to refer to tooling or IG Guidance IG build location
@@ -1926,7 +1920,7 @@ public class HTMLInspector {
       }
     }
 
-    if (comparisonFiles.contains(fixedRef)) {
+    if (rootRef != null && comparisonFiles.contains(rootRef)) {
       return true;
     }
     // external terminology resources
@@ -2087,6 +2081,39 @@ public class HTMLInspector {
   //    return sm;
   //  }
 
+  /**
+   * The path a local reference resolves to, relative to the root of the output, taking the folder of the page
+   * it appears in into account (e.g. 'package.tgz' from en/downloads.html is 'en/package.tgz').
+   *
+   * @return null if the reference isn't a relative local reference, or if it goes above the root
+   */
+  private String rootRelativeRef(String filename, String ref) {
+    if (ref == null || filename == null || !filename.startsWith(rootFolder) || ref.startsWith("#") || ref.startsWith("/") || ref.contains(":")) {
+      return null;
+    }
+    if (ref.contains("#")) {
+      ref = ref.substring(0, ref.indexOf("#"));
+    }
+    List<String> parts = new ArrayList<>();
+    String[] folders = filename.substring(rootFolder.length()).replace(File.separatorChar, '/').split("/");
+    for (int i = 0; i < folders.length - 1; i++) { // last is the file name
+      if (!folders[i].isEmpty()) {
+        parts.add(folders[i]);
+      }
+    }
+    for (String s : ref.split("/")) {
+      if ("..".equals(s)) {
+        if (parts.isEmpty()) {
+          return null;
+        }
+        parts.remove(parts.size() - 1);
+      } else if (!s.isEmpty() && !".".equals(s)) {
+        parts.add(s);
+      }
+    }
+    return String.join("/", parts);
+  }
+
   private String makeLocal(String filename) {
     if (filename.startsWith(rootFolder))
       return filename.substring(rootFolder.length()+1);
@@ -2113,8 +2140,10 @@ public class HTMLInspector {
     if (ref.startsWith("./")) {
       ref = ref.substring(2);
     }
-    if (!resolved)
-      resolved = manual.contains(ref);
+    if (!resolved) {
+      String rootRef = rootRelativeRef(filename, ref);
+      resolved = rootRef != null ? manual.contains(rootRef) : manual.contains(ref);
+    }
     if (!resolved && specs != null){
       for (SpecMapManager spec : specs) {
         resolved = resolved || (spec.getBase() != null && spec.hasImage(ref));
