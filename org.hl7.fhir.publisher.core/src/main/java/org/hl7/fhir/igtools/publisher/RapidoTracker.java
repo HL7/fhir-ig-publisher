@@ -19,15 +19,19 @@ import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -43,8 +47,10 @@ import org.hl7.fhir.igtools.publisher.RapidoDependencyAnalyser.Hasher;
 import org.hl7.fhir.igtools.publisher.RapidoDependencyAnalyser.ResourceNode;
 import org.hl7.fhir.model.IModelContext;
 import org.hl7.fhir.model.core.CanonicalResource;
+import org.hl7.fhir.model.core.CanonicalType;
 import org.hl7.fhir.model.core.DateTimeType;
 import org.hl7.fhir.model.core.DomainResource;
+import org.hl7.fhir.model.core.ElementDefinition;
 import org.hl7.fhir.model.core.Resource;
 import org.hl7.fhir.model.core.StructureDefinition;
 import org.hl7.fhir.model.core.ValueSet;
@@ -58,6 +64,7 @@ import org.hl7.fhir.standalone.terminology.client.TerminologyClientManager;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.ToolingClientLogger;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonElement;
@@ -127,11 +134,18 @@ public class RapidoTracker {
   private int validationsDone;
   /** the date the loader puts on canonical resources that have none; it differs every build */
   private final String buildDate;
+  /**
+   * whether a Reference.reference only needs its target to exist with the right type. Before R4, definitions are
+   * linked by Reference too (a binding's valueSetReference, QuestionnaireResponse.questionnaire, ...), and the validator
+   * reads all of the target, so there it's a full edge
+   */
+  private final boolean weakReferences;
 
   public RapidoTracker(PublisherFields pf) throws IOException {
     this.pf = pf;
     this.stateFile = Utilities.path(pf.tempDir, "_rapido", "state.json");
     this.buildDate = new DateTimeType(pf.getExecTime()).asStringValue();
+    this.weakReferences = pf.version != null && VersionUtilities.isR4Plus(pf.version);
   }
 
   // ---- analysis ------------------------------------------------------------------------------------------------------
@@ -393,6 +407,7 @@ public class RapidoTracker {
 
   ResourceNode resourceNode(FetchedResource r) {
     ResourceNode n = new ResourceNode(r.fhirType(), r.getId());
+    definitions.clear();
     Element e = r.getElement();
     Hasher h = new Hasher();
     h.add(r.fhirType()).add(r.getId()).add(r.getTitle()).add(r.getResourceName()).add(r.getResourceDescription())
@@ -413,6 +428,20 @@ public class RapidoTracker {
       n.setTitle(singleValue(e, "title"));
       if ("StructureDefinition".equals(r.fhirType())) {
         n.setBaseDefinition(e.getNamedChildValue("baseDefinition"));
+        // what the validator checks of a target profile, besides that it exists
+        n.addIdentity(singleValue(e, "type")).addIdentity(singleValue(e, "kind")).addIdentity(singleValue(e, "derivation"))
+          .addIdentity(singleValue(e, "abstract"));
+        // and, for a logical model, whether it can be the target of a reference
+        for (Element x : e.getChildrenByName("extension")) {
+          String u = x.getNamedChildValue("url");
+          if (u != null && (u.endsWith("/structuredefinition-type-characteristics") || u.endsWith("/logical-target"))) {
+            for (Element v : x.getChildList()) {
+              if (v.getName().startsWith("value")) {
+                n.addIdentity(u+"="+v.primitiveValue());
+              }
+            }
+          }
+        }
       }
       h.add("(").add(e.getName()).add(e.fhirType());
       for (String c : e.getComments()) {
@@ -423,13 +452,138 @@ public class RapidoTracker {
           // stamped by the loader because the source has no date: the same input every build, so hash it as such
           h.add("(build date)");
         } else {
-          scan(c, h, n);
+          scan(c, e, null, h, n);
         }
       }
       h.add(")");
     }
     n.setContentHash(h.finish());
+    if (definitionsReadTargets(r, n)) {
+      n.setReadsTargets(true);
+    }
     return n;
+  }
+
+  /** the profiles and extensions that the resource being scanned claims or uses (meta.profile, Extension.url) */
+  private final Set<String> definitions = new LinkedHashSet<>();
+
+  /** for each url: whether the StructureDefinition it names in the context reads the targets of references */
+  private final Map<String, Boolean> definitionReadsTargets = new HashMap<>();
+
+  /**
+   * Whether validating the resource can read the content of what it refers to through a definition the IG doesn't hold
+   * (the analysis looks at the IG's own): its type's (Observation's obs-9 has a resolve()), a profile or extension from a
+   * package, or a type they use. Without a context to look in, it may
+   */
+  private boolean definitionsReadTargets(FetchedResource r, ResourceNode n) {
+    if (pf.context == null) {
+      return true;
+    }
+    if ("MeasureReport".equals(r.fhirType())) {
+      // its validator reads what it refers to: a subject-list MeasureReport counts the entries of its Lists
+      return true;
+    }
+    Set<String> urls = new LinkedHashSet<>();
+    urls.add("http://hl7.org/fhir/StructureDefinition/"+r.fhirType());
+    urls.addAll(r.getProfiles(false));
+    urls.addAll(definitions);
+    for (String u : urls) {
+      if (definitionReadsTargets(u)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Whether the StructureDefinition the url names, or any definition it reaches through its elements' types, reads the
+   * targets of references. A walk over what it reaches: a definition is only known not to read them when nothing it
+   * reaches does, so a false is kept for everything the walk saw only once the walk is over (a cycle can't leave a
+   * false behind for a definition that reaches one that does)
+   */
+  private boolean definitionReadsTargets(String root) {
+    Boolean known = definitionReadsTargets.get(root);
+    if (known != null) {
+      return known;
+    }
+    Set<String> seen = new HashSet<>();
+    Deque<String> todo = new ArrayDeque<>();
+    todo.push(root);
+    boolean res = false;
+    try {
+      while (!todo.isEmpty() && !res) {
+        String url = todo.pop();
+        Boolean k = definitionReadsTargets.get(url);
+        if (Boolean.TRUE.equals(k)) {
+          res = true;
+        } else if (k == null && seen.add(url)) {
+          StructureDefinition sd = pf.context.fetchResource(StructureDefinition.class, url);
+          if (sd != null) {
+            // the validator checks against the profiles it imposes too
+            for (org.hl7.fhir.model.core.Extension x : sd.getExtension()) {
+              if (x.getUrl() != null && x.getUrl().endsWith("/structuredefinition-imposeProfile") && x.hasValue()) {
+                todo.push(x.getValue().primitiveValue());
+              }
+            }
+            if (!sd.hasSnapshot()) {
+              // the constraints it inherits aren't known
+              res = sd.getDerivation() == StructureDefinition.TypeDerivationRule.CONSTRAINT || readsTargets(sd.getDifferential().getElementList(), todo);
+            } else {
+              res = readsTargets(sd.getSnapshot().getElementList(), todo);
+            }
+          }
+        }
+      }
+    } catch (RuntimeException e) {
+      res = true;
+    }
+    if (res) {
+      definitionReadsTargets.put(root, true);
+    } else {
+      for (String u : seen) {
+        definitionReadsTargets.put(u, false);
+      }
+    }
+    return res;
+  }
+
+  /** whether the elements read the targets of references themselves; the definitions their types name are added to todo */
+  private boolean readsTargets(List<ElementDefinition> elements, Deque<String> todo) {
+    for (ElementDefinition ed : elements) {
+      for (ElementDefinition.ElementDefinitionConstraintComponent c : ed.getConstraintList()) {
+        if (readsTargets(c.getExpression())) {
+          return true;
+        }
+      }
+      if (ed.hasSlicing()) {
+        for (ElementDefinition.ElementDefinitionSlicingDiscriminatorComponent d : ed.getSlicing().getDiscriminatorList()) {
+          if (readsTargets(d.getPath()) || discriminatorFollowsReference(d.getPath())) {
+            return true;
+          }
+        }
+      }
+      for (ElementDefinition.TypeRefComponent t : ed.getTypeList()) {
+        for (CanonicalType p : t.getProfileList()) {
+          if (p.hasValue()) {
+            todo.push(p.getValue());
+          }
+        }
+        String code = t.getWorkingCode();
+        if (code != null) {
+          todo.push(Utilities.isAbsoluteUrl(code) ? code : "http://hl7.org/fhir/StructureDefinition/"+code);
+        }
+      }
+    }
+    return false;
+  }
+
+  private static boolean readsTargets(String expression) {
+    return expression != null && (expression.contains("resolve()") || expression.contains("conformsTo("));
+  }
+
+  /** a discriminator path that goes through a Reference's reference: the validator fetches the target and goes on in it */
+  static boolean discriminatorFollowsReference(String path) {
+    return path != null && Arrays.asList(path.split("\\.")).contains("reference");
   }
 
   // a canonical resource's url, version, name and title are single primitives; other resources can repeat them (Device.name)
@@ -441,22 +595,42 @@ public class RapidoTracker {
     return l.size() == 1 && l.get(0).isPrimitive() ? l.get(0).getValue() : null;
   }
 
-  private void scan(Element e, Hasher h, ResourceNode n) {
+  private void scan(Element e, Element parent, Element grandparent, Hasher h, ResourceNode n) {
     h.add("(").add(e.getName()).add(e.fhirType());
+    if (e.isResource()) {
+      // a contained resource, or one in a Bundle or Parameters: the validator checks the references to it against
+      // the whole of their target profiles (CHECK_VALID)
+      n.setReadsTargets(true);
+    }
     if (e.isXhtml()) {
       String x = e.getXhtml() == null ? e.getValue() : new XhtmlComposer(XhtmlComposer.XML).compose(e.getXhtml());
       h.add(x);
-      n.addString(x);
+      // narrative only links to what it mentions
+      n.addLink(x);
     } else if (e.hasValue()) {
       h.add(e.getValue());
-      n.addString(e.getValue());
+      if (("profile".equals(e.getName()) && "meta".equals(parent.getName()))
+          || ("url".equals(e.getName()) && Utilities.existsInList(parent.getName(), "extension", "modifierExtension"))) {
+        definitions.add(e.getValue());
+      }
+      if ("path".equals(e.getName()) && "discriminator".equals(parent.getName()) && discriminatorFollowsReference(e.getValue())) {
+        n.setReadsTargets(true);
+      }
+      if (weakReferences && "reference".equals(e.getName()) && "Reference".equals(parent.fhirType())) {
+        n.addInstanceReference(e.getValue());
+      } else if ("targetProfile".equals(e.getName()) && "type".equals(parent.getName()) && grandparent != null
+          && "ElementDefinition".equals(grandparent.fhirType())) {
+        n.addLink(e.getValue());
+      } else {
+        n.addString(e.getValue());
+      }
     }
     for (String c : e.getComments()) {
       h.add("comment").add(c);
     }
     if (e.hasChildren()) {
       for (Element c : e.getChildList()) {
-        scan(c, h, n);
+        scan(c, e, parent, h, n);
       }
     }
     h.add(")");
