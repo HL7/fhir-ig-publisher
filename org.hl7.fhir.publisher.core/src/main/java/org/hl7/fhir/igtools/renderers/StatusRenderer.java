@@ -14,6 +14,7 @@ import org.hl7.fhir.model.core.Extension;
 import org.hl7.fhir.model.core.IntegerType;
 import org.hl7.fhir.model.core.StringType;
 import org.hl7.fhir.services.renderers.utils.RenderingContext;
+import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.Utilities;
 
 public class StatusRenderer {
@@ -89,12 +90,7 @@ public class StatusRenderer {
         if (resource.hasExtension(ExtensionDefinitions.EXT_FMM_SUPPORT))
           setFmmSupport(resource.getExtensionByUrl(ExtensionDefinitions.EXT_FMM_SUPPORT).getValueStringType().getValue());
         else if (fmm.hasExtension(ExtensionDefinitions.EXT_FMM_DERIVED)) {
-          List<Extension> derivations = fmm.getExtensionsByUrl(ExtensionDefinitions.EXT_FMM_DERIVED);
-          String s = "Inherited from ";
-          for (Extension ex: derivations) {
-            s += ", " + ex.getValueCanonicalType();
-          }
-          setFmmSupport(s);
+          setFmmSupport(inheritedFrom(fmm.getExtensionsByUrl(ExtensionDefinitions.EXT_FMM_DERIVED)));
         }
       }
     }
@@ -102,15 +98,10 @@ public class StatusRenderer {
       if (resource.hasExtension(ExtensionDefinitions.EXT_FMM_LEVEL)) {
         setFmm(resource.getExtensionString(ExtensionDefinitions.EXT_FMM_LEVEL));
         Element fmm = resource.getExtension(ExtensionDefinitions.EXT_FMM_LEVEL).getNamedChild("value");
-        if (fmm.hasExtension(ExtensionDefinitions.EXT_FMM_SUPPORT))
-          setFmmSupport(fmm.getExtensionString(ExtensionDefinitions.EXT_FMM_SUPPORT));
+        if (resource.hasExtension(ExtensionDefinitions.EXT_FMM_SUPPORT))
+          setFmmSupport(resource.getExtensionString(ExtensionDefinitions.EXT_FMM_SUPPORT));
         else if (fmm.hasExtension(ExtensionDefinitions.EXT_FMM_DERIVED)) {
-          List<Element> derivations = fmm.getExtensions(ExtensionDefinitions.EXT_FMM_DERIVED);
-          String s = "Inherited from ";
-          for (Element ex: derivations) {
-            s += ", " + ex.primitiveValue();
-          }
-          setFmmSupport(s);
+          setFmmSupport(inheritedFromElements(fmm.getExtensions(ExtensionDefinitions.EXT_FMM_DERIVED)));
         }
       }
     }
@@ -121,12 +112,7 @@ public class StatusRenderer {
         if (resource.hasExtension(ExtensionDefinitions.EXT_STANDARDS_STATUS_REASON))
           setSstatusSupport(resource.getExtensionByUrl(ExtensionDefinitions.EXT_STANDARDS_STATUS_REASON).getValueStringType().getValue());
         else if (sstatus.hasExtension(ExtensionDefinitions.EXT_FMM_DERIVED)) {
-          List<Extension> derivations = sstatus.getExtensionsByUrl(ExtensionDefinitions.EXT_FMM_DERIVED);
-          String s = "Inherited from ";
-          for (Extension ex: derivations) {
-            s += ", " + ex.getValueCanonicalType();
-          }
-          setFmmSupport(s);
+          setSstatusSupport(inheritedFrom(sstatus.getExtensionsByUrl(ExtensionDefinitions.EXT_FMM_DERIVED)));
         }
       }
     }
@@ -135,17 +121,28 @@ public class StatusRenderer {
       if (resource.hasExtension(ExtensionDefinitions.EXT_STANDARDS_STATUS)) {
         setSstatus(resource.getExtensionString(ExtensionDefinitions.EXT_STANDARDS_STATUS));
         Element sstatus = resource.getExtension(ExtensionDefinitions.EXT_STANDARDS_STATUS).getNamedChild("value");
-        if (sstatus.hasExtension(ExtensionDefinitions.EXT_FMM_SUPPORT))
-          setFmmSupport(sstatus.getExtensionString(ExtensionDefinitions.EXT_FMM_SUPPORT));
+        if (resource.hasExtension(ExtensionDefinitions.EXT_STANDARDS_STATUS_REASON))
+          setSstatusSupport(resource.getExtensionString(ExtensionDefinitions.EXT_STANDARDS_STATUS_REASON));
         else if (sstatus.hasExtension(ExtensionDefinitions.EXT_FMM_DERIVED)) {
-          List<Element> derivations = sstatus.getExtensions(ExtensionDefinitions.EXT_FMM_DERIVED);
-          String s = "Inherited from ";
-          for (Element ex: derivations) {
-            s += ", " + ex.primitiveValue();
-          }
-          setFmmSupport(s);
+          setSstatusSupport(inheritedFromElements(sstatus.getExtensions(ExtensionDefinitions.EXT_FMM_DERIVED)));
         }
       }
+    }
+
+    private static String inheritedFrom(List<Extension> derivations) {
+      CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder();
+      for (Extension ex : derivations) {
+        b.append(ex.getValue().primitiveValue());
+      }
+      return "Inherited from " + b.toString();
+    }
+
+    private static String inheritedFromElements(List<Element> derivations) {
+      CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder();
+      for (Element ex : derivations) {
+        b.append(ex.getNamedChildValue("value"));
+      }
+      return "Inherited from " + b.toString();
     }
   }
 

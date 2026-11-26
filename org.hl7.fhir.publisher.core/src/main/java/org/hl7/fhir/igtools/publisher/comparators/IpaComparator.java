@@ -361,7 +361,14 @@ public class IpaComparator {
   }
 
 
-  public String getBaseFile() {
-    return "";
+  /**
+   * The index page of each comparison this generates, relative to the output root, for the link checker
+   */
+  public List<String> getIndexFiles() {
+    List<String> res = new ArrayList<>();
+    for (VersionInstance vi : versionList) {
+      res.add("ipa-comparison-v"+vi.version+"/index.html");
+    }
+    return res;
   }
 }

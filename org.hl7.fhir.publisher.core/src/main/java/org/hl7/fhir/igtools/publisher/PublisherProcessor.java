@@ -1044,9 +1044,9 @@ public class PublisherProcessor extends PublisherBase  {
             res.getExtension().remove(statusExt);
             addExtension = true;
 
-          } else if (status.getValue() == parentStatus.getValue()) {
-            if (fmm.getExtensionsByUrl(ExtensionDefinitions.EXT_FMM_DERIVED).size() < FMM_DERIVATION_MAX)
-              fmm.addExtension(ExtensionDefinitions.EXT_FMM_DERIVED, new CanonicalType(parentCanonical));
+          } else if (status.getValue().equals(parentStatus.getValue())) {
+            if (status.getExtensionsByUrl(ExtensionDefinitions.EXT_FMM_DERIVED).size() < FMM_DERIVATION_MAX)
+              status.addExtension(ExtensionDefinitions.EXT_FMM_DERIVED, new CanonicalType(parentCanonical));
 
           }
         }

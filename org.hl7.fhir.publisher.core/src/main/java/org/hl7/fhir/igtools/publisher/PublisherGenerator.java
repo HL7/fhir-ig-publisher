@@ -635,11 +635,11 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
         pf.inspector.getComparisonFiles().add("comparison-v"+vi.getVersion()+"/index.html");
       }
     }
-    if (pf.ipaComparator != null && pf.ipaComparator.hasLast()) {
-      pf.inspector.getComparisonFiles().add(pf.ipaComparator.getBaseFile());
+    if (pf.ipaComparator != null) {
+      pf.inspector.getComparisonFiles().addAll(pf.ipaComparator.getIndexFiles());
     }
-    if (pf.ipsComparator != null && pf.ipsComparator.hasLast()) {
-      pf.inspector.getComparisonFiles().add(pf.ipsComparator.getBaseFile());
+    if (pf.ipsComparator != null) {
+      pf.inspector.getComparisonFiles().addAll(pf.ipsComparator.getIndexFiles());
     }
     List<ValidationMessage> linkmsgs = settings.isGenerationOff() ? new ArrayList<ValidationMessage>() : pf.inspector.check(statusMessage, statusMessages);
     int bl = 0;
@@ -3955,6 +3955,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
   }
 
   void templateBeforeGenerate() throws IOException, FHIRException {
+    renderImageSources();
     if (pf.template != null) {
       logMessage("Run Template");
       TimeTracker.Session tts = pf.tt.start("template");
@@ -3988,6 +3989,40 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     cleanUpExtensions(pf.publishedIg);
   }
 
+
+  /**
+   * The diagram sources in the path-image-source folders, rendered to svg in _includes, where the template used to put
+   * them (see ImageSourceRenderer). Before the template runs, as the template's script used to do it then
+   */
+  private void renderImageSources() throws IOException {
+    if (pf.imageSourceDirs.isEmpty()) {
+      return;
+    }
+    logMessage("Render Image Sources");
+    List<ImageSourceRenderer.ImageIssue> issues = new ArrayList<>();
+    List<ImageSourceRenderer.RenderedImage> images = new ImageSourceRenderer().render(pf.imageSourceDirs, issues);
+    Map<String, ImageSourceRenderer.RenderedImage> done = new HashMap<>();
+    for (ImageSourceRenderer.RenderedImage image : images) {
+      ImageSourceRenderer.RenderedImage prior = done.get(image.getName().toLowerCase());
+      if (prior != null) {
+        pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE, imageSourcePath(image.getSource()),
+            "The image "+image.getName()+" is produced by "+imageSourcePath(prior.getSource())+" as well, so this one has been ignored", ValidationMessage.IssueSeverity.WARNING));
+      } else {
+        done.put(image.getName().toLowerCase(), image);
+        checkMakeFile(image.getContent(), Utilities.path(pf.tempDir, "_includes", image.getName()), pf.otherFilesRun);
+      }
+    }
+    for (ImageSourceRenderer.ImageIssue issue : issues) {
+      pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.INVALID, issue.getLine(), 0, imageSourcePath(issue.getSource()),
+          issue.getMessage(), ValidationMessage.IssueSeverity.ERROR));
+    }
+    logDebugMessage(LogCategory.PROGRESS, "Rendered "+done.size()+" images");
+  }
+
+  private String imageSourcePath(File source) {
+    String s = FileUtilities.getRelativePath(pf.rootDir, source.getAbsolutePath());
+    return Utilities.noString(s) ? source.getName() : s;
+  }
 
   private void genBasePages() throws IOException, Exception {
     String json;
@@ -4026,6 +4061,13 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
   }
 
 
+  /**
+   * Page content can use {{root-path}} to refer to files at the root of the IG output (package.tgz, full-ig.zip,
+   * comparisons etc.) without caring whether the page ends up in a language folder or not
+   */
+  private static final String ROOT_PATH_LANG = "{% assign root-path = '../' %}";
+  private static final String ROOT_PATH_ROOT = "{% assign root-path = '' %}";
+
   private void applyPageTemplate(String htmlTemplate, String mdTemplate, ImplementationGuide.ImplementationGuideDefinitionPageComponent page) throws Exception {
     String p = page.getName();
     String sourceName = null;
@@ -4051,7 +4093,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           checkMakeFile(makeLangRedirect(p), targetPath, f.getOutputNames());
         }
         for (String l : allLangs()) {
-          String s = "---\r\n---\r\n{% include " + template + " lang='" + l + "' %}";
+          String s = "---\r\n---\r\n" + ROOT_PATH_LANG + "{% include " + template + " lang='" + l + "' %}";
           targetPath = Utilities.path(this.pf.tempDir, l, p);
           FileUtilities.stringToFile(s, targetPath);
           if (f==null) { // toc.xml
@@ -4061,7 +4103,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
           }
         }
       } else {
-        String s = "---\r\n---\r\n{% include " + template + " %}";
+        String s = "---\r\n---\r\n" + ROOT_PATH_ROOT + "{% include " + template + " %}";
         String targetPath = Utilities.path(this.pf.tempDir, p);
         FileUtilities.stringToFile(s, targetPath);
         if (f==null) { // toc.xml
