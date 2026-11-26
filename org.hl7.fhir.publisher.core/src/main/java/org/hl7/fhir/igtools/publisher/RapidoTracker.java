@@ -13,12 +13,18 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.Proxy;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.DirectoryIteratorException;
 import java.nio.file.DirectoryStream;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -34,10 +40,12 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
@@ -95,16 +103,65 @@ import org.hl7.fhir.utilities.xhtml.XhtmlNode;
  * resource, the template, other files in the IG folder, the day) goes into a global hash, and each package the build loaded is
  * recorded with a hash of its package.json. If any of that changes, or the set of files changes, or the last build
  * didn't finish, the build is a complete one.
+ *
+ * <p>What keeping the state costs a build goes with what changed, not with the size of the IG:
+ * <ul>
+ *   <li>the state a process saved is the state its next build starts from (watch mode), so it isn't read again while the
+ *   file is still the one that was written (see {@link Kept})</li>
+ *   <li>a journaled expansion is a file of its own, named by the hash of its content, so it is written once, and parsed
+ *   once by a process, however many builds replay it</li>
+ *   <li>a file a phase wrote is taken as unchanged from its size and times when those can't have stayed the same over a
+ *   change (see {@link FileStamp}), and only read and hashed otherwise</li>
+ * </ul>
  */
 public class RapidoTracker {
 
   public static final String PHASE_HTML = "html";
   public static final String PHASE_SHEETS = "sheets";
 
-  private static final int STATE_VERSION = 4;
+  private static final int STATE_VERSION = 5;
+
+  /**
+   * The state this process saved last, and the expansions it has parsed. The next build of the same IG in this process
+   * (watch mode) starts from it instead of reading the file, as long as the file is still the one that was written: it
+   * has the size and times it had then, and starts with the id that was written into it. So a state saved by another
+   * process since, or a file that was replaced or removed, is read (or missed) as in a new process.
+   */
+  private record Kept(String file, String id, String stamp, JsonObject state, Map<String, ValueSet> expansions) {
+  }
+
+  private static Kept kept;
+
+  /** for a test: what a new process has */
+  static synchronized void forgetKept() {
+    kept = null;
+  }
+
+  /** for a test: the state this process has kept for that state file, or null */
+  static JsonObject keptState(File file) {
+    Kept k = kept(file.getPath());
+    return k == null ? null : k.state();
+  }
+
+  private static synchronized Kept kept(String file) {
+    return kept != null && kept.file().equals(file) ? kept : null;
+  }
+
+  private static synchronized void keep(Kept k) {
+    kept = k;
+  }
 
   private final PublisherFields pf;
   private final String stateFile;
+  /** the journaled expansions, each in a file named by the hash of its content */
+  private final String expansionDir;
+  /** the parsed expansions of the last build, by hash, if this process has them */
+  private Map<String, ValueSet> oldExpansions = new HashMap<>();
+  /** the expansions this build replays, by hash */
+  private final Map<String, ValueSet> expansions = new HashMap<>();
+  /** the file system's time when this build first looked at the files of the last one (see {@link FileStamp}) */
+  private FileStamp buildClock;
+  private boolean buildClockRead;
   private final Map<FetchedFile, String> keys = new IdentityHashMap<>();
   private final Set<FetchedFile> validationClean = Collections.newSetFromMap(new IdentityHashMap<>());
   private final Set<FetchedFile> renderClean = Collections.newSetFromMap(new IdentityHashMap<>());
@@ -144,6 +201,7 @@ public class RapidoTracker {
   public RapidoTracker(PublisherFields pf) throws IOException {
     this.pf = pf;
     this.stateFile = Utilities.path(pf.tempDir, "_rapido", "state.json");
+    this.expansionDir = Utilities.path(pf.tempDir, "_rapido", "expansions");
     this.buildDate = new DateTimeType(pf.getExecTime()).asStringValue();
     this.weakReferences = pf.version != null && VersionUtilities.isR4Plus(pf.version);
   }
@@ -316,6 +374,12 @@ public class RapidoTracker {
       }
     } catch (IOException e) {
       return false; // an output somewhere the build's file access doesn't reach
+    }
+    // also when this process has them parsed: the saved state has to stay one that another process can use
+    for (String h : j.forceArray("expansions").asStrings()) {
+      if (!expansionFile(h).exists()) {
+        return false;
+      }
     }
     return true;
   }
@@ -966,6 +1030,12 @@ public class RapidoTracker {
       if (!f.exists()) {
         return null;
       }
+      Kept k = kept(stateFile);
+      if (k != null && isStillTheFile(f, k.id(), k.stamp())) {
+        oldExpansions = k.expansions();
+        return k.state();
+      }
+      keep(null);
       return readState(f);
     } catch (Exception e) {
       return new JsonObject().add("unreadable", e.getMessage() == null ? e.getClass().getName() : e.getMessage());
@@ -976,22 +1046,60 @@ public class RapidoTracker {
     return org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(f);
   }
 
+  /** how a state file with that id starts (see writeState()) */
+  private static String stateStart(String id) {
+    return "{\"version\":"+STATE_VERSION+",\"id\":\""+id+"\"";
+  }
+
+  /**
+   * whether the state file is the one that was written with that id, when it had that stamp. The stamp alone could be
+   * that of another file written in the same instant with the same size; the id is different for every save
+   */
+  static boolean isStillTheFile(File f, String id, String stamp) {
+    FileStamp now = FileStamp.of(f.getPath());
+    if (id == null || stamp == null || now == null || !stamp.equals(now.text)) {
+      return false;
+    }
+    byte[] start = stateStart(id).getBytes(StandardCharsets.UTF_8);
+    try (FileInputStream in = new FileInputStream(f)) {
+      return Arrays.equals(start, in.readNBytes(start.length));
+    } catch (IOException e) {
+      return false;
+    }
+  }
+
   /**
    * The JSON writer escapes the values it writes, but not the names, and the state's names are paths and file names
    * (on Windows, with backslashes in them): written as they are, the next build can't read the state. So the names are
    * escaped here, as the reader unescapes them. A name with nothing to escape is written as before
    */
   static void writeState(JsonObject state, File f) throws IOException {
-    // as the JSON writer writes it, but written as it goes: the state of a large IG is hundreds of MB, and made as one
+    // written next to the file and then moved over it, so that a build that is killed while it saves leaves the state
+    // of the build before it (which the build tracker says isn't to be used) and not half of this one
+    File tmp = new File(f.getPath()+".tmp");
+    // as the JSON writer writes it, but written as it goes: the state of a large IG is tens of MB, and made as one
     // string (and then as bytes) first, it took seconds, at the end of each build
-    try (Writer w = new BufferedWriter(new OutputStreamWriter(ManagedFileAccess.outStream(f), StandardCharsets.UTF_8), 1 << 16)) {
-      write(w, state);
+    try {
+      try (Writer w = new BufferedWriter(new OutputStreamWriter(ManagedFileAccess.outStream(tmp), StandardCharsets.UTF_8), 1 << 16)) {
+        write(w, state);
+      }
+      move(tmp, f);
     } catch (IOException | RuntimeException e) {
-      // not left half written: with no state, the next build is a complete one
-      if (f.exists() && !f.delete()) {
-        e.addSuppressed(new IOException("Unable to delete the incomplete " + f));
+      // neither half written, nor the state of the build before: with no state, the next build is a complete one
+      for (File x : new File[] {tmp, f}) {
+        if (x.exists() && !x.delete()) {
+          e.addSuppressed(new IOException("Unable to delete " + x));
+        }
       }
       throw e;
+    }
+  }
+
+  private static void move(File from, File to) throws IOException {
+    try {
+      Files.move(from.toPath(), to.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+    } catch (AtomicMoveNotSupportedException e) {
+      Files.move(from.toPath(), to.toPath(), StandardCopyOption.REPLACE_EXISTING);
     }
   }
 
@@ -1069,13 +1177,17 @@ public class RapidoTracker {
   /** saves the state for the next build. Only called once the build has finished successfully */
   public void save() throws IOException {
     JsonObject state = new JsonObject();
+    String id = UUID.randomUUID().toString();
+    // first, and in this order: see stateStart()
     state.add("version", STATE_VERSION);
+    state.add("id", id);
     File sf = ManagedFileAccess.file(stateFile);
     FileUtilities.createDirectory(sf.getParent());
     int txFailures = txFailures(pf);
     if (txFailures > 0) {
       // what the build made from those calls isn't what the server would have said, so none of it can be reused
       state.add("txFailures", txFailures);
+      keep(null);
       writeState(state, sf);
       return;
     }
@@ -1104,12 +1216,18 @@ public class RapidoTracker {
     }
     state.add("packages", pk);
     JsonObject files = new JsonObject();
+    Set<String> expansionsUsed = new HashSet<>();
     for (FetchedFile f : pf.fileList) {
       String key = keys.get(f);
       FileResult res = results.get(key);
       JsonObject nf = newFiles.getJsonObject(key);
       if (res == null || nf == null) {
         continue;
+      }
+      for (String phase : new String[] {PHASE_HTML, PHASE_SHEETS}) {
+        if (nf.has(phase)) {
+          expansionsUsed.addAll(nf.getJsonObject(phase).forceArray("expansions").asStrings());
+        }
       }
       nf.set("oh", res.getOwnHash());
       nf.set("src", nodes.get(f).getSourceHash());
@@ -1123,7 +1241,215 @@ public class RapidoTracker {
       files.set(key, nf);
     }
     state.add("files", files);
+    // until the file is written and its stamp read, there is nothing this process can start its next build from
+    keep(null);
     writeState(state, sf);
+    FileStamp stamp = FileStamp.of(stateFile);
+    if (stamp != null) {
+      expansions.keySet().retainAll(expansionsUsed);
+      keep(new Kept(stateFile, id, stamp.text, state, expansions));
+    }
+    removeExpansionsExcept(expansionsUsed);
+  }
+
+  // ---- journaled expansions --------------------------------------------------------------------------------------------
+
+  private File expansionFile(String hash) {
+    return new File(expansionDir, hash+".json");
+  }
+
+  /**
+   * Writes a journaled expansion to its file, unless it's there already, and returns its hash. Written under another name
+   * and then moved, so that a file with the name of a hash is never part of an expansion
+   */
+  private String storeExpansion(String json) throws IOException {
+    String hash = new Hasher().add(json).finish();
+    File f = expansionFile(hash);
+    if (!f.exists()) {
+      FileUtilities.createDirectory(expansionDir);
+      File tmp = new File(Utilities.path(expansionDir, hash+"."+UUID.randomUUID()+".tmp"));
+      try {
+        Files.write(tmp.toPath(), json.getBytes(StandardCharsets.UTF_8));
+        move(tmp, f);
+      } finally {
+        Files.deleteIfExists(tmp.toPath());
+      }
+    }
+    return hash;
+  }
+
+  /**
+   * The journaled expansion with that hash, parsed: the one this process parsed before, or read from its file. null if
+   * it can't be read, or isn't what was written (then the file is removed, so that it's written again)
+   */
+  private ValueSet loadExpansion(String hash) {
+    ValueSet vs = expansions.get(hash);
+    if (vs == null) {
+      vs = oldExpansions.get(hash);
+    }
+    if (vs == null) {
+      vs = readExpansionFile(hash);
+    }
+    if (vs != null) {
+      expansions.put(hash, vs);
+    }
+    return vs;
+  }
+
+  private ValueSet readExpansionFile(String hash) {
+    File f = expansionFile(hash);
+    ValueSet vs = null;
+    try {
+      String json = new String(read(f), StandardCharsets.UTF_8);
+      if (hash.equals(new Hasher().add(json).finish())) {
+        vs = readExpansion(new JsonParser(pf.context.getModelContext()), json);
+      }
+    } catch (Exception e) {
+      // as for a file that doesn't hold what was written
+    }
+    if (vs == null) {
+      f.delete();
+    }
+    return vs;
+  }
+
+  /** removes the expansions (and what a killed build left of one) that the state just saved doesn't refer to */
+  private void removeExpansionsExcept(Set<String> used) {
+    File[] list = new File(expansionDir).listFiles();
+    if (list != null) {
+      for (File f : list) {
+        String n = f.getName();
+        if (!n.endsWith(".json") || !used.contains(n.substring(0, n.length() - 5))) {
+          f.delete();
+        }
+      }
+    }
+  }
+
+  // ---- file stamps -----------------------------------------------------------------------------------------------------
+
+  /**
+   * What the file system says of a file without reading it: its size, when it was last modified and, where the file
+   * system says, when it was last changed in any way (ctime, which a program can't set), which file it is (so that
+   * another file moved to its name is another file) and which device it is on.
+   *
+   * <p>A file is taken to hold what it held when it was hashed if its stamp is the same as then, but only if the stamp
+   * was "settled" when the file was hashed: the file system's own clock, read (by writing a file in the same folder
+   * tree, see clock()) before the file was read, was already past the file's times. Any write after that gets a time
+   * from that clock that is no earlier than the reading of it, so later than the times in the stamp, and so changes the
+   * stamp. This doesn't depend on how coarse the file system's times are: a file written in the same tick as the clock
+   * was read (within the second, on a file system that keeps seconds) has a stamp that isn't settled, and is hashed in
+   * the next build, as every file was before. It does assume that the file system's clock doesn't go back.
+   *
+   * <p>Where the file system doesn't say that much (no unix attributes, as on Windows), the stamp is the size, the
+   * modified time and the creation time, and the device is the volume of the path. There, a file written again with the
+   * same size by a program that then sets its modified time back to what it was is taken as unchanged.
+   */
+  static final class FileStamp {
+    private static final boolean UNIX = FileSystems.getDefault().supportedFileAttributeViews().contains("unix");
+
+    final String text;
+    private final long earliest;
+    private final long latest;
+    private final Object device;
+
+    private FileStamp(String text, long earliest, long latest, Object device) {
+      this.text = text;
+      this.earliest = earliest;
+      this.latest = latest;
+      this.device = device;
+    }
+
+    /** the stamp of the file, or null if it isn't a file, or the file system doesn't say */
+    static FileStamp of(String path) {
+      try {
+        Path p = Paths.get(path);
+        if (UNIX) {
+          Map<String, Object> a = Files.readAttributes(p, "unix:isRegularFile,size,lastModifiedTime,ctime,ino,dev");
+          if (!Boolean.TRUE.equals(a.get("isRegularFile"))) {
+            return null;
+          }
+          long m = nanos((FileTime) a.get("lastModifiedTime"));
+          long c = nanos((FileTime) a.get("ctime"));
+          return new FileStamp(a.get("size")+" "+m+" "+c+" "+a.get("ino")+" "+a.get("dev"), Math.min(m, c), Math.max(m, c), a.get("dev"));
+        }
+        return basic(p);
+      } catch (IOException | RuntimeException e) {
+        return null;
+      }
+    }
+
+    /** the stamp where the file system doesn't say more: the device is the volume the path is on */
+    static FileStamp basic(Path p) throws IOException {
+      BasicFileAttributes a = Files.readAttributes(p, BasicFileAttributes.class);
+      if (!a.isRegularFile()) {
+        return null;
+      }
+      long m = nanos(a.lastModifiedTime());
+      Path root = p.toAbsolutePath().getRoot();
+      return new FileStamp(a.size()+" "+m+" "+nanos(a.creationTime()), m, m, String.valueOf(root));
+    }
+
+    private static long nanos(FileTime t) {
+      return t.to(TimeUnit.NANOSECONDS);
+    }
+
+    /**
+     * whether that reading of the clock, which has to be from before this stamp was taken, was already past the times
+     * in it, and is of the same device. False without a reading
+     */
+    boolean settledAt(FileStamp clock) {
+      return clock != null && Objects.equals(device, clock.device) && latest < clock.earliest;
+    }
+  }
+
+  /**
+   * The file system's time now, where the files of the build are: the stamp of a file written just now, next to the
+   * state. null if it can't be told
+   */
+  private FileStamp clock() {
+    return clock(new File(new File(stateFile).getParentFile(), "clock"));
+  }
+
+  static FileStamp clock(File f) {
+    try {
+      FileUtilities.createDirectory(f.getParent());
+      Files.write(f.toPath(), new byte[] {0});
+      return FileStamp.of(f.getPath());
+    } catch (IOException | RuntimeException e) {
+      return null;
+    }
+  }
+
+  /**
+   * The hash of the file's content, for a phase's record of what it wrote; and its stamp, if it is settled at that
+   * reading of the clock (which has to be from before this is called), so that the file doesn't have to be read to
+   * know that it still holds this
+   */
+  static String hashAndStamp(String path, JsonObject stamps, FileStamp clock) {
+    FileStamp stamp = FileStamp.of(path);
+    String hash = fileHash(path);
+    if (isContentHash(hash) && stamp != null && stamp.settledAt(clock)) {
+      stamps.set(path, stamp.text);
+    } else {
+      stamps.remove(path);
+    }
+    return hash;
+  }
+
+  /** whether the file holds what the phase recorded that it wrote, reading it only if its stamp doesn't say */
+  static boolean holds(String path, JsonObject written, JsonObject stamps, FileStamp clock) {
+    FileStamp stamp = FileStamp.of(path);
+    if (stamp != null && stamp.text.equals(stamps.asString(path)) && isContentHash(written.asString(path))) {
+      return true;
+    }
+    boolean same = fileHash(path).equals(written.asString(path));
+    if (same && stamp != null && stamp.settledAt(clock)) {
+      stamps.set(path, stamp.text);
+    } else {
+      stamps.remove(path);
+    }
+    return same;
   }
 
   /** the terminology calls of this build that got no answer, including the ones that ask the registry which server to use */
@@ -1607,9 +1933,22 @@ public class RapidoTracker {
       problem = "no record of its outputs";
     }
     if (problem == null) {
+      if (!buildClockRead) {
+        buildClock = clock();
+        buildClockRead = true;
+      }
+      JsonObject stamps = j.forceObject("stamps");
       for (String path : written.getNames()) {
-        if (!fileHash(path).equals(written.asString(path))) {
+        if (!holds(path, written, stamps, buildClock)) {
           problem = "an output was overwritten: "+new File(path).getName();
+          break;
+        }
+      }
+    }
+    if (problem == null) {
+      for (String h : j.forceArray("expansions").asStrings()) {
+        if (loadExpansion(h) == null) {
+          problem = "an expansion it saved can't be read";
           break;
         }
       }
@@ -1620,6 +1959,11 @@ public class RapidoTracker {
       return false;
     }
     return true;
+  }
+
+  /** whether it is the hash of what a file held: not what fileHash() gives for a file that is missing, or can't be read */
+  static boolean isContentHash(String hash) {
+    return hash != null && !hash.equals("missing") && !hash.startsWith("unreadable: ");
   }
 
   static String fileHash(String path) {
@@ -1737,14 +2081,18 @@ public class RapidoTracker {
     }
     // what the phase wrote, including what it wrote over from an earlier phase, to check before it's replayed
     JsonObject written = j.forceObject("written");
+    JsonObject stamps = j.forceObject("stamps");
+    FileStamp clock = clock();
     for (String s : new TreeSet<>(f.getOutputNames())) {
-      String h = fileHash(s);
+      String h = hashAndStamp(s, stamps, clock);
       if (!h.equals(rec.outputHashesBefore.get(s))) {
         written.set(s, h);
+      } else {
+        stamps.remove(s);
       }
     }
     for (String s : other.asStrings()) {
-      written.set(s, fileHash(s));
+      written.set(s, hashAndStamp(s, stamps, clock));
     }
     if (pf.errors.size() < rec.errorsBefore || f.getErrors().size() < rec.fileErrorsBefore || pf.expansions.size() < rec.expansionsBefore) {
       return;
@@ -1779,7 +2127,7 @@ public class RapidoTracker {
     JsonArray exp = j.forceArray("expansions");
     for (ValueSet vs : pf.expansions.subList(rec.expansionsBefore, pf.expansions.size())) {
       try {
-        exp.add(saveExpansion(new JsonParser(pf.context.getModelContext()), vs));
+        exp.add(storeExpansion(saveExpansion(new JsonParser(pf.context.getModelContext()), vs)));
       } catch (Exception e) {
         return;
       }
@@ -1867,12 +2215,13 @@ public class RapidoTracker {
     for (JsonObject e : j.forceArray("npm").asJsonObjects()) {
       res.npm.add(new NpmEntry(e.asString("category"), e.asString("folder"), e.asString("name"), Base64.getDecoder().decode(e.asString("content"))));
     }
-    for (String s : j.forceArray("expansions").asStrings()) {
-      try {
-        res.expansions.add(readExpansion(new JsonParser(pf.context.getModelContext()), s));
-      } catch (Exception e) {
-        throw new Error("Unable to read an expansion saved by the last Rapido build: "+e.getMessage(), e);
+    for (String h : j.forceArray("expansions").asStrings()) {
+      // canReplay() has read it
+      ValueSet vs = loadExpansion(h);
+      if (vs == null) {
+        throw new Error("Unable to read an expansion saved by the last Rapido build: "+h);
       }
+      res.expansions.add(vs);
     }
     for (JsonElement e : j.forceArray("tracked").getItems()) {
       List<String> a = ((JsonArray) e).asStrings();
