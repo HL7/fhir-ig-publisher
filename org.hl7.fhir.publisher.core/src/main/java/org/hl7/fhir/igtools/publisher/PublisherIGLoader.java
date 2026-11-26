@@ -167,6 +167,7 @@ public class PublisherIGLoader extends PublisherBase {
     }
     pf.fetcher.setRootDir(pf.rootDir);
     pf.fetcher.setResourceDirs(pf.resourceDirs);
+    ImageSourceRenderer.initPlantUmlSecurity();
     if (settings.getConfigFile() != null && focusDir().contains(" ")) {
       throw new Error("There is a space in the folder path: \""+focusDir()+"\". Please fix your directory arrangement to remove the space and try again");
     }
@@ -608,6 +609,9 @@ public class PublisherIGLoader extends PublisherBase {
           break;
         case "path-binary":
           pf.binaryPaths.add(Utilities.path(pf.rootDir, p.getValue()));
+          break;
+        case "path-image-source":
+          pf.imageSourceDirs.add(Utilities.path(pf.rootDir, p.getValue()));
           break;
         case "show-inherited-invariants":
           pf.allInvariants = "true".equals(p.getValue());
@@ -2399,6 +2403,9 @@ public class PublisherIGLoader extends PublisherBase {
     }
     for (String s : pf.otherDirs) {
       checkInsideRoot(s, "other");
+    }
+    for (String s : pf.imageSourceDirs) {
+      checkInsideRoot(s, "image-source");
     }
   }
 

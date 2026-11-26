@@ -3955,6 +3955,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
   }
 
   void templateBeforeGenerate() throws IOException, FHIRException {
+    renderImageSources();
     if (pf.template != null) {
       logMessage("Run Template");
       TimeTracker.Session tts = pf.tt.start("template");
@@ -3988,6 +3989,40 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     cleanUpExtensions(pf.publishedIg);
   }
 
+
+  /**
+   * The diagram sources in the path-image-source folders, rendered to svg in _includes, where the template used to put
+   * them (see ImageSourceRenderer). Before the template runs, as the template's script used to do it then
+   */
+  private void renderImageSources() throws IOException {
+    if (pf.imageSourceDirs.isEmpty()) {
+      return;
+    }
+    logMessage("Render Image Sources");
+    List<ImageSourceRenderer.ImageIssue> issues = new ArrayList<>();
+    List<ImageSourceRenderer.RenderedImage> images = new ImageSourceRenderer().render(pf.imageSourceDirs, issues);
+    Map<String, ImageSourceRenderer.RenderedImage> done = new HashMap<>();
+    for (ImageSourceRenderer.RenderedImage image : images) {
+      ImageSourceRenderer.RenderedImage prior = done.get(image.getName().toLowerCase());
+      if (prior != null) {
+        pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE, imageSourcePath(image.getSource()),
+            "The image "+image.getName()+" is produced by "+imageSourcePath(prior.getSource())+" as well, so this one has been ignored", ValidationMessage.IssueSeverity.WARNING));
+      } else {
+        done.put(image.getName().toLowerCase(), image);
+        checkMakeFile(image.getContent(), Utilities.path(pf.tempDir, "_includes", image.getName()), pf.otherFilesRun);
+      }
+    }
+    for (ImageSourceRenderer.ImageIssue issue : issues) {
+      pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.INVALID, issue.getLine(), 0, imageSourcePath(issue.getSource()),
+          issue.getMessage(), ValidationMessage.IssueSeverity.ERROR));
+    }
+    logDebugMessage(LogCategory.PROGRESS, "Rendered "+done.size()+" images");
+  }
+
+  private String imageSourcePath(File source) {
+    String s = FileUtilities.getRelativePath(pf.rootDir, source.getAbsolutePath());
+    return Utilities.noString(s) ? source.getName() : s;
+  }
 
   private void genBasePages() throws IOException, Exception {
     String json;
