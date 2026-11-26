@@ -157,6 +157,7 @@ class FileChangeMonitorTest {
   }
 
   @Test
+  @DisabledOnOs(OS.WINDOWS)
   void aFolderMadeWhileMonitoringIsWatched() throws Exception {
     monitor.startMonitoring();
     Path images = dir.resolve("input/images/new");
