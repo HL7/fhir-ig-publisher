@@ -599,8 +599,12 @@ public class FileChangeMonitor implements Closeable {
         Path filename = ev.context();
         changedPath = directory.resolve(filename);
 
+        // a watched folder made again (e.g. SUSHI clearing fsh-generated) is watched again now, without waiting for its
+        // old key to be cancelled: on Windows a deleted folder is pending delete until the watch service lets go of it,
+        // so the old key can be reported invalid after the folder is made again, or not for a while
         if (kind == StandardWatchEventKinds.ENTRY_CREATE && Files.isDirectory(changedPath, LinkOption.NOFOLLOW_LINKS)
-            && (recursiveDirs.contains(directory) || awaitedDirs.remove(changedPath))) {
+            && (recursiveDirs.contains(directory) || awaitedDirs.remove(changedPath) || recursiveRoots.contains(changedPath))) {
+          awaitedDirs.remove(changedPath);
           watchNewDirectory(changedPath, ignored);
         }
         if (kind == StandardWatchEventKinds.ENTRY_MODIFY && Files.isDirectory(changedPath, LinkOption.NOFOLLOW_LINKS)) {
