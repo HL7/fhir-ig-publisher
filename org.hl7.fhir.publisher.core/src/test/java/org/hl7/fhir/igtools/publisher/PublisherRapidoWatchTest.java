@@ -86,6 +86,38 @@ class PublisherRapidoWatchTest {
   }
 
   @Test
+  void aDifferentialBuildHasTheStepsOfTheLastBuild() throws Exception {
+    PublisherFields first = build("a");
+    first.rapido.getSteps().start("lists/en/Patient", "key");
+    first.rapido.getSteps().record(new RapidoSteps.Fragment("list-patients", "en", "list-patients", "Cross", 3, 40, "stamp", null));
+    first.rapido.getSteps().finish();
+    finish(first);
+
+    PublisherFields second = build("a2");
+    assertFalse(second.rapido.isCompleteBuild(), second.rapido.getReason());
+    List<RapidoSteps.Fragment> last = second.rapido.getSteps().reusable("lists/en/Patient", "key");
+    assertEquals(1, last.size());
+    assertEquals("list-patients", last.get(0).name);
+    // a step that this build doesn't run or reuse isn't one the next build can reuse
+    finish(second);
+
+    assertNull(build("a3").rapido.getSteps().reusable("lists/en/Patient", "key"));
+  }
+
+  @Test
+  void aCompleteBuildHasNoStepsToReuse() throws Exception {
+    PublisherFields first = build("a");
+    first.rapido.getSteps().start("lists/en/Patient", "key");
+    first.rapido.getSteps().finish();
+    finish(first);
+
+    // the next day: nothing is reused
+    PublisherFields second = build("a", 1);
+    assertTrue(second.rapido.isCompleteBuild());
+    assertNull(second.rapido.getSteps().reusable("lists/en/Patient", "key"));
+  }
+
+  @Test
   void withoutARecordOfWhatTheLastBuildWroteTheBuildIsComplete() throws Exception {
     finish(build("a"));
     // an older publisher built it, or the record was removed
