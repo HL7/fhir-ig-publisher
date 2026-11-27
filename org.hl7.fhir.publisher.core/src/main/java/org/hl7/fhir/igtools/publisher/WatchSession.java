@@ -20,13 +20,14 @@ import org.hl7.fhir.igtools.templates.Template;
 /**
  * What watch mode (-watch) keeps from one build to the next:
  * <ul>
- *   <li>the content of the watched source files when the current build started, to decide whether anything changed
- *   since, and what</li>
+ *   <li>the content of the watched source files when the current and the previous build started, to decide whether
+ *   anything changed since, and what</li>
  *   <li>the source files as the last SUSHI run saw them, so SUSHI is not run again when only page content changed</li>
  * </ul>
  *
  * What a rebuild reuses is decided by -rapido, as for any build: the validation and generated outputs of the files
- * that neither changed nor depend on (or are used by) one that did.
+ * that neither changed nor depend on (or are used by) one that did. When only the content of plain pages changed, the
+ * pages are rendered again on top of what the last build left instead (see PageRebuild).
  */
 public class WatchSession {
 
@@ -48,6 +49,7 @@ public class WatchSession {
   private final List<Path> notMonitored = new ArrayList<>();
 
   private SourceSnapshot buildStart;
+  private SourceSnapshot previousBuildStart;
   /** the watched files when the last build failed (null if it didn't) */
   private SourceSnapshot afterFailure;
   private SourceSnapshot sushiInputs;
@@ -105,10 +107,10 @@ public class WatchSession {
 
   /** Records the content of the watched files as the build that is starting will see them */
   public void startBuild() throws IOException {
-    SourceSnapshot last = buildStart;
+    previousBuildStart = buildStart;
     afterFailure = null;
     buildStart = take(watched, buildStart);
-    countWhatStartedThisBuild(last);
+    countWhatStartedThisBuild(previousBuildStart);
   }
 
   /**
@@ -139,6 +141,14 @@ public class WatchSession {
         }
       }
     }
+  }
+
+  /**
+   * What changed in the watched files between the start of the previous build (with what SUSHI generated in it) and
+   * the start of the current one; null if this is the first build
+   */
+  public SourceSnapshot.Changes changesSincePreviousBuild() {
+    return previousBuildStart == null ? null : buildStart.changesSince(previousBuildStart);
   }
 
   /**
