@@ -3966,7 +3966,13 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       for (String newFile: newFileList) {
         if (!newFile.isEmpty()) {
           try {
-            FetchedFile f = this.pf.fetcher.fetch(Utilities.path(this.pf.repoRoot, newFile));
+            String fn = Utilities.path(this.pf.repoRoot, newFile);
+            if (isPublisherOutput(fn)) {
+              // the template says it made a file the publisher made (e.g. the svgs rendered from path-image-source,
+              // which older templates list because they used to render them): it's an output, not a source page
+              continue;
+            }
+            FetchedFile f = this.pf.fetcher.fetch(fn);
             String dir = FileUtilities.getDirectoryForFile(f.getPath());
             String relative = canonicalTempDir.length() > dir.length() ? "" : dir.substring(canonicalTempDir.length());
             if (relative.length() > 0)
@@ -3989,6 +3995,11 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     cleanUpExtensions(pf.publishedIg);
   }
 
+
+  /** whether the publisher has already generated this file in this run (allOutputs holds lower case paths) */
+  private boolean isPublisherOutput(String path) throws IOException {
+    return pf.allOutputs.contains(path.toLowerCase()) || pf.allOutputs.contains(new File(path).getCanonicalPath().toLowerCase());
+  }
 
   /**
    * The diagram sources in the path-image-source folders, rendered to svg in _includes, where the template used to put
