@@ -5117,7 +5117,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     String is = "[FHIR]\r\nversion="+version+"\r\n";
     IniFile ini = new IniFile(new ByteArrayInputStream(FileUtilities.stringToBytes(is)));
     ini.setStringProperty("IG", "version", version, null);
-    ini.setStringProperty("IG", "date",  new SimpleDateFormat("yyyyMMddhhmmssZ", new Locale("en", "US")).format(pf.getExecTime().getTime()), null);
+    ini.setStringProperty("IG", "date",  new SimpleDateFormat("yyyyMMddHHmmssZ", new Locale("en", "US")).format(pf.getExecTime().getTime()), null);
     ByteArrayOutputStream b = new ByteArrayOutputStream();
     ini.save(b);
     return b.toByteArray();

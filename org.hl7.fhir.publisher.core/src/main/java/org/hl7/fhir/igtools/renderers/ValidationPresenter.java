@@ -1872,7 +1872,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   }
 
   private String date(ValidationMessage vm) {
-    return vm.getRuleDate() != null  ? new SimpleDateFormat("YYYY-MM-DD").format(vm.getRuleDate()) : "????";
+    return vm.getRuleDate() != null  ? new SimpleDateFormat("yyyy-MM-dd").format(vm.getRuleDate()) : "????";
   }
   
   private String stripId(String loc) {

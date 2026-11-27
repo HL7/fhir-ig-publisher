@@ -1122,7 +1122,7 @@ public class PublicationProcess {
     return b.toString();
   }
   
-  private static final String RSS_DATE = "EEE, dd MMM yyyy hh:mm:ss Z";
+  private static final String RSS_DATE = "EEE, dd MMM yyyy HH:mm:ss Z";
   public String presentDate(Date date) {
     SimpleDateFormat sdf = new SimpleDateFormat(RSS_DATE, new Locale("en", "US"));// Wed, 04 Sep 2019 08:58:14 GMT      
     return sdf.format(date);
