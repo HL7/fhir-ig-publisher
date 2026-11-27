@@ -1090,8 +1090,10 @@ public class PublisherIGLoader extends PublisherBase {
     for (String s : pf.resourceDirs) {
       logDebugMessage(LogCategory.INIT, "Source: "+s);
       if (s.endsWith(File.separator+"*")) {
+        // a folder/* entry was scanned for its sub-folders (above): it isn't a folder itself, and on Windows, where *
+        // can't be in a name, asking file access about it fails
         missingDirs.add(s);
-
+        continue;
       }
       if (!checkDir(s, true))
         missingDirs.add(s);
