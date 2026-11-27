@@ -52,6 +52,11 @@ class TemplateManagerTest {
     return dir.resolve("fhir-settings.json").toString();
   }
 
+  /** the user's settings allow ig.ini to override templates with local folders (template development) */
+  private void allowOverrides() throws IOException {
+    write("fhir-settings.json", "{\"" + LocalTemplateTrust.ALLOW_OVERRIDES + "\": true}");
+  }
+
   private String folder(String path) {
     return dir.resolve(path).toFile().getAbsolutePath();
   }
@@ -78,7 +83,8 @@ class TemplateManagerTest {
     write("template/config.json", "{\"script\": \"scripts/ant.xml\", \"otherScripts\": [], \"targets\": {\"onLoad\": \"onLoad\"}}");
     write("template/scripts/ant.xml", "<project name=\"test\">\n<touch file=\"" + marker + "\"/>\n<target name=\"onLoad\"/>\n</project>\n");
     if (!autoMode) {
-      write("fhir-settings.json", "{\"trustedTemplates\": [\"#template\"]}"); // locally, the user has said they trust it
+      // locally, the user has said they trust it (by its folder)
+      write("fhir-settings.json", "{\"trustedTemplates\": [\"" + folder("template").replace("\\", "\\\\") + "\"]}");
     }
 
     Template template = manager().loadTemplate("#template", dir.toString(), "x.y", autoMode, false, false);
@@ -194,7 +200,9 @@ class TemplateManagerTest {
 
     FHIRException e = assertThrows(FHIRException.class, () -> manager().loadTemplate("#template", dir.toString(), "x.y", false, false, false));
 
-    assertTrue(e.getMessage().contains("'-trust-template #template'"), e.getMessage());
+    // the template is named by its folder, not '#template', which is a different template in every IG
+    assertTrue(e.getMessage().contains("The template '" + folder("template") + "' runs scripts"), e.getMessage());
+    assertTrue(e.getMessage().contains("'-trust-template \"" + folder("template") + "\"'"), e.getMessage()); // quoted: it may have spaces
     assertTrue(e.getMessage().contains("'-trust-template all'"), e.getMessage());
     assertTrue(e.getMessage().contains(settingsFile()), e.getMessage());
     assertFalse(Files.exists(marker));
@@ -211,7 +219,9 @@ class TemplateManagerTest {
     tm.loadTemplate("#template", dir.toString(), "x.y", false, false, false);
 
     assertTrue(Files.exists(marker));
-    assertTrue(LocalTemplateTrust.isTrusted(settingsFile(), "#template"));
+    // recorded by its folder, even if the user named it as the IG does
+    assertTrue(LocalTemplateTrust.isTrusted(settingsFile(), folder("template")));
+    assertEquals(trust.equals("all"), LocalTemplateTrust.isTrusted(settingsFile(), "#template"));
     // and the next run doesn't need it
     manager().loadTemplate("#template", dir.toString(), "x.y", false, false, false);
   }
@@ -230,10 +240,136 @@ class TemplateManagerTest {
   }
 
   @ParameterizedTest
-  @CsvSource({"'#template', '#template'", "my.template#1.0.0, my.template", "my.template, my.template",
-      "https://github.com/org/repo, https://github.com/org/repo", "'#my-folder', '#my-folder'"})
+  @CsvSource({"my.template#1.0.0, my.template", "my.template, my.template",
+      "https://github.com/org/repo, https://github.com/org/repo"})
   void aTemplateIsTrustedLocallyByItsIdWithoutAVersion(String template, String id) {
-    assertEquals(id, TemplateManager.trustId(template));
+    assertEquals(id, TemplateManager.trustId(template, dir.toString()));
+  }
+
+  /** a template in the IG's folders is trusted by its absolute folder: '#template' is a different template in every IG */
+  @ParameterizedTest
+  @CsvSource({"'#template', template", "'#my-folder', my-folder", "'#sub/../my-folder', my-folder"})
+  void aTemplateInTheIGsFoldersIsTrustedLocallyByItsAbsoluteFolder(String template, String folder) {
+    assertEquals(folder(folder), TemplateManager.trustId(template, dir.toString()));
+  }
+
+  /** trusting another IG's #template doesn't trust this IG's #template */
+  @Test
+  void locallyTrustingTheSameNameInAnotherIGDoesNotRunThisOne() throws IOException {
+    Path marker = scriptedInPlaceTemplate();
+    LocalTemplateTrust.addTrust(settingsFile(), folder("other-ig/template"));
+    LocalTemplateTrust.addTrust(settingsFile(), "#template"); // as recorded before trust was by folder
+
+    assertThrows(FHIRException.class, () -> manager().loadTemplate("#template", dir.toString(), "x.y", false, false, false));
+
+    assertFalse(Files.exists(marker));
+  }
+
+  /** -trust-template with the folder that the refusal names, as it tells the user to */
+  @Test
+  void locallyTrustTemplateByTheFolderTheRefusalNames() throws IOException {
+    Path marker = scriptedInPlaceTemplate();
+    TemplateManager tm = manager();
+    tm.setTrustTemplate(folder("template"));
+
+    tm.loadTemplate("#template", dir.toString(), "x.y", false, false, false);
+
+    assertTrue(Files.exists(marker));
+    assertTrue(LocalTemplateTrust.isTrusted(settingsFile(), folder("template")));
+  }
+
+  /** an absolute path is kept as it is (normalised): a # in a folder name isn't a version */
+  @Test
+  void anAbsolutePathIsTrustedAsItIsEvenWithAHashInIt() {
+    assertEquals(folder("c#-igs/ig/template"), TemplateManager.trustId(folder("c#-igs/ig/sub/../template"), dir.toString()));
+  }
+
+  /** a template in a local folder that the IG names by a relative path (template = my-template, not #my-template) */
+  private void localFolderTemplateWithActiveContent() throws IOException {
+    write("my-template/package/package.json", "{\"name\": \"my.template\", \"version\": \"1.0.0\", \"type\": \"fhir.template\"}");
+    write("my-template/package/scripts/groupings.txt", "x");
+    write("my-template/package/$root/config.json", "{}");
+  }
+
+  /**
+   * a template in a local folder named by a relative path is trusted by its absolute folder, as #folder is: the same
+   * relative name is a different template in every IG, so trusting it by that name (as was recorded before) doesn't
+   * trust this one
+   */
+  @Test
+  void aLocalFolderTemplateIsTrustedLocallyByItsAbsoluteFolder() throws IOException {
+    localFolderTemplateWithActiveContent();
+    LocalTemplateTrust.addTrust(settingsFile(), "my-template");
+
+    FHIRException e = assertThrows(FHIRException.class, () -> manager().loadTemplate("my-template", dir.toString(), "x.y", false, false, false));
+
+    assertTrue(e.getMessage().contains("The template '" + folder("my-template") + "' runs scripts"), e.getMessage());
+    assertTrue(e.getMessage().contains("'-trust-template \"" + folder("my-template") + "\"'"), e.getMessage());
+  }
+
+  /** -trust-template can name a local folder template as the IG does, or by its folder: either way, it's recorded by its folder */
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void aLocalFolderTemplateCanBeTrustedAsTheIGNamesItOrByItsFolder(boolean byFolder) throws IOException {
+    localFolderTemplateWithActiveContent();
+    TemplateManager tm = manager();
+    tm.setTrustTemplate(byFolder ? folder("my-template") : "my-template");
+
+    tm.loadTemplate("my-template", dir.toString(), "x.y", false, false, false);
+
+    assertTrue(LocalTemplateTrust.isTrusted(settingsFile(), folder("my-template")));
+    assertFalse(LocalTemplateTrust.isTrusted(settingsFile(), "my-template"));
+    // and the next run doesn't need it
+    manager().loadTemplate("my-template", dir.toString(), "x.y", false, false, false);
+  }
+
+  /**
+   * Everything that makes the template active content is reported together: content in scripts/ as well as the file
+   * extensions. A pre-compressed copy is judged as the file it's a copy of, and .DS_Store is ignored
+   */
+  @Test
+  void scriptsContentAndExtensionsAreAllReported() throws IOException {
+    write("template/config.json", "{}");
+    write("template/.DS_Store", "x");
+    write("template/content/.DS_Store", "x");
+    write("template/content/assets/css/x.css.gz", "x");
+    write("template/content/assets/css/x.css.br", "x");
+    write("template/content/assets/js/x.js", "var x;");
+    write("template/content/assets/js/x.js.gz", "x");
+    write("template/scripts/onGenerate.final.xslt", "<xsl:stylesheet version=\"3.0\" xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\"/>");
+
+    Template template = manager().loadTemplate("#template", dir.toString(), "x.y", true, false, false);
+
+    assertFalse(template.canExecute());
+    assertTrue(template.getUntrustedReason().contains("(reason: Template has content in scripts/ (scripts/onGenerate.final.xslt); Template has file extensions: [.js, .js.gz])"),
+        template.getUntrustedReason());
+  }
+
+  /** a template whose only extras are .DS_Store files and compressed copies of harmless files has no active content */
+  @Test
+  void dsStoreAndCompressedHarmlessFilesAreNotActiveContent() throws IOException {
+    write("template/config.json", "{}");
+    write("template/.DS_Store", "x");
+    write("template/content/assets/css/x.css.gz", "x");
+    write("template/content/assets/css/x.css.br", "x");
+    write("template/content/my.folder/notes.txt", "x");
+
+    Template template = manager().loadTemplate("#template", dir.toString(), "x.y", true, false, false);
+
+    assertTrue(template.canExecute(), template.getUntrustedReason());
+  }
+
+  /** every file extension that makes the template active content is reported, not just the first one found */
+  @Test
+  void allTheActiveFileExtensionsAreReported() throws IOException {
+    write("template/config.json", "{}");
+    write("template/content/assets/js/x.js", "var x;");
+    write("template/content/assets/transform.xslt", "<xsl:stylesheet version=\"3.0\" xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\"/>");
+
+    Template template = manager().loadTemplate("#template", dir.toString(), "x.y", true, false, false);
+
+    assertFalse(template.canExecute());
+    assertTrue(template.getUntrustedReason().contains("Template has file extensions: [.js, .xslt]"), template.getUntrustedReason());
   }
 
   /**
@@ -314,6 +450,7 @@ class TemplateManagerTest {
   void anOverrideWithABrokenPackageIsStillALocalFolder() throws IOException {
     write("override/package/package.json", "{ not json");
     write("ig.ini", "[IG]\nig = input/ig.xml\ntemplate = my.template#1.0.0\nmy.template = override\n");
+    allowOverrides();
     TemplateManager tm = manager();
     tm.loadTemplateOverrides(new IniFile(dir.resolve("ig.ini").toString()), dir.toString());
     assertBrokenJson(assertThrows(Exception.class, () -> tm.loadTemplate("my.template#1.0.0", dir.toString(), "x.y", false, false, false)));
@@ -324,6 +461,7 @@ class TemplateManagerTest {
   @Test
   void theOverrideFoldersAreTheFoldersIgIniNames(@TempDir Path other) throws IOException {
     write("ig.ini", "[IG]\nig = input/ig.xml\ntemplate = my.template#1.0.0\nmy.template = override\nother.template#1.0.0 = " + other + "\n");
+    allowOverrides();
     TemplateManager tm = manager();
     tm.loadTemplateOverrides(new IniFile(dir.resolve("ig.ini").toString()), dir.toString());
     assertEquals(List.of(folder("override"), other.toFile().getAbsolutePath()), tm.getTemplateOverrideFolders(false));
@@ -341,10 +479,12 @@ class TemplateManagerTest {
     write("template-src/package/package.json", "{ not json");
     write("ig/ig.ini", "[IG]\nig = input/ig.xml\ntemplate = my.template#1.0.0\nmy.template = " + folder("template-src") + "\n");
     String ig = folder("ig");
+    allowOverrides();
+    // the overrides are read (with the settings, in the user's .fhir folder) before the build is limited to the IG's folders
+    TemplateManager tm = manager();
+    tm.loadTemplateOverrides(new IniFile(dir.resolve("ig/ig.ini").toString()), ig);
     try {
       ManagedFileAccess.setAllowedPaths(List.of(ig));
-      TemplateManager tm = manager();
-      tm.loadTemplateOverrides(new IniFile(dir.resolve("ig/ig.ini").toString()), ig);
       Exception e = assertThrows(Exception.class, () -> tm.loadTemplate("my.template#1.0.0", ig, "x.y", false, false, false));
       assertTrue(e.getMessage().contains("cannot be accessed by policy"), e.getMessage());
 
@@ -355,6 +495,38 @@ class TemplateManagerTest {
     } finally {
       ManagedFileAccess.setAllowedPaths(Collections.emptyList());
     }
+  }
+
+  /** ig.ini comes with the IG: its template overrides are only used if the user's own settings say so */
+  @ParameterizedTest
+  @ValueSource(strings = {"", "{}", "{\"allow-template-overrides\": false}", "{ not json"})
+  void templateOverridesAreIgnoredUnlessTheSettingsAllowThem(String settings) throws IOException {
+    write("ig.ini", "[IG]\nig = input/ig.xml\ntemplate = my.template#1.0.0\nmy.template = override\n");
+    if (!settings.isEmpty()) {
+      write("fhir-settings.json", settings);
+    }
+    TemplateManager tm = manager();
+
+    tm.loadTemplateOverrides(new IniFile(dir.resolve("ig.ini").toString()), dir.toString());
+
+    assertTrue(tm.getTemplateOverrideFolders(false).isEmpty());
+  }
+
+  /** a template loaded from an override is the developer's own: the active content rules don't apply to it */
+  @Test
+  void anOverriddenTemplateWithActiveContentRunsWithoutBeingTrusted() throws IOException {
+    write("override/package/package.json", "{\"name\": \"my.template\", \"version\": \"1.0.0\", \"type\": \"fhir.template\"}");
+    write("override/package/$root/config.json", "{}");
+    write("override/package/scripts/groupings.txt", "x");
+    write("ig.ini", "[IG]\nig = input/ig.xml\ntemplate = my.template#1.0.0\nmy.template = override\n");
+    allowOverrides();
+    TemplateManager tm = manager();
+    tm.loadTemplateOverrides(new IniFile(dir.resolve("ig.ini").toString()), dir.toString());
+
+    Template template = tm.loadTemplate("my.template#1.0.0", dir.toString(), "x.y", false, false, false);
+
+    assertTrue(template.canExecute());
+    assertFalse(LocalTemplateTrust.isTrusted(settingsFile(), "my.template"));
   }
 
   private static byte[] zip(String... names) throws IOException {

@@ -363,6 +363,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   private String globalCheck;
   private String draftDependencies;
   private TerminologyClientManager txServers;
+  private ExperimentalContentRenderer experimentalContent;
 
   boolean hintAboutNonMustSupport = false;
   boolean anyExtensionsAllowed = false;
@@ -427,6 +428,10 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     this.displayWarnings = displayWarnings;
 
   }
+  public void setExperimentalContent(ExperimentalContentRenderer experimentalContent) {
+    this.experimentalContent = experimentalContent;
+  }
+
   private void determineCode() {
     if (provider.getCanonical().startsWith("http://hl7.org/fhir")) {
       String[] u = provider.getCanonical().split("\\/");
@@ -555,6 +560,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     genQATextForCompare(title, files, path, filteredMessages, linkErrors);
     genQAESLintCompactText(title, files, path, filteredMessages, linkErrors);
     genTXServerQA(title, path);
+    genExperimentalQA(title, path);
     
     String summary = "Errors: " + err + ", Warnings: " + warn + ", Info: " + info+", Broken Links: "+brokenLinks;
     return path + "\r\n" + summary;
@@ -647,8 +653,16 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       }
     }
     
-    String page = genTxServersHeader(title)+new XhtmlComposer(false, true).compose(x.getChildNodes())+genTxServerFooter(title);
+    String page = genTxServersHeader(title, "Terminology Server Report")+new XhtmlComposer(false, true).compose(x.getChildNodes())+genTxServerFooter(title);
     FileUtilities.stringToFile(page, Utilities.path(FileUtilities.getDirectoryForFile(path), "qa-txservers.html"));    
+  }
+
+  private void genExperimentalQA(String title, String path) throws IOException {
+    if (experimentalContent == null) {
+      return;
+    }
+    String page = genTxServersHeader(title, "Experimental Content Report")+new XhtmlComposer(false, true).compose(experimentalContent.render().getChildNodes())+genTxServerFooter(title);
+    FileUtilities.stringToFile(page, Utilities.path(FileUtilities.getDirectoryForFile(path), ExperimentalContentRenderer.PAGE_NAME));
   }
 
   private void genServerReport(XhtmlNode x, TerminologyClientContext t) {
@@ -728,9 +742,10 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     return t.render();
   }
 
-  private String genTxServersHeader(String title) {
+  private String genTxServersHeader(String title, String report) {
 
     ST t = template(headerTemplateTxServers);
+    t.add("report", report);
     t.add("version", statedVersion);
     t.add("toolsVersion", toolsVersion);
     t.add("versionCheck", versionCheckText());
@@ -1120,6 +1135,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       " <tr><td>HTA Analysis:</td><td>$csAnalysis$</td></tr>\r\n"+
       " <tr><td>R5 Dependencies:</td><td>$r5usage$</td></tr>\r\n"+
       " <tr><td>Draft Dependencies:</td><td>$draftDependencies$</td></tr>\r\n"+
+      " <tr><td>Experimental Content:</td><td><a href=\"qa-experimental.html\">$experimental$</a></td></tr>\r\n"+
       " <tr><td>Modifier Extensions:</td><td>$modifiers$</td></tr>\r\n"+
       " <tr><td>Previous Version Comparison:</td><td> $previousVersion$</td></tr>\r\n"+
       " <tr><td>IPA Comparison:</td><td> $ipaComparison$</td></tr>\r\n"+
@@ -1139,7 +1155,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       "<!DOCTYPE HTML>\r\n"+
       "<html xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\" lang=\"en\">\r\n"+
       "<head>\r\n"+
-      "  <title>$title$ : Terminology Server Report</title>\r\n"+
+      "  <title>$title$ : $report$</title>\r\n"+
       "  <link href=\"fhir.css\" rel=\"stylesheet\"/>\r\n"+
       "  <meta charset=\"utf-8\"/>\r\n"+
       "  <style>\r\n"+
@@ -1149,7 +1165,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       "  </style>\r\n"+
       "</head>\r\n"+
       "<body style=\"margin: 20px; background-color: #ffffff\">\r\n"+
-      " <h1>Terminology Server Report for $title$</h1>\r\n"+
+      " <h1>$report$ for $title$</h1>\r\n"+
       " <p>Generated $time$, FHIR version $version$ for $packageId$#$igversion$ (canonical = <a href=\"$canonical$\">$canonical$</a> (<a href=\"$canonical$/history.html\">history</a>))</p>\r\n";
   
   private final String summaryTemplate = 
@@ -1291,6 +1307,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     t.add("txserverlist", txserverlist());
     t.add("dependencyCheck", dependencies);
     t.add("draftDependencies", draftDependencies);
+    t.add("experimental", experimentalContent == null ? "n/a" : experimentalContent.summary());
     t.add("relatedIgs", relatedIgs());
     t.add("dependentIgs", dependentIgs.getCountDesc());    
     t.add("csAnalysis", csAnalysis);

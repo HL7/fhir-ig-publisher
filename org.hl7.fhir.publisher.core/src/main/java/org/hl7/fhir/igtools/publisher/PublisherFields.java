@@ -168,6 +168,7 @@ public class PublisherFields {
     List<ContactDetail> contacts;
     List<UsageContext> contexts;
     List<String> binaryPaths = new ArrayList<String>();
+    List<String> imageSourceDirs = new ArrayList<String>();
     MarkdownType copyright;
     List<CodeableConcept> jurisdictions;
     Enumeration<ImplementationGuide.SPDXLicense> licenseInfo;

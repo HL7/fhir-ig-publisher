@@ -34,11 +34,13 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -76,6 +78,9 @@ public class TemplateManager {
   private final List<String> localFolders = new ArrayList<>(); // the local folders the last template was loaded from
   private String trustTemplate; // -trust-template: a template id, or "all"
   private String settingsPath; // fhir-settings.json: null = FhirSettings.getFilePath()
+  private String rootFolder; // the IG's root folder, for the last template loaded
+  // the templates (as named) that were loaded from a local folder or file (other than #folder): where they were loaded from
+  private final Map<String, String> localTemplatePaths = new HashMap<>();
 
   private static final String ACCESSIBLE_MARKER = "[%accessibility-routines%]";
   private static final String JS_ROUTINE_NAME_REGEX = "[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)*";
@@ -94,7 +99,11 @@ public class TemplateManager {
    *   hl7.fhir.template#current = /Users/me/work/templates/hl7.fhir.template
    *   hl7.base.template = ../templates/hl7.base.template
    *
-   * Relative folders are relative to the IG root folder. Ignored in auto-build mode
+   * Relative folders are relative to the IG root folder. Ignored in auto-build mode.
+   *
+   * This is for template development only: ig.ini comes with the IG, so the overrides are only used if the user's
+   * fhir-settings.json says "allow-template-overrides": true (which is only ever set by hand). A template loaded from an
+   * override isn't subject to the active content rules: it's the developer's own
    */
   public void loadTemplateOverrides(IniFile ini, String rootFolder) throws IOException {
     templateOverrides.clear();
@@ -112,6 +121,25 @@ public class TemplateManager {
           templateOverrides.put(name, f.getAbsolutePath());
         }
       }
+    }
+    if (!templateOverrides.isEmpty() && !allowsTemplateOverrides()) {
+      logger.logMessage("Template overrides in ig.ini are ignored, because "+ (getSettingsPath() == null ? "the FHIR settings file isn't known" : getSettingsPath()+" doesn't say \""+LocalTemplateTrust.ALLOW_OVERRIDES+"\": true")
+          + " (they're for template development): "+String.join(", ", templateOverrides.keySet()));
+      templateOverrides.clear();
+    }
+  }
+
+  /** whether the settings file allows ig.ini to override templates; if it can't be read, it doesn't */
+  private boolean allowsTemplateOverrides() {
+    String settings = getSettingsPath();
+    if (settings == null) {
+      return false;
+    }
+    try {
+      return LocalTemplateTrust.allowsTemplateOverrides(settings);
+    } catch (IOException | RuntimeException e) {
+      logger.logMessage("Unable to read "+settings+": "+e.getMessage());
+      return false;
     }
   }
 
@@ -136,8 +164,10 @@ public class TemplateManager {
 
   public Template loadTemplate(String template, String rootFolder, String packageId, boolean autoMode, boolean wantLog, boolean rapidoMode) throws FHIRException, IOException {
     this.autoMode = autoMode;
+    this.rootFolder = rootFolder;
     this.usedOverride = false;
     localFolders.clear();
+    localTemplatePaths.clear();
     if (autoMode && !templateOverrides.isEmpty()) {
       // overrides would let an IG substitute arbitrary content for a trusted template id
       logger.logMessage("Template overrides in ig.ini are ignored in auto-build mode: "+String.join(", ", templateOverrides.keySet()));
@@ -193,13 +223,32 @@ public class TemplateManager {
 
   /**
    * The id that a template is trusted by locally: what the IG (or the template that uses it as its base) names it by,
-   * without a version - a package id, a github URL, a folder, or #folder for a template in the IG's own folders
+   * without a version - a package id, a github URL, or a folder. A template in the IG's own folders (#folder) is
+   * trusted by its absolute folder: '#ig-template' names a different template in every IG, and trusting one of them
+   * mustn't trust them all. So is any other local folder or file (see localTrustId()): an absolute path is kept as it
+   * is (normalised), since a # in it isn't a version
    */
-  static String trustId(String template) {
-    if (template.startsWith("#") || !template.contains("#")) {
+  static String trustId(String template, String rootFolder) {
+    if (template.startsWith("#")) {
+      return rootFolder == null ? template : Paths.get(rootFolder, template.substring(1)).toAbsolutePath().normalize().toString();
+    }
+    if (new File(template).isAbsolute()) {
+      return Paths.get(template).toAbsolutePath().normalize().toString();
+    }
+    if (!template.contains("#")) {
       return template;
     }
     return template.substring(0, template.indexOf("#"));
+  }
+
+  /**
+   * The id a template is trusted by locally, as for trustId(), except that a template that was loaded from a local
+   * folder or file (template = ../my-template, say) is trusted by where it was loaded from: the same relative name is
+   * a different template in every IG
+   */
+  private String localTrustId(String template) {
+    String path = localTemplatePaths.get(template);
+    return path != null ? path : trustId(template, rootFolder);
   }
 
   /**
@@ -208,18 +257,20 @@ public class TemplateManager {
    * -trust-template, which adds it there. Otherwise the run stops, saying why and what to do
    */
   private void checkLocalTrust() throws IOException {
-    String id = trustId(templateThatCantExecute);
+    String id = localTrustId(templateThatCantExecute);
     String settings = getSettingsPath();
     if (settings != null && isTrustedInSettings(settings, id)) {
       return;
     }
-    if (trustTemplate != null && (LocalTemplateTrust.ALL.equals(trustTemplate) || trustTemplate.equals(id))) {
+    // -trust-template can name the template as the IG does (#folder, ../my-template): it's recorded by its absolute folder
+    String trusted = trustTemplate == null || LocalTemplateTrust.ALL.equals(trustTemplate) ? trustTemplate : localTrustId(trustTemplate);
+    if (trusted != null && (LocalTemplateTrust.ALL.equals(trusted) || trusted.equals(id))) {
       if (settings == null) {
         logger.logMessage("Template '"+id+"' is trusted for this run, as you said. It couldn't be recorded, because the FHIR settings file isn't known");
       } else {
         try {
-          LocalTemplateTrust.addTrust(settings, trustTemplate);
-          logger.logMessage("Template '"+id+"' is trusted, as you said ("+(LocalTemplateTrust.ALL.equals(trustTemplate) ? "all templates" : "this template")+"): recorded in "+settings+", so you won't be asked again");
+          LocalTemplateTrust.addTrust(settings, trusted);
+          logger.logMessage("Template '"+id+"' is trusted, as you said ("+(LocalTemplateTrust.ALL.equals(trusted) ? "all templates" : "this template")+"): recorded in "+settings+", so you won't be asked again");
         } catch (IOException | RuntimeException e) {
           // the settings file can't be written (a container, a read-only home folder) or read: the user has still said
           // they trust it, so it runs - they'll have to say so again next time
@@ -228,9 +279,9 @@ public class TemplateManager {
       }
       return;
     }
-    throw new FHIRException("The template '"+templateThatCantExecute+"' runs scripts, and it is not a trusted template ("+templateReason+"). "
+    throw new FHIRException("The template '"+id+"' runs scripts, and it is not a trusted template ("+templateReason+"). "
         + "A template's scripts can do anything you can do on this computer, so be sure that this template is trustworthy before you run it. "
-        + "If you are sure, run the IG Publisher again with '-trust-template "+id+"' to trust this template, or '-trust-template all' to trust all templates. "
+        + "If you are sure, run the IG Publisher again with '-trust-template \""+id+"\"' to trust this template, or '-trust-template all' to trust all templates. "
         + (settings != null ? "That will be recorded in "+settings+", and you won't be asked again." : "")
         + (trustTemplate != null ? " (-trust-template '"+trustTemplate+"' doesn't name this template.)" : ""));
   }
@@ -312,8 +363,9 @@ public class TemplateManager {
     // if scriptReason != null, then the template has active content, and scriptReason contains the reason why we decided that there's active content
     String scriptReason = activeContentReason(templateDir, files, config, npm.name()+"#"+npm.version());
 
-    // if it has active content, then we check to see if it's trusted. Locally: always trusted. auto-build: only some trusted
-    if (scriptReason != null) {
+    // if it has active content, then we check to see if it's trusted. Locally: always trusted. auto-build: only some trusted.
+    // A template from an override (only allowed when the user's settings say so) is the developer's own: no rules apply
+    if (scriptReason != null && override == null) {
       checkTemplateId(template, npm.name(), scriptReason);
     }
     if (level==0 && configs.size() > 1) {
@@ -342,7 +394,7 @@ public class TemplateManager {
    * @return null if the template has no active content
    */
   String activeContentReason(String templateDir, List<String> files, JsonObject config, String id) {
-    Set<String> ext = new HashSet<>();
+    Set<String> ext = new TreeSet<>(); // all of them, so the user knows everything the template has
     String scriptReason = null;
     if (config != null) {
       // check to see if it defines an active script
@@ -378,14 +430,17 @@ public class TemplateManager {
       }
     }
 
-    // if we have't already found that it's considered a script, we'll look through the content
+    // if we have't already found that it's considered a script, we'll look through the content. Everything that makes
+    // it active content is reported, so the user knows all of what they're deciding to trust
     if (scriptReason == null) {
+      List<String> reasons = new ArrayList<>();
+      List<String> scriptsContent = new ArrayList<>();
+      boolean hasAntScript = false;
       for (String fn : files) {
         // where the file actually is: the name it was unpacked with could have . or .. in it
         String n = templatePath(templateDir, fn);
         if (n == null) {
-          scriptReason = "Template has a file outside the template folder ("+fn+")";
-          break;
+          return "Template has a file outside the template folder ("+fn+")";
         }
         String lower = n.toLowerCase();
 
@@ -394,8 +449,8 @@ public class TemplateManager {
           String unix = n.replace('\\', '/');
           String base = unix.contains("/") ? unix.substring(unix.lastIndexOf('/') + 1) : unix;
 
-          // Allow a few harmless dotfiles anywhere
-          if (Utilities.existsInList(base, ".gitignore", ".gitattributes", ".gitkeep")) {
+          // Allow a few harmless dotfiles anywhere (.DS_Store: macOS folder metadata, which nothing reads)
+          if (Utilities.existsInList(base, ".gitignore", ".gitattributes", ".gitkeep", ".DS_Store")) {
             continue;
           }
 
@@ -421,25 +476,41 @@ public class TemplateManager {
           // scripts/ (ig.scripts) is where the scripts keep what they run and read: stylesheets, jars, and data files
           // with harmless extensions (e.g. groupings.txt). Anything there is active content, whatever its extension
           if (unix.toLowerCase().startsWith("scripts/")) {
-            scriptReason = "Template has content in scripts/ ("+unix+")";
-            break;
+            scriptsContent.add(unix);
+            continue;
           }
-          String s = extension(n);
           if (antScripts.contains(lower)) {
             // nah, if you overwrite an xml ant script, you're doing active content
-            scriptReason = "Template contains a registered ant script";
-          } else if (!Utilities.existsInList(s,
+            hasAntScript = true;
+            continue;
+          }
+          String s = extension(n);
+          // a pre-compressed copy (x.js.gz, x.css.br) is served as the file it's a copy of: it's judged as that file
+          String inner = s;
+          if (Utilities.existsInList(s.toLowerCase(), ".gz", ".br")) {
+            inner = extension(n.substring(0, n.length() - s.length()));
+          }
+          if (!Utilities.existsInList(inner,
               ".html", ".css", ".png", ".gif", ".oet", ".json", ".xml", ".ico", ".jpg", ".md", ".ini", ".po",
               ".eot", ".otf", ".svg", ".ttf", ".woff", ".woff2", ".txt", ".yml", ".yaml", ".liquid", ".gitignore")) {
             // we don't track what other scripts are potentially active, so we only allow a whitelist of files.
             // this is safe if the base templates don't call out to scripts with weird file extensions (the template authors know about this rule)
-            ext.add(s);
-            break;
+            ext.add(inner.equals(s) ? s : inner + s);
           }
         }
       }
+      if (!scriptsContent.isEmpty()) {
+        reasons.add("Template has content in scripts/ ("+String.join(", ", scriptsContent.subList(0, Math.min(5, scriptsContent.size())))
+            + (scriptsContent.size() > 5 ? " and "+(scriptsContent.size() - 5)+" more" : "")+")");
+      }
+      if (hasAntScript) {
+        reasons.add("Template contains a registered ant script");
+      }
       if (!ext.isEmpty()) {
-        scriptReason = "Template has file extensions: " + ext;
+        reasons.add("Template has file extensions: " + ext);
+      }
+      if (!reasons.isEmpty()) {
+        scriptReason = String.join("; ", reasons);
       }
     }
 
@@ -564,11 +635,13 @@ public class TemplateManager {
     return template.startsWith("https://github.com/") || template.startsWith("http://github.com/");
   }
 
+  /** the extension of the file's name (a . in a folder name isn't one) */
   private String extension(String n) {
-    if (!n.contains(".")) {
+    String name = n.substring(Math.max(n.lastIndexOf('/'), n.lastIndexOf('\\')) + 1);
+    if (!name.contains(".")) {
       return "";
     }
-    return n.substring(n.lastIndexOf("."));
+    return name.substring(name.lastIndexOf("."));
   }
 
   /**
@@ -652,11 +725,13 @@ public class TemplateManager {
         f = ManagedFileAccess.file(Utilities.path(rootFolder, template));
       }
       if (f != null && f.exists()) {
+        // trusted locally by where it is, not by the name the IG gives it (see localTrustId())
+        localTemplatePaths.put(template, f.toPath().toAbsolutePath().normalize().toString());
         if (f.isDirectory()) {
           localFolders.add(f.getAbsolutePath());
           return NpmPackage.fromFolder(f.getAbsolutePath());
         } else {
-          try (FileInputStream in = ManagedFileAccess.inStream(template)) {
+          try (FileInputStream in = ManagedFileAccess.inStream(f)) {
             return NpmPackage.fromPackage(in);
           }
         }
