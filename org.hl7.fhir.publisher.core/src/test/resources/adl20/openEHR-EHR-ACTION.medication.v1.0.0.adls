@@ -1,0 +1,846 @@
+archetype (adl_version=2.1.0; rm_release=1.0.2; uid=f1875ab8-c67a-4915-9bbb-5e4817700414)
+	openEHR-EHR-ACTION.medication.v1.0.0
+
+language
+	original_language = <[ISO_639-1::en]>
+
+description
+	lifecycle_state = <"unmanaged">
+	original_author = <
+		["name"] = <"Thomas Beale">
+		["organisation"] = <"openEHR Foundation">
+		["email"] = <"thomas.beale@openehr.org">
+		["date"] = <"2017-01-16">
+	>
+	copyright = <"© 2017 openEHR Foundation">
+	licence = <"This work is licensed under the Creative Commons Attribution-ShareAlike 3.0 License. To view a copy of this license, visit http://creativecommons.org/licenses/by-sa/3.0/.">
+	details = <
+		["en"] = <
+			language = <[ISO_639-1::en]>
+			purpose = <"Test archetye illustrating use of tuples to model ACTIONs.">
+			keywords = <"test", "tuple">
+		>
+	>
+
+definition
+	ACTION[id1] matches {	-- Medication
+		ism_transition matches {
+			ISM_TRANSITION[id110] matches {	-- Medication recommended
+				current_state matches {
+					DV_CODED_TEXT[id146] matches {
+						defining_code matches {[at141]}
+					}
+				}
+				careflow_step matches {
+					DV_CODED_TEXT[id147] matches {
+						defining_code matches {[at110]}
+					}
+				}
+			}
+			ISM_TRANSITION[id14] matches {	-- Scheduled medication postponed
+				current_state matches {
+					DV_CODED_TEXT[id148] matches {
+						defining_code matches {[at142]}
+					}
+				}
+				careflow_step matches {
+					DV_CODED_TEXT[id149] matches {
+						defining_code matches {[at14]}
+					}
+				}
+			}
+			ISM_TRANSITION[id13] matches {	-- Medication course cancelled
+				current_state matches {
+					DV_CODED_TEXT[id150] matches {
+						defining_code matches {[at143]}
+					}
+				}
+				careflow_step matches {
+					DV_CODED_TEXT[id151] matches {
+						defining_code matches {[at13]}
+					}
+				}
+			}
+			ISM_TRANSITION[id17] matches {	-- Medication start date/condition set
+				current_state matches {
+					DV_CODED_TEXT[id152] matches {
+						defining_code matches {[at144]}
+					}
+				}
+				careflow_step matches {
+					DV_CODED_TEXT[id153] matches {
+						defining_code matches {[at17]}
+					}
+				}
+			}
+			ISM_TRANSITION[id138] matches {	-- Medication restart date/condition set
+				current_state matches {
+					DV_CODED_TEXT[id154] matches {
+						defining_code matches {[at144]}
+					}
+				}
+				careflow_step matches {
+					DV_CODED_TEXT[id155] matches {
+						defining_code matches {[at138]}
+					}
+				}
+			}
+			ISM_TRANSITION[id3] matches {	-- Prescription first issued
+				current_state matches {
+					DV_CODED_TEXT[id156] matches {
+						defining_code matches {[at145]}
+					}
+				}
+				careflow_step matches {
+					DV_CODED_TEXT[id157] matches {
+						defining_code matches {[at3]}
+					}
+				}
+			}
+			ISM_TRANSITION[id4] matches {	-- Medication dispensed
+				current_state matches {
+					DV_CODED_TEXT[id158] matches {
+						defining_code matches {[at145]}
+					}
+				}
+				careflow_step matches {
+					DV_CODED_TEXT[id159] matches {
+						defining_code matches {[at4]}
+					}
+				}
+			}
+			ISM_TRANSITION[id5] matches {	-- Medication course commenced
+				current_state matches {
+					DV_CODED_TEXT[id160] matches {
+						defining_code matches {[at145]}
+					}
+				}
+				careflow_step matches {
+					DV_CODED_TEXT[id161] matches {
+						defining_code matches {[at5]}
+					}
+				}
+			}
+			ISM_TRANSITION[id6] matches {	-- Medication course reviewed
+				current_state matches {
+					DV_CODED_TEXT[id162] matches {
+						defining_code matches {[at145]}
+					}
+				}
+				careflow_step matches {
+					DV_CODED_TEXT[id163] matches {
+						defining_code matches {[at6]}
+					}
+				}
+			}
+			ISM_TRANSITION[id42] matches {	-- Minor change to order
+				current_state matches {
+					DV_CODED_TEXT[id164] matches {
+						defining_code matches {[at145]}
+					}
+				}
+				careflow_step matches {
+					DV_CODED_TEXT[id165] matches {
+						defining_code matches {[at42]}
+					}
+				}
+			}
+			ISM_TRANSITION[id7] matches {	-- Dose administered
+				current_state matches {
+					DV_CODED_TEXT[id166] matches {
+						defining_code matches {[at145]}
+					}
+				}
+				careflow_step matches {
+					DV_CODED_TEXT[id167] matches {
+						defining_code matches {[at7]}
+					}
+				}
+			}
+			ISM_TRANSITION[id107] matches {	-- Medication re-authorised
+				current_state matches {
+					DV_CODED_TEXT[id168] matches {
+						defining_code matches {[at145]}
+					}
+				}
+				careflow_step matches {
+					DV_CODED_TEXT[id169] matches {
+						defining_code matches {[at107]}
+					}
+				}
+			}
+			ISM_TRANSITION[id11] matches {	-- Prescription re-issued
+				current_state matches {
+					DV_CODED_TEXT[id170] matches {
+						defining_code matches {[at145]}
+					}
+				}
+				careflow_step matches {
+					DV_CODED_TEXT[id171] matches {
+						defining_code matches {[at11]}
+					}
+				}
+			}
+			ISM_TRANSITION[id19] matches {	-- Dose administration omitted
+				current_state matches {
+					DV_CODED_TEXT[id172] matches {
+						defining_code matches {[at145]}
+					}
+				}
+				careflow_step matches {
+					DV_CODED_TEXT[id173] matches {
+						defining_code matches {[at19]}
+					}
+				}
+			}
+			ISM_TRANSITION[id45] matches {	-- Dose administration deferred
+				current_state matches {
+					DV_CODED_TEXT[id174] matches {
+						defining_code matches {[at145]}
+					}
+				}
+				careflow_step matches {
+					DV_CODED_TEXT[id175] matches {
+						defining_code matches {[at45]}
+					}
+				}
+			}
+			ISM_TRANSITION[id36] matches {	-- Dispensed medication returned.
+				current_state matches {
+					DV_CODED_TEXT[id176] matches {
+						defining_code matches {[at145]}
+					}
+				}
+				careflow_step matches {
+					DV_CODED_TEXT[id177] matches {
+						defining_code matches {[at36]}
+					}
+				}
+			}
+			ISM_TRANSITION[id9] matches {	-- Medication course supply delayed
+				current_state matches {
+					DV_CODED_TEXT[id178] matches {
+						defining_code matches {[at146]}
+					}
+				}
+				careflow_step matches {
+					DV_CODED_TEXT[id179] matches {
+						defining_code matches {[at9]}
+					}
+				}
+			}
+			ISM_TRANSITION[id10] matches {	-- Medication course suspended
+				current_state matches {
+					DV_CODED_TEXT[id180] matches {
+						defining_code matches {[at146]}
+					}
+				}
+				careflow_step matches {
+					DV_CODED_TEXT[id181] matches {
+						defining_code matches {[at10]}
+					}
+				}
+			}
+			ISM_TRANSITION[id12] matches {	-- Prescription re-issue suspended
+				current_state matches {
+					DV_CODED_TEXT[id182] matches {
+						defining_code matches {[at146]}
+					}
+				}
+				careflow_step matches {
+					DV_CODED_TEXT[id183] matches {
+						defining_code matches {[at12]}
+					}
+				}
+			}
+			ISM_TRANSITION[id16] matches {	-- Medication course stopped
+				current_state matches {
+					DV_CODED_TEXT[id184] matches {
+						defining_code matches {[at147]}
+					}
+				}
+				careflow_step matches {
+					DV_CODED_TEXT[id185] matches {
+						defining_code matches {[at16]}
+					}
+				}
+			}
+			ISM_TRANSITION[id40] matches {	-- Major change to order.
+				current_state matches {
+					DV_CODED_TEXT[id186] matches {
+						defining_code matches {[at147]}
+					}
+				}
+				careflow_step matches {
+					DV_CODED_TEXT[id187] matches {
+						defining_code matches {[at40]}
+					}
+				}
+			}
+			ISM_TRANSITION[id8] matches {	-- Medication course completed
+				current_state matches {
+					DV_CODED_TEXT[id188] matches {
+						defining_code matches {[at148]}
+					}
+				}
+				careflow_step matches {
+					DV_CODED_TEXT[id189] matches {
+						defining_code matches {[at8]}
+					}
+				}
+			}
+		}
+		description matches {
+			ITEM_TREE[id18] matches {
+				items matches {
+					ELEMENT[id21] occurrences matches {0..1} matches {	-- Medication
+						value matches {
+							DV_TEXT[id190] 
+						}
+					}
+					CLUSTER[id83] matches {	-- Product
+						items matches {
+							allow_archetype CLUSTER[id105] occurrences matches {0..1} matches {	-- Preparation details
+								include
+									archetype_id/value matches {/openEHR-EHR-CLUSTER\.medication_substance(-a-zA-Z0-9_]+)*\.v0/}
+							}
+							ELEMENT[id131] occurrences matches {0..1} matches {	-- Manufacturer
+								value matches {
+									DV_TEXT[id191] 
+								}
+							}
+							ELEMENT[id84] occurrences matches {0..1} matches {	-- Batch ID
+								value matches {
+									DV_TEXT[id192] 
+								}
+							}
+							ELEMENT[id85] occurrences matches {0..1} matches {	-- Expiry date
+								value matches {
+									DV_DATE[id193] 
+								}
+							}
+							allow_archetype CLUSTER[id132] occurrences matches {0..1} matches {	-- Amount
+								include
+									archetype_id/value matches {/openEHR-EHR-CLUSTER\.medication_supply_amount(-a-zA-Z0-9_]+)*\.v0/}
+							}
+							ELEMENT[id106] occurrences matches {0..1} matches {	-- Max class dose administered
+								value matches {
+									DV_PROPORTION[id194] matches {
+										numerator matches {|0.0..100.0|}
+										is_integral matches {False}
+										type matches {2}
+									}
+								}
+							}
+							ELEMENT[id133] occurrences matches {0..1} matches {	-- Dispensing substitution
+								value matches {
+									DV_CODED_TEXT[id195] matches {
+										defining_code matches {[ac1]}		-- Dispensing substitution (synthesised)
+									}
+								}
+							}
+							ELEMENT[id134] occurrences matches {0..1} matches {	-- Dispensing substitution reason
+								value matches {
+									DV_TEXT[id196] 
+								}
+							}
+						}
+					}
+					ELEMENT[id44] occurrences matches {0..1} matches {	-- Order scheduled datetime
+						value matches {
+							DV_DATE_TIME[id197] 
+						}
+					}
+					ELEMENT[id22] matches {	-- Reason
+						value matches {
+							DV_TEXT[id198] 
+						}
+					}
+					ELEMENT[id118] matches {	-- Reason course amended/stopped
+						value matches {
+							DV_CODED_TEXT[id199] matches {
+								defining_code matches {[ac2]}		-- Reason course amended/stopped (synthesised)
+							}
+							DV_TEXT[id200] 
+						}
+					}
+					ELEMENT[id117] matches {	-- Reason dose not administered
+						value matches {
+							DV_CODED_TEXT[id201] matches {
+								defining_code matches {[ac3]}		-- Reason dose not administered (synthesised)
+							}
+						}
+					}
+					CLUSTER[id141] occurrences matches {0..1} matches {	-- Delivery details
+						items matches {
+							ELEMENT[id142] occurrences matches {0..1} matches {	-- Body site
+								value matches {
+									DV_TEXT[id202] 
+								}
+							}
+							allow_archetype CLUSTER[id143] occurrences matches {0..1} matches {	-- Structured body site
+								include
+									archetype_id/value matches {/openEHR-EHR-CLUSTER\.anatomical_location(-a-zA-Z0-9_]+)*\.v1|openEHR-EHR-CLUSTER\.anatomical_location_clock(-a-zA-Z0-9_]+)*\.v0|openEHR-EHR-CLUSTER\.anatomical_location_relative(-a-zA-Z0-9_]+)*\.v1/}
+							}
+							ELEMENT[id144] matches {	-- Delivery method
+								value matches {
+									DV_TEXT[id203] 
+								}
+							}
+							allow_archetype CLUSTER[id145] matches {	-- Delivery device details
+								include
+									archetype_id/value matches {/openEHR-EHR-CLUSTER\.device(-a-zA-Z0-9_]+)*\.v1/}
+							}
+						}
+					}
+					allow_archetype CLUSTER[id54] matches {	-- Details
+						include
+							archetype_id/value matches {/openEHR-EHR-CLUSTER\.medication_authorisation(-a-zA-Z0-9_]+)*\.v0/}
+					}
+					ELEMENT[id34] matches {	-- Patient guidance
+						value matches {
+							DV_TEXT[id204] 
+						}
+					}
+					ELEMENT[id26] occurrences matches {0..1} matches {	-- Sequence number
+						value matches {
+							DV_COUNT[id205] 
+						}
+					}
+					ELEMENT[id25] occurrences matches {0..1} matches {	-- Comment
+						value matches {
+							DV_TEXT[id206] 
+						}
+					}
+				}
+			}
+		}
+		protocol matches {
+			ITEM_TREE[id31] matches {
+				items cardinality matches {1..*; unordered} matches {
+					ELEMENT[id104] occurrences matches {0..1} matches {	-- Order ID
+						value matches {
+							DV_IDENTIFIER[id207] 
+						}
+					}
+					allow_archetype CLUSTER[id86] matches {	-- Extension
+						include
+							archetype_id/value matches {/.*/}
+					}
+				}
+			}
+		}
+	}
+
+terminology
+	term_definitions = <
+		["en"] = <
+			["id1"] = <
+				text = <"Medication">
+				description = <"Details of use, administration, dispensing or other care step relating to a medicine, vaccine or other therapeutic good which may arise from an instruction from a clinician.">
+			>
+			["id3"] = <
+				text = <"Prescription first issued">
+				description = <"The instruction has issued as an item on a prescription.">
+			>
+			["id4"] = <
+				text = <"Medication dispensed">
+				description = <"The medication has been dispensed.">
+			>
+			["id5"] = <
+				text = <"Medication course commenced">
+				description = <"The medication has been taken by, or administered to, the patient for the first time.">
+			>
+			["id6"] = <
+				text = <"Medication course reviewed">
+				description = <"The medication has been reviewed.">
+			>
+			["id7"] = <
+				text = <"Dose administered">
+				description = <"A single administration of the medication has taken place.">
+			>
+			["id8"] = <
+				text = <"Medication course completed">
+				description = <"The medication course has been completed as planned.">
+			>
+			["id9"] = <
+				text = <"Medication course supply delayed">
+				description = <"The medication course has not been dispensed as supply is not yet available.">
+			>
+			["id10"] = <
+				text = <"Medication course suspended">
+				description = <"The administration of the medication has been suspended. No further doses should be given until further notice, or when the restart date or conditions have been met.">
+			>
+			["id11"] = <
+				text = <"Prescription re-issued">
+				description = <"A prescription token has been re-issued for an existing medication order.">
+			>
+			["id12"] = <
+				text = <"Prescription re-issue suspended">
+				description = <"Reissuing of this prescription is not available without some intervention.">
+			>
+			["id13"] = <
+				text = <"Medication course cancelled">
+				description = <"The planned administration has been cancelled prior to any administration.">
+			>
+			["id14"] = <
+				text = <"Scheduled medication postponed">
+				description = <"A scheduled medication has been postponed prior to any administration.">
+			>
+			["id16"] = <
+				text = <"Medication course stopped">
+				description = <"The administration of this medication has been ceased before anticipated completion.">
+			>
+			["id17"] = <
+				text = <"Medication start date/condition set">
+				description = <"The time to start this medication, or other starting condition, has been set.">
+			>
+			["id19"] = <
+				text = <"Dose administration omitted">
+				description = <"The administration of a medication has been withheld and not given. There is no expectation that it will be given later, though the next dose (if any) should be administered according to the original order.">
+			>
+			["id21"] = <
+				text = <"Medication">
+				description = <"The medicine, vaccine or other therapeutic good which was the focus of the action. This element will normally be coded with a medicines terminology but free text may be required in some cases.">
+			>
+			["id22"] = <
+				text = <"Reason">
+				description = <"The reason(s) the specific action or step was carried out. Note: This is not the reason for the medication instruction, rather the specific reason e.g. for administration.">
+			>
+			["id25"] = <
+				text = <"Comment">
+				description = <"A comment on the action taken including details of any variance between the intended action and the action actually performed.">
+			>
+			["id26"] = <
+				text = <"Sequence number">
+				description = <"The sequence number specific to the action being recorded.">
+			>
+			["id34"] = <
+				text = <"Patient guidance">
+				description = <"Any guidance, instructions or advice given to the subject of care or carer at the time of the action.">
+			>
+			["id36"] = <
+				text = <"Dispensed medication returned.">
+				description = <"A dispensed medication is returned, or not collected, without being used.">
+			>
+			["id40"] = <
+				text = <"Major change to order.">
+				description = <"A major change to the order was required, resulting in this order being stopped and a replacement order being started.">
+			>
+			["id42"] = <
+				text = <"Minor change to order">
+				description = <"The medication order has been changed in a manner which does not require a new instruction/order to be issued, according to local clinical rules.">
+			>
+			["id44"] = <
+				text = <"Order scheduled datetime">
+				description = <"The datetime at which the medication order was scheduled to occur.">
+			>
+			["id45"] = <
+				text = <"Dose administration deferred">
+				description = <"Administration of a dose of mediciation has been delayed but is expected to be given as soon as possible.">
+			>
+			["id54"] = <
+				text = <"Details">
+				description = <"Further structured details of the action, possibly specific to a pathway step.">
+			>
+			["id83"] = <
+				text = <"Product">
+				description = <"Details of the product dispensed, authorised or administered.">
+			>
+			["id84"] = <
+				text = <"Batch ID">
+				description = <"Assigned by the manufacturer to identify the manufacturing batch of the item.">
+			>
+			["id85"] = <
+				text = <"Expiry date">
+				description = <"The expiry date of the medicine administered as documented by the manufacturer.">
+			>
+			["id86"] = <
+				text = <"Extension">
+				description = <"Additional information required to capture local content or to align with other reference models/formalisms.">
+			>
+			["id104"] = <
+				text = <"Order ID">
+				description = <"The identifier assigned with the original order.">
+			>
+			["id105"] = <
+				text = <"Preparation details">
+				description = <"Details of the medication preparation.">
+			>
+			["id106"] = <
+				text = <"Max class dose administered">
+				description = <"The proportion of the maximum allowed dose equivalent administered.">
+			>
+			["id107"] = <
+				text = <"Medication re-authorised">
+				description = <"A repeat prescription or dispense has been re-authorised.">
+			>
+			["id110"] = <
+				text = <"Medication recommended">
+				description = <"The medication has been recommended but no steps have been taken to initiate prescribing.">
+			>
+			["id117"] = <
+				text = <"Reason dose not administered">
+				description = <"The reason(s) why a particular dose administration did not take place, including complte omission of the dose and deferral of the dose.">
+			>
+			["id118"] = <
+				text = <"Reason course amended/stopped">
+				description = <"The reason(s) for amending or stopping a course of medication.">
+			>
+			["at119"] = <
+				text = <"Allergy/Adverse Reaction/ Intolerance">
+				description = <"The patient experienced an adverse reaction.">
+			>
+			["at120"] = <
+				text = <"Inadequate clinical response">
+				description = <"The clinical response to the medication was inadequate.">
+			>
+			["at121"] = <
+				text = <"Patient choice / difficulty">
+				description = <"The course was changed because of patient preference or difficulty.">
+			>
+			["at122"] = <
+				text = <"Prescribed in error">
+				description = <"The medication was prescribed in error.">
+			>
+			["at123"] = <
+				text = <"Additional information available">
+				description = <"Addiotnal information informed the amendment.">
+			>
+			["at124"] = <
+				text = <"Temporarily suspended">
+				description = <"The medication was suspended for a temporary period only.">
+			>
+			["at125"] = <
+				text = <"Change to dose form/ strength /route">
+				description = <"The dose form/strength and or route were changed.">
+			>
+			["at126"] = <
+				text = <"Patient refused">
+				description = <"The patient refused to take the medication.">
+			>
+			["at127"] = <
+				text = <"Nil by mouth">
+				description = <"The patient is on a nil-by-mouth regime.">
+			>
+			["at128"] = <
+				text = <"Medicine unavailable">
+				description = <"The medicine was unavailable.">
+			>
+			["at129"] = <
+				text = <"Patient unavailable">
+				description = <"The patient was not available.">
+			>
+			["at130"] = <
+				text = <"Clinical reason">
+				description = <"The medication administration was withheld/deferred for a clinical reason.">
+			>
+			["id131"] = <
+				text = <"Manufacturer">
+				description = <"The manufacturer of the medication.">
+			>
+			["id132"] = <
+				text = <"Amount">
+				description = <"Details of the amount of medication supplied i.e. authorised, dispensed or administered.">
+			>
+			["id133"] = <
+				text = <"Dispensing substitution">
+				description = <"Subsitution action taken by the dispenser.">
+			>
+			["id134"] = <
+				text = <"Dispensing substitution reason">
+				description = <"The reason or justification for the substitution action taken.">
+			>
+			["id138"] = <
+				text = <"Medication restart date/condition set">
+				description = <"A  suspended medication has had its restart date or condition set.">
+			>
+			["at139"] = <
+				text = <"Substitute product dispensed">
+				description = <"A medication was dispensed which is bioequivalent to that ordered.">
+			>
+			["at140"] = <
+				text = <"Substitute product not dispensed">
+				description = <"Although allowed by the medication order a substitute bioequvalent medication was not dispensed.">
+			>
+			["id141"] = <
+				text = <"Delivery details">
+				description = <"Details of body site and delivery of the medication.">
+			>
+			["id142"] = <
+				text = <"Body site">
+				description = <"Identification of the site of administration of the medication, vaccine or therapeutic good.">
+			>
+			["id143"] = <
+				text = <"Structured body site">
+				description = <"Structured description of the site of administration  of the medication, vaccine or therapeutic good.">
+			>
+			["id144"] = <
+				text = <"Delivery method">
+				description = <"The method by which the medication is to be delivered.">
+			>
+			["id145"] = <
+				text = <"Delivery device details">
+				description = <"Details of the medical device used to assist delivery of the medication.">
+			>
+			["at110"] = <
+				text = <"Medication recommended">
+				description = <"The medication has been recommended but no steps have been taken to initiate prescribing.">
+			>
+			["at14"] = <
+				text = <"Scheduled medication postponed">
+				description = <"A scheduled medication has been postponed prior to any administration.">
+			>
+			["at13"] = <
+				text = <"Medication course cancelled">
+				description = <"The planned administration has been cancelled prior to any administration.">
+			>
+			["at17"] = <
+				text = <"Medication start date/condition set">
+				description = <"The time to start this medication, or other starting condition, has been set.">
+			>
+			["at138"] = <
+				text = <"Medication restart date/condition set">
+				description = <"A  suspended medication has had its restart date or condition set.">
+			>
+			["at3"] = <
+				text = <"Prescription first issued">
+				description = <"The instruction has issued as an item on a prescription.">
+			>
+			["at4"] = <
+				text = <"Medication dispensed">
+				description = <"The medication has been dispensed.">
+			>
+			["at5"] = <
+				text = <"Medication course commenced">
+				description = <"The medication has been taken by, or administered to, the patient for the first time.">
+			>
+			["at6"] = <
+				text = <"Medication course reviewed">
+				description = <"The medication has been reviewed.">
+			>
+			["at42"] = <
+				text = <"Minor change to order">
+				description = <"The medication order has been changed in a manner which does not require a new instruction/order to be issued, according to local clinical rules.">
+			>
+			["at7"] = <
+				text = <"Dose administered">
+				description = <"A single administration of the medication has taken place.">
+			>
+			["at107"] = <
+				text = <"Medication re-authorised">
+				description = <"A repeat prescription or dispense has been re-authorised.">
+			>
+			["at11"] = <
+				text = <"Prescription re-issued">
+				description = <"A prescription token has been re-issued for an existing medication order.">
+			>
+			["at19"] = <
+				text = <"Dose administration omitted">
+				description = <"The administration of a medication has been withheld and not given. There is no expectation that it will be given later, though the next dose (if any) should be administered according to the original order.">
+			>
+			["at45"] = <
+				text = <"Dose administration deferred">
+				description = <"Administration of a dose of mediciation has been delayed but is expected to be given as soon as possible.">
+			>
+			["at36"] = <
+				text = <"Dispensed medication returned.">
+				description = <"A dispensed medication is returned, or not collected, without being used.">
+			>
+			["at9"] = <
+				text = <"Medication course supply delayed">
+				description = <"The medication course has not been dispensed as supply is not yet available.">
+			>
+			["at10"] = <
+				text = <"Medication course suspended">
+				description = <"The administration of the medication has been suspended. No further doses should be given until further notice, or when the restart date or conditions have been met.">
+			>
+			["at12"] = <
+				text = <"Prescription re-issue suspended">
+				description = <"Reissuing of this prescription is not available without some intervention.">
+			>
+			["at16"] = <
+				text = <"Medication course stopped">
+				description = <"The administration of this medication has been ceased before anticipated completion.">
+			>
+			["at40"] = <
+				text = <"Major change to order.">
+				description = <"A major change to the order was required, resulting in this order being stopped and a replacement order being started.">
+			>
+			["at8"] = <
+				text = <"Medication course completed">
+				description = <"The medication course has been completed as planned.">
+			>
+			["at141"] = <
+				text = <"planned">
+				description = <"planned">
+			>
+			["at142"] = <
+				text = <"postponed">
+				description = <"postponed">
+			>
+			["at143"] = <
+				text = <"cancelled">
+				description = <"cancelled">
+			>
+			["at144"] = <
+				text = <"scheduled">
+				description = <"scheduled">
+			>
+			["at145"] = <
+				text = <"active">
+				description = <"active">
+			>
+			["at146"] = <
+				text = <"suspended">
+				description = <"suspended">
+			>
+			["at147"] = <
+				text = <"aborted">
+				description = <"aborted">
+			>
+			["at148"] = <
+				text = <"complete">
+				description = <"complete">
+			>
+			["ac1"] = <
+				text = <"Dispensing substitution (synthesised)">
+				description = <"Subsitution action taken by the dispenser. (synthesised)">
+			>
+			["ac2"] = <
+				text = <"Reason course amended/stopped (synthesised)">
+				description = <"The reason(s) for amending or stopping a course of medication. (synthesised)">
+			>
+			["ac3"] = <
+				text = <"Reason dose not administered (synthesised)">
+				description = <"The reason(s) why a particular dose administration did not take place, including complte omission of the dose and deferral of the dose. (synthesised)">
+			>
+		>
+	>
+	term_bindings = <
+		["openehr"] = <
+			["at141"] = <http://openehr.org/id/526>
+			["at142"] = <http://openehr.org/id/527>
+			["at143"] = <http://openehr.org/id/528>
+			["at144"] = <http://openehr.org/id/529>
+			["at145"] = <http://openehr.org/id/245>
+			["at146"] = <http://openehr.org/id/530>
+			["at147"] = <http://openehr.org/id/531>
+			["at148"] = <http://openehr.org/id/532>
+		>
+	>
+	value_sets = <
+		["ac1"] = <
+			id = <"ac1">
+			members = <"at139", "at140">
+		>
+		["ac2"] = <
+			id = <"ac2">
+			members = <"at119", "at120", "at121", "at122", "at123", "at124", "at125">
+		>
+		["ac3"] = <
+			id = <"ac3">
+			members = <"at126", "at127", "at128", "at129", "at130">
+		>
+	>
+

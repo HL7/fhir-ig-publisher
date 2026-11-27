@@ -30,7 +30,7 @@
         <log4jVersion>2.26.1</log4jVersion>
         <jackson_version>2.22.4</jackson_version>
         <jackson_annotations_version>2.22</jackson_annotations_version>
-        <nedap-healthcare-archie.version>3.19.0</nedap-healthcare-archie.version>
+        <nedap-healthcare-archie.version>4.0.0</nedap-healthcare-archie.version>
     </properties>
 
     <name>HL7 FHIR IG Publisher</name>
@@ -437,18 +437,23 @@
             <artifactId>plantuml-mit</artifactId>
             <version>1.2026.1</version>
         </dependency>
-
+        <!-- archie -->
         <dependency>
             <groupId>com.nedap.healthcare.archie</groupId>
             <artifactId>aom</artifactId>
             <version>${nedap-healthcare-archie.version}</version>
         </dependency>
-
         <dependency>
             <groupId>com.nedap.healthcare.archie</groupId>
             <artifactId>referencemodels</artifactId>
             <version>${nedap-healthcare-archie.version}</version>
         </dependency>
+        <dependency>
+            <groupId>com.nedap.healthcare.archie</groupId>
+            <artifactId>archie-utils</artifactId>
+            <version>${nedap-healthcare-archie.version}</version>
+        </dependency>
+        
         <dependency>
             <groupId>io.methvin</groupId>
             <artifactId>directory-watcher</artifactId>

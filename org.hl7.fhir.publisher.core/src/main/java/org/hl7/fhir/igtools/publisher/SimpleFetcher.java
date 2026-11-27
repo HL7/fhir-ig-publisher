@@ -437,7 +437,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
                     }
                   }
                 }
-              if (!ok && !Utilities.existsInList(ext, "xml", "ttl", "html", "txt", "fml", "adl")) {
+              if (!ok && !Utilities.existsInList(ext, "xml", "ttl", "html", "txt", "fml", "adl", "adls")) {
                 try {
                   List<ValidatedFragment> el;
                   try (FileInputStream in = ManagedFileAccess.inStream(fn)) {
@@ -459,7 +459,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
                   }
                 }
               }
-              if (!ok && !Utilities.existsInList(ext, "json", "xml", "html", "txt", "fml", "adl")) {
+              if (!ok && !Utilities.existsInList(ext, "json", "xml", "html", "txt", "fml", "adl", "adls")) {
                 try {
                   org.hl7.fhir.services.elementmodel.Element e;
                   try (FileInputStream in = ManagedFileAccess.inStream(fn)) {
@@ -480,7 +480,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
                   }
                 }
               }              
-              if (!ok && !Utilities.existsInList(ext, "json", "xml", "html", "txt", "adl")) {
+              if (!ok && !Utilities.existsInList(ext, "json", "xml", "html", "txt", "adl", "adls")) {
                 try {
                   if (fp==null) {
                     fp = new FmlParser(context, fpe);
@@ -506,10 +506,10 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
               }            
               if (!ok && !Utilities.existsInList(ext, "json", "xml", "html", "txt", "ttl") && context.hasPackage("openehr.base", null)) {
                 try {
-                  try (FileInputStream in = ManagedFileAccess.inStream(f)) {
-                    new ArchetypeImporter(context, pkp.getCanonical()).checkArchetype(in, f.getName());
+                  try (FileInputStream in = new FileInputStream(f)) {
+                    new ArchetypeImporter(context, pkp.getCanonical()).checkArchetype(in, f.getName(), ext);
                   }
-                  addFileForElement(res, f, null, "adl");
+                  addFileForElement(res, f, null, ext);
                   count++;
                   ok = true;
                 } catch (Exception e) {
@@ -546,7 +546,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
   }
 
   private List<String> fixedFileTypes() {
-    List<String> res = Utilities.strings("json", "ttl", "html", "txt", "fml", "adl");
+    List<String> res = Utilities.strings("json", "ttl", "html", "txt", "fml", "adl","adls");
     Collections.addAll(res, UNPARSED_FILE_TYPES);
     return res;
   }
