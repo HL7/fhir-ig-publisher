@@ -167,6 +167,59 @@ class RapidoTrackerResourcesTest {
     return "{\"resourceType\":\"Patient\",\"id\":\"p\",\"name\":[{\"family\":\""+family+"\"}]}";
   }
 
+  /** a build's file list: the IG, and a file for each resource */
+  private PublisherFields build(String... resources) throws Exception {
+    assumeTrue(context != null, noContext);
+    PublisherFields pf = new PublisherFields();
+    pf.rootDir = temp.toString();
+    pf.tempDir = temp.resolve("temp").toString();
+    pf.vsCache = temp.resolve("txcache").toString();
+    pf.context = context;
+    pf.version = "5.0.0";
+    pf.igpkp = mock(IGKnowledgeProvider.class);
+    when(pf.igpkp.getCanonical()).thenReturn("http://example.org/fhir");
+    FetchedFile igf = new FetchedFile("input/ig.json");
+    igf.setPath(temp.resolve("ig.json").toString());
+    igf.setSource("{}".getBytes(StandardCharsets.UTF_8));
+    pf.fileList.add(igf);
+    for (String json : resources) {
+      Element e = parseJson(json);
+      String name = e.fhirType()+"-"+e.getIdBase()+".json";
+      FetchedFile f = new FetchedFile(name);
+      f.setPath(temp.resolve(name).toString());
+      f.setSource(json.getBytes(StandardCharsets.UTF_8));
+      f.addResource(e.getIdBase()).setElement(e).setId(e.getIdBase());
+      pf.fileList.add(f);
+    }
+    pf.rapido = new RapidoTracker(pf);
+    pf.rapido.analyse(pf.fileList.get(0), null);
+    return pf;
+  }
+
+  /** what the native outputs of a file are keyed by: the state its outputs are written from, in any build */
+  @Test
+  void theRenderHashOfAFileIsItsStateWithWhatRefersToIt() throws Exception {
+    PublisherFields first = build(patient("Karimov"), CONDITION);
+    FetchedFile patient = first.fileList.get(1);
+    String hash = first.rapido.renderHash(patient);
+    assertNotNull(hash);
+    // the first build is a complete one: nothing is reused
+    assertTrue(first.rapido.isCompleteBuild());
+    assertFalse(first.rapido.isRenderClean(patient));
+    assertEquals(null, first.rapido.renderHash(new FetchedFile("not-in-the-build.json")));
+
+    PublisherFields same = build(patient("Karimov"), CONDITION);
+    assertEquals(hash, same.rapido.renderHash(same.fileList.get(1)));
+    assertFalse(hash.equals(same.rapido.renderHash(same.fileList.get(2))));
+
+    // the patient's page lists what refers to it
+    PublisherFields referrer = build(patient("Karimov"), CONDITION.replace("Asthma", "Hay fever"));
+    assertFalse(hash.equals(referrer.rapido.renderHash(referrer.fileList.get(1))));
+
+    PublisherFields own = build(patient("Rakhimov"), CONDITION);
+    assertFalse(hash.equals(own.rapido.renderHash(own.fileList.get(1))));
+  }
+
   /** the narrative the publisher generates for the resource, with Patient/p resolving to the patient given */
   private static String narrative(Element resource, Element patient) throws Exception {
     RenderingContext rc = new RenderingContext(context, new RendererFactory(), new MarkDownProcessor(MarkDownProcessor.Dialect.COMMON_MARK),

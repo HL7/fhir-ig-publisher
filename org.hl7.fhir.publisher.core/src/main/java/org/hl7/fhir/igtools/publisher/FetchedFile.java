@@ -292,8 +292,10 @@ public class FetchedFile {
   }
   
   public void start(String activityName) {
-    if (!columns.contains(activityName)) {
-      columns.add(activityName);
+    synchronized (columns) { // with -threads, files are started on several threads
+      if (!columns.contains(activityName)) {
+        columns.add(activityName);
+      }
     }
     ProcessingReport pr = new ProcessingReport();
     pr.activity = activityName;
