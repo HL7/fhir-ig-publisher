@@ -34,6 +34,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -78,6 +79,8 @@ public class TemplateManager {
   private String trustTemplate; // -trust-template: a template id, or "all"
   private String settingsPath; // fhir-settings.json: null = FhirSettings.getFilePath()
   private String rootFolder; // the IG's root folder, for the last template loaded
+  // the templates (as named) that were loaded from a local folder or file (other than #folder): where they were loaded from
+  private final Map<String, String> localTemplatePaths = new HashMap<>();
 
   private static final String ACCESSIBLE_MARKER = "[%accessibility-routines%]";
   private static final String JS_ROUTINE_NAME_REGEX = "[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)*";
@@ -96,7 +99,11 @@ public class TemplateManager {
    *   hl7.fhir.template#current = /Users/me/work/templates/hl7.fhir.template
    *   hl7.base.template = ../templates/hl7.base.template
    *
-   * Relative folders are relative to the IG root folder. Ignored in auto-build mode
+   * Relative folders are relative to the IG root folder. Ignored in auto-build mode.
+   *
+   * This is for template development only: ig.ini comes with the IG, so the overrides are only used if the user's
+   * fhir-settings.json says "allow-template-overrides": true (which is only ever set by hand). A template loaded from an
+   * override isn't subject to the active content rules: it's the developer's own
    */
   public void loadTemplateOverrides(IniFile ini, String rootFolder) throws IOException {
     templateOverrides.clear();
@@ -114,6 +121,25 @@ public class TemplateManager {
           templateOverrides.put(name, f.getAbsolutePath());
         }
       }
+    }
+    if (!templateOverrides.isEmpty() && !allowsTemplateOverrides()) {
+      logger.logMessage("Template overrides in ig.ini are ignored, because "+ (getSettingsPath() == null ? "the FHIR settings file isn't known" : getSettingsPath()+" doesn't say \""+LocalTemplateTrust.ALLOW_OVERRIDES+"\": true")
+          + " (they're for template development): "+String.join(", ", templateOverrides.keySet()));
+      templateOverrides.clear();
+    }
+  }
+
+  /** whether the settings file allows ig.ini to override templates; if it can't be read, it doesn't */
+  private boolean allowsTemplateOverrides() {
+    String settings = getSettingsPath();
+    if (settings == null) {
+      return false;
+    }
+    try {
+      return LocalTemplateTrust.allowsTemplateOverrides(settings);
+    } catch (IOException | RuntimeException e) {
+      logger.logMessage("Unable to read "+settings+": "+e.getMessage());
+      return false;
     }
   }
 
@@ -141,6 +167,7 @@ public class TemplateManager {
     this.rootFolder = rootFolder;
     this.usedOverride = false;
     localFolders.clear();
+    localTemplatePaths.clear();
     if (autoMode && !templateOverrides.isEmpty()) {
       // overrides would let an IG substitute arbitrary content for a trusted template id
       logger.logMessage("Template overrides in ig.ini are ignored in auto-build mode: "+String.join(", ", templateOverrides.keySet()));
@@ -198,11 +225,15 @@ public class TemplateManager {
    * The id that a template is trusted by locally: what the IG (or the template that uses it as its base) names it by,
    * without a version - a package id, a github URL, or a folder. A template in the IG's own folders (#folder) is
    * trusted by its absolute folder: '#ig-template' names a different template in every IG, and trusting one of them
-   * mustn't trust them all
+   * mustn't trust them all. So is any other local folder or file (see localTrustId()): an absolute path is kept as it
+   * is (normalised), since a # in it isn't a version
    */
   static String trustId(String template, String rootFolder) {
     if (template.startsWith("#")) {
       return rootFolder == null ? template : Paths.get(rootFolder, template.substring(1)).toAbsolutePath().normalize().toString();
+    }
+    if (new File(template).isAbsolute()) {
+      return Paths.get(template).toAbsolutePath().normalize().toString();
     }
     if (!template.contains("#")) {
       return template;
@@ -211,18 +242,28 @@ public class TemplateManager {
   }
 
   /**
+   * The id a template is trusted by locally, as for trustId(), except that a template that was loaded from a local
+   * folder or file (template = ../my-template, say) is trusted by where it was loaded from: the same relative name is
+   * a different template in every IG
+   */
+  private String localTrustId(String template) {
+    String path = localTemplatePaths.get(template);
+    return path != null ? path : trustId(template, rootFolder);
+  }
+
+  /**
    * Run locally, a template that has active content and isn't trusted can run, but only once the user has said they
    * trust it: by listing its id (or "all") in trustedTemplates in fhir-settings.json, or by running with
    * -trust-template, which adds it there. Otherwise the run stops, saying why and what to do
    */
   private void checkLocalTrust() throws IOException {
-    String id = trustId(templateThatCantExecute, rootFolder);
+    String id = localTrustId(templateThatCantExecute);
     String settings = getSettingsPath();
     if (settings != null && isTrustedInSettings(settings, id)) {
       return;
     }
-    // -trust-template can name the template as the IG does (#folder): it's recorded by its absolute folder
-    String trusted = trustTemplate == null || LocalTemplateTrust.ALL.equals(trustTemplate) ? trustTemplate : trustId(trustTemplate, rootFolder);
+    // -trust-template can name the template as the IG does (#folder, ../my-template): it's recorded by its absolute folder
+    String trusted = trustTemplate == null || LocalTemplateTrust.ALL.equals(trustTemplate) ? trustTemplate : localTrustId(trustTemplate);
     if (trusted != null && (LocalTemplateTrust.ALL.equals(trusted) || trusted.equals(id))) {
       if (settings == null) {
         logger.logMessage("Template '"+id+"' is trusted for this run, as you said. It couldn't be recorded, because the FHIR settings file isn't known");
@@ -240,7 +281,7 @@ public class TemplateManager {
     }
     throw new FHIRException("The template '"+id+"' runs scripts, and it is not a trusted template ("+templateReason+"). "
         + "A template's scripts can do anything you can do on this computer, so be sure that this template is trustworthy before you run it. "
-        + "If you are sure, run the IG Publisher again with '-trust-template "+id+"' to trust this template, or '-trust-template all' to trust all templates. "
+        + "If you are sure, run the IG Publisher again with '-trust-template \""+id+"\"' to trust this template, or '-trust-template all' to trust all templates. "
         + (settings != null ? "That will be recorded in "+settings+", and you won't be asked again." : "")
         + (trustTemplate != null ? " (-trust-template '"+trustTemplate+"' doesn't name this template.)" : ""));
   }
@@ -322,8 +363,9 @@ public class TemplateManager {
     // if scriptReason != null, then the template has active content, and scriptReason contains the reason why we decided that there's active content
     String scriptReason = activeContentReason(templateDir, files, config, npm.name()+"#"+npm.version());
 
-    // if it has active content, then we check to see if it's trusted. Locally: always trusted. auto-build: only some trusted
-    if (scriptReason != null) {
+    // if it has active content, then we check to see if it's trusted. Locally: always trusted. auto-build: only some trusted.
+    // A template from an override (only allowed when the user's settings say so) is the developer's own: no rules apply
+    if (scriptReason != null && override == null) {
       checkTemplateId(template, npm.name(), scriptReason);
     }
     if (level==0 && configs.size() > 1) {
@@ -683,11 +725,13 @@ public class TemplateManager {
         f = ManagedFileAccess.file(Utilities.path(rootFolder, template));
       }
       if (f != null && f.exists()) {
+        // trusted locally by where it is, not by the name the IG gives it (see localTrustId())
+        localTemplatePaths.put(template, f.toPath().toAbsolutePath().normalize().toString());
         if (f.isDirectory()) {
           localFolders.add(f.getAbsolutePath());
           return NpmPackage.fromFolder(f.getAbsolutePath());
         } else {
-          try (FileInputStream in = ManagedFileAccess.inStream(template)) {
+          try (FileInputStream in = ManagedFileAccess.inStream(f)) {
             return NpmPackage.fromPackage(in);
           }
         }

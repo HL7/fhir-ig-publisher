@@ -21,6 +21,11 @@ public class LocalTemplateTrust {
 
   public static final String PROPERTY = "trustedTemplates";
   public static final String ALL = "all";
+  /**
+   * "allow-template-overrides": true lets ig.ini load templates from local folders in place of packages (see
+   * TemplateManager.loadTemplateOverrides): that's for template development, so it's only ever set by hand
+   */
+  public static final String ALLOW_OVERRIDES = "allow-template-overrides";
 
   /**
    * @return true if the settings file says the template (or all templates) can be trusted
@@ -36,6 +41,15 @@ public class LocalTemplateTrust {
       }
     }
     return false;
+  }
+
+  /**
+   * @return true if the settings file says that ig.ini can override templates with local folders
+   */
+  public static boolean allowsTemplateOverrides(String settingsPath) throws IOException {
+    JsonObject settings = read(settingsPath);
+    return settings != null && settings.has(ALLOW_OVERRIDES) && settings.get(ALLOW_OVERRIDES).isJsonPrimitive()
+        && "true".equals(settings.get(ALLOW_OVERRIDES).asString());
   }
 
   /**
