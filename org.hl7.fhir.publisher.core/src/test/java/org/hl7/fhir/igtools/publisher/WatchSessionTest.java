@@ -527,4 +527,27 @@ class WatchSessionTest {
     window(l, "onGenerate", "template/stamp.txt", "built at 3");
     assertEquals(Collections.singleton(abs("template/stamp.txt")), s.changesSinceBuildStart().getModified());
   }
+
+  @Test
+  void thePublisherVersionIsLookedUpOncePerSession() throws IOException {
+    WatchSession s = session();
+    int[] lookups = {0};
+    assertEquals("1.2.3", s.currentPublisherVersion(() -> { lookups[0]++; return "1.2.3"; }));
+    assertEquals("1.2.3", s.currentPublisherVersion(() -> { lookups[0]++; return "1.2.4"; }));
+    assertEquals(1, lookups[0]);
+  }
+
+  @Test
+  void aFailedPublisherVersionLookupIsNotTriedAgain() throws IOException {
+    WatchSession s = session();
+    List<String> log = new ArrayList<>();
+    s.setLog(log::add);
+    int[] lookups = {0};
+    assertNull(s.currentPublisherVersion(() -> { lookups[0]++; return null; }));
+    assertNull(s.currentPublisherVersion(() -> { lookups[0]++; return "1.2.3"; }));
+    assertEquals(1, lookups[0]);
+    // said once, as nothing else tells why qa.html has no latest release
+    assertEquals(1, log.size());
+    assertTrue(log.get(0).contains("unable to find the latest release of the IG Publisher"), log.get(0));
+  }
 }
