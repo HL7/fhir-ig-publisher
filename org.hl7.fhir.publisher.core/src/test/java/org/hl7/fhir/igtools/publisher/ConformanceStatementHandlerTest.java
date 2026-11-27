@@ -14,10 +14,13 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayOutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -29,12 +32,15 @@ import org.hl7.fhir.igtools.publisher.HTMLInspector.LoadedFile;
 import org.hl7.fhir.model.core.ActorDefinition;
 import org.hl7.fhir.model.core.Coding;
 import org.hl7.fhir.model.core.IdType;
+import org.hl7.fhir.model.core.ImplementationGuide;
 import org.hl7.fhir.model.core.Requirements;
 import org.hl7.fhir.services.context.IWorkerContext;
+import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.hl7.fhir.validation.BaseValidator.BooleanHolder;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -334,6 +340,43 @@ class ConformanceStatementHandlerTest {
     assertFalse(ConformanceStatementHandler.actorsMatch(req, List.of(server)));
     req.getActorList().get(0).setKey("other");
     assertFalse(ConformanceStatementHandler.actorsMatch(req, List.of(client)));
+  }
+
+  /**
+   * https://github.com/HL7/fhir-ig-publisher/issues/1451: Requirements-fromNarrative has to be generated whenever
+   * the pages have conformance statements, also when the HTML check found nothing else to report
+   */
+  @Test
+  void generatesRequirementsWhenHtmlCheckHasNoMessages(@TempDir Path dir) throws Exception {
+    IWorkerContext context = mock(IWorkerContext.class);
+    when(context.getLocale()).thenReturn(Locale.ENGLISH);
+    when(context.getFHIRVersion()).thenReturn("5.0.0");
+    ConformanceStatementHandler handler = new ConformanceStatementHandler(null, context, null, List.of("en"), false, null);
+    ImplementationGuide ig = new ImplementationGuide();
+    ig.setUrl("http://example.org/ig/ImplementationGuide/example");
+    handler.setup(ig);
+    handler.setDefaultLang("en");
+    handler.setTranslationLangs(List.of());
+    handler.setReqFolder(dir.toString());
+
+    LoadedFile source = mock(LoadedFile.class);
+    source.filename = dir.resolve("page.html").toString();
+    source.path = "page.html";
+    XhtmlNode div = new XhtmlNode(NodeType.Element, "div");
+    div.addTag("p").tx("\u00a7req1:Implementations SHALL respect units.\u00a7");
+    List<ValidationMessage> messages = new ArrayList<>();
+    BooleanHolder hasClauses = new BooleanHolder(false);
+    handler.readConformanceClauses(source, div, hasClauses, new BooleanHolder(false), messages);
+    assertTrue(hasClauses.ok());
+    assertTrue(messages.isEmpty());
+
+    handler.generateRequirementsInstance(messages);
+
+    Path generated = dir.resolve("Requirements-fromNarrative.json");
+    assertTrue(Files.exists(generated));
+    Requirements req = loadAsSpecialType(Files.readAllBytes(generated));
+    assertEquals(1, req.getStatementList().size());
+    assertEquals("req1", req.getStatementList().get(0).getKey());
   }
 
   private static Requirements loadAsSpecialType(byte[] source) throws Exception {

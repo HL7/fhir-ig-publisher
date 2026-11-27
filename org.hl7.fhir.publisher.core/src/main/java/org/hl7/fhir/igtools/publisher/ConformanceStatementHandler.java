@@ -215,7 +215,7 @@ class ConformanceStatementHandler {
   }
 
   public void generateRequirementsInstance(List<ValidationMessage> messages) throws IOException {
-    if (messages.isEmpty())
+    if (languageClauses.isEmpty())
       return;
     String reqUrl = this.rootUrl + "Requirements/fromNarrative";
     Requirements req = context.fetchResource(Requirements.class, reqUrl, VersionResolutionRules.defaultRule());
