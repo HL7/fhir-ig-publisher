@@ -100,7 +100,7 @@ public class SpecMapManager {
     spec.add("webUrl", webUrl);
     if (genDate != null) {
       spec.add("date", new SimpleDateFormat("yyyy-MM-dd", new Locale("en", "US")).format(genDate.getTime()));
-      spec.add("date-time", new SimpleDateFormat("yyyyMMddhhmmssZ", new Locale("en", "US")).format(genDate.getTime()));
+      spec.add("date-time", new SimpleDateFormat("yyyyMMddHHmmssZ", new Locale("en", "US")).format(genDate.getTime()));
     }
     paths = new JsonObject();
     spec.add("paths", paths);

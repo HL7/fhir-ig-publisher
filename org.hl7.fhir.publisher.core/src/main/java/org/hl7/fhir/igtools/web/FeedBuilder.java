@@ -29,7 +29,7 @@ import com.google.gson.JsonSyntaxException;
 
 public class FeedBuilder {
 
-  private static final String RSS_DATE = "EEE, dd MMM yyyy hh:mm:ss Z";
+  private static final String RSS_DATE = "EEE, dd MMM yyyy HH:mm:ss Z";
 
   public class PublicationSorter implements Comparator<Publication> {
 

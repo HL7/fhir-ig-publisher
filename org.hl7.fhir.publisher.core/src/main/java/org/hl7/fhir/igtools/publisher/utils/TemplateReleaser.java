@@ -115,7 +115,7 @@ public class TemplateReleaser {
     }
   }
 
-  private static final String RSS_DATE = "EEE, dd MMM yyyy hh:mm:ss Z";
+  private static final String RSS_DATE = "EEE, dd MMM yyyy HH:mm:ss Z";
 
   private static final String INDEX_TEMPLATE = "---\nlayout: page\ntitle: FHIR IG Templates (HL7 FHIR Foundation)\n---\n<p>A list of currently maintained FHIR IG templates</p>\n{{index}}"+
     "<p>Note that not all templates must be released through this page, but most are in order to benefit from a comment version/lifecycle management system. Contact fhir-director at hl7.org to get listed.</p>\n";

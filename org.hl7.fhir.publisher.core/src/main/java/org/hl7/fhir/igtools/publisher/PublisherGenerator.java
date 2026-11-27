@@ -5117,7 +5117,7 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
     String is = "[FHIR]\r\nversion="+version+"\r\n";
     IniFile ini = new IniFile(new ByteArrayInputStream(FileUtilities.stringToBytes(is)));
     ini.setStringProperty("IG", "version", version, null);
-    ini.setStringProperty("IG", "date",  new SimpleDateFormat("yyyyMMddhhmmssZ", new Locale("en", "US")).format(pf.getExecTime().getTime()), null);
+    ini.setStringProperty("IG", "date",  new SimpleDateFormat("yyyyMMddHHmmssZ", new Locale("en", "US")).format(pf.getExecTime().getTime()), null);
     ByteArrayOutputStream b = new ByteArrayOutputStream();
     ini.save(b);
     return b.toByteArray();
@@ -6646,7 +6646,8 @@ public class PublisherGenerator extends PublisherBase implements BaseRenderer.Re
       jp.compose(eNN, bsj, OutputStyle.PRETTY, this.pf.igpkp.getCanonical());
     }
     String path = Utilities.path(this.pf.tempDir, "_includes", r.fhirType()+"-"+r.getId()+".json");
-    FileUtilities.bytesToFile(bsj.toByteArray(), path);
+    // this is included raw by the templates (e.g. layout-ai), so any liquid-like text in the resource (e.g. "{% include x.svg %}" in documentation) must not be run by Jekyll
+    FileUtilities.stringToFile(wrapLiquid(new String(bsj.toByteArray(), StandardCharsets.UTF_8)), path);
     String pathEsc = Utilities.path(this.pf.tempDir, "_includes", r.fhirType()+"-"+r.getId()+".escaped.json");
     XmlEscaper.convert(path, pathEsc);
 
