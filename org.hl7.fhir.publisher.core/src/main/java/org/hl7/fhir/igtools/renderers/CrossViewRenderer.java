@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -1362,7 +1363,7 @@ public class CrossViewRenderer extends Renderer {
       ValueSet vs = context.getContext().findTxResource(ValueSet.class, url, VersionResolutionRules.defaultRule());
       if (vs != null) {
         if (!vs.hasUserData(UserDataNames.pub_xref_used)) {
-          vs.setUserData(UserDataNames.pub_xref_used, new HashSet<>());
+          vs.setUserData(UserDataNames.pub_xref_used, new LinkedHashSet<>());
         }
         Set<Resource> rl = (Set<Resource>) vs.getUserData(UserDataNames.pub_xref_used);
         rl.add(source);
@@ -1677,7 +1678,7 @@ public class CrossViewRenderer extends Renderer {
       CodeSystem cs = context.getContext().fetchResource(CodeSystem.class, url.primitiveValue(), ExtensionUtilities.getVersionResolutionRules(url));
       if (cs != null) {
         if (!cs.hasUserData(UserDataNames.pub_xref_used)) {
-          cs.setUserData(UserDataNames.pub_xref_used, new HashSet<>());
+          cs.setUserData(UserDataNames.pub_xref_used, new LinkedHashSet<>());
         }
         Set<Resource> rl = (Set<Resource>) cs.getUserData(UserDataNames.pub_xref_used);
         rl.add(source);
