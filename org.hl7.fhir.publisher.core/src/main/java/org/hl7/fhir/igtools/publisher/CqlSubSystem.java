@@ -775,6 +775,11 @@ public class CqlSubSystem {
         }
         catch (Exception ex) {
           logger.logMessage(String.format("CQL Translation succeeded for file: '%s', but ELM generation failed with the following error: %s", file.getAbsolutePath(), ex.getMessage()));
+          addError(IssueType.PROCESSING,
+              String.format("CQL Translation succeeded, but ELM generation failed with the following error: %s", ex.getMessage()),
+              IssueSeverity.WARNING
+          );
+
         }
       }
     }
@@ -973,9 +978,6 @@ public class CqlSubSystem {
     // should work until that new translator release is available.
     Library coreLibrary = (Library)VersionConvertorFactory_50_N.convertResource(moduleDefinitionLibrary);
 
-    // TODO: Workaround for a fix that is coming in the translator: https://github.com/cqframework/clinical_quality_language/pull/1929
-    fixupAnalysisExceptions(coreLibrary);
-
     return coreLibrary.getDataRequirementList();
   }
 
@@ -1060,12 +1062,18 @@ public class CqlSubSystem {
     AtomicBoolean isList = new AtomicBoolean(false);
     Enumerations.FHIRTypes typeCode = Enumerations.FHIRTypes.fromCode(toFHIRParameterTypeCode(parameterType, def.getName(), isList));
 
-    return new ParameterDefinition()
+    var pd = new ParameterDefinition()
             .setName(def.getName())
             .setUse(Enumerations.OperationParameterUse.IN)
             .setMin(0)
             .setMax(isList.get() ? "*" : "1")
             .setType(typeCode);
+
+    if (typeCode == Enumerations.FHIRTypes.BASE) {
+      pd.addExtension("http://hl7.org/fhir/4.0/StructureDefinition/extension-OperationDefinition.parameter.type", new CodeType().setValue("Any"));
+    }
+
+    return pd;
   }
 
   private ParameterDefinition toOutputParameterDefinition(ExpressionDef def) {
@@ -1073,12 +1081,17 @@ public class CqlSubSystem {
     DataType resultType = Trackable.INSTANCE.getResultType(def);
     Enumerations.FHIRTypes typeCode = Enumerations.FHIRTypes.fromCode(toFHIRResultTypeCode(resultType, def.getName(), isList));
 
-    return new ParameterDefinition()
+    var pd = new ParameterDefinition()
             .setName(def.getName())
             .setUse(Enumerations.OperationParameterUse.OUT)
             .setMin(0)
             .setMax(isList.get() ? "*" : "1")
             .setType(typeCode);
+
+    if (typeCode == Enumerations.FHIRTypes.BASE) {
+      pd.addExtension("http://hl7.org/fhir/4.0/StructureDefinition/extension-OperationDefinition.parameter.type", new CodeType().setValue("Any"));
+    }
+    return pd;
   }
 
   private String toFHIRResultTypeCode(org.hl7.cql.model.DataType dataType, String defName, AtomicBoolean isList) {
@@ -1133,8 +1146,7 @@ public class CqlSubSystem {
         case "System.String": return "string";
         case "System.Quantity": return "Quantity";
         case "System.Ratio": return "Ratio";
-        // TODO: This should be "Base", but there is no "Base" code in R4, so setting it to base fails the conversion
-        case "System.Any": return "Resource";
+        case "System.Any": return "Base";
         case "System.Code": return "Coding";
         case "System.Concept": return "CodeableConcept";
       }
@@ -1155,8 +1167,7 @@ public class CqlSubSystem {
     }
 
     isValid.set(false);
-    // TODO: This should be "Base", but there is no "Base" code in R4, so setting it to base fails the conversion
-    return "Resource";
+    return "Base";
   }
 
   private org.hl7.fhir.model.core.DataRequirement toDataRequirement(Retrieve retrieve, CompiledLibrary library, LibraryManager libraryManager) {
@@ -1681,44 +1692,24 @@ public class CqlSubSystem {
         annotationsEnabled
     ));
 
-    // TODO: Workaround for a fix that is coming in the translator: https://github.com/cqframework/clinical_quality_language/pull/1929
-    fixupAnalysisExceptions(moduleDefinitionLibrary);
+    fixupBaseMapping(moduleDefinitionLibrary);
     fixupFHIRReferences(f, moduleDefinitionLibrary, compiledLibrary);
 
     return moduleDefinitionLibrary;
   }
 
-  private void fixupAnalysisExceptions(Library library) {
-    for (var dr : library.getDataRequirementList()) {
-      for (var cfc : dr.getCodeFilterList()) {
-        for (var cfcc : cfc.getCodeList()) {
-          for (var ext : cfcc.getExtensionList()) {
-            fixupAnalysisException(ext);
-          }
-        }
-      }
-
-      for (var dfc : dr.getDateFilterList()) {
-        if (dfc.hasValue()) {
-          for (var ext : dfc.getExtension()) {
-            fixupAnalysisException(ext);
-          }
-        }
-      }
-
-      for (var vf : dr.getExtensionsByUrl("http://hl7.org/fhir/StructureDefinition/cqf-valueFilter")) {
-        for (var vfv : vf.getExtensionsByUrl("value")) {
-          for (var ext : vfv.getExtension()) {
-            fixupAnalysisException(ext);
-          }
-        }
-      }
+  private void fixupBaseMapping(Library library) {
+    for (var pd : library.getParameterList()) {
+      fixupParameterDefinitionBaseMapping(pd);
     }
   }
 
-  private void fixupAnalysisException(Extension ext) {
-    if (ext.hasUrl() && ext.getUrl().equals("http://hl7.org/fhir/uv/crmi-analysisException")) {
-      ext.setUrl("http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-analysisException");
+  private void fixupParameterDefinitionBaseMapping(ParameterDefinition pd) {
+    for (var e : pd.getExtensionsByUrl("http://hl7.org/fhir/StructureDefinition/cqf-parameterDefinition")) {
+      fixupParameterDefinitionBaseMapping(e.getValueParameterDefinition());
+    }
+    if (pd.getType() == Enumerations.FHIRTypes.BASE) {
+      pd.addExtension("http://hl7.org/fhir/4.0/StructureDefinition/extension-OperationDefinition.parameter.type", new CodeType().setValue("Any"));
     }
   }
 
