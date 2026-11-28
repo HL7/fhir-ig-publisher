@@ -382,14 +382,21 @@ public class PublisherBase implements ILoggingService {
 
   protected String targetUrl() {
     if (settings.getMode() == null)
-      return "file://"+ finalOutputDir();
+      return localOutputUrl();
     switch (settings.getMode()) {
     case AUTOBUILD: return settings.getTargetOutput() == null ? "https://build.fhir.org/ig/[org]/[repo]" : settings.getTargetOutput();
-    case MANUAL: return "file://"+ finalOutputDir();
+    case MANUAL: return localOutputUrl();
     case WEBSERVER: return "http://unknown";
     case PUBLICATION: return settings.getTargetOutput();
     default: return pf.igpkp.getCanonical();
     }
+  }
+
+  private String localOutputUrl() {
+    // "file://" + the URI's path gives file:///C:/Users/.../output/ on Windows
+    // and file:///home/.../output/ elsewhere, with spaces and other unsafe characters percent-encoded
+    String url = "file://" + new File(finalOutputDir()).getAbsoluteFile().toURI().getRawPath();
+    return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
   }
 
   protected Map<String, String> relatedIgMap() {

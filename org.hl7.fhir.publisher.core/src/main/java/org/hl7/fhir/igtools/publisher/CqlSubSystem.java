@@ -770,6 +770,11 @@ public class CqlSubSystem {
         }
         catch (Exception ex) {
           logger.logMessage(String.format("CQL Translation succeeded for file: '%s', but ELM generation failed with the following error: %s", file.getAbsolutePath(), ex.getMessage()));
+          addError(IssueType.PROCESSING,
+              String.format("CQL Translation succeeded, but ELM generation failed with the following error: %s", ex.getMessage()),
+              IssueSeverity.WARNING
+          );
+
         }
       }
     }
@@ -1052,12 +1057,18 @@ public class CqlSubSystem {
     AtomicBoolean isList = new AtomicBoolean(false);
     Enumerations.FHIRTypes typeCode = Enumerations.FHIRTypes.fromCode(toFHIRParameterTypeCode(parameterType, def.getName(), isList));
 
-    return new ParameterDefinition()
+    var pd = new ParameterDefinition()
             .setName(def.getName())
             .setUse(Enumerations.OperationParameterUse.IN)
             .setMin(0)
             .setMax(isList.get() ? "*" : "1")
             .setType(typeCode);
+
+    if (typeCode == Enumerations.FHIRTypes.BASE) {
+      pd.getTypeElement().addExtension("http://hl7.org/fhir/4.0/StructureDefinition/extension-OperationDefinition.parameter.type", new CodeType().setValue("Any"));
+    }
+
+    return pd;
   }
 
   private ParameterDefinition toOutputParameterDefinition(ExpressionDef def) {
@@ -1065,12 +1076,17 @@ public class CqlSubSystem {
     DataType resultType = Trackable.INSTANCE.getResultType(def);
     Enumerations.FHIRTypes typeCode = Enumerations.FHIRTypes.fromCode(toFHIRResultTypeCode(resultType, def.getName(), isList));
 
-    return new ParameterDefinition()
+    var pd = new ParameterDefinition()
             .setName(def.getName())
             .setUse(Enumerations.OperationParameterUse.OUT)
             .setMin(0)
             .setMax(isList.get() ? "*" : "1")
             .setType(typeCode);
+
+    if (typeCode == Enumerations.FHIRTypes.BASE) {
+      pd.getTypeElement().addExtension("http://hl7.org/fhir/4.0/StructureDefinition/extension-OperationDefinition.parameter.type", new CodeType().setValue("Any"));
+    }
+    return pd;
   }
 
   private String toFHIRResultTypeCode(org.hl7.cql.model.DataType dataType, String defName, AtomicBoolean isList) {
@@ -1094,7 +1110,7 @@ public class CqlSubSystem {
     if (!isValid.get()) {
       // Issue a warning that the parameter type is not supported
       addError(IssueType.NOTSUPPORTED,
-              String.format("Parameter type %s of parameter %s is not supported; reported as FHIR.Any", dataType.toLabel(), parameterName),
+              String.format("Parameter type %s of parameter %s is not supported; reported as FHIR.Base", dataType.toLabel(), parameterName),
               IssueSeverity.WARNING
       );
     }
@@ -1125,7 +1141,7 @@ public class CqlSubSystem {
         case "System.String": return "string";
         case "System.Quantity": return "Quantity";
         case "System.Ratio": return "Ratio";
-        case "System.Any": return "Any";
+        case "System.Any": return "Base";
         case "System.Code": return "Coding";
         case "System.Concept": return "CodeableConcept";
       }
@@ -1146,7 +1162,7 @@ public class CqlSubSystem {
     }
 
     isValid.set(false);
-    return "Any";
+    return "Base";
   }
 
   private org.hl7.fhir.model.core.DataRequirement toDataRequirement(Retrieve retrieve, CompiledLibrary library, LibraryManager libraryManager) {
@@ -1671,9 +1687,25 @@ public class CqlSubSystem {
         annotationsEnabled
     ));
 
+    fixupBaseMapping(moduleDefinitionLibrary);
     fixupFHIRReferences(f, moduleDefinitionLibrary, compiledLibrary);
 
     return moduleDefinitionLibrary;
+  }
+
+  private void fixupBaseMapping(Library library) {
+    for (var pd : library.getParameterList()) {
+      fixupParameterDefinitionBaseMapping(pd);
+    }
+  }
+
+  private void fixupParameterDefinitionBaseMapping(ParameterDefinition pd) {
+    for (var e : pd.getExtensionsByUrl("http://hl7.org/fhir/StructureDefinition/cqf-parameterDefinition")) {
+      fixupParameterDefinitionBaseMapping(e.getValueParameterDefinition());
+    }
+    if (pd.getType() == Enumerations.FHIRTypes.BASE) {
+      pd.getTypeElement().addExtension("http://hl7.org/fhir/4.0/StructureDefinition/extension-OperationDefinition.parameter.type", new CodeType().setValue("Any"));
+    }
   }
 
   private boolean isExpressionIdentifier(org.hl7.fhir.model.core.Expression expression) {
