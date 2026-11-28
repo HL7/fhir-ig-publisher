@@ -1070,7 +1070,7 @@ public class CqlSubSystem {
             .setType(typeCode);
 
     if (typeCode == Enumerations.FHIRTypes.BASE) {
-      pd.addExtension("http://hl7.org/fhir/4.0/StructureDefinition/extension-OperationDefinition.parameter.type", new CodeType().setValue("Any"));
+      pd.getTypeElement().addExtension("http://hl7.org/fhir/4.0/StructureDefinition/extension-OperationDefinition.parameter.type", new CodeType().setValue("Any"));
     }
 
     return pd;
@@ -1089,7 +1089,7 @@ public class CqlSubSystem {
             .setType(typeCode);
 
     if (typeCode == Enumerations.FHIRTypes.BASE) {
-      pd.addExtension("http://hl7.org/fhir/4.0/StructureDefinition/extension-OperationDefinition.parameter.type", new CodeType().setValue("Any"));
+      pd.getTypeElement().addExtension("http://hl7.org/fhir/4.0/StructureDefinition/extension-OperationDefinition.parameter.type", new CodeType().setValue("Any"));
     }
     return pd;
   }
@@ -1709,7 +1709,7 @@ public class CqlSubSystem {
       fixupParameterDefinitionBaseMapping(e.getValueParameterDefinition());
     }
     if (pd.getType() == Enumerations.FHIRTypes.BASE) {
-      pd.addExtension("http://hl7.org/fhir/4.0/StructureDefinition/extension-OperationDefinition.parameter.type", new CodeType().setValue("Any"));
+      pd.getTypeElement().addExtension("http://hl7.org/fhir/4.0/StructureDefinition/extension-OperationDefinition.parameter.type", new CodeType().setValue("Any"));
     }
   }
 
